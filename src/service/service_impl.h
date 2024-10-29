@@ -2,15 +2,15 @@
 
 #include "service.h"
 
-namespace service {
+namespace service
+{
+    class ServiceImpl : public Service
+    {
+    public:
+        ServiceImpl();
 
-class ServiceImpl : public Service {
-  public:
-    ServiceImpl();
-
-  private:
-    Error status() const override;
-    std::tuple<HelloResponse, Error> greet(const HelloRequest&) override;
-};
-
-}  // namespace service
+    private:
+        Error status() const override;
+        std::tuple<HelloResponse, Error> greet(const HelloRequest&) override;
+    };
+}

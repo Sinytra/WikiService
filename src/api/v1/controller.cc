@@ -22,6 +22,8 @@ namespace api::v1
         auto code(mapError(err));
 
         resp->setStatusCode(code);
+        resp->setContentTypeCode(CT_APPLICATION_JSON);
+        resp->setBody(R"({"message": "hello"})");
         return callback(resp);
     }
 

@@ -6,24 +6,22 @@ using namespace std;
 using namespace drogon;
 using namespace service;
 
-namespace {
-
-const unordered_map<Error, HttpStatusCode> errorMap = {
-    {Error::Ok, HttpStatusCode::k200OK},
-};
-
+namespace
+{
+    const unordered_map<Error, HttpStatusCode> errorMap = {
+        {Error::Ok, HttpStatusCode::k200OK},
+    };
 }
 
-namespace api {
-namespace v1 {
-
-HttpStatusCode mapError(const service::Error err) {
-    auto cit(errorMap.find(err));
-    if (cit != errorMap.cend()) {
-        return cit->second;
+namespace api::v1
+{
+    HttpStatusCode mapError(const service::Error err)
+    {
+        auto cit(errorMap.find(err));
+        if (cit != errorMap.cend())
+        {
+            return cit->second;
+        }
+        return HttpStatusCode::k500InternalServerError;
     }
-    return HttpStatusCode::k500InternalServerError;
 }
-
-}  // namespace v1
-}  // namespace api
