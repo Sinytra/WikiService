@@ -29,7 +29,7 @@ add_executable(${PROJECT_NAME} main.cc)
 #
 # and comment out the following lines
 find_package(Drogon CONFIG REQUIRED)
-target_link_libraries(${PROJECT_NAME} PRIVATE Drogon::Drogon)
+target_link_libraries(${PROJECT_NAME} PRIVATE Drogon::Drogon spdlog::spdlog api)
 
 # ##############################################################################
 
@@ -41,13 +41,13 @@ else ()
     message(STATUS "use c++20")
 endif ()
 
-aux_source_directory(controllers CTL_SRC)
-aux_source_directory(filters FILTER_SRC)
-aux_source_directory(plugins PLUGIN_SRC)
+#aux_source_directory(controllers CTL_SRC)
+#aux_source_directory(filters FILTER_SRC)
+#aux_source_directory(plugins PLUGIN_SRC)
 aux_source_directory(models MODEL_SRC)
 
-drogon_create_views(${PROJECT_NAME} views
-                    ${CMAKE_CURRENT_BINARY_DIR})
+#drogon_create_views(${PROJECT_NAME} views
+#                    ${CMAKE_CURRENT_BINARY_DIR})
 # use the following line to create views with namespaces.
 # drogon_create_views(${PROJECT_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/views
 #                     ${CMAKE_CURRENT_BINARY_DIR} TRUE)
@@ -72,4 +72,7 @@ target_sources(${PROJECT_NAME}
 
 # ##############################################################################
 
+add_subdirectory(api/v1)
+add_subdirectory(log)
+add_subdirectory(service)
 add_subdirectory(test)
