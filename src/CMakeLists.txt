@@ -1,6 +1,5 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.10)
 project(recipe_service CXX)
-
 include(CheckIncludeFileCXX)
 
 check_include_file_cxx(any HAS_ANY)
@@ -24,12 +23,18 @@ add_executable(${PROJECT_NAME} main.cc)
 # ##############################################################################
 # If you include the drogon source code locally in your project, use this method
 # to add drogon
-# add_subdirectory(drogon)
-# target_link_libraries(${PROJECT_NAME} PRIVATE drogon)
+#target_link_libraries(${PROJECT_NAME} PRIVATE drogon)
 #
 # and comment out the following lines
 find_package(Drogon CONFIG REQUIRED)
-target_link_libraries(${PROJECT_NAME} PRIVATE Drogon::Drogon spdlog::spdlog api)
+find_package(spdlog CONFIG REQUIRED)
+target_link_libraries(${PROJECT_NAME} PRIVATE
+        api
+        Drogon::Drogon
+        spdlog::spdlog
+        jwt-cpp
+        base64
+)
 
 # ##############################################################################
 
@@ -75,4 +80,6 @@ target_sources(${PROJECT_NAME}
 add_subdirectory(api/v1)
 add_subdirectory(log)
 add_subdirectory(service)
-add_subdirectory(test)
+#add_subdirectory(test)
+
+FILE(COPY ../config.json DESTINATION "${PROJECT_BINARY_DIR}")

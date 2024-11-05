@@ -1,6 +1,7 @@
 #pragma once
 
 #include <drogon/HttpController.h>
+#include <service/github.h>
 
 #include "service/service.h"
 
@@ -14,13 +15,10 @@ namespace api::v1
     public:
         METHOD_LIST_BEGIN
             ADD_METHOD_TO(HelloWorld::status, "/status", drogon::Get);
-            ADD_METHOD_TO(HelloWorld::greet, "/greet", drogon::Post);
         METHOD_LIST_END
 
-        void status(const drogon::HttpRequestPtr& req,
-                    std::function<void(const drogon::HttpResponsePtr&)>&& callback) const;
-        void greet(const drogon::HttpRequestPtr& req,
-                   std::function<void(const drogon::HttpResponsePtr&)>&& callback) const;
+        drogon::Task<> status(drogon::HttpRequestPtr req,
+            std::function<void(const drogon::HttpResponsePtr&)> callback) const;
 
     private:
         service::Service& service_;

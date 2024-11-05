@@ -1,0 +1,36 @@
+services:
+  db:
+    container_name: mm_wiki_service_db
+    image: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      PGDATA: data/postgres
+      POSTGRES_DB: postgres
+    volumes:
+      - db:/data/postgres
+    ports:
+      - "5432:5432"
+    networks:
+      - db
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -d postgres" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+  cache:
+    container_name: mm_wiki_service_cache
+    image: redis:8.0-M02-bookworm
+    ports:
+      - "6379:6379"
+    networks:
+      - cache
+networks:
+  db:
+    driver: bridge
+  cache:
+    driver: bridge
+
+volumes:
+  db:

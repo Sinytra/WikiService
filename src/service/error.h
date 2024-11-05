@@ -6,5 +6,6 @@ namespace service
     {
         Ok = 0,
         ErrInternal,
+        ErrNotFound
     };
 }
