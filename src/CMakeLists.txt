@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(recipe_service CXX)
+project(wiki_service CXX)
 include(CheckIncludeFileCXX)
 
 check_include_file_cxx(any HAS_ANY)
@@ -82,4 +82,5 @@ add_subdirectory(log)
 add_subdirectory(service)
 #add_subdirectory(test)
 
+# TODO FIX NOT BEING MOVED
 FILE(COPY ../config.json DESTINATION "${PROJECT_BINARY_DIR}")

@@ -12,5 +12,11 @@
       "connection_number": 1,
       "filename": ""
     }
-  ]
+  ],
+  "custom_config": {
+    "github_app": {
+      "client_id": "",
+      "private_key_path": ""
+    }
+  }
 }

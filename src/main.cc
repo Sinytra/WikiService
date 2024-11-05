@@ -13,12 +13,17 @@ int main() {
     const auto port(8080);
     logger.info("Starting hello-world server on port {}", port);
 
+    app().loadConfigFile("config.json");
+
+    const Json::Value& customConfig = app().getCustomConfig();
+    const Json::Value& githubAppConfig = customConfig["github_app"];
+    const std::string& appClientId = githubAppConfig["client_id"].asString();
+    const std::string& appPrivateKeyPath = githubAppConfig["private_key_path"].asString();
+
     auto cache(service::MemoryCache{});
     auto servis(service::ServiceImpl{});
-    auto github(service::GitHub{cache});
+    auto github(service::GitHub{cache, appClientId, appPrivateKeyPath});
     auto controller(make_shared<api::v1::DocsController>(servis, github));
-
-    app().loadConfigFile("config.json");
 
     app()
         .setLogPath("./")

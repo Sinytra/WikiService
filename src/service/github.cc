@@ -66,20 +66,16 @@ std::optional<std::chrono::system_clock::time_point> parseISO8601(const std::str
 }
 
 namespace service {
-    GitHub::GitHub(service::MemoryCache &cache_) : cache_(cache_) {
-    }
+    GitHub::GitHub(service::MemoryCache &cache_, const std::string& appClientId_, const std::string& appPrivateKeyPath_)
+    : cache_(cache_), appClientId_(appClientId_), appPrivateKeyPath_(appPrivateKeyPath_) {}
 
     Task<std::tuple<std::optional<std::string>, Error> > GitHub::getApplicationJWTToken() {
-        // TODO CONFIGURABLE
-        const std::string clientId = "xxxxxxxxxxxxxxxxxxxx";
-        const std::string key_path = "../../run/github_app_key.pem";
-
-        if (const auto cached = co_await cache_.getFromCache("jwt:" + clientId)) {
+        if (const auto cached = co_await cache_.getFromCache("jwt:" + appClientId_)) {
             logger.debug("Reusing cached app JWT token");
             co_return {cached, Error::Ok};
         }
 
-        std::ifstream t(key_path);
+        std::ifstream t(appPrivateKeyPath_);
         std::string contents((std::istreambuf_iterator(t)), std::istreambuf_iterator<char>());
 
         const auto issuedAt = std::chrono::system_clock::now() - 60s;
@@ -88,7 +84,7 @@ namespace service {
         std::string token;
         try {
             token = jwt::create()
-                    .set_issuer(clientId)
+                    .set_issuer(appClientId_)
                     .set_issued_at(issuedAt)
                     .set_expires_at(expiresAt)
                     .sign(jwt::algorithm::rs256("", contents));
@@ -96,7 +92,7 @@ namespace service {
             // TODO don't block thread
             logger.debug("Storing JWT token in cache");
             const auto ttl = std::chrono::duration_cast<std::chrono::seconds>(expiresAt - std::chrono::system_clock::now()) - 5s;
-            co_await cache_.updateCache("jwt:" + clientId, token, ttl);
+            co_await cache_.updateCache("jwt:" + appClientId_, token, ttl);
         } catch (std::exception &e) {
             logger.error("Failed to issue JWT auth token: {}", e.what());
             co_return {std::nullopt, Error::ErrInternal};
@@ -105,18 +101,20 @@ namespace service {
         co_return {std::optional{token}, Error::Ok};
     }
 
-    Task<std::tuple<std::optional<std::string>, Error> > GitHub::getRepositoryInstallation(const std::string repo, const std::string jwt) {
+    Task<std::tuple<std::optional<std::string>, Error> > GitHub::getRepositoryInstallation(const std::string repo) {
         if (const auto cached = co_await cache_.getFromCache("repo_install_id:" + repo)) {
             logger.debug("Reusing cached repo installation ID for {}", repo);
             co_return {cached, Error::Ok};
         }
+
+        const auto [jwt, error](co_await getApplicationJWTToken());
 
         const auto client = createHttpClient();
         if (auto installation = co_await sendApiRequest(
             client,
             Get,
             std::format("/repos/{}/installation", repo),
-            jwt)) {
+            *jwt)) {
             const std::string installationId = (*installation)["id"].asString();
 
             logger.debug("Storing installation ID for {} in cache", repo);
@@ -129,19 +127,20 @@ namespace service {
         co_return {std::nullopt, Error::ErrNotFound};
     }
 
-    Task<std::tuple<std::optional<std::string>, Error> > GitHub::getInstallationToken(std::string installationId, std::string jwt) {
+    Task<std::tuple<std::optional<std::string>, Error> > GitHub::getInstallationToken(const std::string installationId) {
         if (const auto cached = co_await cache_.getFromCache("installation_token:" + installationId)) {
             logger.debug("Reusing cached repo installation token for {}", installationId);
             co_return {cached, Error::Ok};
         }
+
+        const auto [jwt, error](co_await getApplicationJWTToken());
 
         const auto client = createHttpClient();
         if (auto installationToken = co_await sendApiRequest(
             client,
             Post,
             std::format("/app/installations/{}/access_tokens", installationId),
-            jwt)) {
-            logger.info(installationToken->toStyledString());
+            *jwt)) {
             const std::string expiryString = (*installationToken)["expires_at"].asString();
             const std::string token = (*installationToken)["token"].asString();
 

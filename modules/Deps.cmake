@@ -1,4 +1,4 @@
-include(cmake/CPM.cmake)
+include(modules/CPM.cmake)
 
 #CPMAddPackage(
 #        NAME SPDLOG

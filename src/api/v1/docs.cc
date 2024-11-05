@@ -28,9 +28,8 @@ namespace api::v1 {
             const string repo = "Su5eD/WikiTest";
             const string path = "docs/examplemod/sinytra-wiki.json";
 
-            const auto [token, error](co_await github_.getApplicationJWTToken());
-            const auto [installationId, error2](co_await github_.getRepositoryInstallation(repo, token.value()));
-            const auto [installationToken, error3](co_await github_.getInstallationToken(installationId.value(), token.value()));
+            const auto [installationId, error2](co_await github_.getRepositoryInstallation(repo));
+            const auto [installationToken, error3](co_await github_.getInstallationToken(installationId.value()));
             const auto [contents, error4](co_await github_.getRepositoryContents(repo, path, installationToken.value()));
 
             Json::Value root;
