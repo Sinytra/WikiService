@@ -3,6 +3,8 @@ add_library(service STATIC
     github.cc
     util.cc
     cache.cc
+    database.cc
+    documentation.cc
 )
 
 target_link_libraries(service PRIVATE

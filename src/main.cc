@@ -23,7 +23,9 @@ int main() {
     auto cache(service::MemoryCache{});
     auto servis(service::ServiceImpl{});
     auto github(service::GitHub{cache, appClientId, appPrivateKeyPath});
-    auto controller(make_shared<api::v1::DocsController>(servis, github));
+    auto database(service::Database{});
+    auto documentation(service::Documentation{github, cache});
+    auto controller(make_shared<api::v1::DocsController>(servis, github, database, documentation));
 
     app()
         .setLogPath("./")

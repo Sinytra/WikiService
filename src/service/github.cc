@@ -7,6 +7,7 @@
 
 #include <chrono>
 #include <fstream>
+#include <map>
 #include <jwt-cpp/jwt.h>
 #include <base64.hpp>
 
@@ -16,8 +17,13 @@ using namespace logging;
 using namespace drogon;
 using namespace std::chrono_literals;
 
+bool isSuccess(const HttpStatusCode& code) {
+    return code == k200OK || code == k201Created || code == k202Accepted;
+}
+
 Task<std::optional<Json::Value> > sendApiRequest(HttpClientPtr client, HttpMethod method, std::string path,
-                                                 std::string token) {
+                                                 std::string token,
+                                                 const std::map<std::string, std::string> &params = {}) {
     try {
         auto httpReq = HttpRequest::newHttpRequest();
         httpReq->setMethod(method);
@@ -25,16 +31,22 @@ Task<std::optional<Json::Value> > sendApiRequest(HttpClientPtr client, HttpMetho
         httpReq->addHeader("Accept", "application/vnd.github+json");
         httpReq->addHeader("Authorization", "Bearer " + token);
         httpReq->addHeader("X-GitHub-Api-Version", "2022-11-28");
-
-        logger.info("=> Request to {}", path);
-        const auto response = co_await client->sendRequestCoro(httpReq);
-        if (const auto jsonResp = response->getJsonObject()) {
-            logger.info("<= Received response for {}", path);
-            co_return std::make_optional(*jsonResp);
-        } else {
-            logger.error("Unexpected api response: {}", response->getBody());
-            co_return std::nullopt;
+        for (const auto &[key, val]: params) {
+            httpReq->setParameter(key, val);
         }
+
+        logger.debug("=> Request to {}", path);
+        const auto response = co_await client->sendRequestCoro(httpReq);
+        const auto status = response->getStatusCode();
+        if (isSuccess(status)) {
+            if (const auto jsonResp = response->getJsonObject()) {
+                logger.debug("<= Response ({}) from {}", std::to_string(status), path);
+                co_return std::make_optional(*jsonResp);
+            }
+        }
+
+        logger.error("Unexpected api response: ({}) {}", std::to_string(status), response->getBody());
+        co_return std::nullopt;
     } catch (std::exception &e) {
         logger.error(e.what());
         co_return std::nullopt;
@@ -53,7 +65,7 @@ std::string parseEncodedContents(const std::string &encoded) {
     return base64::from_base64(copy);
 }
 
-std::optional<std::chrono::system_clock::time_point> parseISO8601(const std::string& iso_time) {
+std::optional<std::chrono::system_clock::time_point> parseISO8601(const std::string &iso_time) {
     std::istringstream ss(iso_time);
     std::chrono::system_clock::time_point tp;
     ss >> std::chrono::parse("%Y-%m-%dT%H:%M:%SZ", tp);
@@ -66,8 +78,9 @@ std::optional<std::chrono::system_clock::time_point> parseISO8601(const std::str
 }
 
 namespace service {
-    GitHub::GitHub(service::MemoryCache &cache_, const std::string& appClientId_, const std::string& appPrivateKeyPath_)
-    : cache_(cache_), appClientId_(appClientId_), appPrivateKeyPath_(appPrivateKeyPath_) {}
+    GitHub::GitHub(service::MemoryCache &cache_, const std::string &appClientId_, const std::string &appPrivateKeyPath_)
+        : cache_(cache_), appClientId_(appClientId_), appPrivateKeyPath_(appPrivateKeyPath_) {
+    }
 
     Task<std::tuple<std::optional<std::string>, Error> > GitHub::getApplicationJWTToken() {
         if (const auto cached = co_await cache_.getFromCache("jwt:" + appClientId_)) {
@@ -91,7 +104,8 @@ namespace service {
 
             // TODO don't block thread
             logger.debug("Storing JWT token in cache");
-            const auto ttl = std::chrono::duration_cast<std::chrono::seconds>(expiresAt - std::chrono::system_clock::now()) - 5s;
+            const auto ttl = std::chrono::duration_cast<std::chrono::seconds>(
+                                 expiresAt - std::chrono::system_clock::now()) - 5s;
             co_await cache_.updateCache("jwt:" + appClientId_, token, ttl);
         } catch (std::exception &e) {
             logger.error("Failed to issue JWT auth token: {}", e.what());
@@ -127,7 +141,8 @@ namespace service {
         co_return {std::nullopt, Error::ErrNotFound};
     }
 
-    Task<std::tuple<std::optional<std::string>, Error> > GitHub::getInstallationToken(const std::string installationId) {
+    Task<std::tuple<std::optional<std::string>, Error> >
+    GitHub::getInstallationToken(const std::string installationId) {
         if (const auto cached = co_await cache_.getFromCache("installation_token:" + installationId)) {
             logger.debug("Reusing cached repo installation token for {}", installationId);
             co_return {cached, Error::Ok};
@@ -146,7 +161,8 @@ namespace service {
 
             if (const auto expiryTime = parseISO8601(expiryString)) {
                 logger.debug("Storing installation token for {} in cache", installationId);
-                const auto ttl = std::chrono::duration_cast<std::chrono::seconds>(*expiryTime - std::chrono::system_clock::now()) - 5s;
+                const auto ttl = std::chrono::duration_cast<std::chrono::seconds>(
+                                     *expiryTime - std::chrono::system_clock::now()) - 5s;
                 co_await cache_.updateCache("installation_token:" + installationId, token, ttl);
             }
 
@@ -157,19 +173,27 @@ namespace service {
         co_return {std::nullopt, Error::ErrInternal};
     }
 
-    Task<std::tuple<std::optional<RepositoryContentsResponse>, Error> > GitHub::getRepositoryContents(
-        std::string repo, std::string path, std::string installationToken) {
+    Task<std::tuple<std::optional<Json::Value>, Error> > GitHub::getRepositoryContents(
+        const std::string repo, const std::optional<std::string> ref, const std::string path, const std::string installationToken) {
         const auto client = createHttpClient();
+        std::map<std::string, std::string> params = {};
+        if (ref) {
+            params["ref"] = *ref;
+        }
+
         if (auto repositoryContents = co_await sendApiRequest(
             client,
             Get,
             std::format("/repos/{}/contents/{}", repo, path),
-            installationToken)) {
-            const std::string encoded = (*repositoryContents)["content"].asString();
-            const std::string decoded = parseEncodedContents(encoded);
-            const auto resp = RepositoryContentsResponse{.body = decoded};
+            installationToken,
+            params)
+        ) {
+            // const std::string encoded = (*repositoryContents)["content"].asString();
+            // const std::string decoded = parseEncodedContents(encoded);
+            // const auto resp = RepositoryContentsResponse{.body = decoded};
+            // co_return {std::optional{resp}, Error::Ok};
 
-            co_return {std::optional{resp}, Error::Ok};
+            co_return {std::optional(repositoryContents), Error::Ok};
         }
 
         logger.error("Failed to get repository contents, repo {} at {}", repo, path);

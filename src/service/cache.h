@@ -5,6 +5,7 @@
 #include <optional>
 #include <string>
 #include <chrono>
+#include <vector>
 #include <drogon/utils/coroutine.h>
 
 namespace service
@@ -16,7 +17,9 @@ namespace service
 
     public:
         drogon::Task<std::optional<std::string>> getFromCache(std::string key);
+        drogon::Task<bool> isSetMember(std::string key, std::string value);
         drogon::Task<> updateCache(std::string key, std::string value, std::chrono::duration<long> expire);
+        drogon::Task<> updateCacheSet(std::string key, std::vector<std::string> value, std::chrono::duration<long> expire);
     };
 }
 

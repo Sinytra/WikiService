@@ -9,6 +9,8 @@
 #include <string>
 #include <fstream>
 
+#include "error.h"
+
 using namespace std;
 using namespace drogon;
 using namespace service;
@@ -18,27 +20,54 @@ using namespace drogon::orm;
 using namespace drogon_model::postgres;
 
 namespace api::v1 {
-    DocsController::DocsController(Service &s, GitHub &g) : service_(s), github_(g) {
+    void errorResponse(const Error &error, const std::string &message,
+                       std::function<void(const HttpResponsePtr &)> &callback) {
+        Json::Value json;
+        json["error"] = message;
+        const auto resp = HttpResponse::newHttpJsonResponse(std::move(json));
+        resp->setStatusCode(mapError(error));
+
+        callback(resp);
     }
 
-    Task<> DocsController::page(drogon::HttpRequestPtr req,
-                                std::function<void(const drogon::HttpResponsePtr &)> callback, std::string mod) const {
+    DocsController::DocsController(Service &s, GitHub &g, Database &db, Documentation &d)
+        : service_(s), github_(g), database_(db), documentation_(d) {}
+
+    Task<> DocsController::page(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback,
+                                std::string mod, std::string path, std::string locale) const {
         try {
-            // TODO Static asserts to return if tuple is empty
-            const string repo = "Su5eD/WikiTest";
-            const string path = "docs/examplemod/sinytra-wiki.json";
-
-            const auto [installationId, error2](co_await github_.getRepositoryInstallation(repo));
-            const auto [installationToken, error3](co_await github_.getInstallationToken(installationId.value()));
-            const auto [contents, error4](co_await github_.getRepositoryContents(repo, path, installationToken.value()));
-
-            Json::Value root;
-            Json::Reader reader;
-            if (bool parsingSuccessful = reader.parse(contents.value().body, root); !parsingSuccessful) {
-                cout << "Error parsing the string" << endl;
+            if (path.empty()) {
+                co_return errorResponse(Error::ErrBadRequest, "Missing path parameter", callback);
             }
 
-            const auto resp = HttpResponse::newHttpJsonResponse(std::move(root));
+            const auto [modResult, modError] = co_await database_.getModSource(mod);
+            if (!modResult) {
+                co_return errorResponse(modError, "Mod not found", callback);
+            }
+            const std::string repo = *modResult->getSourceRepo();
+
+            const auto [installationId, installationIdError](co_await github_.getRepositoryInstallation(repo));
+            if (!installationId) {
+                co_return errorResponse(installationIdError, "Missing repository installation", callback);
+            }
+
+            const auto [installationToken, error3](co_await github_.getInstallationToken(installationId.value()));
+            if (!installationToken) {
+                co_return errorResponse(installationIdError, "GitHub authentication failure", callback);
+            }
+
+            const auto [locales, localesError](co_await documentation_.hasAvailableLocale(*modResult, locale, *installationToken));
+            logger.info("Has locale for {}: {}", mod, locales);
+
+            const auto ref = req->getOptionalParameter<std::string>("version");
+            const auto prefixedPath = *modResult->getSourcePath() + '/' + path;
+            const auto [contents, contentsError](
+                co_await github_.getRepositoryContents(repo, ref, prefixedPath, installationToken.value()));
+            if (!contents) {
+                co_return errorResponse(contentsError, "File not found", callback);
+            }
+
+            const auto resp = HttpResponse::newHttpJsonResponse(*contents);
             resp->setStatusCode(k200OK);
             callback(resp);
 
@@ -60,7 +89,7 @@ namespace api::v1 {
             //
             //     callback(resp);
             // }
-        } catch (const drogon::HttpException &err) {
+        } catch (const HttpException &err) {
             const auto resp = HttpResponse::newHttpResponse();
             resp->setBody(err.what());
             callback(resp);

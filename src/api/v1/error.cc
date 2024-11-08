@@ -9,19 +9,21 @@ using namespace service;
 namespace
 {
     const unordered_map<Error, HttpStatusCode> errorMap = {
-        {Error::Ok, HttpStatusCode::k200OK},
+        {Error::Ok, k200OK},
+        {Error::ErrNotFound, k404NotFound},
+        {Error::ErrBadRequest, k400BadRequest}
     };
 }
 
 namespace api::v1
 {
-    HttpStatusCode mapError(const service::Error err)
+    HttpStatusCode mapError(const Error err)
     {
         auto cit(errorMap.find(err));
         if (cit != errorMap.cend())
         {
             return cit->second;
         }
-        return HttpStatusCode::k500InternalServerError;
+        return k500InternalServerError;
     }
 }
