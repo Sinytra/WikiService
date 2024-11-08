@@ -1,6 +1,7 @@
 #include <drogon/drogon.h>
 
 #include "api/v1/docs.h"
+#include "api/v1/controller.h"
 #include "log/log.h"
 #include "service/service_impl.h"
 #include "service/github.h"
@@ -26,15 +27,15 @@ int main() {
     auto database(service::Database{});
     auto documentation(service::Documentation{github, cache});
     auto controller(make_shared<api::v1::DocsController>(servis, github, database, documentation));
+    auto ctrl(make_shared<api::v1::HelloWorld>(servis, github, database, documentation));
 
     app()
-        .setLogPath("./")
         .setLogLevel(trantor::Logger::kDebug)
         .addListener("0.0.0.0", port)
         .setThreadNum(16);
 
-    app().createRedisClient("127.0.0.1", 6379);
     app().registerController(controller);
+    app().registerController(ctrl);
 
     app().run();
 

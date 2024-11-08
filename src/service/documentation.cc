@@ -3,6 +3,9 @@
 
 #include <drogon/drogon.h>
 
+#include <mutex>
+#include <unordered_map>
+
 using namespace logging;
 using namespace drogon;
 using namespace drogon::orm;
@@ -14,15 +17,22 @@ namespace service {
 
     Task<std::tuple<bool, Error>> Documentation::hasAvailableLocale(const Mod& mod, std::string locale, std::string installationToken) {
         const auto cacheKey = "locales:" + *mod.getId();
-        if (const auto cached = co_await cache_.isSetMember(cacheKey, locale)) {
-            logger.debug("Reusing cached locale for mod {}", *mod.getId());
+
+        if (const auto exists = co_await cache_.exists(cacheKey); !exists) {
+            if (const auto pending = co_await CacheableServiceBase::getOrStartTask<std::tuple<bool, Error>>(cacheKey)) {
+                co_return pending->get();
+            }
+
+            const auto [locales, localesError] = co_await getAvailableLocales(mod, installationToken);
+            co_await cache_.updateCacheSet(cacheKey, *locales, 7 * 24h);
+
+            const auto cached = co_await cache_.isSetMember(cacheKey, locale);
+            co_await CacheableServiceBase::completeTask<std::tuple<bool, Error>>(cacheKey, {cached, Error::Ok});
             co_return {cached, Error::Ok};
         }
 
-        const auto [locales, localesError] = co_await getAvailableLocales(mod, installationToken);
-        if (locales) {
-            logger.debug("Storing available locales for {} in cache", *mod.getId());
-            co_await cache_.updateCacheSet(cacheKey, *locales, 7 * 24h);
+        if (const auto cached = co_await cache_.isSetMember(cacheKey, locale)) {
+            co_return {cached, Error::Ok};
         }
 
         co_return {false, Error::Ok};
@@ -32,6 +42,9 @@ namespace service {
         const Mod &mod, const std::string installationToken
     ) {
         std::vector<std::string> locales;
+
+        auto currentLoop = trantor::EventLoop::getEventLoopOfCurrentThread();
+        co_await sleepCoro(currentLoop, 20s);
 
         const auto repo = *mod.getSourceRepo();
         const auto path = *mod.getSourcePath() + "/.translated";

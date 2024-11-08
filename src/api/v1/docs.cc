@@ -2,7 +2,6 @@
 
 #include <drogon/HttpClient.h>
 #include <models/Mod.h>
-#include <trantor/utils/AsyncFileLogger.h>
 
 #include "log/log.h"
 
@@ -34,8 +33,11 @@ namespace api::v1 {
         : service_(s), github_(g), database_(db), documentation_(d) {}
 
     Task<> DocsController::page(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback,
-                                std::string mod, std::string path, std::string locale) const {
+                                std::string mod, std::string path) const {
         try {
+            if (mod.empty()) {
+                co_return errorResponse(Error::ErrBadRequest, "Missing mod parameter", callback);
+            }
             if (path.empty()) {
                 co_return errorResponse(Error::ErrBadRequest, "Missing path parameter", callback);
             }
@@ -56,8 +58,11 @@ namespace api::v1 {
                 co_return errorResponse(installationIdError, "GitHub authentication failure", callback);
             }
 
-            const auto [locales, localesError](co_await documentation_.hasAvailableLocale(*modResult, locale, *installationToken));
-            logger.info("Has locale for {}: {}", mod, locales);
+            const auto locale = req->getOptionalParameter<std::string>("locale");
+            if (locale) {
+                const auto [locales, localesError](co_await documentation_.hasAvailableLocale(*modResult, *locale, *installationToken));
+                logger.info("Has locale for {}: {}", *locale, locales);
+            }
 
             const auto ref = req->getOptionalParameter<std::string>("version");
             const auto prefixedPath = *modResult->getSourcePath() + '/' + path;

@@ -13,8 +13,7 @@ using namespace drogon_model::postgres;
 
 namespace service
 {
-    class Documentation
-    {
+    class Documentation : public CacheableServiceBase {
     public:
         explicit Documentation(service::GitHub&, service::MemoryCache&);
 
