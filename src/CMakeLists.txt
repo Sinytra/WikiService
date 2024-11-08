@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.10)
 project(wiki_service CXX)
 include(CheckIncludeFileCXX)
 
+set(BUILD_SHARED_LIBS OFF)
+set(CMAKE_FIND_LIBRARY_SUFFIXES .a .lib)
+
 check_include_file_cxx(any HAS_ANY)
 check_include_file_cxx(string_view HAS_STRING_VIEW)
 check_include_file_cxx(coroutine HAS_COROUTINE)
@@ -26,8 +29,10 @@ add_executable(${PROJECT_NAME} main.cc)
 #target_link_libraries(${PROJECT_NAME} PRIVATE drogon)
 #
 # and comment out the following lines
-find_package(Drogon CONFIG REQUIRED)
-find_package(spdlog CONFIG REQUIRED)
+if (NOT USE_LOCAL_DEPS)
+    find_package(Drogon CONFIG REQUIRED)
+    find_package(spdlog CONFIG REQUIRED)
+endif ()
 target_link_libraries(${PROJECT_NAME} PRIVATE
         api
         Drogon::Drogon
