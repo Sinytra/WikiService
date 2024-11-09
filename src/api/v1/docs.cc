@@ -75,28 +75,64 @@ namespace api::v1 {
             const auto resp = HttpResponse::newHttpJsonResponse(*contents);
             resp->setStatusCode(k200OK);
             callback(resp);
-
-            // auto [modResponse, err](co_await service_.getMod(ModRequest{.id = mod}));
-            // if (auto respValue = modResponse; respValue && err == Error::Ok) {
-            //     Json::Value json;
-            //     json["message"] = "Hello";
-            //     json["id"] = modResponse.value().id;
-            //     json["name"] = modResponse.value().name;
-            //     const auto resp = HttpResponse::newHttpJsonResponse(std::move(json));
-            //     resp->setStatusCode(drogon::k200OK);
-            //
-            //     callback(resp);
-            // } else {
-            //     Json::Value json;
-            //     json["error"] = "Mod does not exist";
-            //     const auto resp = HttpResponse::newHttpJsonResponse(std::move(json));
-            //     resp->setStatusCode(drogon::k500InternalServerError);
-            //
-            //     callback(resp);
-            // }
         } catch (const HttpException &err) {
             const auto resp = HttpResponse::newHttpResponse();
             resp->setBody(err.what());
+            callback(resp);
+        }
+
+        co_return;
+    }
+
+    Task<> DocsController::tree(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback,
+                                std::string mod) const {
+        try {
+            if (mod.empty()) {
+                co_return errorResponse(Error::ErrBadRequest, "Missing mod parameter", callback);
+            }
+
+            const auto [modResult, modError] = co_await database_.getModSource(mod);
+            if (!modResult) {
+                co_return errorResponse(modError, "Mod not found", callback);
+            }
+            const std::string repo = modResult->getValueOfSourceRepo();
+
+            const auto [installationId, installationIdError](co_await github_.getRepositoryInstallation(repo));
+            if (!installationId) {
+                co_return errorResponse(installationIdError, "Missing repository installation", callback);
+            }
+
+            const auto [installationToken, error3](co_await github_.getInstallationToken(installationId.value()));
+            if (!installationToken) {
+                co_return errorResponse(installationIdError, "GitHub authentication failure", callback);
+            }
+
+            const auto [contents, contentsError](co_await documentation_.getDirectoryTree(*modResult, *installationToken));
+            if (!contents) {
+                co_return errorResponse(contentsError, "Error getting dir tree", callback);
+            }
+
+            Json::Value root;
+            {
+                Json::Value modJson;
+                modJson["id"] = modResult->getValueOfId();
+                modJson["name"] = modResult->getValueOfName();
+                modJson["platform"] = modResult->getValueOfPlatform();
+                modJson["slug"] = modResult->getValueOfSlug();
+                modJson["source_repo"] = modResult->getValueOfSourceRepo();
+                modJson["is_community"] = modResult->getValueOfIsCommunity();
+                modJson["is_public"] = true; // TODO
+                root["mod"] = modJson;
+            }
+            root["tree"] = contents;
+
+            const auto resp = HttpResponse::newHttpJsonResponse(root);
+            resp->setStatusCode(k200OK);
+            callback(resp);
+        } catch (const HttpException &err) {
+            const auto resp = HttpResponse::newHttpResponse();
+            resp->setBody(err.what());
+            resp->setStatusCode(k500InternalServerError);
             callback(resp);
         }
 

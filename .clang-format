@@ -8,10 +8,12 @@ AlignConsecutiveDeclarations: false
 AlignOperands: true
 AlignTrailingComments: false
 AlwaysBreakTemplateDeclarations: Yes
-BraceWrapping: 
+FixNamespaceComments: false
+CompactNamespaces: false
+BraceWrapping:
   AfterCaseLabel: false
   AfterClass: false
-  AfterControlStatement: false
+  AfterControlStatement: MultiLine
   AfterEnum: false
   AfterFunction: false
   AfterNamespace: false

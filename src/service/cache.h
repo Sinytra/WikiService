@@ -66,12 +66,14 @@ namespace service
         }
 
         template<class T>
-        drogon::Task<> completeTask(const std::string &key, T&& value) {
+        drogon::Task<T> completeTask(const std::string &key, T&& value) {
             auto pair = std::any_cast<std::pair<std::shared_ptr<std::promise<T>>, std::shared_future<T>>&>(pendingTasks_[key]);
             pair.first->set_value(value);
 
             auto guard = co_await mutex_.scoped_lock();
             pendingTasks_.erase(key);
+
+            co_return value;
         }
     private:
         drogon::Mutex mutex_;

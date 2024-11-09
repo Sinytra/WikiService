@@ -18,6 +18,8 @@ namespace service
         explicit Documentation(service::GitHub&, service::MemoryCache&);
 
         drogon::Task<std::tuple<bool, Error>> hasAvailableLocale(const Mod& mod, std::string locale, std::string installationToken);
+
+        drogon::Task<std::tuple<Json::Value, Error>> getDirectoryTree(const Mod& mod, std::string installationToken);
     private:
         drogon::Task<std::tuple<std::optional<std::vector<std::string>>, Error>> getAvailableLocales(const Mod& mod, std::string installationToken);
 
