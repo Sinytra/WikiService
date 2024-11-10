@@ -27,6 +27,7 @@ namespace service
         drogon::Task<std::tuple<std::optional<std::string>, Error>> getInstallationToken(std::string installationId);
         drogon::Task<std::tuple<std::optional<Json::Value>, Error>> getRepositoryContents(std::string repo, std::optional<std::string> ref, std::string path, std::string installationToken);
         drogon::Task<std::tuple<bool, Error>> isPublicRepository(std::string repo, std::string installationToken);
+        drogon::Task<std::tuple<std::optional<std::string>, Error>> getFileLastUpdateTime(std::string repo, std::optional<std::string> ref, std::string path, std::string installationToken);
     private:
         service::MemoryCache& cache_;
         const std::string& appClientId_;

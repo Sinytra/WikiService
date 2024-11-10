@@ -180,10 +180,33 @@ namespace service {
 
     Task<std::tuple<bool, Error>> GitHub::isPublicRepository(std::string repo, std::string installationToken) {
         const auto client = createHttpClient();
-        if (auto repositoryContents = co_await sendApiRequest(client, Get, "/repos/" + repo, installationToken))
-        {
+        if (auto repositoryContents = co_await sendApiRequest(client, Get, "/repos/" + repo, installationToken)) {
             co_return {!(*repositoryContents)["private"].asBool(), Error::Ok};
         }
         co_return {false, Error::ErrNotFound};
+    }
+
+    Task<std::tuple<std::optional<std::string>, Error>> GitHub::getFileLastUpdateTime(std::string repo,
+                                                                                      std::optional<std::string> ref,
+                                                                                      std::string path,
+                                                                                      std::string installationToken) {
+        const auto client = createHttpClient();
+        std::map<std::string, std::string> params = { {"page", "1"}, {"per_page", "1"} };
+        params.try_emplace("path", path);
+        if (ref) {
+            params["sha"] = *ref;
+        }
+        if (auto commits =
+                    co_await sendApiRequest(client, Get, std::format("/repos/{}/commits", repo), installationToken, params);
+            commits && commits->isArray())
+        {
+            const auto entry = commits->front();
+            if (entry.isMember("commit") && entry["commit"].isMember("committer") && entry["commit"]["committer"].isMember("date")) {
+                const auto date = entry["commit"]["committer"]["date"].asString();
+                co_return {date, Error::Ok};
+            }
+        }
+
+        co_return {std::nullopt, Error::ErrNotFound};
     }
 }

@@ -74,6 +74,9 @@ namespace api::v1 {
                 co_return errorResponse(contentsError, "File not found", callback);
             }
 
+            const auto [updatedAt, updatedAtError](
+                    co_await github_.getFileLastUpdateTime(repo, ref, prefixedPath, installationToken.value()));
+
             const auto [isPublic, publicError](co_await github_.isPublicRepository(modResult->getValueOfSourceRepo(), *installationToken));
 
             Json::Value root;
@@ -92,7 +95,9 @@ namespace api::v1 {
             if (isPublic) {
                 root["edit_url"] = (*contents)["html_url"];
             }
-            // TODO Update and edit url
+            if (updatedAt) {
+                root["updated_at"] = *updatedAt;
+            }
 
             const auto resp = HttpResponse::newHttpJsonResponse(root);
             resp->setStatusCode(k200OK);
