@@ -75,7 +75,7 @@ namespace service {
 
     Task<std::tuple<std::optional<std::string>, Error>> GitHub::getApplicationJWTToken() {
         if (const auto cached = co_await cache_.getFromCache("jwt:" + appClientId_)) {
-            logger.debug("Reusing cached app JWT token");
+            logger.trace("Reusing cached app JWT token");
             co_return {cached, Error::Ok};
         }
 
@@ -94,7 +94,7 @@ namespace service {
                             .sign(jwt::algorithm::rs256("", contents));
 
             // TODO don't block thread
-            logger.debug("Storing JWT token in cache");
+            logger.trace("Storing JWT token in cache");
             const auto ttl =
                     std::chrono::duration_cast<std::chrono::seconds>(expiresAt - std::chrono::system_clock::now()) - 5s;
             co_await cache_.updateCache("jwt:" + appClientId_, token, ttl);
@@ -108,7 +108,7 @@ namespace service {
 
     Task<std::tuple<std::optional<std::string>, Error>> GitHub::getRepositoryInstallation(const std::string repo) {
         if (const auto cached = co_await cache_.getFromCache("repo_install_id:" + repo)) {
-            logger.debug("Reusing cached repo installation ID for {}", repo);
+            logger.trace("Reusing cached repo installation ID for {}", repo);
             co_return {cached, Error::Ok};
         }
 
@@ -119,7 +119,7 @@ namespace service {
         {
             const std::string installationId = (*installation)["id"].asString();
 
-            logger.debug("Storing installation ID for {} in cache", repo);
+            logger.trace("Storing installation ID for {} in cache", repo);
             co_await cache_.updateCache("repo_install_id:" + repo, installationId, 14 * 24h);
 
             co_return {std::optional{installationId}, Error::Ok};
@@ -131,7 +131,7 @@ namespace service {
 
     Task<std::tuple<std::optional<std::string>, Error>> GitHub::getInstallationToken(const std::string installationId) {
         if (const auto cached = co_await cache_.getFromCache("installation_token:" + installationId)) {
-            logger.debug("Reusing cached repo installation token for {}", installationId);
+            logger.trace("Reusing cached repo installation token for {}", installationId);
             co_return {cached, Error::Ok};
         }
 
@@ -145,7 +145,7 @@ namespace service {
             const std::string token = (*installationToken)["token"].asString();
 
             if (const auto expiryTime = parseISO8601(expiryString)) {
-                logger.debug("Storing installation token for {} in cache", installationId);
+                logger.trace("Storing installation token for {} in cache", installationId);
                 const auto ttl = std::chrono::duration_cast<std::chrono::seconds>(*expiryTime -
                                                                                   std::chrono::system_clock::now()) -
                                  5s;
@@ -176,5 +176,14 @@ namespace service {
 
         logger.error("Failed to get repository contents, repo {} at {}", repo, path);
         co_return {std::nullopt, Error::ErrNotFound};
+    }
+
+    Task<std::tuple<bool, Error>> GitHub::isPublicRepository(std::string repo, std::string installationToken) {
+        const auto client = createHttpClient();
+        if (auto repositoryContents = co_await sendApiRequest(client, Get, "/repos/" + repo, installationToken))
+        {
+            co_return {!(*repositoryContents)["private"].asBool(), Error::Ok};
+        }
+        co_return {false, Error::ErrNotFound};
     }
 }

@@ -1,5 +1,4 @@
 #include "documentation.h"
-#include "util.h"
 
 #include <drogon/drogon.h>
 
@@ -13,6 +12,7 @@
 #define I18N_FILE_PATH "/.translated"
 #define TYPE_FILE "file"
 #define TYPE_DIR "dir"
+#define BASE64_PREFIX "data:image/png;base64,"
 
 using namespace logging;
 using namespace drogon;
@@ -136,6 +136,7 @@ namespace service {
         co_return {false, Error::Ok};
     }
 
+    // TODO Support locales
     Task<std::tuple<Json::Value, Error>> Documentation::getDirectoryTree(const Mod &mod,
                                                                          std::string installationToken) {
         const auto cacheKey = "docs_tree:" + *mod.getId();
@@ -186,6 +187,27 @@ namespace service {
             }
         }
 
-        co_return {std::optional(locales), Error::Ok};
+        co_return {locales, Error::Ok};
+    }
+
+    // TODO Include branch in assets
+    Task<std::tuple<std::optional<std::string>, Error>>
+    Documentation::getAssetResource(const Mod &mod, ResourceLocation location, std::string installationToken) {
+        const auto path = mod.getValueOfSourcePath() + "/.assets/item/" + location.namespace_ + "/" + location.path_ +
+                          (location.path_.find('.') != std::string::npos ? "" : ".png");
+
+        const auto [isPublic, publicError](co_await github_.isPublicRepository(mod.getValueOfSourceRepo(), installationToken));
+        // Fast (static) track
+        if (isPublic) {
+            const auto baseUrl = std::format("https://raw.githubusercontent.com/{}/{}", mod.getValueOfSourceRepo(), "master");
+            co_return {baseUrl + path, Error::Ok};
+        }
+
+        const auto [contents, contentsError](co_await github_.getRepositoryContents(
+                mod.getValueOfSourceRepo(), std::nullopt, path, installationToken));
+        if (!contents) {
+            co_return {std::nullopt, Error::ErrBadRequest};
+        }
+        co_return {BASE64_PREFIX + (*contents)["content"].asString(), Error::Ok};
     }
 }

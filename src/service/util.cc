@@ -2,6 +2,16 @@
 
 #include <base64.hpp>
 
+std::optional<ResourceLocation> ResourceLocation::parse(const std::string& str) {
+    const auto delimeter = str.find(':');
+    if (delimeter == std::string::npos || delimeter == str.size() - 1) {
+        return std::nullopt;
+    }
+    const auto namespace_ = str.substr(0, delimeter);
+    const auto path_ = str.substr(delimeter + 1);
+    return ResourceLocation{namespace_, path_};
+}
+
 void replace_all(
 std::string& s,
 std::string const& toReplace,

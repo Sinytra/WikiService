@@ -18,6 +18,7 @@ namespace api::v1
         METHOD_LIST_BEGIN
             ADD_METHOD_TO(DocsController::page, "/page?mod={1}&path={2}", drogon::Get);
             ADD_METHOD_TO(DocsController::tree, "/tree?mod={1}", drogon::Get);
+            ADD_METHOD_TO(DocsController::asset, "/asset?mod={1}&location={2}", drogon::Get);
         METHOD_LIST_END
 
         drogon::Task<> page(drogon::HttpRequestPtr req,
@@ -27,6 +28,10 @@ namespace api::v1
         drogon::Task<> tree(drogon::HttpRequestPtr req,
             std::function<void(const drogon::HttpResponsePtr&)> callback,
             std::string mod) const;
+
+        drogon::Task<> asset(drogon::HttpRequestPtr req,
+            std::function<void(const drogon::HttpResponsePtr&)> callback,
+            std::string mod, std::string location) const;
 
     private:
         service::Service& service_;
