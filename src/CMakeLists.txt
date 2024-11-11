@@ -3,7 +3,6 @@ project(wiki_service CXX)
 include(CheckIncludeFileCXX)
 
 set(BUILD_SHARED_LIBS OFF)
-set(CMAKE_FIND_LIBRARY_SUFFIXES .a .lib)
 
 check_include_file_cxx(any HAS_ANY)
 check_include_file_cxx(string_view HAS_STRING_VIEW)
@@ -87,5 +86,9 @@ add_subdirectory(log)
 add_subdirectory(service)
 #add_subdirectory(test)
 
-# TODO FIX NOT BEING MOVED
-FILE(COPY ../config.json DESTINATION "${PROJECT_BINARY_DIR}")
+set_target_properties(${PROJECT_NAME}
+        PROPERTIES
+        ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+)

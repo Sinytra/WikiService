@@ -4,7 +4,6 @@ project(wiki CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(BUILD_SHARED_LIBS OFF)
-set(CMAKE_FIND_LIBRARY_SUFFIXES .a .lib)
 
 option(USE_LOCAL_DEPS "Build dependencies locally" OFF)
 

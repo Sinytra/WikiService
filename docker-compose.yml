@@ -25,11 +25,9 @@ services:
     ports:
       - "6379:6379"
     networks:
-      - cache
+      - db
 networks:
   db:
-    driver: bridge
-  cache:
     driver: bridge
 
 volumes:
