@@ -40,8 +40,7 @@ namespace api::v1 {
         co_return std::nullopt;
     }
 
-    DocsController::DocsController(Service &s, GitHub &g, Database &db, Documentation &d) :
-        service_(s), github_(g), database_(db), documentation_(d) {}
+    DocsController::DocsController(GitHub &g, Database &db, Documentation &d) : github_(g), database_(db), documentation_(d) {}
 
     Task<> DocsController::page(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string mod,
                                 std::string path) const {
@@ -73,7 +72,8 @@ namespace api::v1 {
                     co_await assertLocale(req->getOptionalParameter<std::string>("locale"), documentation_, *modResult, *installationToken);
             const auto ref = req->getOptionalParameter<std::string>("version");
             const auto prefixedPath = *modResult->getSourcePath() + '/' + path;
-            const auto [contents, contentsError](co_await documentation_.getDocumentationPage(*modResult, path, locale, ref, *installationToken));
+            const auto [contents,
+                        contentsError](co_await documentation_.getDocumentationPage(*modResult, path, locale, ref, *installationToken));
             if (!contents) {
                 co_return errorResponse(contentsError, "File not found", callback);
             }

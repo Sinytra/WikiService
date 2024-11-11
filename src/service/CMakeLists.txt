@@ -1,5 +1,4 @@
 add_library(service STATIC
-    service_impl.cc
     github.cc
     util.cc
     cache.cc

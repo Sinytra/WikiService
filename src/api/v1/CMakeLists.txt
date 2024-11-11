@@ -1,5 +1,4 @@
 add_library(api STATIC
-    controller.cc
     docs.cc
     error.cc
 )

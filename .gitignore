@@ -562,3 +562,4 @@ FodyWeavers.xsd
 
 !src/log/
 run
+config.json

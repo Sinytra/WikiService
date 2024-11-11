@@ -32,7 +32,7 @@ Task<std::optional<Json::Value>> sendApiRequest(HttpClientPtr client, HttpMethod
             httpReq->setParameter(key, val);
         }
 
-        logger.debug("=> Request to {}", path);
+        logger.trace("=> Request to {}", path);
         const auto response = co_await client->sendRequestCoro(httpReq);
         const auto status = response->getStatusCode();
         if (isSuccess(status)) {
@@ -42,7 +42,7 @@ Task<std::optional<Json::Value>> sendApiRequest(HttpClientPtr client, HttpMethod
             }
         }
 
-        logger.error("Unexpected api response: ({}) {}", std::to_string(status), response->getBody());
+        logger.trace("Unexpected api response: ({}) {}", std::to_string(status), response->getBody());
         co_return std::nullopt;
     } catch (std::exception &e) {
         logger.error(e.what());
