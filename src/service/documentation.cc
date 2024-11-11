@@ -37,11 +37,13 @@ std::string getTreeEntryPath(const std::string &s, int pathPrefix) {
     return relative.ends_with(DOCS_FILE_EXT) ? relative.substr(0, relative.size() - 4) : relative;
 }
 
-Task<FolderMetadata> getFolderMetadata(service::GitHub &github, std::string repo, std::string path,
+Task<FolderMetadata> getFolderMetadata(service::GitHub &github, std::string repo, std::string rootPath,
+                                       std::string path, std::optional<std::string> locale,
                                        std::string installationToken) {
     FolderMetadata metadata;
+    const auto filePath = rootPath + (locale ? "/.translated/" + *locale : "") + path + META_FILE_PATH;
     if (const auto [contents,
-                    contentsError](co_await github.getRepositoryContents(repo, std::nullopt, path, installationToken));
+                    contentsError](co_await github.getRepositoryContents(repo, std::nullopt, filePath, installationToken));
         contents)
     {
         const auto body = decodeBase64((*contents)["content"].asString());
@@ -57,6 +59,8 @@ Task<FolderMetadata> getFolderMetadata(service::GitHub &github, std::string repo
                 }
             }
         }
+    } else if (locale) {
+        co_return co_await getFolderMetadata(github, repo, rootPath, path, std::nullopt, installationToken);
     }
     co_return metadata;
 }
@@ -71,17 +75,18 @@ bool isValidEntry(const Json::Value &value) {
             (value["type"] != TYPE_FILE || value["name"].asString().ends_with(DOCS_FILE_EXT));
 }
 
-Task<Json::Value> crawlDocsTree(service::GitHub &github, std::string repo, int pathPrefix, std::string path,
-                                std::string installationToken, trantor::EventLoopThreadPool &pool) {
+Task<Json::Value> crawlDocsTree(service::GitHub &github, std::string repo, std::string rootPath, std::string path,
+                                std::optional<std::string> locale, std::string installationToken,
+                                trantor::EventLoopThreadPool &pool) {
     auto currentLoop = trantor::EventLoop::getEventLoopOfCurrentThread();
     co_await switchThreadCoro(pool.getNextLoop());
 
     Json::Value root{Json::arrayValue};
     if (const auto [contents,
-                    contentsError](co_await github.getRepositoryContents(repo, std::nullopt, path, installationToken));
+                    contentsError](co_await github.getRepositoryContents(repo, std::nullopt, rootPath + path, installationToken));
         contents && contents->isArray())
     {
-        FolderMetadata metadata = co_await getFolderMetadata(github, repo, path + META_FILE_PATH, installationToken);
+        FolderMetadata metadata = co_await getFolderMetadata(github, repo, rootPath, path, locale, installationToken);
 
         for (const auto &child: *contents) {
             if (isValidEntry(child)) {
@@ -89,16 +94,17 @@ Task<Json::Value> crawlDocsTree(service::GitHub &github, std::string repo, int p
                 const auto childMeta = metadata.contains(childName)
                                                ? metadata[childName]
                                                : FolderMetadataEntry{getTreeEntryName(childName), ""};
+                const auto relativePath = getTreeEntryPath(child["path"].asString(), rootPath.size());
                 Json::Value obj;
                 obj["name"] = childMeta.name;
                 if (!childMeta.icon.empty()) {
                     obj["icon"] = childMeta.icon;
                 }
-                obj["path"] = getTreeEntryPath(child["path"].asString(), pathPrefix);
+                obj["path"] = relativePath;
                 obj["type"] = child["type"];
                 if (child["type"] == TYPE_DIR) {
-                    Json::Value children = co_await crawlDocsTree(github, repo, pathPrefix, child["path"].asString(),
-                                                                  installationToken, pool);
+                    Json::Value children = co_await crawlDocsTree(github, repo, rootPath, "/" + relativePath,
+                                                                  locale, installationToken, pool);
                     obj["children"] = children;
                 }
                 root.append(obj);
@@ -136,10 +142,20 @@ namespace service {
         co_return {false, Error::Ok};
     }
 
-    // TODO Support locales
+    Task<std::tuple<std::optional<Json::Value>, Error>> Documentation::getDocumentationPage(const Mod& mod, std::string path, std::optional<std::string> locale, std::optional<std::string> version, std::string installationToken) {
+        const auto sourcePath = removeTrailingSlash(mod.getValueOfSourcePath());
+        const auto resourcePath = sourcePath + (locale ? "/.translated/" + *locale : "") + "/" + removeLeadingSlash(path);
+        const auto [contents, contentsError](co_await github_.getRepositoryContents(mod.getValueOfSourceRepo(), version, resourcePath, installationToken));
+        if (!contents && locale) {
+            co_return co_await getDocumentationPage(mod, path, std::nullopt, version, installationToken);
+        }
+        co_return {contents, contentsError};
+    }
+
     Task<std::tuple<Json::Value, Error>> Documentation::getDirectoryTree(const Mod &mod,
+                                                                         std::optional<std::string> locale,
                                                                          std::string installationToken) {
-        const auto cacheKey = "docs_tree:" + *mod.getId();
+        const auto cacheKey = "docs_tree:" + *mod.getId() + ":" + locale.value_or("default");
 
         if (const auto cached = co_await cache_.getFromCache(cacheKey)) {
             if (const auto parsed = parseJsonString(*cached)) {
@@ -159,7 +175,7 @@ namespace service {
         trantor::EventLoopThreadPool pool{10};
         pool.start();
 
-        Json::Value root = co_await crawlDocsTree(github_, repo, path.size(), path, installationToken, pool);
+        Json::Value root = co_await crawlDocsTree(github_, repo, removeTrailingSlash(path), "", locale, installationToken, pool);
 
         for (int16_t i = 0; i < 10; i++)
             pool.getLoop(i)->quit();

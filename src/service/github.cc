@@ -32,7 +32,7 @@ Task<std::optional<Json::Value>> sendApiRequest(HttpClientPtr client, HttpMethod
             httpReq->setParameter(key, val);
         }
 
-        logger.trace("=> Request to {}", path);
+        logger.debug("=> Request to {}", path);
         const auto response = co_await client->sendRequestCoro(httpReq);
         const auto status = response->getStatusCode();
         if (isSuccess(status)) {
@@ -168,8 +168,10 @@ namespace service {
             params["ref"] = *ref;
         }
 
+        const auto normalizedPath = removeTrailingSlash(path);
+        const auto normalizedStart = path.starts_with('/') ? path.substr(1) : path;
         if (auto repositoryContents = co_await sendApiRequest(
-                    client, Get, std::format("/repos/{}/contents/{}", repo, path), installationToken, params))
+                    client, Get, std::format("/repos/{}/contents/{}", repo, normalizedStart), installationToken, params))
         {
             co_return {std::optional(repositoryContents), Error::Ok};
         }

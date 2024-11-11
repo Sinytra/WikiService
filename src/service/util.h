@@ -20,3 +20,6 @@ std::optional<Json::Value> parseJsonString(const std::string& str);
 std::string serializeJsonString(const Json::Value& value);
 
 std::string toCamelCase(std::string s);
+
+std::string removeLeadingSlash(const std::string &s);
+std::string removeTrailingSlash(const std::string &s);

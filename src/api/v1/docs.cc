@@ -8,8 +8,8 @@
 #include <fstream>
 #include <string>
 
-#include "error.h"
 #include <service/util.h>
+#include "error.h"
 
 using namespace std;
 using namespace drogon;
@@ -20,8 +20,7 @@ using namespace drogon::orm;
 using namespace drogon_model::postgres;
 
 namespace api::v1 {
-    void errorResponse(const Error &error, const std::string &message,
-                       std::function<void(const HttpResponsePtr &)> &callback) {
+    void errorResponse(const Error &error, const std::string &message, std::function<void(const HttpResponsePtr &)> &callback) {
         Json::Value json;
         json["error"] = message;
         const auto resp = HttpResponse::newHttpJsonResponse(std::move(json));
@@ -30,11 +29,22 @@ namespace api::v1 {
         callback(resp);
     }
 
+    Task<std::optional<std::string>> assertLocale(const std::optional<std::string> &locale, Documentation &documentation, const Mod &mod,
+                                                  const std::string &installationToken) {
+        if (locale) {
+            const auto [hasLocale, hasLocaleError](co_await documentation.hasAvailableLocale(mod, *locale, installationToken));
+            if (hasLocale) {
+                co_return locale;
+            }
+        }
+        co_return std::nullopt;
+    }
+
     DocsController::DocsController(Service &s, GitHub &g, Database &db, Documentation &d) :
         service_(s), github_(g), database_(db), documentation_(d) {}
 
-    Task<> DocsController::page(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback,
-                                std::string mod, std::string path) const {
+    Task<> DocsController::page(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string mod,
+                                std::string path) const {
         try {
             if (mod.empty()) {
                 co_return errorResponse(Error::ErrBadRequest, "Missing mod parameter", callback);
@@ -59,23 +69,17 @@ namespace api::v1 {
                 co_return errorResponse(installationIdError, "GitHub authentication failure", callback);
             }
 
-            const auto locale = req->getOptionalParameter<std::string>("locale");
-            if (locale) {
-                const auto [locales, localesError](
-                        co_await documentation_.hasAvailableLocale(*modResult, *locale, *installationToken));
-                logger.info("Has locale for {}: {}", *locale, locales);
-            }
-
+            const auto locale =
+                    co_await assertLocale(req->getOptionalParameter<std::string>("locale"), documentation_, *modResult, *installationToken);
             const auto ref = req->getOptionalParameter<std::string>("version");
             const auto prefixedPath = *modResult->getSourcePath() + '/' + path;
-            const auto [contents, contentsError](
-                    co_await github_.getRepositoryContents(repo, ref, prefixedPath, installationToken.value()));
+            const auto [contents, contentsError](co_await documentation_.getDocumentationPage(*modResult, path, locale, ref, *installationToken));
             if (!contents) {
                 co_return errorResponse(contentsError, "File not found", callback);
             }
 
-            const auto [updatedAt, updatedAtError](
-                    co_await github_.getFileLastUpdateTime(repo, ref, prefixedPath, installationToken.value()));
+            const auto [updatedAt,
+                        updatedAtError](co_await github_.getFileLastUpdateTime(repo, ref, prefixedPath, installationToken.value()));
 
             const auto [isPublic, publicError](co_await github_.isPublicRepository(modResult->getValueOfSourceRepo(), *installationToken));
 
@@ -111,8 +115,7 @@ namespace api::v1 {
         co_return;
     }
 
-    Task<> DocsController::tree(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback,
-                                std::string mod) const {
+    Task<> DocsController::tree(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string mod) const {
         try {
             if (mod.empty()) {
                 co_return errorResponse(Error::ErrBadRequest, "Missing mod parameter", callback);
@@ -134,8 +137,9 @@ namespace api::v1 {
                 co_return errorResponse(installationIdError, "GitHub authentication failure", callback);
             }
 
-            const auto [contents,
-                        contentsError](co_await documentation_.getDirectoryTree(*modResult, *installationToken));
+            const auto locale =
+                    co_await assertLocale(req->getOptionalParameter<std::string>("locale"), documentation_, *modResult, *installationToken);
+            const auto [contents, contentsError](co_await documentation_.getDirectoryTree(*modResult, locale, *installationToken));
             if (!contents) {
                 co_return errorResponse(contentsError, "Error getting dir tree", callback);
             }
@@ -169,9 +173,8 @@ namespace api::v1 {
         co_return;
     }
 
-    Task<> DocsController::asset(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
-                 std::string mod, std::string location) const
-    {
+    Task<> DocsController::asset(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback, std::string mod,
+                                 std::string location) const {
         try {
             if (mod.empty()) {
                 co_return errorResponse(Error::ErrBadRequest, "Missing mod parameter", callback);
