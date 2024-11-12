@@ -3,5 +3,5 @@
 #include <spdlog/spdlog.h>
 
 namespace logging {
-    extern spdlog::logger& logger;
+    extern spdlog::logger &logger;
 }

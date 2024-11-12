@@ -40,6 +40,21 @@ namespace api::v1 {
         co_return std::nullopt;
     }
 
+    Task<std::optional<std::string>> assertVersion(const std::optional<std::string> &version, Documentation &documentation, const Mod &mod,
+                                                   const std::string &installationToken) {
+        if (version) {
+            const auto [versions, versionsError](co_await documentation.getAvailableVersions(mod, installationToken));
+            if (versions) {
+                for (auto it = versions->begin(); it != versions->end(); it++) {
+                    if (it->isString() && it->asString() == *version) {
+                        co_return version;
+                    }
+                }
+            }
+        }
+        co_return std::nullopt;
+    }
+
     DocsController::DocsController(GitHub &g, Database &db, Documentation &d) : github_(g), database_(db), documentation_(d) {}
 
     Task<> DocsController::page(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string mod,
@@ -70,7 +85,9 @@ namespace api::v1 {
 
             const auto locale =
                     co_await assertLocale(req->getOptionalParameter<std::string>("locale"), documentation_, *modResult, *installationToken);
-            const auto ref = req->getOptionalParameter<std::string>("version");
+            const auto ref = (co_await assertVersion(req->getOptionalParameter<std::string>("version"), documentation_, *modResult,
+                                                     *installationToken))
+                                     .value_or(modResult->getValueOfSourceBranch());
             const auto prefixedPath = *modResult->getSourcePath() + '/' + path;
             const auto [contents,
                         contentsError](co_await documentation_.getDocumentationPage(*modResult, path, locale, ref, *installationToken));
@@ -139,12 +156,16 @@ namespace api::v1 {
 
             const auto locale =
                     co_await assertLocale(req->getOptionalParameter<std::string>("locale"), documentation_, *modResult, *installationToken);
-            const auto [contents, contentsError](co_await documentation_.getDirectoryTree(*modResult, locale, *installationToken));
+            const auto version = (co_await assertVersion(req->getOptionalParameter<std::string>("version"), documentation_, *modResult,
+                                                         *installationToken))
+                                         .value_or(modResult->getValueOfSourceBranch());
+            const auto [contents, contentsError](co_await documentation_.getDirectoryTree(*modResult, version, locale, *installationToken));
             if (!contents) {
                 co_return errorResponse(contentsError, "Error getting dir tree", callback);
             }
 
             const auto [isPublic, publicError](co_await github_.isPublicRepository(modResult->getValueOfSourceRepo(), *installationToken));
+            const auto [versions, versionsError](co_await documentation_.getAvailableVersions(*modResult, *installationToken));
 
             Json::Value root;
             {
@@ -156,6 +177,9 @@ namespace api::v1 {
                 modJson["source_repo"] = modResult->getValueOfSourceRepo();
                 modJson["is_community"] = modResult->getValueOfIsCommunity();
                 modJson["is_public"] = isPublic;
+                if (versions) {
+                    modJson["versions"] = *versions;
+                }
                 root["mod"] = modJson;
             }
             root["tree"] = contents;
@@ -204,7 +228,11 @@ namespace api::v1 {
                 co_return errorResponse(Error::ErrBadRequest, "Invalid location specified", callback);
             }
 
-            const auto [asset, assetError](co_await documentation_.getAssetResource(*modResult, *resourceLocation, *installationToken));
+            const auto version = (co_await assertVersion(req->getOptionalParameter<std::string>("version"), documentation_, *modResult,
+                                                         *installationToken))
+                                         .value_or(modResult->getValueOfSourceBranch());
+            const auto [asset,
+                        assetError](co_await documentation_.getAssetResource(*modResult, *resourceLocation, version, *installationToken));
             if (!asset) {
                 co_return errorResponse(assetError, "Asset not found", callback);
             }

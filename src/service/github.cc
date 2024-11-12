@@ -18,8 +18,7 @@ using namespace std::chrono_literals;
 
 bool isSuccess(const HttpStatusCode &code) { return code == k200OK || code == k201Created || code == k202Accepted; }
 
-Task<std::optional<Json::Value>> sendApiRequest(HttpClientPtr client, HttpMethod method, std::string path,
-                                                std::string token,
+Task<std::optional<Json::Value>> sendApiRequest(HttpClientPtr client, HttpMethod method, std::string path, std::string token,
                                                 const std::map<std::string, std::string> &params = {}) {
     try {
         auto httpReq = HttpRequest::newHttpRequest();
@@ -69,8 +68,7 @@ std::optional<std::chrono::system_clock::time_point> parseISO8601(const std::str
 }
 
 namespace service {
-    GitHub::GitHub(service::MemoryCache &cache_, const std::string &appClientId_,
-                   const std::string &appPrivateKeyPath_) :
+    GitHub::GitHub(service::MemoryCache &cache_, const std::string &appClientId_, const std::string &appPrivateKeyPath_) :
         cache_(cache_), appClientId_(appClientId_), appPrivateKeyPath_(appPrivateKeyPath_) {}
 
     Task<std::tuple<std::optional<std::string>, Error>> GitHub::getApplicationJWTToken() {
@@ -95,8 +93,7 @@ namespace service {
 
             // TODO don't block thread
             logger.trace("Storing JWT token in cache");
-            const auto ttl =
-                    std::chrono::duration_cast<std::chrono::seconds>(expiresAt - std::chrono::system_clock::now()) - 5s;
+            const auto ttl = std::chrono::duration_cast<std::chrono::seconds>(expiresAt - std::chrono::system_clock::now()) - 5s;
             co_await cache_.updateCache("jwt:" + appClientId_, token, ttl);
         } catch (std::exception &e) {
             logger.error("Failed to issue JWT auth token: {}", e.what());
@@ -115,8 +112,7 @@ namespace service {
         const auto [jwt, error](co_await getApplicationJWTToken());
 
         const auto client = createHttpClient();
-        if (auto installation = co_await sendApiRequest(client, Get, std::format("/repos/{}/installation", repo), *jwt))
-        {
+        if (auto installation = co_await sendApiRequest(client, Get, std::format("/repos/{}/installation", repo), *jwt)) {
             const std::string installationId = (*installation)["id"].asString();
 
             logger.trace("Storing installation ID for {} in cache", repo);
@@ -138,17 +134,15 @@ namespace service {
         const auto [jwt, error](co_await getApplicationJWTToken());
 
         const auto client = createHttpClient();
-        if (auto installationToken = co_await sendApiRequest(
-                    client, Post, std::format("/app/installations/{}/access_tokens", installationId), *jwt))
+        if (auto installationToken =
+                    co_await sendApiRequest(client, Post, std::format("/app/installations/{}/access_tokens", installationId), *jwt))
         {
             const std::string expiryString = (*installationToken)["expires_at"].asString();
             const std::string token = (*installationToken)["token"].asString();
 
             if (const auto expiryTime = parseISO8601(expiryString)) {
                 logger.trace("Storing installation token for {} in cache", installationId);
-                const auto ttl = std::chrono::duration_cast<std::chrono::seconds>(*expiryTime -
-                                                                                  std::chrono::system_clock::now()) -
-                                 5s;
+                const auto ttl = std::chrono::duration_cast<std::chrono::seconds>(*expiryTime - std::chrono::system_clock::now()) - 5s;
                 co_await cache_.updateCache("installation_token:" + installationId, token, ttl);
             }
 
@@ -159,19 +153,29 @@ namespace service {
         co_return {std::nullopt, Error::ErrInternal};
     }
 
-    Task<std::tuple<std::optional<Json::Value>, Error>>
-    GitHub::getRepositoryContents(const std::string repo, const std::optional<std::string> ref, const std::string path,
-                                  const std::string installationToken) {
-        const auto client = createHttpClient();
-        std::map<std::string, std::string> params = {};
-        if (ref) {
-            params["ref"] = *ref;
+    Task<std::tuple<std::optional<Json::Value>, Error>> GitHub::getRepositoryJSONFile(std::string repo, std::string ref, std::string path,
+                                                                                      std::string installationToken) {
+        const auto [contents, contentsError](co_await getRepositoryContents(repo, ref, path, installationToken));
+        if (contents) {
+            const auto body = decodeBase64((*contents)["content"].asString());
+            if (const auto parsed = parseJsonString(body)) {
+                co_return {parsed, Error::Ok};
+            }
+            co_return {std::nullopt, Error::ErrBadRequest};
         }
+        co_return {std::nullopt, contentsError};
+    }
 
-        const auto normalizedPath = removeTrailingSlash(path);
-        const auto normalizedStart = path.starts_with('/') ? path.substr(1) : path;
-        if (auto repositoryContents = co_await sendApiRequest(
-                    client, Get, std::format("/repos/{}/contents/{}", repo, normalizedStart), installationToken, params))
+    Task<std::tuple<std::optional<Json::Value>, Error>> GitHub::getRepositoryContents(const std::string repo, const std::string ref,
+                                                                                      const std::string path,
+                                                                                      const std::string installationToken) {
+        const auto client = createHttpClient();
+        std::map<std::string, std::string> params;
+        params.try_emplace("ref", ref);
+
+        const auto normalizedPath = removeLeadingSlash(removeTrailingSlash(path));
+        if (auto repositoryContents = co_await sendApiRequest(client, Get, std::format("/repos/{}/contents/{}", repo, normalizedPath),
+                                                              installationToken, params))
         {
             co_return {std::optional(repositoryContents), Error::Ok};
         }
@@ -188,18 +192,13 @@ namespace service {
         co_return {false, Error::ErrNotFound};
     }
 
-    Task<std::tuple<std::optional<std::string>, Error>> GitHub::getFileLastUpdateTime(std::string repo,
-                                                                                      std::optional<std::string> ref,
-                                                                                      std::string path,
+    Task<std::tuple<std::optional<std::string>, Error>> GitHub::getFileLastUpdateTime(std::string repo, std::string ref, std::string path,
                                                                                       std::string installationToken) {
         const auto client = createHttpClient();
-        std::map<std::string, std::string> params = { {"page", "1"}, {"per_page", "1"} };
+        std::map<std::string, std::string> params = {{"page", "1"}, {"per_page", "1"}};
         params.try_emplace("path", path);
-        if (ref) {
-            params["sha"] = *ref;
-        }
-        if (auto commits =
-                    co_await sendApiRequest(client, Get, std::format("/repos/{}/commits", repo), installationToken, params);
+        params.try_emplace("sha", ref);
+        if (auto commits = co_await sendApiRequest(client, Get, std::format("/repos/{}/commits", repo), installationToken, params);
             commits && commits->isArray())
         {
             const auto entry = commits->front();

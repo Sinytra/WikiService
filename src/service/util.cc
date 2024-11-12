@@ -2,15 +2,11 @@
 
 #include <base64.hpp>
 
-std::string removeTrailingSlash(const std::string &s) {
-    return s.ends_with('/') ? s.substr(0, s.size() - 1) : s;
-}
+std::string removeTrailingSlash(const std::string &s) { return s.ends_with('/') ? s.substr(0, s.size() - 1) : s; }
 
-std::string removeLeadingSlash(const std::string &s) {
-    return s.starts_with('/') ? s.substr(1) : s;
-}
+std::string removeLeadingSlash(const std::string &s) { return s.starts_with('/') ? s.substr(1) : s; }
 
-std::optional<ResourceLocation> ResourceLocation::parse(const std::string& str) {
+std::optional<ResourceLocation> ResourceLocation::parse(const std::string &str) {
     const auto delimeter = str.find(':');
     if (delimeter == std::string::npos || delimeter == str.size() - 1) {
         return std::nullopt;
@@ -20,11 +16,7 @@ std::optional<ResourceLocation> ResourceLocation::parse(const std::string& str) 
     return ResourceLocation{namespace_, path_};
 }
 
-void replace_all(
-std::string& s,
-std::string const& toReplace,
-std::string const& replaceWith
-) {
+void replace_all(std::string &s, std::string const &toReplace, std::string const &replaceWith) {
     std::string buf;
     std::size_t pos = 0;
     std::size_t prevPos;
@@ -51,7 +43,7 @@ std::string decodeBase64(std::string encoded) {
     return base64::from_base64(encoded);
 }
 
-std::optional<Json::Value> parseJsonString(const std::string& str) {
+std::optional<Json::Value> parseJsonString(const std::string &str) {
     Json::Value root;
     JSONCPP_STRING err;
     Json::CharReaderBuilder builder;
@@ -65,8 +57,7 @@ std::optional<Json::Value> parseJsonString(const std::string& str) {
 std::string toCamelCase(std::string s) {
     char previous = ' ';
     auto f = [&](char current) {
-        char result =
-                (std::isblank(previous) && std::isalpha(current)) ? std::toupper(current) : std::tolower(current);
+        char result = (std::isblank(previous) && std::isalpha(current)) ? std::toupper(current) : std::tolower(current);
         previous = current;
         return result;
     };
@@ -74,7 +65,7 @@ std::string toCamelCase(std::string s) {
     return s;
 }
 
-std::string serializeJsonString(const Json::Value& value) {
+std::string serializeJsonString(const Json::Value &value) {
     Json::FastWriter fastWriter;
     return fastWriter.write(value);
 }

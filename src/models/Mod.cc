@@ -26,1720 +26,1237 @@ const std::string Mod::primaryKeyName = "id";
 const bool Mod::hasPrimaryKey = true;
 const std::string Mod::tableName = "\"mod\"";
 
-const std::vector<typename Mod::MetaData> Mod::metaData_={
-{"id","std::string","text",0,0,1,1},
-{"name","std::string","text",0,0,0,1},
-{"platform","std::string","character varying",50,0,0,1},
-{"slug","std::string","text",0,0,0,1},
-{"createdAt","::trantor::Date","timestamp without time zone",0,0,0,1},
-{"source_path","std::string","text",0,0,0,1},
-{"source_repo","std::string","text",0,0,0,1},
-{"source_branch","std::string","text",0,0,0,1},
-{"is_community","bool","boolean",1,0,0,1}
-};
-const std::string &Mod::getColumnName(size_t index) noexcept(false)
-{
+const std::vector<typename Mod::MetaData> Mod::metaData_ = {{"id", "std::string", "text", 0, 0, 1, 1},
+                                                            {"name", "std::string", "text", 0, 0, 0, 1},
+                                                            {"platform", "std::string", "character varying", 50, 0, 0, 1},
+                                                            {"slug", "std::string", "text", 0, 0, 0, 1},
+                                                            {"createdAt", "::trantor::Date", "timestamp without time zone", 0, 0, 0, 1},
+                                                            {"source_path", "std::string", "text", 0, 0, 0, 1},
+                                                            {"source_repo", "std::string", "text", 0, 0, 0, 1},
+                                                            {"source_branch", "std::string", "text", 0, 0, 0, 1},
+                                                            {"is_community", "bool", "boolean", 1, 0, 0, 1}};
+const std::string &Mod::getColumnName(size_t index) noexcept(false) {
     assert(index < metaData_.size());
     return metaData_[index].colName_;
 }
-Mod::Mod(const Row &r, const ssize_t indexOffset) noexcept
-{
-    if(indexOffset < 0)
-    {
-        if(!r["id"].isNull())
-        {
-            id_=std::make_shared<std::string>(r["id"].as<std::string>());
+Mod::Mod(const Row &r, const ssize_t indexOffset) noexcept {
+    if (indexOffset < 0) {
+        if (!r["id"].isNull()) {
+            id_ = std::make_shared<std::string>(r["id"].as<std::string>());
         }
-        if(!r["name"].isNull())
-        {
-            name_=std::make_shared<std::string>(r["name"].as<std::string>());
+        if (!r["name"].isNull()) {
+            name_ = std::make_shared<std::string>(r["name"].as<std::string>());
         }
-        if(!r["platform"].isNull())
-        {
-            platform_=std::make_shared<std::string>(r["platform"].as<std::string>());
+        if (!r["platform"].isNull()) {
+            platform_ = std::make_shared<std::string>(r["platform"].as<std::string>());
         }
-        if(!r["slug"].isNull())
-        {
-            slug_=std::make_shared<std::string>(r["slug"].as<std::string>());
+        if (!r["slug"].isNull()) {
+            slug_ = std::make_shared<std::string>(r["slug"].as<std::string>());
         }
-        if(!r["createdAt"].isNull())
-        {
+        if (!r["createdAt"].isNull()) {
             auto timeStr = r["createdAt"].as<std::string>();
             struct tm stm;
-            memset(&stm,0,sizeof(stm));
-            auto p = strptime(timeStr.c_str(),"%Y-%m-%d %H:%M:%S",&stm);
+            memset(&stm, 0, sizeof(stm));
+            auto p = strptime(timeStr.c_str(), "%Y-%m-%d %H:%M:%S", &stm);
             time_t t = mktime(&stm);
             size_t decimalNum = 0;
-            if(p)
-            {
-                if(*p=='.')
-                {
-                    std::string decimals(p+1,&timeStr[timeStr.length()]);
-                    while(decimals.length()<6)
-                    {
+            if (p) {
+                if (*p == '.') {
+                    std::string decimals(p + 1, &timeStr[timeStr.length()]);
+                    while (decimals.length() < 6) {
                         decimals += "0";
                     }
-                    decimalNum = (size_t)atol(decimals.c_str());
+                    decimalNum = (size_t) atol(decimals.c_str());
                 }
-                createdat_=std::make_shared<::trantor::Date>(t*1000000+decimalNum);
+                createdat_ = std::make_shared<::trantor::Date>(t * 1000000 + decimalNum);
             }
         }
-        if(!r["source_path"].isNull())
-        {
-            sourcePath_=std::make_shared<std::string>(r["source_path"].as<std::string>());
+        if (!r["source_path"].isNull()) {
+            sourcePath_ = std::make_shared<std::string>(r["source_path"].as<std::string>());
         }
-        if(!r["source_repo"].isNull())
-        {
-            sourceRepo_=std::make_shared<std::string>(r["source_repo"].as<std::string>());
+        if (!r["source_repo"].isNull()) {
+            sourceRepo_ = std::make_shared<std::string>(r["source_repo"].as<std::string>());
         }
-        if(!r["source_branch"].isNull())
-        {
-            sourceBranch_=std::make_shared<std::string>(r["source_branch"].as<std::string>());
+        if (!r["source_branch"].isNull()) {
+            sourceBranch_ = std::make_shared<std::string>(r["source_branch"].as<std::string>());
         }
-        if(!r["is_community"].isNull())
-        {
-            isCommunity_=std::make_shared<bool>(r["is_community"].as<bool>());
+        if (!r["is_community"].isNull()) {
+            isCommunity_ = std::make_shared<bool>(r["is_community"].as<bool>());
         }
-    }
-    else
-    {
-        size_t offset = (size_t)indexOffset;
-        if(offset + 9 > r.size())
-        {
+    } else {
+        size_t offset = (size_t) indexOffset;
+        if (offset + 9 > r.size()) {
             LOG_FATAL << "Invalid SQL result for this model";
             return;
         }
         size_t index;
         index = offset + 0;
-        if(!r[index].isNull())
-        {
-            id_=std::make_shared<std::string>(r[index].as<std::string>());
+        if (!r[index].isNull()) {
+            id_ = std::make_shared<std::string>(r[index].as<std::string>());
         }
         index = offset + 1;
-        if(!r[index].isNull())
-        {
-            name_=std::make_shared<std::string>(r[index].as<std::string>());
+        if (!r[index].isNull()) {
+            name_ = std::make_shared<std::string>(r[index].as<std::string>());
         }
         index = offset + 2;
-        if(!r[index].isNull())
-        {
-            platform_=std::make_shared<std::string>(r[index].as<std::string>());
+        if (!r[index].isNull()) {
+            platform_ = std::make_shared<std::string>(r[index].as<std::string>());
         }
         index = offset + 3;
-        if(!r[index].isNull())
-        {
-            slug_=std::make_shared<std::string>(r[index].as<std::string>());
+        if (!r[index].isNull()) {
+            slug_ = std::make_shared<std::string>(r[index].as<std::string>());
         }
         index = offset + 4;
-        if(!r[index].isNull())
-        {
+        if (!r[index].isNull()) {
             auto timeStr = r[index].as<std::string>();
             struct tm stm;
-            memset(&stm,0,sizeof(stm));
-            auto p = strptime(timeStr.c_str(),"%Y-%m-%d %H:%M:%S",&stm);
+            memset(&stm, 0, sizeof(stm));
+            auto p = strptime(timeStr.c_str(), "%Y-%m-%d %H:%M:%S", &stm);
             time_t t = mktime(&stm);
             size_t decimalNum = 0;
-            if(p)
-            {
-                if(*p=='.')
-                {
-                    std::string decimals(p+1,&timeStr[timeStr.length()]);
-                    while(decimals.length()<6)
-                    {
+            if (p) {
+                if (*p == '.') {
+                    std::string decimals(p + 1, &timeStr[timeStr.length()]);
+                    while (decimals.length() < 6) {
                         decimals += "0";
                     }
-                    decimalNum = (size_t)atol(decimals.c_str());
+                    decimalNum = (size_t) atol(decimals.c_str());
                 }
-                createdat_=std::make_shared<::trantor::Date>(t*1000000+decimalNum);
+                createdat_ = std::make_shared<::trantor::Date>(t * 1000000 + decimalNum);
             }
         }
         index = offset + 5;
-        if(!r[index].isNull())
-        {
-            sourcePath_=std::make_shared<std::string>(r[index].as<std::string>());
+        if (!r[index].isNull()) {
+            sourcePath_ = std::make_shared<std::string>(r[index].as<std::string>());
         }
         index = offset + 6;
-        if(!r[index].isNull())
-        {
-            sourceRepo_=std::make_shared<std::string>(r[index].as<std::string>());
+        if (!r[index].isNull()) {
+            sourceRepo_ = std::make_shared<std::string>(r[index].as<std::string>());
         }
         index = offset + 7;
-        if(!r[index].isNull())
-        {
-            sourceBranch_=std::make_shared<std::string>(r[index].as<std::string>());
+        if (!r[index].isNull()) {
+            sourceBranch_ = std::make_shared<std::string>(r[index].as<std::string>());
         }
         index = offset + 8;
-        if(!r[index].isNull())
-        {
-            isCommunity_=std::make_shared<bool>(r[index].as<bool>());
+        if (!r[index].isNull()) {
+            isCommunity_ = std::make_shared<bool>(r[index].as<bool>());
         }
     }
-
 }
 
-Mod::Mod(const Json::Value &pJson, const std::vector<std::string> &pMasqueradingVector) noexcept(false)
-{
-    if(pMasqueradingVector.size() != 9)
-    {
+Mod::Mod(const Json::Value &pJson, const std::vector<std::string> &pMasqueradingVector) noexcept(false) {
+    if (pMasqueradingVector.size() != 9) {
         LOG_ERROR << "Bad masquerading vector";
         return;
     }
-    if(!pMasqueradingVector[0].empty() && pJson.isMember(pMasqueradingVector[0]))
-    {
+    if (!pMasqueradingVector[0].empty() && pJson.isMember(pMasqueradingVector[0])) {
         dirtyFlag_[0] = true;
-        if(!pJson[pMasqueradingVector[0]].isNull())
-        {
-            id_=std::make_shared<std::string>(pJson[pMasqueradingVector[0]].asString());
+        if (!pJson[pMasqueradingVector[0]].isNull()) {
+            id_ = std::make_shared<std::string>(pJson[pMasqueradingVector[0]].asString());
         }
     }
-    if(!pMasqueradingVector[1].empty() && pJson.isMember(pMasqueradingVector[1]))
-    {
+    if (!pMasqueradingVector[1].empty() && pJson.isMember(pMasqueradingVector[1])) {
         dirtyFlag_[1] = true;
-        if(!pJson[pMasqueradingVector[1]].isNull())
-        {
-            name_=std::make_shared<std::string>(pJson[pMasqueradingVector[1]].asString());
+        if (!pJson[pMasqueradingVector[1]].isNull()) {
+            name_ = std::make_shared<std::string>(pJson[pMasqueradingVector[1]].asString());
         }
     }
-    if(!pMasqueradingVector[2].empty() && pJson.isMember(pMasqueradingVector[2]))
-    {
+    if (!pMasqueradingVector[2].empty() && pJson.isMember(pMasqueradingVector[2])) {
         dirtyFlag_[2] = true;
-        if(!pJson[pMasqueradingVector[2]].isNull())
-        {
-            platform_=std::make_shared<std::string>(pJson[pMasqueradingVector[2]].asString());
+        if (!pJson[pMasqueradingVector[2]].isNull()) {
+            platform_ = std::make_shared<std::string>(pJson[pMasqueradingVector[2]].asString());
         }
     }
-    if(!pMasqueradingVector[3].empty() && pJson.isMember(pMasqueradingVector[3]))
-    {
+    if (!pMasqueradingVector[3].empty() && pJson.isMember(pMasqueradingVector[3])) {
         dirtyFlag_[3] = true;
-        if(!pJson[pMasqueradingVector[3]].isNull())
-        {
-            slug_=std::make_shared<std::string>(pJson[pMasqueradingVector[3]].asString());
+        if (!pJson[pMasqueradingVector[3]].isNull()) {
+            slug_ = std::make_shared<std::string>(pJson[pMasqueradingVector[3]].asString());
         }
     }
-    if(!pMasqueradingVector[4].empty() && pJson.isMember(pMasqueradingVector[4]))
-    {
+    if (!pMasqueradingVector[4].empty() && pJson.isMember(pMasqueradingVector[4])) {
         dirtyFlag_[4] = true;
-        if(!pJson[pMasqueradingVector[4]].isNull())
-        {
+        if (!pJson[pMasqueradingVector[4]].isNull()) {
             auto timeStr = pJson[pMasqueradingVector[4]].asString();
             struct tm stm;
-            memset(&stm,0,sizeof(stm));
-            auto p = strptime(timeStr.c_str(),"%Y-%m-%d %H:%M:%S",&stm);
+            memset(&stm, 0, sizeof(stm));
+            auto p = strptime(timeStr.c_str(), "%Y-%m-%d %H:%M:%S", &stm);
             time_t t = mktime(&stm);
             size_t decimalNum = 0;
-            if(p)
-            {
-                if(*p=='.')
-                {
-                    std::string decimals(p+1,&timeStr[timeStr.length()]);
-                    while(decimals.length()<6)
-                    {
+            if (p) {
+                if (*p == '.') {
+                    std::string decimals(p + 1, &timeStr[timeStr.length()]);
+                    while (decimals.length() < 6) {
                         decimals += "0";
                     }
-                    decimalNum = (size_t)atol(decimals.c_str());
+                    decimalNum = (size_t) atol(decimals.c_str());
                 }
-                createdat_=std::make_shared<::trantor::Date>(t*1000000+decimalNum);
+                createdat_ = std::make_shared<::trantor::Date>(t * 1000000 + decimalNum);
             }
         }
     }
-    if(!pMasqueradingVector[5].empty() && pJson.isMember(pMasqueradingVector[5]))
-    {
+    if (!pMasqueradingVector[5].empty() && pJson.isMember(pMasqueradingVector[5])) {
         dirtyFlag_[5] = true;
-        if(!pJson[pMasqueradingVector[5]].isNull())
-        {
-            sourcePath_=std::make_shared<std::string>(pJson[pMasqueradingVector[5]].asString());
+        if (!pJson[pMasqueradingVector[5]].isNull()) {
+            sourcePath_ = std::make_shared<std::string>(pJson[pMasqueradingVector[5]].asString());
         }
     }
-    if(!pMasqueradingVector[6].empty() && pJson.isMember(pMasqueradingVector[6]))
-    {
+    if (!pMasqueradingVector[6].empty() && pJson.isMember(pMasqueradingVector[6])) {
         dirtyFlag_[6] = true;
-        if(!pJson[pMasqueradingVector[6]].isNull())
-        {
-            sourceRepo_=std::make_shared<std::string>(pJson[pMasqueradingVector[6]].asString());
+        if (!pJson[pMasqueradingVector[6]].isNull()) {
+            sourceRepo_ = std::make_shared<std::string>(pJson[pMasqueradingVector[6]].asString());
         }
     }
-    if(!pMasqueradingVector[7].empty() && pJson.isMember(pMasqueradingVector[7]))
-    {
+    if (!pMasqueradingVector[7].empty() && pJson.isMember(pMasqueradingVector[7])) {
         dirtyFlag_[7] = true;
-        if(!pJson[pMasqueradingVector[7]].isNull())
-        {
-            sourceBranch_=std::make_shared<std::string>(pJson[pMasqueradingVector[7]].asString());
+        if (!pJson[pMasqueradingVector[7]].isNull()) {
+            sourceBranch_ = std::make_shared<std::string>(pJson[pMasqueradingVector[7]].asString());
         }
     }
-    if(!pMasqueradingVector[8].empty() && pJson.isMember(pMasqueradingVector[8]))
-    {
+    if (!pMasqueradingVector[8].empty() && pJson.isMember(pMasqueradingVector[8])) {
         dirtyFlag_[8] = true;
-        if(!pJson[pMasqueradingVector[8]].isNull())
-        {
-            isCommunity_=std::make_shared<bool>(pJson[pMasqueradingVector[8]].asBool());
+        if (!pJson[pMasqueradingVector[8]].isNull()) {
+            isCommunity_ = std::make_shared<bool>(pJson[pMasqueradingVector[8]].asBool());
         }
     }
 }
 
-Mod::Mod(const Json::Value &pJson) noexcept(false)
-{
-    if(pJson.isMember("id"))
-    {
-        dirtyFlag_[0]=true;
-        if(!pJson["id"].isNull())
-        {
-            id_=std::make_shared<std::string>(pJson["id"].asString());
+Mod::Mod(const Json::Value &pJson) noexcept(false) {
+    if (pJson.isMember("id")) {
+        dirtyFlag_[0] = true;
+        if (!pJson["id"].isNull()) {
+            id_ = std::make_shared<std::string>(pJson["id"].asString());
         }
     }
-    if(pJson.isMember("name"))
-    {
-        dirtyFlag_[1]=true;
-        if(!pJson["name"].isNull())
-        {
-            name_=std::make_shared<std::string>(pJson["name"].asString());
+    if (pJson.isMember("name")) {
+        dirtyFlag_[1] = true;
+        if (!pJson["name"].isNull()) {
+            name_ = std::make_shared<std::string>(pJson["name"].asString());
         }
     }
-    if(pJson.isMember("platform"))
-    {
-        dirtyFlag_[2]=true;
-        if(!pJson["platform"].isNull())
-        {
-            platform_=std::make_shared<std::string>(pJson["platform"].asString());
+    if (pJson.isMember("platform")) {
+        dirtyFlag_[2] = true;
+        if (!pJson["platform"].isNull()) {
+            platform_ = std::make_shared<std::string>(pJson["platform"].asString());
         }
     }
-    if(pJson.isMember("slug"))
-    {
-        dirtyFlag_[3]=true;
-        if(!pJson["slug"].isNull())
-        {
-            slug_=std::make_shared<std::string>(pJson["slug"].asString());
+    if (pJson.isMember("slug")) {
+        dirtyFlag_[3] = true;
+        if (!pJson["slug"].isNull()) {
+            slug_ = std::make_shared<std::string>(pJson["slug"].asString());
         }
     }
-    if(pJson.isMember("createdAt"))
-    {
-        dirtyFlag_[4]=true;
-        if(!pJson["createdAt"].isNull())
-        {
+    if (pJson.isMember("createdAt")) {
+        dirtyFlag_[4] = true;
+        if (!pJson["createdAt"].isNull()) {
             auto timeStr = pJson["createdAt"].asString();
             struct tm stm;
-            memset(&stm,0,sizeof(stm));
-            auto p = strptime(timeStr.c_str(),"%Y-%m-%d %H:%M:%S",&stm);
+            memset(&stm, 0, sizeof(stm));
+            auto p = strptime(timeStr.c_str(), "%Y-%m-%d %H:%M:%S", &stm);
             time_t t = mktime(&stm);
             size_t decimalNum = 0;
-            if(p)
-            {
-                if(*p=='.')
-                {
-                    std::string decimals(p+1,&timeStr[timeStr.length()]);
-                    while(decimals.length()<6)
-                    {
+            if (p) {
+                if (*p == '.') {
+                    std::string decimals(p + 1, &timeStr[timeStr.length()]);
+                    while (decimals.length() < 6) {
                         decimals += "0";
                     }
-                    decimalNum = (size_t)atol(decimals.c_str());
+                    decimalNum = (size_t) atol(decimals.c_str());
                 }
-                createdat_=std::make_shared<::trantor::Date>(t*1000000+decimalNum);
+                createdat_ = std::make_shared<::trantor::Date>(t * 1000000 + decimalNum);
             }
         }
     }
-    if(pJson.isMember("source_path"))
-    {
-        dirtyFlag_[5]=true;
-        if(!pJson["source_path"].isNull())
-        {
-            sourcePath_=std::make_shared<std::string>(pJson["source_path"].asString());
+    if (pJson.isMember("source_path")) {
+        dirtyFlag_[5] = true;
+        if (!pJson["source_path"].isNull()) {
+            sourcePath_ = std::make_shared<std::string>(pJson["source_path"].asString());
         }
     }
-    if(pJson.isMember("source_repo"))
-    {
-        dirtyFlag_[6]=true;
-        if(!pJson["source_repo"].isNull())
-        {
-            sourceRepo_=std::make_shared<std::string>(pJson["source_repo"].asString());
+    if (pJson.isMember("source_repo")) {
+        dirtyFlag_[6] = true;
+        if (!pJson["source_repo"].isNull()) {
+            sourceRepo_ = std::make_shared<std::string>(pJson["source_repo"].asString());
         }
     }
-    if(pJson.isMember("source_branch"))
-    {
-        dirtyFlag_[7]=true;
-        if(!pJson["source_branch"].isNull())
-        {
-            sourceBranch_=std::make_shared<std::string>(pJson["source_branch"].asString());
+    if (pJson.isMember("source_branch")) {
+        dirtyFlag_[7] = true;
+        if (!pJson["source_branch"].isNull()) {
+            sourceBranch_ = std::make_shared<std::string>(pJson["source_branch"].asString());
         }
     }
-    if(pJson.isMember("is_community"))
-    {
-        dirtyFlag_[8]=true;
-        if(!pJson["is_community"].isNull())
-        {
-            isCommunity_=std::make_shared<bool>(pJson["is_community"].asBool());
+    if (pJson.isMember("is_community")) {
+        dirtyFlag_[8] = true;
+        if (!pJson["is_community"].isNull()) {
+            isCommunity_ = std::make_shared<bool>(pJson["is_community"].asBool());
         }
     }
 }
 
-void Mod::updateByMasqueradedJson(const Json::Value &pJson,
-                                            const std::vector<std::string> &pMasqueradingVector) noexcept(false)
-{
-    if(pMasqueradingVector.size() != 9)
-    {
+void Mod::updateByMasqueradedJson(const Json::Value &pJson, const std::vector<std::string> &pMasqueradingVector) noexcept(false) {
+    if (pMasqueradingVector.size() != 9) {
         LOG_ERROR << "Bad masquerading vector";
         return;
     }
-    if(!pMasqueradingVector[0].empty() && pJson.isMember(pMasqueradingVector[0]))
-    {
-        if(!pJson[pMasqueradingVector[0]].isNull())
-        {
-            id_=std::make_shared<std::string>(pJson[pMasqueradingVector[0]].asString());
+    if (!pMasqueradingVector[0].empty() && pJson.isMember(pMasqueradingVector[0])) {
+        if (!pJson[pMasqueradingVector[0]].isNull()) {
+            id_ = std::make_shared<std::string>(pJson[pMasqueradingVector[0]].asString());
         }
     }
-    if(!pMasqueradingVector[1].empty() && pJson.isMember(pMasqueradingVector[1]))
-    {
+    if (!pMasqueradingVector[1].empty() && pJson.isMember(pMasqueradingVector[1])) {
         dirtyFlag_[1] = true;
-        if(!pJson[pMasqueradingVector[1]].isNull())
-        {
-            name_=std::make_shared<std::string>(pJson[pMasqueradingVector[1]].asString());
+        if (!pJson[pMasqueradingVector[1]].isNull()) {
+            name_ = std::make_shared<std::string>(pJson[pMasqueradingVector[1]].asString());
         }
     }
-    if(!pMasqueradingVector[2].empty() && pJson.isMember(pMasqueradingVector[2]))
-    {
+    if (!pMasqueradingVector[2].empty() && pJson.isMember(pMasqueradingVector[2])) {
         dirtyFlag_[2] = true;
-        if(!pJson[pMasqueradingVector[2]].isNull())
-        {
-            platform_=std::make_shared<std::string>(pJson[pMasqueradingVector[2]].asString());
+        if (!pJson[pMasqueradingVector[2]].isNull()) {
+            platform_ = std::make_shared<std::string>(pJson[pMasqueradingVector[2]].asString());
         }
     }
-    if(!pMasqueradingVector[3].empty() && pJson.isMember(pMasqueradingVector[3]))
-    {
+    if (!pMasqueradingVector[3].empty() && pJson.isMember(pMasqueradingVector[3])) {
         dirtyFlag_[3] = true;
-        if(!pJson[pMasqueradingVector[3]].isNull())
-        {
-            slug_=std::make_shared<std::string>(pJson[pMasqueradingVector[3]].asString());
+        if (!pJson[pMasqueradingVector[3]].isNull()) {
+            slug_ = std::make_shared<std::string>(pJson[pMasqueradingVector[3]].asString());
         }
     }
-    if(!pMasqueradingVector[4].empty() && pJson.isMember(pMasqueradingVector[4]))
-    {
+    if (!pMasqueradingVector[4].empty() && pJson.isMember(pMasqueradingVector[4])) {
         dirtyFlag_[4] = true;
-        if(!pJson[pMasqueradingVector[4]].isNull())
-        {
+        if (!pJson[pMasqueradingVector[4]].isNull()) {
             auto timeStr = pJson[pMasqueradingVector[4]].asString();
             struct tm stm;
-            memset(&stm,0,sizeof(stm));
-            auto p = strptime(timeStr.c_str(),"%Y-%m-%d %H:%M:%S",&stm);
+            memset(&stm, 0, sizeof(stm));
+            auto p = strptime(timeStr.c_str(), "%Y-%m-%d %H:%M:%S", &stm);
             time_t t = mktime(&stm);
             size_t decimalNum = 0;
-            if(p)
-            {
-                if(*p=='.')
-                {
-                    std::string decimals(p+1,&timeStr[timeStr.length()]);
-                    while(decimals.length()<6)
-                    {
+            if (p) {
+                if (*p == '.') {
+                    std::string decimals(p + 1, &timeStr[timeStr.length()]);
+                    while (decimals.length() < 6) {
                         decimals += "0";
                     }
-                    decimalNum = (size_t)atol(decimals.c_str());
+                    decimalNum = (size_t) atol(decimals.c_str());
                 }
-                createdat_=std::make_shared<::trantor::Date>(t*1000000+decimalNum);
+                createdat_ = std::make_shared<::trantor::Date>(t * 1000000 + decimalNum);
             }
         }
     }
-    if(!pMasqueradingVector[5].empty() && pJson.isMember(pMasqueradingVector[5]))
-    {
+    if (!pMasqueradingVector[5].empty() && pJson.isMember(pMasqueradingVector[5])) {
         dirtyFlag_[5] = true;
-        if(!pJson[pMasqueradingVector[5]].isNull())
-        {
-            sourcePath_=std::make_shared<std::string>(pJson[pMasqueradingVector[5]].asString());
+        if (!pJson[pMasqueradingVector[5]].isNull()) {
+            sourcePath_ = std::make_shared<std::string>(pJson[pMasqueradingVector[5]].asString());
         }
     }
-    if(!pMasqueradingVector[6].empty() && pJson.isMember(pMasqueradingVector[6]))
-    {
+    if (!pMasqueradingVector[6].empty() && pJson.isMember(pMasqueradingVector[6])) {
         dirtyFlag_[6] = true;
-        if(!pJson[pMasqueradingVector[6]].isNull())
-        {
-            sourceRepo_=std::make_shared<std::string>(pJson[pMasqueradingVector[6]].asString());
+        if (!pJson[pMasqueradingVector[6]].isNull()) {
+            sourceRepo_ = std::make_shared<std::string>(pJson[pMasqueradingVector[6]].asString());
         }
     }
-    if(!pMasqueradingVector[7].empty() && pJson.isMember(pMasqueradingVector[7]))
-    {
+    if (!pMasqueradingVector[7].empty() && pJson.isMember(pMasqueradingVector[7])) {
         dirtyFlag_[7] = true;
-        if(!pJson[pMasqueradingVector[7]].isNull())
-        {
-            sourceBranch_=std::make_shared<std::string>(pJson[pMasqueradingVector[7]].asString());
+        if (!pJson[pMasqueradingVector[7]].isNull()) {
+            sourceBranch_ = std::make_shared<std::string>(pJson[pMasqueradingVector[7]].asString());
         }
     }
-    if(!pMasqueradingVector[8].empty() && pJson.isMember(pMasqueradingVector[8]))
-    {
+    if (!pMasqueradingVector[8].empty() && pJson.isMember(pMasqueradingVector[8])) {
         dirtyFlag_[8] = true;
-        if(!pJson[pMasqueradingVector[8]].isNull())
-        {
-            isCommunity_=std::make_shared<bool>(pJson[pMasqueradingVector[8]].asBool());
+        if (!pJson[pMasqueradingVector[8]].isNull()) {
+            isCommunity_ = std::make_shared<bool>(pJson[pMasqueradingVector[8]].asBool());
         }
     }
 }
 
-void Mod::updateByJson(const Json::Value &pJson) noexcept(false)
-{
-    if(pJson.isMember("id"))
-    {
-        if(!pJson["id"].isNull())
-        {
-            id_=std::make_shared<std::string>(pJson["id"].asString());
+void Mod::updateByJson(const Json::Value &pJson) noexcept(false) {
+    if (pJson.isMember("id")) {
+        if (!pJson["id"].isNull()) {
+            id_ = std::make_shared<std::string>(pJson["id"].asString());
         }
     }
-    if(pJson.isMember("name"))
-    {
+    if (pJson.isMember("name")) {
         dirtyFlag_[1] = true;
-        if(!pJson["name"].isNull())
-        {
-            name_=std::make_shared<std::string>(pJson["name"].asString());
+        if (!pJson["name"].isNull()) {
+            name_ = std::make_shared<std::string>(pJson["name"].asString());
         }
     }
-    if(pJson.isMember("platform"))
-    {
+    if (pJson.isMember("platform")) {
         dirtyFlag_[2] = true;
-        if(!pJson["platform"].isNull())
-        {
-            platform_=std::make_shared<std::string>(pJson["platform"].asString());
+        if (!pJson["platform"].isNull()) {
+            platform_ = std::make_shared<std::string>(pJson["platform"].asString());
         }
     }
-    if(pJson.isMember("slug"))
-    {
+    if (pJson.isMember("slug")) {
         dirtyFlag_[3] = true;
-        if(!pJson["slug"].isNull())
-        {
-            slug_=std::make_shared<std::string>(pJson["slug"].asString());
+        if (!pJson["slug"].isNull()) {
+            slug_ = std::make_shared<std::string>(pJson["slug"].asString());
         }
     }
-    if(pJson.isMember("createdAt"))
-    {
+    if (pJson.isMember("createdAt")) {
         dirtyFlag_[4] = true;
-        if(!pJson["createdAt"].isNull())
-        {
+        if (!pJson["createdAt"].isNull()) {
             auto timeStr = pJson["createdAt"].asString();
             struct tm stm;
-            memset(&stm,0,sizeof(stm));
-            auto p = strptime(timeStr.c_str(),"%Y-%m-%d %H:%M:%S",&stm);
+            memset(&stm, 0, sizeof(stm));
+            auto p = strptime(timeStr.c_str(), "%Y-%m-%d %H:%M:%S", &stm);
             time_t t = mktime(&stm);
             size_t decimalNum = 0;
-            if(p)
-            {
-                if(*p=='.')
-                {
-                    std::string decimals(p+1,&timeStr[timeStr.length()]);
-                    while(decimals.length()<6)
-                    {
+            if (p) {
+                if (*p == '.') {
+                    std::string decimals(p + 1, &timeStr[timeStr.length()]);
+                    while (decimals.length() < 6) {
                         decimals += "0";
                     }
-                    decimalNum = (size_t)atol(decimals.c_str());
+                    decimalNum = (size_t) atol(decimals.c_str());
                 }
-                createdat_=std::make_shared<::trantor::Date>(t*1000000+decimalNum);
+                createdat_ = std::make_shared<::trantor::Date>(t * 1000000 + decimalNum);
             }
         }
     }
-    if(pJson.isMember("source_path"))
-    {
+    if (pJson.isMember("source_path")) {
         dirtyFlag_[5] = true;
-        if(!pJson["source_path"].isNull())
-        {
-            sourcePath_=std::make_shared<std::string>(pJson["source_path"].asString());
+        if (!pJson["source_path"].isNull()) {
+            sourcePath_ = std::make_shared<std::string>(pJson["source_path"].asString());
         }
     }
-    if(pJson.isMember("source_repo"))
-    {
+    if (pJson.isMember("source_repo")) {
         dirtyFlag_[6] = true;
-        if(!pJson["source_repo"].isNull())
-        {
-            sourceRepo_=std::make_shared<std::string>(pJson["source_repo"].asString());
+        if (!pJson["source_repo"].isNull()) {
+            sourceRepo_ = std::make_shared<std::string>(pJson["source_repo"].asString());
         }
     }
-    if(pJson.isMember("source_branch"))
-    {
+    if (pJson.isMember("source_branch")) {
         dirtyFlag_[7] = true;
-        if(!pJson["source_branch"].isNull())
-        {
-            sourceBranch_=std::make_shared<std::string>(pJson["source_branch"].asString());
+        if (!pJson["source_branch"].isNull()) {
+            sourceBranch_ = std::make_shared<std::string>(pJson["source_branch"].asString());
         }
     }
-    if(pJson.isMember("is_community"))
-    {
+    if (pJson.isMember("is_community")) {
         dirtyFlag_[8] = true;
-        if(!pJson["is_community"].isNull())
-        {
-            isCommunity_=std::make_shared<bool>(pJson["is_community"].asBool());
+        if (!pJson["is_community"].isNull()) {
+            isCommunity_ = std::make_shared<bool>(pJson["is_community"].asBool());
         }
     }
 }
 
-const std::string &Mod::getValueOfId() const noexcept
-{
+const std::string &Mod::getValueOfId() const noexcept {
     static const std::string defaultValue = std::string();
-    if(id_)
+    if (id_)
         return *id_;
     return defaultValue;
 }
-const std::shared_ptr<std::string> &Mod::getId() const noexcept
-{
-    return id_;
-}
-void Mod::setId(const std::string &pId) noexcept
-{
+const std::shared_ptr<std::string> &Mod::getId() const noexcept { return id_; }
+void Mod::setId(const std::string &pId) noexcept {
     id_ = std::make_shared<std::string>(pId);
     dirtyFlag_[0] = true;
 }
-void Mod::setId(std::string &&pId) noexcept
-{
+void Mod::setId(std::string &&pId) noexcept {
     id_ = std::make_shared<std::string>(std::move(pId));
     dirtyFlag_[0] = true;
 }
-const typename Mod::PrimaryKeyType & Mod::getPrimaryKey() const
-{
+const typename Mod::PrimaryKeyType &Mod::getPrimaryKey() const {
     assert(id_);
     return *id_;
 }
 
-const std::string &Mod::getValueOfName() const noexcept
-{
+const std::string &Mod::getValueOfName() const noexcept {
     static const std::string defaultValue = std::string();
-    if(name_)
+    if (name_)
         return *name_;
     return defaultValue;
 }
-const std::shared_ptr<std::string> &Mod::getName() const noexcept
-{
-    return name_;
-}
-void Mod::setName(const std::string &pName) noexcept
-{
+const std::shared_ptr<std::string> &Mod::getName() const noexcept { return name_; }
+void Mod::setName(const std::string &pName) noexcept {
     name_ = std::make_shared<std::string>(pName);
     dirtyFlag_[1] = true;
 }
-void Mod::setName(std::string &&pName) noexcept
-{
+void Mod::setName(std::string &&pName) noexcept {
     name_ = std::make_shared<std::string>(std::move(pName));
     dirtyFlag_[1] = true;
 }
 
-const std::string &Mod::getValueOfPlatform() const noexcept
-{
+const std::string &Mod::getValueOfPlatform() const noexcept {
     static const std::string defaultValue = std::string();
-    if(platform_)
+    if (platform_)
         return *platform_;
     return defaultValue;
 }
-const std::shared_ptr<std::string> &Mod::getPlatform() const noexcept
-{
-    return platform_;
-}
-void Mod::setPlatform(const std::string &pPlatform) noexcept
-{
+const std::shared_ptr<std::string> &Mod::getPlatform() const noexcept { return platform_; }
+void Mod::setPlatform(const std::string &pPlatform) noexcept {
     platform_ = std::make_shared<std::string>(pPlatform);
     dirtyFlag_[2] = true;
 }
-void Mod::setPlatform(std::string &&pPlatform) noexcept
-{
+void Mod::setPlatform(std::string &&pPlatform) noexcept {
     platform_ = std::make_shared<std::string>(std::move(pPlatform));
     dirtyFlag_[2] = true;
 }
 
-const std::string &Mod::getValueOfSlug() const noexcept
-{
+const std::string &Mod::getValueOfSlug() const noexcept {
     static const std::string defaultValue = std::string();
-    if(slug_)
+    if (slug_)
         return *slug_;
     return defaultValue;
 }
-const std::shared_ptr<std::string> &Mod::getSlug() const noexcept
-{
-    return slug_;
-}
-void Mod::setSlug(const std::string &pSlug) noexcept
-{
+const std::shared_ptr<std::string> &Mod::getSlug() const noexcept { return slug_; }
+void Mod::setSlug(const std::string &pSlug) noexcept {
     slug_ = std::make_shared<std::string>(pSlug);
     dirtyFlag_[3] = true;
 }
-void Mod::setSlug(std::string &&pSlug) noexcept
-{
+void Mod::setSlug(std::string &&pSlug) noexcept {
     slug_ = std::make_shared<std::string>(std::move(pSlug));
     dirtyFlag_[3] = true;
 }
 
-const ::trantor::Date &Mod::getValueOfCreatedat() const noexcept
-{
+const ::trantor::Date &Mod::getValueOfCreatedat() const noexcept {
     static const ::trantor::Date defaultValue = ::trantor::Date();
-    if(createdat_)
+    if (createdat_)
         return *createdat_;
     return defaultValue;
 }
-const std::shared_ptr<::trantor::Date> &Mod::getCreatedat() const noexcept
-{
-    return createdat_;
-}
-void Mod::setCreatedat(const ::trantor::Date &pCreatedat) noexcept
-{
+const std::shared_ptr<::trantor::Date> &Mod::getCreatedat() const noexcept { return createdat_; }
+void Mod::setCreatedat(const ::trantor::Date &pCreatedat) noexcept {
     createdat_ = std::make_shared<::trantor::Date>(pCreatedat);
     dirtyFlag_[4] = true;
 }
 
-const std::string &Mod::getValueOfSourcePath() const noexcept
-{
+const std::string &Mod::getValueOfSourcePath() const noexcept {
     static const std::string defaultValue = std::string();
-    if(sourcePath_)
+    if (sourcePath_)
         return *sourcePath_;
     return defaultValue;
 }
-const std::shared_ptr<std::string> &Mod::getSourcePath() const noexcept
-{
-    return sourcePath_;
-}
-void Mod::setSourcePath(const std::string &pSourcePath) noexcept
-{
+const std::shared_ptr<std::string> &Mod::getSourcePath() const noexcept { return sourcePath_; }
+void Mod::setSourcePath(const std::string &pSourcePath) noexcept {
     sourcePath_ = std::make_shared<std::string>(pSourcePath);
     dirtyFlag_[5] = true;
 }
-void Mod::setSourcePath(std::string &&pSourcePath) noexcept
-{
+void Mod::setSourcePath(std::string &&pSourcePath) noexcept {
     sourcePath_ = std::make_shared<std::string>(std::move(pSourcePath));
     dirtyFlag_[5] = true;
 }
 
-const std::string &Mod::getValueOfSourceRepo() const noexcept
-{
+const std::string &Mod::getValueOfSourceRepo() const noexcept {
     static const std::string defaultValue = std::string();
-    if(sourceRepo_)
+    if (sourceRepo_)
         return *sourceRepo_;
     return defaultValue;
 }
-const std::shared_ptr<std::string> &Mod::getSourceRepo() const noexcept
-{
-    return sourceRepo_;
-}
-void Mod::setSourceRepo(const std::string &pSourceRepo) noexcept
-{
+const std::shared_ptr<std::string> &Mod::getSourceRepo() const noexcept { return sourceRepo_; }
+void Mod::setSourceRepo(const std::string &pSourceRepo) noexcept {
     sourceRepo_ = std::make_shared<std::string>(pSourceRepo);
     dirtyFlag_[6] = true;
 }
-void Mod::setSourceRepo(std::string &&pSourceRepo) noexcept
-{
+void Mod::setSourceRepo(std::string &&pSourceRepo) noexcept {
     sourceRepo_ = std::make_shared<std::string>(std::move(pSourceRepo));
     dirtyFlag_[6] = true;
 }
 
-const std::string &Mod::getValueOfSourceBranch() const noexcept
-{
+const std::string &Mod::getValueOfSourceBranch() const noexcept {
     static const std::string defaultValue = std::string();
-    if(sourceBranch_)
+    if (sourceBranch_)
         return *sourceBranch_;
     return defaultValue;
 }
-const std::shared_ptr<std::string> &Mod::getSourceBranch() const noexcept
-{
-    return sourceBranch_;
-}
-void Mod::setSourceBranch(const std::string &pSourceBranch) noexcept
-{
+const std::shared_ptr<std::string> &Mod::getSourceBranch() const noexcept { return sourceBranch_; }
+void Mod::setSourceBranch(const std::string &pSourceBranch) noexcept {
     sourceBranch_ = std::make_shared<std::string>(pSourceBranch);
     dirtyFlag_[7] = true;
 }
-void Mod::setSourceBranch(std::string &&pSourceBranch) noexcept
-{
+void Mod::setSourceBranch(std::string &&pSourceBranch) noexcept {
     sourceBranch_ = std::make_shared<std::string>(std::move(pSourceBranch));
     dirtyFlag_[7] = true;
 }
 
-const bool &Mod::getValueOfIsCommunity() const noexcept
-{
+const bool &Mod::getValueOfIsCommunity() const noexcept {
     static const bool defaultValue = bool();
-    if(isCommunity_)
+    if (isCommunity_)
         return *isCommunity_;
     return defaultValue;
 }
-const std::shared_ptr<bool> &Mod::getIsCommunity() const noexcept
-{
-    return isCommunity_;
-}
-void Mod::setIsCommunity(const bool &pIsCommunity) noexcept
-{
+const std::shared_ptr<bool> &Mod::getIsCommunity() const noexcept { return isCommunity_; }
+void Mod::setIsCommunity(const bool &pIsCommunity) noexcept {
     isCommunity_ = std::make_shared<bool>(pIsCommunity);
     dirtyFlag_[8] = true;
 }
 
-void Mod::updateId(const uint64_t id)
-{
-}
+void Mod::updateId(const uint64_t id) {}
 
-const std::vector<std::string> &Mod::insertColumns() noexcept
-{
-    static const std::vector<std::string> inCols={
-        "id",
-        "name",
-        "platform",
-        "slug",
-        "createdAt",
-        "source_path",
-        "source_repo",
-        "source_branch",
-        "is_community"
-    };
+const std::vector<std::string> &Mod::insertColumns() noexcept {
+    static const std::vector<std::string> inCols = {"id",          "name",        "platform",      "slug",        "createdAt",
+                                                    "source_path", "source_repo", "source_branch", "is_community"};
     return inCols;
 }
 
-void Mod::outputArgs(drogon::orm::internal::SqlBinder &binder) const
-{
-    if(dirtyFlag_[0])
-    {
-        if(getId())
-        {
+void Mod::outputArgs(drogon::orm::internal::SqlBinder &binder) const {
+    if (dirtyFlag_[0]) {
+        if (getId()) {
             binder << getValueOfId();
-        }
-        else
-        {
+        } else {
             binder << nullptr;
         }
     }
-    if(dirtyFlag_[1])
-    {
-        if(getName())
-        {
+    if (dirtyFlag_[1]) {
+        if (getName()) {
             binder << getValueOfName();
-        }
-        else
-        {
+        } else {
             binder << nullptr;
         }
     }
-    if(dirtyFlag_[2])
-    {
-        if(getPlatform())
-        {
+    if (dirtyFlag_[2]) {
+        if (getPlatform()) {
             binder << getValueOfPlatform();
-        }
-        else
-        {
+        } else {
             binder << nullptr;
         }
     }
-    if(dirtyFlag_[3])
-    {
-        if(getSlug())
-        {
+    if (dirtyFlag_[3]) {
+        if (getSlug()) {
             binder << getValueOfSlug();
-        }
-        else
-        {
+        } else {
             binder << nullptr;
         }
     }
-    if(dirtyFlag_[4])
-    {
-        if(getCreatedat())
-        {
+    if (dirtyFlag_[4]) {
+        if (getCreatedat()) {
             binder << getValueOfCreatedat();
-        }
-        else
-        {
+        } else {
             binder << nullptr;
         }
     }
-    if(dirtyFlag_[5])
-    {
-        if(getSourcePath())
-        {
+    if (dirtyFlag_[5]) {
+        if (getSourcePath()) {
             binder << getValueOfSourcePath();
-        }
-        else
-        {
+        } else {
             binder << nullptr;
         }
     }
-    if(dirtyFlag_[6])
-    {
-        if(getSourceRepo())
-        {
+    if (dirtyFlag_[6]) {
+        if (getSourceRepo()) {
             binder << getValueOfSourceRepo();
-        }
-        else
-        {
+        } else {
             binder << nullptr;
         }
     }
-    if(dirtyFlag_[7])
-    {
-        if(getSourceBranch())
-        {
+    if (dirtyFlag_[7]) {
+        if (getSourceBranch()) {
             binder << getValueOfSourceBranch();
-        }
-        else
-        {
+        } else {
             binder << nullptr;
         }
     }
-    if(dirtyFlag_[8])
-    {
-        if(getIsCommunity())
-        {
+    if (dirtyFlag_[8]) {
+        if (getIsCommunity()) {
             binder << getValueOfIsCommunity();
-        }
-        else
-        {
+        } else {
             binder << nullptr;
         }
     }
 }
 
-const std::vector<std::string> Mod::updateColumns() const
-{
+const std::vector<std::string> Mod::updateColumns() const {
     std::vector<std::string> ret;
-    if(dirtyFlag_[0])
-    {
+    if (dirtyFlag_[0]) {
         ret.push_back(getColumnName(0));
     }
-    if(dirtyFlag_[1])
-    {
+    if (dirtyFlag_[1]) {
         ret.push_back(getColumnName(1));
     }
-    if(dirtyFlag_[2])
-    {
+    if (dirtyFlag_[2]) {
         ret.push_back(getColumnName(2));
     }
-    if(dirtyFlag_[3])
-    {
+    if (dirtyFlag_[3]) {
         ret.push_back(getColumnName(3));
     }
-    if(dirtyFlag_[4])
-    {
+    if (dirtyFlag_[4]) {
         ret.push_back(getColumnName(4));
     }
-    if(dirtyFlag_[5])
-    {
+    if (dirtyFlag_[5]) {
         ret.push_back(getColumnName(5));
     }
-    if(dirtyFlag_[6])
-    {
+    if (dirtyFlag_[6]) {
         ret.push_back(getColumnName(6));
     }
-    if(dirtyFlag_[7])
-    {
+    if (dirtyFlag_[7]) {
         ret.push_back(getColumnName(7));
     }
-    if(dirtyFlag_[8])
-    {
+    if (dirtyFlag_[8]) {
         ret.push_back(getColumnName(8));
     }
     return ret;
 }
 
-void Mod::updateArgs(drogon::orm::internal::SqlBinder &binder) const
-{
-    if(dirtyFlag_[0])
-    {
-        if(getId())
-        {
+void Mod::updateArgs(drogon::orm::internal::SqlBinder &binder) const {
+    if (dirtyFlag_[0]) {
+        if (getId()) {
             binder << getValueOfId();
-        }
-        else
-        {
+        } else {
             binder << nullptr;
         }
     }
-    if(dirtyFlag_[1])
-    {
-        if(getName())
-        {
+    if (dirtyFlag_[1]) {
+        if (getName()) {
             binder << getValueOfName();
-        }
-        else
-        {
+        } else {
             binder << nullptr;
         }
     }
-    if(dirtyFlag_[2])
-    {
-        if(getPlatform())
-        {
+    if (dirtyFlag_[2]) {
+        if (getPlatform()) {
             binder << getValueOfPlatform();
-        }
-        else
-        {
+        } else {
             binder << nullptr;
         }
     }
-    if(dirtyFlag_[3])
-    {
-        if(getSlug())
-        {
+    if (dirtyFlag_[3]) {
+        if (getSlug()) {
             binder << getValueOfSlug();
-        }
-        else
-        {
+        } else {
             binder << nullptr;
         }
     }
-    if(dirtyFlag_[4])
-    {
-        if(getCreatedat())
-        {
+    if (dirtyFlag_[4]) {
+        if (getCreatedat()) {
             binder << getValueOfCreatedat();
-        }
-        else
-        {
+        } else {
             binder << nullptr;
         }
     }
-    if(dirtyFlag_[5])
-    {
-        if(getSourcePath())
-        {
+    if (dirtyFlag_[5]) {
+        if (getSourcePath()) {
             binder << getValueOfSourcePath();
-        }
-        else
-        {
+        } else {
             binder << nullptr;
         }
     }
-    if(dirtyFlag_[6])
-    {
-        if(getSourceRepo())
-        {
+    if (dirtyFlag_[6]) {
+        if (getSourceRepo()) {
             binder << getValueOfSourceRepo();
-        }
-        else
-        {
+        } else {
             binder << nullptr;
         }
     }
-    if(dirtyFlag_[7])
-    {
-        if(getSourceBranch())
-        {
+    if (dirtyFlag_[7]) {
+        if (getSourceBranch()) {
             binder << getValueOfSourceBranch();
-        }
-        else
-        {
+        } else {
             binder << nullptr;
         }
     }
-    if(dirtyFlag_[8])
-    {
-        if(getIsCommunity())
-        {
+    if (dirtyFlag_[8]) {
+        if (getIsCommunity()) {
             binder << getValueOfIsCommunity();
-        }
-        else
-        {
+        } else {
             binder << nullptr;
         }
     }
 }
-Json::Value Mod::toJson() const
-{
+Json::Value Mod::toJson() const {
     Json::Value ret;
-    if(getId())
-    {
-        ret["id"]=getValueOfId();
+    if (getId()) {
+        ret["id"] = getValueOfId();
+    } else {
+        ret["id"] = Json::Value();
     }
-    else
-    {
-        ret["id"]=Json::Value();
+    if (getName()) {
+        ret["name"] = getValueOfName();
+    } else {
+        ret["name"] = Json::Value();
     }
-    if(getName())
-    {
-        ret["name"]=getValueOfName();
+    if (getPlatform()) {
+        ret["platform"] = getValueOfPlatform();
+    } else {
+        ret["platform"] = Json::Value();
     }
-    else
-    {
-        ret["name"]=Json::Value();
+    if (getSlug()) {
+        ret["slug"] = getValueOfSlug();
+    } else {
+        ret["slug"] = Json::Value();
     }
-    if(getPlatform())
-    {
-        ret["platform"]=getValueOfPlatform();
+    if (getCreatedat()) {
+        ret["createdAt"] = getCreatedat()->toDbStringLocal();
+    } else {
+        ret["createdAt"] = Json::Value();
     }
-    else
-    {
-        ret["platform"]=Json::Value();
+    if (getSourcePath()) {
+        ret["source_path"] = getValueOfSourcePath();
+    } else {
+        ret["source_path"] = Json::Value();
     }
-    if(getSlug())
-    {
-        ret["slug"]=getValueOfSlug();
+    if (getSourceRepo()) {
+        ret["source_repo"] = getValueOfSourceRepo();
+    } else {
+        ret["source_repo"] = Json::Value();
     }
-    else
-    {
-        ret["slug"]=Json::Value();
+    if (getSourceBranch()) {
+        ret["source_branch"] = getValueOfSourceBranch();
+    } else {
+        ret["source_branch"] = Json::Value();
     }
-    if(getCreatedat())
-    {
-        ret["createdAt"]=getCreatedat()->toDbStringLocal();
-    }
-    else
-    {
-        ret["createdAt"]=Json::Value();
-    }
-    if(getSourcePath())
-    {
-        ret["source_path"]=getValueOfSourcePath();
-    }
-    else
-    {
-        ret["source_path"]=Json::Value();
-    }
-    if(getSourceRepo())
-    {
-        ret["source_repo"]=getValueOfSourceRepo();
-    }
-    else
-    {
-        ret["source_repo"]=Json::Value();
-    }
-    if(getSourceBranch())
-    {
-        ret["source_branch"]=getValueOfSourceBranch();
-    }
-    else
-    {
-        ret["source_branch"]=Json::Value();
-    }
-    if(getIsCommunity())
-    {
-        ret["is_community"]=getValueOfIsCommunity();
-    }
-    else
-    {
-        ret["is_community"]=Json::Value();
+    if (getIsCommunity()) {
+        ret["is_community"] = getValueOfIsCommunity();
+    } else {
+        ret["is_community"] = Json::Value();
     }
     return ret;
 }
 
-Json::Value Mod::toMasqueradedJson(
-    const std::vector<std::string> &pMasqueradingVector) const
-{
+Json::Value Mod::toMasqueradedJson(const std::vector<std::string> &pMasqueradingVector) const {
     Json::Value ret;
-    if(pMasqueradingVector.size() == 9)
-    {
-        if(!pMasqueradingVector[0].empty())
-        {
-            if(getId())
-            {
-                ret[pMasqueradingVector[0]]=getValueOfId();
-            }
-            else
-            {
-                ret[pMasqueradingVector[0]]=Json::Value();
+    if (pMasqueradingVector.size() == 9) {
+        if (!pMasqueradingVector[0].empty()) {
+            if (getId()) {
+                ret[pMasqueradingVector[0]] = getValueOfId();
+            } else {
+                ret[pMasqueradingVector[0]] = Json::Value();
             }
         }
-        if(!pMasqueradingVector[1].empty())
-        {
-            if(getName())
-            {
-                ret[pMasqueradingVector[1]]=getValueOfName();
-            }
-            else
-            {
-                ret[pMasqueradingVector[1]]=Json::Value();
+        if (!pMasqueradingVector[1].empty()) {
+            if (getName()) {
+                ret[pMasqueradingVector[1]] = getValueOfName();
+            } else {
+                ret[pMasqueradingVector[1]] = Json::Value();
             }
         }
-        if(!pMasqueradingVector[2].empty())
-        {
-            if(getPlatform())
-            {
-                ret[pMasqueradingVector[2]]=getValueOfPlatform();
-            }
-            else
-            {
-                ret[pMasqueradingVector[2]]=Json::Value();
+        if (!pMasqueradingVector[2].empty()) {
+            if (getPlatform()) {
+                ret[pMasqueradingVector[2]] = getValueOfPlatform();
+            } else {
+                ret[pMasqueradingVector[2]] = Json::Value();
             }
         }
-        if(!pMasqueradingVector[3].empty())
-        {
-            if(getSlug())
-            {
-                ret[pMasqueradingVector[3]]=getValueOfSlug();
-            }
-            else
-            {
-                ret[pMasqueradingVector[3]]=Json::Value();
+        if (!pMasqueradingVector[3].empty()) {
+            if (getSlug()) {
+                ret[pMasqueradingVector[3]] = getValueOfSlug();
+            } else {
+                ret[pMasqueradingVector[3]] = Json::Value();
             }
         }
-        if(!pMasqueradingVector[4].empty())
-        {
-            if(getCreatedat())
-            {
-                ret[pMasqueradingVector[4]]=getCreatedat()->toDbStringLocal();
-            }
-            else
-            {
-                ret[pMasqueradingVector[4]]=Json::Value();
+        if (!pMasqueradingVector[4].empty()) {
+            if (getCreatedat()) {
+                ret[pMasqueradingVector[4]] = getCreatedat()->toDbStringLocal();
+            } else {
+                ret[pMasqueradingVector[4]] = Json::Value();
             }
         }
-        if(!pMasqueradingVector[5].empty())
-        {
-            if(getSourcePath())
-            {
-                ret[pMasqueradingVector[5]]=getValueOfSourcePath();
-            }
-            else
-            {
-                ret[pMasqueradingVector[5]]=Json::Value();
+        if (!pMasqueradingVector[5].empty()) {
+            if (getSourcePath()) {
+                ret[pMasqueradingVector[5]] = getValueOfSourcePath();
+            } else {
+                ret[pMasqueradingVector[5]] = Json::Value();
             }
         }
-        if(!pMasqueradingVector[6].empty())
-        {
-            if(getSourceRepo())
-            {
-                ret[pMasqueradingVector[6]]=getValueOfSourceRepo();
-            }
-            else
-            {
-                ret[pMasqueradingVector[6]]=Json::Value();
+        if (!pMasqueradingVector[6].empty()) {
+            if (getSourceRepo()) {
+                ret[pMasqueradingVector[6]] = getValueOfSourceRepo();
+            } else {
+                ret[pMasqueradingVector[6]] = Json::Value();
             }
         }
-        if(!pMasqueradingVector[7].empty())
-        {
-            if(getSourceBranch())
-            {
-                ret[pMasqueradingVector[7]]=getValueOfSourceBranch();
-            }
-            else
-            {
-                ret[pMasqueradingVector[7]]=Json::Value();
+        if (!pMasqueradingVector[7].empty()) {
+            if (getSourceBranch()) {
+                ret[pMasqueradingVector[7]] = getValueOfSourceBranch();
+            } else {
+                ret[pMasqueradingVector[7]] = Json::Value();
             }
         }
-        if(!pMasqueradingVector[8].empty())
-        {
-            if(getIsCommunity())
-            {
-                ret[pMasqueradingVector[8]]=getValueOfIsCommunity();
-            }
-            else
-            {
-                ret[pMasqueradingVector[8]]=Json::Value();
+        if (!pMasqueradingVector[8].empty()) {
+            if (getIsCommunity()) {
+                ret[pMasqueradingVector[8]] = getValueOfIsCommunity();
+            } else {
+                ret[pMasqueradingVector[8]] = Json::Value();
             }
         }
         return ret;
     }
     LOG_ERROR << "Masquerade failed";
-    if(getId())
-    {
-        ret["id"]=getValueOfId();
+    if (getId()) {
+        ret["id"] = getValueOfId();
+    } else {
+        ret["id"] = Json::Value();
     }
-    else
-    {
-        ret["id"]=Json::Value();
+    if (getName()) {
+        ret["name"] = getValueOfName();
+    } else {
+        ret["name"] = Json::Value();
     }
-    if(getName())
-    {
-        ret["name"]=getValueOfName();
+    if (getPlatform()) {
+        ret["platform"] = getValueOfPlatform();
+    } else {
+        ret["platform"] = Json::Value();
     }
-    else
-    {
-        ret["name"]=Json::Value();
+    if (getSlug()) {
+        ret["slug"] = getValueOfSlug();
+    } else {
+        ret["slug"] = Json::Value();
     }
-    if(getPlatform())
-    {
-        ret["platform"]=getValueOfPlatform();
+    if (getCreatedat()) {
+        ret["createdAt"] = getCreatedat()->toDbStringLocal();
+    } else {
+        ret["createdAt"] = Json::Value();
     }
-    else
-    {
-        ret["platform"]=Json::Value();
+    if (getSourcePath()) {
+        ret["source_path"] = getValueOfSourcePath();
+    } else {
+        ret["source_path"] = Json::Value();
     }
-    if(getSlug())
-    {
-        ret["slug"]=getValueOfSlug();
+    if (getSourceRepo()) {
+        ret["source_repo"] = getValueOfSourceRepo();
+    } else {
+        ret["source_repo"] = Json::Value();
     }
-    else
-    {
-        ret["slug"]=Json::Value();
+    if (getSourceBranch()) {
+        ret["source_branch"] = getValueOfSourceBranch();
+    } else {
+        ret["source_branch"] = Json::Value();
     }
-    if(getCreatedat())
-    {
-        ret["createdAt"]=getCreatedat()->toDbStringLocal();
-    }
-    else
-    {
-        ret["createdAt"]=Json::Value();
-    }
-    if(getSourcePath())
-    {
-        ret["source_path"]=getValueOfSourcePath();
-    }
-    else
-    {
-        ret["source_path"]=Json::Value();
-    }
-    if(getSourceRepo())
-    {
-        ret["source_repo"]=getValueOfSourceRepo();
-    }
-    else
-    {
-        ret["source_repo"]=Json::Value();
-    }
-    if(getSourceBranch())
-    {
-        ret["source_branch"]=getValueOfSourceBranch();
-    }
-    else
-    {
-        ret["source_branch"]=Json::Value();
-    }
-    if(getIsCommunity())
-    {
-        ret["is_community"]=getValueOfIsCommunity();
-    }
-    else
-    {
-        ret["is_community"]=Json::Value();
+    if (getIsCommunity()) {
+        ret["is_community"] = getValueOfIsCommunity();
+    } else {
+        ret["is_community"] = Json::Value();
     }
     return ret;
 }
 
-bool Mod::validateJsonForCreation(const Json::Value &pJson, std::string &err)
-{
-    if(pJson.isMember("id"))
-    {
-        if(!validJsonOfField(0, "id", pJson["id"], err, true))
+bool Mod::validateJsonForCreation(const Json::Value &pJson, std::string &err) {
+    if (pJson.isMember("id")) {
+        if (!validJsonOfField(0, "id", pJson["id"], err, true))
             return false;
-    }
-    else
-    {
-        err="The id column cannot be null";
+    } else {
+        err = "The id column cannot be null";
         return false;
     }
-    if(pJson.isMember("name"))
-    {
-        if(!validJsonOfField(1, "name", pJson["name"], err, true))
+    if (pJson.isMember("name")) {
+        if (!validJsonOfField(1, "name", pJson["name"], err, true))
             return false;
-    }
-    else
-    {
-        err="The name column cannot be null";
+    } else {
+        err = "The name column cannot be null";
         return false;
     }
-    if(pJson.isMember("platform"))
-    {
-        if(!validJsonOfField(2, "platform", pJson["platform"], err, true))
+    if (pJson.isMember("platform")) {
+        if (!validJsonOfField(2, "platform", pJson["platform"], err, true))
             return false;
-    }
-    else
-    {
-        err="The platform column cannot be null";
+    } else {
+        err = "The platform column cannot be null";
         return false;
     }
-    if(pJson.isMember("slug"))
-    {
-        if(!validJsonOfField(3, "slug", pJson["slug"], err, true))
+    if (pJson.isMember("slug")) {
+        if (!validJsonOfField(3, "slug", pJson["slug"], err, true))
             return false;
-    }
-    else
-    {
-        err="The slug column cannot be null";
+    } else {
+        err = "The slug column cannot be null";
         return false;
     }
-    if(pJson.isMember("createdAt"))
-    {
-        if(!validJsonOfField(4, "createdAt", pJson["createdAt"], err, true))
+    if (pJson.isMember("createdAt")) {
+        if (!validJsonOfField(4, "createdAt", pJson["createdAt"], err, true))
             return false;
     }
-    if(pJson.isMember("source_path"))
-    {
-        if(!validJsonOfField(5, "source_path", pJson["source_path"], err, true))
+    if (pJson.isMember("source_path")) {
+        if (!validJsonOfField(5, "source_path", pJson["source_path"], err, true))
             return false;
-    }
-    else
-    {
-        err="The source_path column cannot be null";
+    } else {
+        err = "The source_path column cannot be null";
         return false;
     }
-    if(pJson.isMember("source_repo"))
-    {
-        if(!validJsonOfField(6, "source_repo", pJson["source_repo"], err, true))
+    if (pJson.isMember("source_repo")) {
+        if (!validJsonOfField(6, "source_repo", pJson["source_repo"], err, true))
             return false;
-    }
-    else
-    {
-        err="The source_repo column cannot be null";
+    } else {
+        err = "The source_repo column cannot be null";
         return false;
     }
-    if(pJson.isMember("source_branch"))
-    {
-        if(!validJsonOfField(7, "source_branch", pJson["source_branch"], err, true))
+    if (pJson.isMember("source_branch")) {
+        if (!validJsonOfField(7, "source_branch", pJson["source_branch"], err, true))
             return false;
-    }
-    else
-    {
-        err="The source_branch column cannot be null";
+    } else {
+        err = "The source_branch column cannot be null";
         return false;
     }
-    if(pJson.isMember("is_community"))
-    {
-        if(!validJsonOfField(8, "is_community", pJson["is_community"], err, true))
+    if (pJson.isMember("is_community")) {
+        if (!validJsonOfField(8, "is_community", pJson["is_community"], err, true))
             return false;
     }
     return true;
 }
-bool Mod::validateMasqueradedJsonForCreation(const Json::Value &pJson,
-                                             const std::vector<std::string> &pMasqueradingVector,
-                                             std::string &err)
-{
-    if(pMasqueradingVector.size() != 9)
-    {
+bool Mod::validateMasqueradedJsonForCreation(const Json::Value &pJson, const std::vector<std::string> &pMasqueradingVector,
+                                             std::string &err) {
+    if (pMasqueradingVector.size() != 9) {
         err = "Bad masquerading vector";
         return false;
     }
     try {
-      if(!pMasqueradingVector[0].empty())
-      {
-          if(pJson.isMember(pMasqueradingVector[0]))
-          {
-              if(!validJsonOfField(0, pMasqueradingVector[0], pJson[pMasqueradingVector[0]], err, true))
-                  return false;
-          }
-        else
-        {
-            err="The " + pMasqueradingVector[0] + " column cannot be null";
-            return false;
-        }
-      }
-      if(!pMasqueradingVector[1].empty())
-      {
-          if(pJson.isMember(pMasqueradingVector[1]))
-          {
-              if(!validJsonOfField(1, pMasqueradingVector[1], pJson[pMasqueradingVector[1]], err, true))
-                  return false;
-          }
-        else
-        {
-            err="The " + pMasqueradingVector[1] + " column cannot be null";
-            return false;
-        }
-      }
-      if(!pMasqueradingVector[2].empty())
-      {
-          if(pJson.isMember(pMasqueradingVector[2]))
-          {
-              if(!validJsonOfField(2, pMasqueradingVector[2], pJson[pMasqueradingVector[2]], err, true))
-                  return false;
-          }
-        else
-        {
-            err="The " + pMasqueradingVector[2] + " column cannot be null";
-            return false;
-        }
-      }
-      if(!pMasqueradingVector[3].empty())
-      {
-          if(pJson.isMember(pMasqueradingVector[3]))
-          {
-              if(!validJsonOfField(3, pMasqueradingVector[3], pJson[pMasqueradingVector[3]], err, true))
-                  return false;
-          }
-        else
-        {
-            err="The " + pMasqueradingVector[3] + " column cannot be null";
-            return false;
-        }
-      }
-      if(!pMasqueradingVector[4].empty())
-      {
-          if(pJson.isMember(pMasqueradingVector[4]))
-          {
-              if(!validJsonOfField(4, pMasqueradingVector[4], pJson[pMasqueradingVector[4]], err, true))
-                  return false;
-          }
-      }
-      if(!pMasqueradingVector[5].empty())
-      {
-          if(pJson.isMember(pMasqueradingVector[5]))
-          {
-              if(!validJsonOfField(5, pMasqueradingVector[5], pJson[pMasqueradingVector[5]], err, true))
-                  return false;
-          }
-        else
-        {
-            err="The " + pMasqueradingVector[5] + " column cannot be null";
-            return false;
-        }
-      }
-      if(!pMasqueradingVector[6].empty())
-      {
-          if(pJson.isMember(pMasqueradingVector[6]))
-          {
-              if(!validJsonOfField(6, pMasqueradingVector[6], pJson[pMasqueradingVector[6]], err, true))
-                  return false;
-          }
-        else
-        {
-            err="The " + pMasqueradingVector[6] + " column cannot be null";
-            return false;
-        }
-      }
-      if(!pMasqueradingVector[7].empty())
-      {
-          if(pJson.isMember(pMasqueradingVector[7]))
-          {
-              if(!validJsonOfField(7, pMasqueradingVector[7], pJson[pMasqueradingVector[7]], err, true))
-                  return false;
-          }
-        else
-        {
-            err="The " + pMasqueradingVector[7] + " column cannot be null";
-            return false;
-        }
-      }
-      if(!pMasqueradingVector[8].empty())
-      {
-          if(pJson.isMember(pMasqueradingVector[8]))
-          {
-              if(!validJsonOfField(8, pMasqueradingVector[8], pJson[pMasqueradingVector[8]], err, true))
-                  return false;
-          }
-      }
-    }
-    catch(const Json::LogicError &e)
-    {
-      err = e.what();
-      return false;
-    }
-    return true;
-}
-bool Mod::validateJsonForUpdate(const Json::Value &pJson, std::string &err)
-{
-    if(pJson.isMember("id"))
-    {
-        if(!validJsonOfField(0, "id", pJson["id"], err, false))
-            return false;
-    }
-    else
-    {
-        err = "The value of primary key must be set in the json object for update";
-        return false;
-    }
-    if(pJson.isMember("name"))
-    {
-        if(!validJsonOfField(1, "name", pJson["name"], err, false))
-            return false;
-    }
-    if(pJson.isMember("platform"))
-    {
-        if(!validJsonOfField(2, "platform", pJson["platform"], err, false))
-            return false;
-    }
-    if(pJson.isMember("slug"))
-    {
-        if(!validJsonOfField(3, "slug", pJson["slug"], err, false))
-            return false;
-    }
-    if(pJson.isMember("createdAt"))
-    {
-        if(!validJsonOfField(4, "createdAt", pJson["createdAt"], err, false))
-            return false;
-    }
-    if(pJson.isMember("source_path"))
-    {
-        if(!validJsonOfField(5, "source_path", pJson["source_path"], err, false))
-            return false;
-    }
-    if(pJson.isMember("source_repo"))
-    {
-        if(!validJsonOfField(6, "source_repo", pJson["source_repo"], err, false))
-            return false;
-    }
-    if(pJson.isMember("source_branch"))
-    {
-        if(!validJsonOfField(7, "source_branch", pJson["source_branch"], err, false))
-            return false;
-    }
-    if(pJson.isMember("is_community"))
-    {
-        if(!validJsonOfField(8, "is_community", pJson["is_community"], err, false))
-            return false;
-    }
-    return true;
-}
-bool Mod::validateMasqueradedJsonForUpdate(const Json::Value &pJson,
-                                           const std::vector<std::string> &pMasqueradingVector,
-                                           std::string &err)
-{
-    if(pMasqueradingVector.size() != 9)
-    {
-        err = "Bad masquerading vector";
-        return false;
-    }
-    try {
-      if(!pMasqueradingVector[0].empty() && pJson.isMember(pMasqueradingVector[0]))
-      {
-          if(!validJsonOfField(0, pMasqueradingVector[0], pJson[pMasqueradingVector[0]], err, false))
-              return false;
-      }
-    else
-    {
-        err = "The value of primary key must be set in the json object for update";
-        return false;
-    }
-      if(!pMasqueradingVector[1].empty() && pJson.isMember(pMasqueradingVector[1]))
-      {
-          if(!validJsonOfField(1, pMasqueradingVector[1], pJson[pMasqueradingVector[1]], err, false))
-              return false;
-      }
-      if(!pMasqueradingVector[2].empty() && pJson.isMember(pMasqueradingVector[2]))
-      {
-          if(!validJsonOfField(2, pMasqueradingVector[2], pJson[pMasqueradingVector[2]], err, false))
-              return false;
-      }
-      if(!pMasqueradingVector[3].empty() && pJson.isMember(pMasqueradingVector[3]))
-      {
-          if(!validJsonOfField(3, pMasqueradingVector[3], pJson[pMasqueradingVector[3]], err, false))
-              return false;
-      }
-      if(!pMasqueradingVector[4].empty() && pJson.isMember(pMasqueradingVector[4]))
-      {
-          if(!validJsonOfField(4, pMasqueradingVector[4], pJson[pMasqueradingVector[4]], err, false))
-              return false;
-      }
-      if(!pMasqueradingVector[5].empty() && pJson.isMember(pMasqueradingVector[5]))
-      {
-          if(!validJsonOfField(5, pMasqueradingVector[5], pJson[pMasqueradingVector[5]], err, false))
-              return false;
-      }
-      if(!pMasqueradingVector[6].empty() && pJson.isMember(pMasqueradingVector[6]))
-      {
-          if(!validJsonOfField(6, pMasqueradingVector[6], pJson[pMasqueradingVector[6]], err, false))
-              return false;
-      }
-      if(!pMasqueradingVector[7].empty() && pJson.isMember(pMasqueradingVector[7]))
-      {
-          if(!validJsonOfField(7, pMasqueradingVector[7], pJson[pMasqueradingVector[7]], err, false))
-              return false;
-      }
-      if(!pMasqueradingVector[8].empty() && pJson.isMember(pMasqueradingVector[8]))
-      {
-          if(!validJsonOfField(8, pMasqueradingVector[8], pJson[pMasqueradingVector[8]], err, false))
-              return false;
-      }
-    }
-    catch(const Json::LogicError &e)
-    {
-      err = e.what();
-      return false;
-    }
-    return true;
-}
-bool Mod::validJsonOfField(size_t index,
-                           const std::string &fieldName,
-                           const Json::Value &pJson,
-                           std::string &err,
-                           bool isForCreation)
-{
-    switch(index)
-    {
-        case 0:
-            if(pJson.isNull())
-            {
-                err="The " + fieldName + " column cannot be null";
+        if (!pMasqueradingVector[0].empty()) {
+            if (pJson.isMember(pMasqueradingVector[0])) {
+                if (!validJsonOfField(0, pMasqueradingVector[0], pJson[pMasqueradingVector[0]], err, true))
+                    return false;
+            } else {
+                err = "The " + pMasqueradingVector[0] + " column cannot be null";
                 return false;
             }
-            if(!pJson.isString())
-            {
-                err="Type error in the "+fieldName+" field";
+        }
+        if (!pMasqueradingVector[1].empty()) {
+            if (pJson.isMember(pMasqueradingVector[1])) {
+                if (!validJsonOfField(1, pMasqueradingVector[1], pJson[pMasqueradingVector[1]], err, true))
+                    return false;
+            } else {
+                err = "The " + pMasqueradingVector[1] + " column cannot be null";
+                return false;
+            }
+        }
+        if (!pMasqueradingVector[2].empty()) {
+            if (pJson.isMember(pMasqueradingVector[2])) {
+                if (!validJsonOfField(2, pMasqueradingVector[2], pJson[pMasqueradingVector[2]], err, true))
+                    return false;
+            } else {
+                err = "The " + pMasqueradingVector[2] + " column cannot be null";
+                return false;
+            }
+        }
+        if (!pMasqueradingVector[3].empty()) {
+            if (pJson.isMember(pMasqueradingVector[3])) {
+                if (!validJsonOfField(3, pMasqueradingVector[3], pJson[pMasqueradingVector[3]], err, true))
+                    return false;
+            } else {
+                err = "The " + pMasqueradingVector[3] + " column cannot be null";
+                return false;
+            }
+        }
+        if (!pMasqueradingVector[4].empty()) {
+            if (pJson.isMember(pMasqueradingVector[4])) {
+                if (!validJsonOfField(4, pMasqueradingVector[4], pJson[pMasqueradingVector[4]], err, true))
+                    return false;
+            }
+        }
+        if (!pMasqueradingVector[5].empty()) {
+            if (pJson.isMember(pMasqueradingVector[5])) {
+                if (!validJsonOfField(5, pMasqueradingVector[5], pJson[pMasqueradingVector[5]], err, true))
+                    return false;
+            } else {
+                err = "The " + pMasqueradingVector[5] + " column cannot be null";
+                return false;
+            }
+        }
+        if (!pMasqueradingVector[6].empty()) {
+            if (pJson.isMember(pMasqueradingVector[6])) {
+                if (!validJsonOfField(6, pMasqueradingVector[6], pJson[pMasqueradingVector[6]], err, true))
+                    return false;
+            } else {
+                err = "The " + pMasqueradingVector[6] + " column cannot be null";
+                return false;
+            }
+        }
+        if (!pMasqueradingVector[7].empty()) {
+            if (pJson.isMember(pMasqueradingVector[7])) {
+                if (!validJsonOfField(7, pMasqueradingVector[7], pJson[pMasqueradingVector[7]], err, true))
+                    return false;
+            } else {
+                err = "The " + pMasqueradingVector[7] + " column cannot be null";
+                return false;
+            }
+        }
+        if (!pMasqueradingVector[8].empty()) {
+            if (pJson.isMember(pMasqueradingVector[8])) {
+                if (!validJsonOfField(8, pMasqueradingVector[8], pJson[pMasqueradingVector[8]], err, true))
+                    return false;
+            }
+        }
+    } catch (const Json::LogicError &e) {
+        err = e.what();
+        return false;
+    }
+    return true;
+}
+bool Mod::validateJsonForUpdate(const Json::Value &pJson, std::string &err) {
+    if (pJson.isMember("id")) {
+        if (!validJsonOfField(0, "id", pJson["id"], err, false))
+            return false;
+    } else {
+        err = "The value of primary key must be set in the json object for update";
+        return false;
+    }
+    if (pJson.isMember("name")) {
+        if (!validJsonOfField(1, "name", pJson["name"], err, false))
+            return false;
+    }
+    if (pJson.isMember("platform")) {
+        if (!validJsonOfField(2, "platform", pJson["platform"], err, false))
+            return false;
+    }
+    if (pJson.isMember("slug")) {
+        if (!validJsonOfField(3, "slug", pJson["slug"], err, false))
+            return false;
+    }
+    if (pJson.isMember("createdAt")) {
+        if (!validJsonOfField(4, "createdAt", pJson["createdAt"], err, false))
+            return false;
+    }
+    if (pJson.isMember("source_path")) {
+        if (!validJsonOfField(5, "source_path", pJson["source_path"], err, false))
+            return false;
+    }
+    if (pJson.isMember("source_repo")) {
+        if (!validJsonOfField(6, "source_repo", pJson["source_repo"], err, false))
+            return false;
+    }
+    if (pJson.isMember("source_branch")) {
+        if (!validJsonOfField(7, "source_branch", pJson["source_branch"], err, false))
+            return false;
+    }
+    if (pJson.isMember("is_community")) {
+        if (!validJsonOfField(8, "is_community", pJson["is_community"], err, false))
+            return false;
+    }
+    return true;
+}
+bool Mod::validateMasqueradedJsonForUpdate(const Json::Value &pJson, const std::vector<std::string> &pMasqueradingVector,
+                                           std::string &err) {
+    if (pMasqueradingVector.size() != 9) {
+        err = "Bad masquerading vector";
+        return false;
+    }
+    try {
+        if (!pMasqueradingVector[0].empty() && pJson.isMember(pMasqueradingVector[0])) {
+            if (!validJsonOfField(0, pMasqueradingVector[0], pJson[pMasqueradingVector[0]], err, false))
+                return false;
+        } else {
+            err = "The value of primary key must be set in the json object for update";
+            return false;
+        }
+        if (!pMasqueradingVector[1].empty() && pJson.isMember(pMasqueradingVector[1])) {
+            if (!validJsonOfField(1, pMasqueradingVector[1], pJson[pMasqueradingVector[1]], err, false))
+                return false;
+        }
+        if (!pMasqueradingVector[2].empty() && pJson.isMember(pMasqueradingVector[2])) {
+            if (!validJsonOfField(2, pMasqueradingVector[2], pJson[pMasqueradingVector[2]], err, false))
+                return false;
+        }
+        if (!pMasqueradingVector[3].empty() && pJson.isMember(pMasqueradingVector[3])) {
+            if (!validJsonOfField(3, pMasqueradingVector[3], pJson[pMasqueradingVector[3]], err, false))
+                return false;
+        }
+        if (!pMasqueradingVector[4].empty() && pJson.isMember(pMasqueradingVector[4])) {
+            if (!validJsonOfField(4, pMasqueradingVector[4], pJson[pMasqueradingVector[4]], err, false))
+                return false;
+        }
+        if (!pMasqueradingVector[5].empty() && pJson.isMember(pMasqueradingVector[5])) {
+            if (!validJsonOfField(5, pMasqueradingVector[5], pJson[pMasqueradingVector[5]], err, false))
+                return false;
+        }
+        if (!pMasqueradingVector[6].empty() && pJson.isMember(pMasqueradingVector[6])) {
+            if (!validJsonOfField(6, pMasqueradingVector[6], pJson[pMasqueradingVector[6]], err, false))
+                return false;
+        }
+        if (!pMasqueradingVector[7].empty() && pJson.isMember(pMasqueradingVector[7])) {
+            if (!validJsonOfField(7, pMasqueradingVector[7], pJson[pMasqueradingVector[7]], err, false))
+                return false;
+        }
+        if (!pMasqueradingVector[8].empty() && pJson.isMember(pMasqueradingVector[8])) {
+            if (!validJsonOfField(8, pMasqueradingVector[8], pJson[pMasqueradingVector[8]], err, false))
+                return false;
+        }
+    } catch (const Json::LogicError &e) {
+        err = e.what();
+        return false;
+    }
+    return true;
+}
+bool Mod::validJsonOfField(size_t index, const std::string &fieldName, const Json::Value &pJson, std::string &err, bool isForCreation) {
+    switch (index) {
+        case 0:
+            if (pJson.isNull()) {
+                err = "The " + fieldName + " column cannot be null";
+                return false;
+            }
+            if (!pJson.isString()) {
+                err = "Type error in the " + fieldName + " field";
                 return false;
             }
             break;
         case 1:
-            if(pJson.isNull())
-            {
-                err="The " + fieldName + " column cannot be null";
+            if (pJson.isNull()) {
+                err = "The " + fieldName + " column cannot be null";
                 return false;
             }
-            if(!pJson.isString())
-            {
-                err="Type error in the "+fieldName+" field";
+            if (!pJson.isString()) {
+                err = "Type error in the " + fieldName + " field";
                 return false;
             }
             break;
         case 2:
-            if(pJson.isNull())
-            {
-                err="The " + fieldName + " column cannot be null";
+            if (pJson.isNull()) {
+                err = "The " + fieldName + " column cannot be null";
                 return false;
             }
-            if(!pJson.isString())
-            {
-                err="Type error in the "+fieldName+" field";
+            if (!pJson.isString()) {
+                err = "Type error in the " + fieldName + " field";
                 return false;
             }
-            if(pJson.isString() && std::strlen(pJson.asCString()) > 50)
-            {
-                err="String length exceeds limit for the " +
-                    fieldName +
-                    " field (the maximum value is 50)";
+            if (pJson.isString() && std::strlen(pJson.asCString()) > 50) {
+                err = "String length exceeds limit for the " + fieldName + " field (the maximum value is 50)";
                 return false;
             }
 
             break;
         case 3:
-            if(pJson.isNull())
-            {
-                err="The " + fieldName + " column cannot be null";
+            if (pJson.isNull()) {
+                err = "The " + fieldName + " column cannot be null";
                 return false;
             }
-            if(!pJson.isString())
-            {
-                err="Type error in the "+fieldName+" field";
+            if (!pJson.isString()) {
+                err = "Type error in the " + fieldName + " field";
                 return false;
             }
             break;
         case 4:
-            if(pJson.isNull())
-            {
-                err="The " + fieldName + " column cannot be null";
+            if (pJson.isNull()) {
+                err = "The " + fieldName + " column cannot be null";
                 return false;
             }
-            if(!pJson.isString())
-            {
-                err="Type error in the "+fieldName+" field";
+            if (!pJson.isString()) {
+                err = "Type error in the " + fieldName + " field";
                 return false;
             }
             break;
         case 5:
-            if(pJson.isNull())
-            {
-                err="The " + fieldName + " column cannot be null";
+            if (pJson.isNull()) {
+                err = "The " + fieldName + " column cannot be null";
                 return false;
             }
-            if(!pJson.isString())
-            {
-                err="Type error in the "+fieldName+" field";
+            if (!pJson.isString()) {
+                err = "Type error in the " + fieldName + " field";
                 return false;
             }
             break;
         case 6:
-            if(pJson.isNull())
-            {
-                err="The " + fieldName + " column cannot be null";
+            if (pJson.isNull()) {
+                err = "The " + fieldName + " column cannot be null";
                 return false;
             }
-            if(!pJson.isString())
-            {
-                err="Type error in the "+fieldName+" field";
+            if (!pJson.isString()) {
+                err = "Type error in the " + fieldName + " field";
                 return false;
             }
             break;
         case 7:
-            if(pJson.isNull())
-            {
-                err="The " + fieldName + " column cannot be null";
+            if (pJson.isNull()) {
+                err = "The " + fieldName + " column cannot be null";
                 return false;
             }
-            if(!pJson.isString())
-            {
-                err="Type error in the "+fieldName+" field";
+            if (!pJson.isString()) {
+                err = "Type error in the " + fieldName + " field";
                 return false;
             }
             break;
         case 8:
-            if(pJson.isNull())
-            {
-                err="The " + fieldName + " column cannot be null";
+            if (pJson.isNull()) {
+                err = "The " + fieldName + " column cannot be null";
                 return false;
             }
-            if(!pJson.isBool())
-            {
-                err="Type error in the "+fieldName+" field";
+            if (!pJson.isBool()) {
+                err = "Type error in the " + fieldName + " field";
                 return false;
             }
             break;
         default:
-            err="Internal error in the server";
+            err = "Internal error in the server";
             return false;
     }
     return true;

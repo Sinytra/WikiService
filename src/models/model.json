@@ -6,5 +6,7 @@
   "schema": "public",
   "user": "postgres",
   "password": "postgres",
-  "tables": ["mod"]
+  "tables": [
+    "mod"
+  ]
 }

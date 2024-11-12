@@ -2,19 +2,17 @@
 
 #include "error.h"
 
-#include <optional>
-#include <string>
-#include <chrono>
-#include <vector>
-#include <shared_mutex>
 #include <any>
+#include <chrono>
 #include <drogon/utils/coroutine.h>
+#include <optional>
+#include <shared_mutex>
+#include <string>
+#include <vector>
 #include "log/log.h"
 
-namespace service
-{
-    class MemoryCache
-    {
+namespace service {
+    class MemoryCache {
     public:
         MemoryCache();
 
@@ -26,15 +24,14 @@ namespace service
         drogon::Task<> updateCacheSet(std::string key, std::vector<std::string> value, std::chrono::duration<long> expire);
     };
 
-    class CacheableServiceBase
-    {
+    class CacheableServiceBase {
     protected:
         template<class T>
         drogon::Task<std::optional<std::shared_future<T>>> startTask(const std::string &key) {
             auto guard = co_await mutex_.scoped_lock();
 
             if (pendingTasks_.contains(key)) {
-                auto pair = std::any_cast<std::pair<std::shared_ptr<std::promise<T>>, std::shared_future<T>>&>(pendingTasks_[key]);
+                auto pair = std::any_cast<std::pair<std::shared_ptr<std::promise<T>>, std::shared_future<T>> &>(pendingTasks_[key]);
                 co_return std::optional{pair.second};
             }
 
@@ -48,7 +45,7 @@ namespace service
         template<class T>
         std::optional<std::shared_future<T>> getPendingTask(const std::string &key) {
             if (pendingTasks_.contains(key)) {
-                auto pair = std::any_cast<std::pair<std::shared_ptr<std::promise<T>>, std::shared_future<T>>&>(pendingTasks_[key]);
+                auto pair = std::any_cast<std::pair<std::shared_ptr<std::promise<T>>, std::shared_future<T>> &>(pendingTasks_[key]);
                 return std::optional{pair.second};
             }
             return std::nullopt;
@@ -66,8 +63,8 @@ namespace service
         }
 
         template<class T>
-        drogon::Task<T> completeTask(const std::string &key, T&& value) {
-            auto pair = std::any_cast<std::pair<std::shared_ptr<std::promise<T>>, std::shared_future<T>>&>(pendingTasks_[key]);
+        drogon::Task<T> completeTask(const std::string &key, T &&value) {
+            auto pair = std::any_cast<std::pair<std::shared_ptr<std::promise<T>>, std::shared_future<T>> &>(pendingTasks_[key]);
             pair.first->set_value(value);
 
             auto guard = co_await mutex_.scoped_lock();
@@ -75,6 +72,7 @@ namespace service
 
             co_return value;
         }
+
     private:
         drogon::Mutex mutex_;
         std::shared_mutex pendingTasks_mtx_;

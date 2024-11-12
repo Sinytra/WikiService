@@ -2,13 +2,14 @@
 
 #include <drogon/drogon.h>
 
+#include <map>
 #include <mutex>
-#include <unordered_map>
 
 #include <trantor/net/EventLoopThreadPool.h>
 
 #define DOCS_FILE_EXT ".mdx"
 #define META_FILE_PATH "/_meta.json"
+#define DOCS_META_FILE_PATH "/sinytra-wiki.json"
 #define I18N_FILE_PATH "/.translated"
 #define TYPE_FILE "file"
 #define TYPE_DIR "dir"
@@ -37,15 +38,11 @@ std::string getTreeEntryPath(const std::string &s, int pathPrefix) {
     return relative.ends_with(DOCS_FILE_EXT) ? relative.substr(0, relative.size() - 4) : relative;
 }
 
-Task<FolderMetadata> getFolderMetadata(service::GitHub &github, std::string repo, std::string rootPath,
-                                       std::string path, std::optional<std::string> locale,
-                                       std::string installationToken) {
+Task<FolderMetadata> getFolderMetadata(service::GitHub &github, std::string repo, std::string version, std::string rootPath,
+                                       std::string path, std::optional<std::string> locale, std::string installationToken) {
     FolderMetadata metadata;
     const auto filePath = rootPath + (locale ? "/.translated/" + *locale : "") + path + META_FILE_PATH;
-    if (const auto [contents,
-                    contentsError](co_await github.getRepositoryContents(repo, std::nullopt, filePath, installationToken));
-        contents)
-    {
+    if (const auto [contents, contentsError](co_await github.getRepositoryContents(repo, version, filePath, installationToken)); contents) {
         const auto body = decodeBase64((*contents)["content"].asString());
         if (const auto parsed = parseJsonString(body); parsed->isObject()) {
             for (auto it = parsed->begin(); it != parsed->end(); it++) {
@@ -53,14 +50,13 @@ Task<FolderMetadata> getFolderMetadata(service::GitHub &github, std::string repo
                     metadata.try_emplace(it.key().asString(), it->asString(), "");
                 } else if (it->isObject()) {
                     metadata.try_emplace(it.key().asString(),
-                                         it->isMember("name") ? (*it)["name"].asString()
-                                                              : getTreeEntryName(it.key().asString()),
+                                         it->isMember("name") ? (*it)["name"].asString() : getTreeEntryName(it.key().asString()),
                                          it->get("icon", "").asString());
                 }
             }
         }
     } else if (locale) {
-        co_return co_await getFolderMetadata(github, repo, rootPath, path, std::nullopt, installationToken);
+        co_return co_await getFolderMetadata(github, repo, version, rootPath, path, std::nullopt, installationToken);
     }
     co_return metadata;
 }
@@ -75,25 +71,22 @@ bool isValidEntry(const Json::Value &value) {
             (value["type"] != TYPE_FILE || value["name"].asString().ends_with(DOCS_FILE_EXT));
 }
 
-Task<Json::Value> crawlDocsTree(service::GitHub &github, std::string repo, std::string rootPath, std::string path,
-                                std::optional<std::string> locale, std::string installationToken,
-                                trantor::EventLoopThreadPool &pool) {
+Task<Json::Value> crawlDocsTree(service::GitHub &github, std::string repo, std::string version, std::string rootPath, std::string path,
+                                std::optional<std::string> locale, std::string installationToken, trantor::EventLoopThreadPool &pool) {
     auto currentLoop = trantor::EventLoop::getEventLoopOfCurrentThread();
     co_await switchThreadCoro(pool.getNextLoop());
 
     Json::Value root{Json::arrayValue};
-    if (const auto [contents,
-                    contentsError](co_await github.getRepositoryContents(repo, std::nullopt, rootPath + path, installationToken));
+    if (const auto [contents, contentsError](co_await github.getRepositoryContents(repo, version, rootPath + path, installationToken));
         contents && contents->isArray())
     {
-        FolderMetadata metadata = co_await getFolderMetadata(github, repo, rootPath, path, locale, installationToken);
+        FolderMetadata metadata = co_await getFolderMetadata(github, repo, version, rootPath, path, locale, installationToken);
 
         for (const auto &child: *contents) {
             if (isValidEntry(child)) {
                 const auto childName = child["name"].asString();
-                const auto childMeta = metadata.contains(childName)
-                                               ? metadata[childName]
-                                               : FolderMetadataEntry{getTreeEntryName(childName), ""};
+                const auto childMeta =
+                        metadata.contains(childName) ? metadata[childName] : FolderMetadataEntry{getTreeEntryName(childName), ""};
                 const auto relativePath = getTreeEntryPath(child["path"].asString(), rootPath.size());
                 Json::Value obj;
                 obj["name"] = childMeta.name;
@@ -103,8 +96,8 @@ Task<Json::Value> crawlDocsTree(service::GitHub &github, std::string repo, std::
                 obj["path"] = relativePath;
                 obj["type"] = child["type"];
                 if (child["type"] == TYPE_DIR) {
-                    Json::Value children = co_await crawlDocsTree(github, repo, rootPath, "/" + relativePath,
-                                                                  locale, installationToken, pool);
+                    Json::Value children =
+                            co_await crawlDocsTree(github, repo, version, rootPath, "/" + relativePath, locale, installationToken, pool);
                     obj["children"] = children;
                 }
                 root.append(obj);
@@ -118,8 +111,7 @@ Task<Json::Value> crawlDocsTree(service::GitHub &github, std::string repo, std::
 namespace service {
     Documentation::Documentation(service::GitHub &g, service::MemoryCache &c) : github_(g), cache_(c) {}
 
-    Task<std::tuple<bool, Error>> Documentation::hasAvailableLocale(const Mod &mod, std::string locale,
-                                                                    std::string installationToken) {
+    Task<std::tuple<bool, Error>> Documentation::hasAvailableLocale(const Mod &mod, std::string locale, std::string installationToken) {
         const auto cacheKey = "locales:" + *mod.getId();
 
         if (const auto exists = co_await cache_.exists(cacheKey); !exists) {
@@ -127,12 +119,11 @@ namespace service {
                 co_return pending->get();
             }
 
-            const auto [locales, localesError] = co_await getAvailableLocales(mod, installationToken);
+            const auto [locales, localesError] = co_await computeAvailableLocales(mod, installationToken);
             co_await cache_.updateCacheSet(cacheKey, *locales, 7 * 24h);
 
             const auto cached = co_await cache_.isSetMember(cacheKey, locale);
-            co_return co_await CacheableServiceBase::completeTask<std::tuple<bool, Error>>(cacheKey,
-                                                                                           {cached, Error::Ok});
+            co_return co_await CacheableServiceBase::completeTask<std::tuple<bool, Error>>(cacheKey, {cached, Error::Ok});
         }
 
         if (const auto cached = co_await cache_.isSetMember(cacheKey, locale)) {
@@ -142,20 +133,23 @@ namespace service {
         co_return {false, Error::Ok};
     }
 
-    Task<std::tuple<std::optional<Json::Value>, Error>> Documentation::getDocumentationPage(const Mod& mod, std::string path, std::optional<std::string> locale, std::optional<std::string> version, std::string installationToken) {
+    Task<std::tuple<std::optional<Json::Value>, Error>> Documentation::getDocumentationPage(const Mod &mod, std::string path,
+                                                                                            std::optional<std::string> locale,
+                                                                                            std::string version,
+                                                                                            std::string installationToken) {
         const auto sourcePath = removeTrailingSlash(mod.getValueOfSourcePath());
         const auto resourcePath = sourcePath + (locale ? "/.translated/" + *locale : "") + "/" + removeLeadingSlash(path);
-        const auto [contents, contentsError](co_await github_.getRepositoryContents(mod.getValueOfSourceRepo(), version, resourcePath, installationToken));
+        const auto [contents, contentsError](
+                co_await github_.getRepositoryContents(mod.getValueOfSourceRepo(), version, resourcePath, installationToken));
         if (!contents && locale) {
             co_return co_await getDocumentationPage(mod, path, std::nullopt, version, installationToken);
         }
         co_return {contents, contentsError};
     }
 
-    Task<std::tuple<Json::Value, Error>> Documentation::getDirectoryTree(const Mod &mod,
-                                                                         std::optional<std::string> locale,
-                                                                         std::string installationToken) {
-        const auto cacheKey = "docs_tree:" + *mod.getId() + ":" + locale.value_or("default");
+    Task<std::tuple<Json::Value, Error>> Documentation::getDirectoryTree(const Mod &mod, std::string version,
+                                                                         std::optional<std::string> locale, std::string installationToken) {
+        const auto cacheKey = "docs_tree:" + *mod.getId() + ":" + version + ":" + locale.value_or("default");
 
         if (const auto cached = co_await cache_.getFromCache(cacheKey)) {
             if (const auto parsed = parseJsonString(*cached)) {
@@ -163,37 +157,32 @@ namespace service {
             }
         }
 
-        if (const auto pending =
-                    co_await CacheableServiceBase::getOrStartTask<std::tuple<Json::Value, Error>>(cacheKey))
-        {
+        if (const auto pending = co_await CacheableServiceBase::getOrStartTask<std::tuple<Json::Value, Error>>(cacheKey)) {
             co_return pending->get();
         }
-
-        const auto repo = *mod.getSourceRepo();
-        const auto path = *mod.getSourcePath();
 
         trantor::EventLoopThreadPool pool{10};
         pool.start();
 
-        Json::Value root = co_await crawlDocsTree(github_, repo, removeTrailingSlash(path), "", locale, installationToken, pool);
+        Json::Value root = co_await crawlDocsTree(github_, mod.getValueOfSourceRepo(), version,
+                                                  removeTrailingSlash(mod.getValueOfSourcePath()), "", locale, installationToken, pool);
 
         for (int16_t i = 0; i < 10; i++)
             pool.getLoop(i)->quit();
         pool.wait();
 
         co_await cache_.updateCache(cacheKey, serializeJsonString(root), 7 * 24h);
-        co_return co_await CacheableServiceBase::completeTask<std::tuple<Json::Value, Error>>(cacheKey,
-                                                                                              {root, Error::Ok});
+        co_return co_await CacheableServiceBase::completeTask<std::tuple<Json::Value, Error>>(cacheKey, {root, Error::Ok});
     }
 
-    Task<std::tuple<std::optional<std::vector<std::string>>, Error>>
-    Documentation::getAvailableLocales(const Mod &mod, const std::string installationToken) {
+    Task<std::tuple<std::optional<std::vector<std::string>>, Error>> Documentation::computeAvailableLocales(const Mod &mod,
+                                                                                                            std::string installationToken) {
         std::vector<std::string> locales;
 
-        const auto repo = *mod.getSourceRepo();
-        const auto path = *mod.getSourcePath() + I18N_FILE_PATH;
-        if (const auto [contents, contentsError](
-                    co_await github_.getRepositoryContents(repo, std::nullopt, path, installationToken));
+        const auto repo = mod.getValueOfSourceRepo();
+        const auto path = mod.getValueOfSourcePath() + I18N_FILE_PATH;
+        if (const auto [contents,
+                        contentsError](co_await github_.getRepositoryContents(repo, mod.getValueOfSourceBranch(), path, installationToken));
             contents && contents->isArray())
         {
             for (const auto &child: *contents) {
@@ -206,9 +195,8 @@ namespace service {
         co_return {locales, Error::Ok};
     }
 
-    // TODO Include branch in assets
     Task<std::tuple<std::optional<std::string>, Error>>
-    Documentation::getAssetResource(const Mod &mod, ResourceLocation location, std::string installationToken) {
+    Documentation::getAssetResource(const Mod &mod, ResourceLocation location, std::string version, std::string installationToken) {
         const auto path = mod.getValueOfSourcePath() + "/.assets/item/" + location.namespace_ + "/" + location.path_ +
                           (location.path_.find('.') != std::string::npos ? "" : ".png");
 
@@ -219,11 +207,50 @@ namespace service {
             co_return {baseUrl + path, Error::Ok};
         }
 
-        const auto [contents, contentsError](co_await github_.getRepositoryContents(
-                mod.getValueOfSourceRepo(), std::nullopt, path, installationToken));
+        const auto [contents, contentsError](
+                co_await github_.getRepositoryContents(mod.getValueOfSourceRepo(), mod.getValueOfSourceBranch(), path, installationToken));
         if (!contents) {
             co_return {std::nullopt, Error::ErrBadRequest};
         }
         co_return {BASE64_PREFIX + (*contents)["content"].asString(), Error::Ok};
+    }
+
+    Task<std::tuple<std::optional<Json::Value>, Error>> Documentation::getAvailableVersions(const Mod &mod, std::string installationToken) {
+        const auto cacheKey = "versions:" + mod.getValueOfId();
+
+        if (const auto exists = co_await cache_.exists(cacheKey); !exists) {
+            if (const auto pending = co_await CacheableServiceBase::getOrStartTask<std::tuple<std::optional<Json::Value>, Error>>(cacheKey))
+            {
+                co_return pending->get();
+            }
+
+            const auto [versions, versionsError] = co_await computeAvailableVersions(mod, installationToken);
+            co_await cache_.updateCache(cacheKey, serializeJsonString(*versions), 7 * 24h);
+
+            co_return co_await CacheableServiceBase::completeTask<std::tuple<std::optional<Json::Value>, Error>>(cacheKey,
+                                                                                                                 {versions, versionsError});
+        }
+
+        if (const auto cached = co_await cache_.getFromCache(cacheKey)) {
+            if (const auto parsed = parseJsonString(*cached)) {
+                co_return {parsed, Error::Ok};
+            }
+        }
+
+        co_return {std::nullopt, Error::Ok};
+    }
+
+    Task<std::tuple<std::optional<Json::Value>, Error>> Documentation::computeAvailableVersions(const Mod &mod,
+                                                                                                std::string installationToken) {
+        const auto path = mod.getValueOfSourcePath() + DOCS_META_FILE_PATH;
+        if (const auto [contents, contentsError](co_await github_.getRepositoryJSONFile(
+                    mod.getValueOfSourceRepo(), mod.getValueOfSourceBranch(), path, installationToken));
+            contents && contents->isObject() && contents->isMember("versions"))
+        {
+            Json::Value versions = (*contents)["versions"];
+            co_return {versions, Error::Ok};
+        }
+
+        co_return {std::nullopt, Error::ErrBadRequest};
     }
 }

@@ -1,11 +1,11 @@
 add_library(log STATIC
-    log.cc
+        log.cc
 )
 
 target_link_libraries(log PUBLIC
-    spdlog::spdlog
+        spdlog::spdlog
 )
 
 target_include_directories(log PUBLIC
-    ${PROJECT_SOURCE_DIR}
+        ${PROJECT_SOURCE_DIR}
 )

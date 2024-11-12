@@ -1,16 +1,16 @@
 add_library(service STATIC
-    github.cc
-    util.cc
-    cache.cc
-    database.cc
-    documentation.cc
+        github.cc
+        util.cc
+        cache.cc
+        database.cc
+        documentation.cc
 )
 
 target_link_libraries(service PRIVATE
-    log
-    drogon
-    jwt-cpp
-    base64
+        log
+        drogon
+        jwt-cpp
+        base64
 )
 
 target_include_directories(service PUBLIC

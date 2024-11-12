@@ -12,7 +12,7 @@ services:
     ports:
       - "5432:5432"
     networks:
-      - db
+      - mm_wiki
     restart: unless-stopped
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -d postgres" ]
@@ -25,9 +25,9 @@ services:
     ports:
       - "6379:6379"
     networks:
-      - db
+      - mm_wiki
 networks:
-  db:
+  mm_wiki:
     driver: bridge
 
 volumes:

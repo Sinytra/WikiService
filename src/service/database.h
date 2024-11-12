@@ -3,16 +3,14 @@
 #include "error.h"
 #include "models/Mod.h"
 
+#include <drogon/utils/coroutine.h>
 #include <optional>
 #include <string>
-#include <drogon/utils/coroutine.h>
 
 using namespace drogon_model::postgres;
 
-namespace service
-{
-    class Database
-    {
+namespace service {
+    class Database {
     public:
         explicit Database();
 
