@@ -91,7 +91,6 @@ namespace service {
                             .set_expires_at(expiresAt)
                             .sign(jwt::algorithm::rs256("", contents));
 
-            // TODO don't block thread
             logger.trace("Storing JWT token in cache");
             const auto ttl = std::chrono::duration_cast<std::chrono::seconds>(expiresAt - std::chrono::system_clock::now()) - 5s;
             co_await cache_.updateCache("jwt:" + appClientId_, token, ttl);
