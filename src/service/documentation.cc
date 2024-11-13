@@ -26,6 +26,14 @@ struct FolderMetadataEntry {
 };
 using FolderMetadata = std::map<std::string, FolderMetadataEntry>;
 
+std::string createLocalesCacheKey(const std::string &modId) { return "mod:" + modId + ":locales"; }
+
+std::string createDocsTreeCacheKey(const std::string &id, const std::string &version, const std::optional<std::string> &locale) {
+    return std::format("mod:{}:docs_tree:{}:{}", id, version, locale.value_or("default"));
+}
+
+std::string createVersionsCacheKey(const std::string &modId) { return "mod:" + modId + ":versions"; }
+
 std::string getTreeEntryName(std::string s) {
     if (s.ends_with(DOCS_FILE_EXT)) {
         s = s.substr(0, s.size() - 4);
@@ -63,12 +71,12 @@ Task<FolderMetadata> getFolderMetadata(service::GitHub &github, std::string repo
 
 bool isValidEntry(const Json::Value &value) {
     return
-            // Check structure
-            value.isObject() && value.isMember("type") && value.isMember("name") &&
-            // Exclude "hidden" files
-            !value["name"].asString().starts_with('.') && !value["name"].asString().starts_with('_') &&
-            // Filter our non-docs
-            (value["type"] != TYPE_FILE || value["name"].asString().ends_with(DOCS_FILE_EXT));
+        // Check structure
+        value.isObject() && value.isMember("type") && value.isMember("name") &&
+        // Exclude "hidden" files
+        !value["name"].asString().starts_with('.') && !value["name"].asString().starts_with('_') &&
+        // Filter our non-docs
+        (value["type"] != TYPE_FILE || value["name"].asString().ends_with(DOCS_FILE_EXT));
 }
 
 Task<Json::Value> crawlDocsTree(service::GitHub &github, std::string repo, std::string version, std::string rootPath, std::string path,
@@ -86,7 +94,7 @@ Task<Json::Value> crawlDocsTree(service::GitHub &github, std::string repo, std::
             if (isValidEntry(child)) {
                 const auto childName = child["name"].asString();
                 const auto childMeta =
-                        metadata.contains(childName) ? metadata[childName] : FolderMetadataEntry{getTreeEntryName(childName), ""};
+                    metadata.contains(childName) ? metadata[childName] : FolderMetadataEntry{getTreeEntryName(childName), ""};
                 const auto relativePath = getTreeEntryPath(child["path"].asString(), rootPath.size());
                 Json::Value obj;
                 obj["name"] = childMeta.name;
@@ -97,7 +105,7 @@ Task<Json::Value> crawlDocsTree(service::GitHub &github, std::string repo, std::
                 obj["type"] = child["type"];
                 if (child["type"] == TYPE_DIR) {
                     Json::Value children =
-                            co_await crawlDocsTree(github, repo, version, rootPath, "/" + relativePath, locale, installationToken, pool);
+                        co_await crawlDocsTree(github, repo, version, rootPath, "/" + relativePath, locale, installationToken, pool);
                     obj["children"] = children;
                 }
                 root.append(obj);
@@ -112,7 +120,7 @@ namespace service {
     Documentation::Documentation(service::GitHub &g, service::MemoryCache &c) : github_(g), cache_(c) {}
 
     Task<std::tuple<bool, Error>> Documentation::hasAvailableLocale(const Mod &mod, std::string locale, std::string installationToken) {
-        const auto cacheKey = "locales:" + *mod.getId();
+        const auto cacheKey = createLocalesCacheKey(mod.getValueOfId());
 
         if (const auto exists = co_await cache_.exists(cacheKey); !exists) {
             if (const auto pending = co_await CacheableServiceBase::getOrStartTask<std::tuple<bool, Error>>(cacheKey)) {
@@ -140,7 +148,7 @@ namespace service {
         const auto sourcePath = removeTrailingSlash(mod.getValueOfSourcePath());
         const auto resourcePath = sourcePath + (locale ? "/.translated/" + *locale : "") + "/" + removeLeadingSlash(path);
         const auto [contents, contentsError](
-                co_await github_.getRepositoryContents(mod.getValueOfSourceRepo(), version, resourcePath, installationToken));
+            co_await github_.getRepositoryContents(mod.getValueOfSourceRepo(), version, resourcePath, installationToken));
         if (!contents && locale) {
             co_return co_await getDocumentationPage(mod, path, std::nullopt, version, installationToken);
         }
@@ -149,7 +157,7 @@ namespace service {
 
     Task<std::tuple<Json::Value, Error>> Documentation::getDirectoryTree(const Mod &mod, std::string version,
                                                                          std::optional<std::string> locale, std::string installationToken) {
-        const auto cacheKey = "docs_tree:" + *mod.getId() + ":" + version + ":" + locale.value_or("default");
+        const auto cacheKey = createDocsTreeCacheKey(mod.getValueOfId(), version, locale);
 
         if (const auto cached = co_await cache_.getFromCache(cacheKey)) {
             if (const auto parsed = parseJsonString(*cached)) {
@@ -208,7 +216,7 @@ namespace service {
         }
 
         const auto [contents, contentsError](
-                co_await github_.getRepositoryContents(mod.getValueOfSourceRepo(), mod.getValueOfSourceBranch(), path, installationToken));
+            co_await github_.getRepositoryContents(mod.getValueOfSourceRepo(), mod.getValueOfSourceBranch(), path, installationToken));
         if (!contents) {
             co_return {std::nullopt, Error::ErrBadRequest};
         }
@@ -216,7 +224,7 @@ namespace service {
     }
 
     Task<std::tuple<std::optional<Json::Value>, Error>> Documentation::getAvailableVersions(const Mod &mod, std::string installationToken) {
-        const auto cacheKey = "versions:" + mod.getValueOfId();
+        const auto cacheKey = createVersionsCacheKey(mod.getValueOfId());
 
         if (const auto exists = co_await cache_.exists(cacheKey); !exists) {
             if (const auto pending = co_await CacheableServiceBase::getOrStartTask<std::tuple<std::optional<Json::Value>, Error>>(cacheKey))
@@ -243,8 +251,8 @@ namespace service {
     Task<std::tuple<std::optional<Json::Value>, Error>> Documentation::computeAvailableVersions(const Mod &mod,
                                                                                                 std::string installationToken) {
         const auto path = mod.getValueOfSourcePath() + DOCS_META_FILE_PATH;
-        if (const auto [contents, contentsError](co_await github_.getRepositoryJSONFile(
-                    mod.getValueOfSourceRepo(), mod.getValueOfSourceBranch(), path, installationToken));
+        if (const auto [contents, contentsError](
+                co_await github_.getRepositoryJSONFile(mod.getValueOfSourceRepo(), mod.getValueOfSourceBranch(), path, installationToken));
             contents && contents->isObject() && contents->isMember("versions"))
         {
             Json::Value versions = (*contents)["versions"];
@@ -252,5 +260,9 @@ namespace service {
         }
 
         co_return {std::nullopt, Error::ErrBadRequest};
+    }
+
+    Task<> Documentation::invalidateCache(const Mod &mod) {
+        co_await cache_.eraseNamespace("mod:" + mod.getValueOfId());
     }
 }

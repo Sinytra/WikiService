@@ -13,9 +13,10 @@ namespace api::v1 {
 
     public:
         METHOD_LIST_BEGIN
-        ADD_METHOD_TO(DocsController::page, "/page?mod={1}&path={2}", drogon::Get, "AuthFilter");
-        ADD_METHOD_TO(DocsController::tree, "/tree?mod={1}", drogon::Get, "AuthFilter");
-        ADD_METHOD_TO(DocsController::asset, "/asset?mod={1}&location={2}", drogon::Get, "AuthFilter");
+        ADD_METHOD_TO(DocsController::page, "/api/v1/mod/{1:mod}/page/{2:path}", drogon::Get, "AuthFilter");
+        ADD_METHOD_TO(DocsController::tree, "/api/v1/mod/{1:mod}/tree", drogon::Get, "AuthFilter");
+        ADD_METHOD_TO(DocsController::asset, "/api/v1/mod/{1:mod}/asset/{2:location}", drogon::Get, "AuthFilter");
+        ADD_METHOD_TO(DocsController::invalidate, "/api/v1/mod/{1:mod}/invalidate", drogon::Post, "AuthFilter");
         METHOD_LIST_END
 
         drogon::Task<> page(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback, std::string mod,
@@ -26,6 +27,9 @@ namespace api::v1 {
 
         drogon::Task<> asset(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback, std::string mod,
                              std::string location) const;
+
+        drogon::Task<> invalidate(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
+                                  std::string mod) const;
 
     private:
         service::GitHub &github_;

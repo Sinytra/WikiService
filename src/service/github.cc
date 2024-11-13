@@ -18,6 +18,14 @@ using namespace std::chrono_literals;
 
 bool isSuccess(const HttpStatusCode &code) { return code == k200OK || code == k201Created || code == k202Accepted; }
 
+std::string createAppJWTTokenCacheKey(const std::string& appClientId) {
+    return "jwt:" + appClientId;
+}
+
+std::string createRepoInstallIdCacheKey(const std::string& repo) {
+    return "repo_install_id:" + repo;
+}
+
 Task<std::optional<Json::Value>> sendApiRequest(HttpClientPtr client, HttpMethod method, std::string path, std::string token,
                                                 const std::map<std::string, std::string> &params = {}) {
     try {
@@ -72,7 +80,9 @@ namespace service {
         cache_(cache_), appClientId_(appClientId_), appPrivateKeyPath_(appPrivateKeyPath_) {}
 
     Task<std::tuple<std::optional<std::string>, Error>> GitHub::getApplicationJWTToken() {
-        if (const auto cached = co_await cache_.getFromCache("jwt:" + appClientId_)) {
+        const auto key = createAppJWTTokenCacheKey(appClientId_);
+
+        if (const auto cached = co_await cache_.getFromCache(key)) {
             logger.trace("Reusing cached app JWT token");
             co_return {cached, Error::Ok};
         }
@@ -93,7 +103,7 @@ namespace service {
 
             logger.trace("Storing JWT token in cache");
             const auto ttl = std::chrono::duration_cast<std::chrono::seconds>(expiresAt - std::chrono::system_clock::now()) - 5s;
-            co_await cache_.updateCache("jwt:" + appClientId_, token, ttl);
+            co_await cache_.updateCache(key, token, ttl);
         } catch (std::exception &e) {
             logger.error("Failed to issue JWT auth token: {}", e.what());
             co_return {std::nullopt, Error::ErrInternal};
@@ -103,7 +113,9 @@ namespace service {
     }
 
     Task<std::tuple<std::optional<std::string>, Error>> GitHub::getRepositoryInstallation(const std::string repo) {
-        if (const auto cached = co_await cache_.getFromCache("repo_install_id:" + repo)) {
+        const auto key = createRepoInstallIdCacheKey(repo);
+
+        if (const auto cached = co_await cache_.getFromCache(key)) {
             logger.trace("Reusing cached repo installation ID for {}", repo);
             co_return {cached, Error::Ok};
         }
@@ -115,7 +127,7 @@ namespace service {
             const std::string installationId = (*installation)["id"].asString();
 
             logger.trace("Storing installation ID for {} in cache", repo);
-            co_await cache_.updateCache("repo_install_id:" + repo, installationId, 14 * 24h);
+            co_await cache_.updateCache(key, installationId, 14 * 24h);
 
             co_return {std::optional{installationId}, Error::Ok};
         }
@@ -208,5 +220,9 @@ namespace service {
         }
 
         co_return {std::nullopt, Error::ErrNotFound};
+    }
+
+    Task<> GitHub::invalidateCache(std::string repo) {
+        co_await cache_.erase(createRepoInstallIdCacheKey(repo));
     }
 }

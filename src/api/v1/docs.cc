@@ -252,4 +252,27 @@ namespace api::v1 {
 
         co_return;
     }
+
+    // TODO Invalidation rate limit
+    Task<> DocsController::invalidate(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback, std::string mod) const {
+        if (mod.empty()) {
+            co_return errorResponse(Error::ErrBadRequest, "Missing mod parameter", callback);
+        }
+
+        const auto [modResult, modError] = co_await database_.getModSource(mod);
+        if (!modResult) {
+            co_return errorResponse(modError, "Mod not found", callback);
+        }
+
+        co_await github_.invalidateCache(modResult->getValueOfSourceRepo());
+        co_await documentation_.invalidateCache(*modResult);
+
+        Json::Value root;
+        root["message"] = "Caches for mod invalidated successfully";
+        const auto resp = HttpResponse::newHttpJsonResponse(root);
+        resp->setStatusCode(k200OK);
+        callback(resp);
+
+        co_return;
+    }
 }

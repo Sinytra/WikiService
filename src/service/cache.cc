@@ -52,4 +52,34 @@ namespace service {
         co_await client->execCommandCoro("EXPIRE %s %ld", key.data(), expireSeconds);
         co_await trans->executeCoro();
     }
+
+    Task<> MemoryCache::erase(std::string key) {
+        const auto client = app().getFastRedisClient();
+        co_await client->execCommandCoro("DEL %s", key.data());
+    }
+
+    Task<> MemoryCache::erase(std::vector<std::string> keys) {
+        const auto client = app().getFastRedisClient();
+        const auto toErase = join(keys, " ");
+
+        co_await client->execCommandCoro("DEL %s", toErase.data());
+    }
+
+    Task<> MemoryCache::eraseNamespace(std::string key) {
+        const auto client = app().getFastRedisClient();
+        const auto result = (co_await client->execCommandCoro("SCAN 0 MATCH %s:*", key.data())).asArray();
+        if (result.size() > 1) {
+            const auto keys = result[1].asArray();
+            if (!keys.empty()) {
+                std::string entries;
+                for (const auto &entry: keys) {
+                    if (!entries.empty())
+                        entries += " ";
+                    entries += entry.asString();
+                }
+                co_await client->execCommandCoro("DEL " + entries);
+            }
+        }
+        co_return;
+    }
 }

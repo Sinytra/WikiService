@@ -22,6 +22,9 @@ namespace service {
         drogon::Task<bool> isSetMember(std::string key, std::string value);
         drogon::Task<> updateCache(std::string key, std::string value, std::chrono::duration<long> expire);
         drogon::Task<> updateCacheSet(std::string key, std::vector<std::string> value, std::chrono::duration<long> expire);
+        drogon::Task<> erase(std::string key);
+        drogon::Task<> erase(std::vector<std::string> keys);
+        drogon::Task<> eraseNamespace(std::string key);
     };
 
     class CacheableServiceBase {

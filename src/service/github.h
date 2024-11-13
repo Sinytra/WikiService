@@ -29,7 +29,7 @@ namespace service {
         drogon::Task<std::tuple<bool, Error>> isPublicRepository(std::string repo, std::string installationToken);
         drogon::Task<std::tuple<std::optional<std::string>, Error>> getFileLastUpdateTime(std::string repo, std::string ref,
                                                                                           std::string path, std::string installationToken);
-
+        drogon::Task<> invalidateCache(std::string repo);
     private:
         service::MemoryCache &cache_;
         const std::string &appClientId_;

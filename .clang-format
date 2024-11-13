@@ -32,8 +32,8 @@ BreakConstructorInitializers: AfterColon
 BreakConstructorInitializersBeforeComma: false
 ColumnLimit: 140
 ConstructorInitializerAllOnOneLineOrOnePerLine: false
-ContinuationIndentWidth: 8
-IncludeCategories: 
+ContinuationIndentWidth: 4
+IncludeCategories:
   - Regex: '^<.*'
     Priority: 1
   - Regex: '^".*'
