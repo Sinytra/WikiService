@@ -57,9 +57,11 @@ namespace api::v1 {
 
     DocsController::DocsController(GitHub &g, Database &db, Documentation &d) : github_(g), database_(db), documentation_(d) {}
 
-    Task<> DocsController::page(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string mod,
-                                std::string path) const {
+    Task<> DocsController::page(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string mod) const {
         try {
+            std::string prefix = std::format("/api/v1/mod/{}/page/", mod);
+            std::string path = req->getPath().substr(prefix.size());
+
             if (mod.empty()) {
                 co_return errorResponse(Error::ErrBadRequest, "Missing mod parameter", callback);
             }
