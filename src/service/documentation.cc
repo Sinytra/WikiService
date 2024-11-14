@@ -211,7 +211,7 @@ namespace service {
         const auto [isPublic, publicError](co_await github_.isPublicRepository(mod.getValueOfSourceRepo(), installationToken));
         // Fast (static) track
         if (isPublic) {
-            const auto baseUrl = std::format("https://raw.githubusercontent.com/{}/{}", mod.getValueOfSourceRepo(), "master");
+            const auto baseUrl = std::format("https://raw.githubusercontent.com/{}/{}", mod.getValueOfSourceRepo(), version);
             co_return {baseUrl + path, Error::Ok};
         }
 

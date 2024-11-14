@@ -59,12 +59,13 @@ namespace api::v1 {
 
     Task<> DocsController::page(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string mod) const {
         try {
-            std::string prefix = std::format("/api/v1/mod/{}/page/", mod);
-            std::string path = req->getPath().substr(prefix.size());
-
             if (mod.empty()) {
                 co_return errorResponse(Error::ErrBadRequest, "Missing mod parameter", callback);
             }
+
+            std::string prefix = std::format("/api/v1/mod/{}/page/", mod);
+            std::string path = req->getPath().substr(prefix.size());
+
             if (path.empty()) {
                 co_return errorResponse(Error::ErrBadRequest, "Missing path parameter", callback);
             }
@@ -201,12 +202,15 @@ namespace api::v1 {
         co_return;
     }
 
-    Task<> DocsController::asset(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback, std::string mod,
-                                 std::string location) const {
+    Task<> DocsController::asset(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback, std::string mod) const {
         try {
             if (mod.empty()) {
                 co_return errorResponse(Error::ErrBadRequest, "Missing mod parameter", callback);
             }
+
+            std::string prefix = std::format("/api/v1/mod/{}/asset/", mod);
+            std::string location = req->getPath().substr(prefix.size());
+
             if (location.empty()) {
                 co_return errorResponse(Error::ErrBadRequest, "Missing location parameter", callback);
             }
