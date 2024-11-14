@@ -28,8 +28,8 @@
   ],
   "custom_config": {
     "github_app": {
-      "client_id": "Iv23liNq0CQL2NOtPtsa",
-      "private_key_path": "run/app_key.pem"
+      "client_id": "",
+      "private_key_path": ""
     },
     "api_key": ""
   }
