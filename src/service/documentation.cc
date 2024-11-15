@@ -223,6 +223,14 @@ namespace service {
         co_return {BASE64_PREFIX + (*contents)["content"].asString(), Error::Ok};
     }
 
+    Task<std::tuple<std::optional<Json::Value>, Error>> Documentation::getAvailableVersionsFiltered(const Mod &mod, std::string installationToken) {
+        const auto [value, valueError] = co_await getAvailableVersions(mod, installationToken);
+        if (value) {
+            co_return {value->empty() ? std::nullopt : value, valueError};
+        }
+        co_return {std::nullopt, Error::Ok};
+    }
+
     Task<std::tuple<std::optional<Json::Value>, Error>> Documentation::getAvailableVersions(const Mod &mod, std::string installationToken) {
         const auto cacheKey = createVersionsCacheKey(mod.getValueOfId());
 
@@ -233,7 +241,7 @@ namespace service {
             }
 
             const auto [versions, versionsError] = co_await computeAvailableVersions(mod, installationToken);
-            co_await cache_.updateCache(cacheKey, serializeJsonString(*versions), 7 * 24h);
+            co_await cache_.updateCache(cacheKey, serializeJsonString(versions), 7 * 24h);
 
             co_return co_await CacheableServiceBase::completeTask<std::tuple<std::optional<Json::Value>, Error>>(cacheKey,
                                                                                                                  {versions, versionsError});
@@ -248,18 +256,17 @@ namespace service {
         co_return {std::nullopt, Error::Ok};
     }
 
-    Task<std::tuple<std::optional<Json::Value>, Error>> Documentation::computeAvailableVersions(const Mod &mod,
+    Task<std::tuple<Json::Value, Error>> Documentation::computeAvailableVersions(const Mod &mod,
                                                                                                 std::string installationToken) {
         const auto path = mod.getValueOfSourcePath() + DOCS_META_FILE_PATH;
-        if (const auto [contents, contentsError](
-                co_await github_.getRepositoryJSONFile(mod.getValueOfSourceRepo(), mod.getValueOfSourceBranch(), path, installationToken));
-            contents && contents->isObject() && contents->isMember("versions"))
-        {
+        const auto [contents, contentsError](
+            co_await github_.getRepositoryJSONFile(mod.getValueOfSourceRepo(), mod.getValueOfSourceBranch(), path, installationToken));
+        if (contents && contents->isObject() && contents->isMember("versions")) {
             Json::Value versions = (*contents)["versions"];
             co_return {versions, Error::Ok};
         }
 
-        co_return {std::nullopt, Error::ErrBadRequest};
+        co_return {Json::Value(Json::objectValue), contentsError};
     }
 
     Task<> Documentation::invalidateCache(const Mod &mod) {

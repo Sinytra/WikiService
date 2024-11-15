@@ -37,9 +37,6 @@ RUN apt-get update && apt-get install -y ca-certificates libspdlog1.12 libcares2
 
 COPY --from=build /build/src/build/bin/wiki_service /app
 
-# Cleanup
-RUN rm -rf -d /build
-
 EXPOSE 8080
 
 CMD ["./wiki_service"]

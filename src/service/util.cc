@@ -67,5 +67,6 @@ std::string toCamelCase(std::string s) {
 
 std::string serializeJsonString(const Json::Value &value) {
     Json::FastWriter fastWriter;
+    fastWriter.omitEndingLineFeed();
     return fastWriter.write(value);
 }

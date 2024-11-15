@@ -43,7 +43,7 @@ namespace api::v1 {
     Task<std::optional<std::string>> getDocsVersion(const std::optional<std::string> &version, Documentation &documentation, const Mod &mod,
                                                     const std::string &installationToken) {
         if (version) {
-            const auto [versions, versionsError](co_await documentation.getAvailableVersions(mod, installationToken));
+            const auto [versions, versionsError](co_await documentation.getAvailableVersionsFiltered(mod, installationToken));
             if (versions) {
                 for (auto it = versions->begin(); it != versions->end(); it++) {
                     if (it.key().isString() && it->isString() && it.key().asString() == *version) {
@@ -56,6 +56,59 @@ namespace api::v1 {
     }
 
     DocsController::DocsController(GitHub &g, Database &db, Documentation &d) : github_(g), database_(db), documentation_(d) {}
+
+    Task<> DocsController::mod(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback, std::string mod) const {
+        try {
+            if (mod.empty()) {
+                co_return errorResponse(Error::ErrBadRequest, "Missing mod parameter", callback);
+            }
+
+            const auto [modResult, modError] = co_await database_.getModSource(mod);
+            if (!modResult) {
+                co_return errorResponse(modError, "Mod not found", callback);
+            }
+            const std::string repo = *modResult->getSourceRepo();
+
+            const auto [installationId, installationIdError](co_await github_.getRepositoryInstallation(repo));
+            if (!installationId) {
+                co_return errorResponse(installationIdError, "Missing repository installation", callback);
+            }
+
+            const auto [installationToken, error3](co_await github_.getInstallationToken(installationId.value()));
+            if (!installationToken) {
+                co_return errorResponse(installationIdError, "GitHub authentication failure", callback);
+            }
+
+            const auto [isPublic, publicError](co_await github_.isPublicRepository(modResult->getValueOfSourceRepo(), *installationToken));
+            const auto [versions, versionsError](co_await documentation_.getAvailableVersionsFiltered(*modResult, *installationToken));
+
+            Json::Value root;
+            {
+                Json::Value modJson;
+                modJson["id"] = modResult->getValueOfId();
+                modJson["name"] = modResult->getValueOfName();
+                modJson["platform"] = modResult->getValueOfPlatform();
+                modJson["slug"] = modResult->getValueOfSlug();
+                modJson["source_repo"] = modResult->getValueOfSourceRepo();
+                modJson["is_community"] = modResult->getValueOfIsCommunity();
+                modJson["is_public"] = isPublic;
+                if (versions) {
+                    modJson["versions"] = *versions;
+                }
+                root["mod"] = modJson;
+            }
+
+            const auto resp = HttpResponse::newHttpJsonResponse(root);
+            resp->setStatusCode(k200OK);
+            callback(resp);
+        } catch (const HttpException &err) {
+            const auto resp = HttpResponse::newHttpResponse();
+            resp->setBody(err.what());
+            callback(resp);
+        }
+
+        co_return;
+    }
 
     Task<> DocsController::page(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string mod) const {
         try {
@@ -101,7 +154,7 @@ namespace api::v1 {
                         updatedAtError](co_await github_.getFileLastUpdateTime(repo, ref, prefixedPath, installationToken.value()));
 
             const auto [isPublic, publicError](co_await github_.isPublicRepository(modResult->getValueOfSourceRepo(), *installationToken));
-            const auto [versions, versionsError](co_await documentation_.getAvailableVersions(*modResult, *installationToken));
+            const auto [versions, versionsError](co_await documentation_.getAvailableVersionsFiltered(*modResult, *installationToken));
 
             Json::Value root;
             {
@@ -170,7 +223,7 @@ namespace api::v1 {
             }
 
             const auto [isPublic, publicError](co_await github_.isPublicRepository(modResult->getValueOfSourceRepo(), *installationToken));
-            const auto [versions, versionsError](co_await documentation_.getAvailableVersions(*modResult, *installationToken));
+            const auto [versions, versionsError](co_await documentation_.getAvailableVersionsFiltered(*modResult, *installationToken));
 
             Json::Value root;
             {

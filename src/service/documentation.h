@@ -26,13 +26,13 @@ namespace service {
                                                                       std::optional<std::string> locale, std::string installationToken);
         drogon::Task<std::tuple<std::optional<std::string>, Error>> getAssetResource(const Mod &mod, ResourceLocation location,
                                                                                      std::string version, std::string installationToken);
+        drogon::Task<std::tuple<std::optional<Json::Value>, Error>> getAvailableVersionsFiltered(const Mod &mod, std::string installationToken);
         drogon::Task<std::tuple<std::optional<Json::Value>, Error>> getAvailableVersions(const Mod &mod, std::string installationToken);
         drogon::Task<> invalidateCache(const Mod &mod);
-
     private:
         drogon::Task<std::tuple<std::optional<std::vector<std::string>>, Error>> computeAvailableLocales(const Mod &mod,
                                                                                                          std::string installationToken);
-        drogon::Task<std::tuple<std::optional<Json::Value>, Error>> computeAvailableVersions(const Mod &mod, std::string installationToken);
+        drogon::Task<std::tuple<Json::Value, Error>> computeAvailableVersions(const Mod &mod, std::string installationToken);
 
         service::GitHub &github_;
         service::MemoryCache &cache_;
