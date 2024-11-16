@@ -19,4 +19,13 @@ namespace api::v1 {
         }
         return k500InternalServerError;
     }
+
+    void errorResponse(const Error &error, const std::string &message, std::function<void(const HttpResponsePtr &)> &callback) {
+        Json::Value json;
+        json["error"] = message;
+        const auto resp = HttpResponse::newHttpJsonResponse(std::move(json));
+        resp->setStatusCode(mapError(error));
+
+        callback(resp);
+    }
 }

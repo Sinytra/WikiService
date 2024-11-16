@@ -1,6 +1,7 @@
 #include <drogon/drogon.h>
 
 #include "api/v1/docs.h"
+#include "api/v1/browse.h"
 #include "log/log.h"
 #include "service/github.h"
 
@@ -29,10 +30,12 @@ int main() {
         auto database(service::Database{});
         auto documentation(service::Documentation{github, cache});
         auto controller(make_shared<api::v1::DocsController>(github, database, documentation));
+        auto browseController(make_shared<api::v1::BrowseController>(database));
 
         app().setLogLevel(trantor::Logger::kDebug).addListener("0.0.0.0", port).setThreadNum(16);
 
         app().registerController(controller);
+        app().registerController(browseController);
 
         app().run();
     } catch (const std::exception &e) {

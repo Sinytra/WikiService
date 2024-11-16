@@ -11,10 +11,6 @@
 #include "cache.h"
 
 namespace service {
-    struct RepositoryContentsResponse {
-        std::string body;
-    };
-
     class GitHub {
     public:
         explicit GitHub(service::MemoryCache &, const std::string &, const std::string &);

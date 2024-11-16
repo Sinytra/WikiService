@@ -20,15 +20,6 @@ using namespace drogon::orm;
 using namespace drogon_model::postgres;
 
 namespace api::v1 {
-    void errorResponse(const Error &error, const std::string &message, std::function<void(const HttpResponsePtr &)> &callback) {
-        Json::Value json;
-        json["error"] = message;
-        const auto resp = HttpResponse::newHttpJsonResponse(std::move(json));
-        resp->setStatusCode(mapError(error));
-
-        callback(resp);
-    }
-
     Task<std::optional<std::string>> assertLocale(const std::optional<std::string> &locale, Documentation &documentation, const Mod &mod,
                                                   const std::string &installationToken) {
         if (locale) {

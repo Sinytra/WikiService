@@ -1,9 +1,14 @@
 #pragma once
 
 #include <drogon/HttpTypes.h>
+#include <drogon/HttpResponse.h>
+
+#include <functional>
 
 #include "service/error.h"
 
 namespace api::v1 {
     drogon::HttpStatusCode mapError(const service::Error);
+
+    void errorResponse(const service::Error &error, const std::string &message, std::function<void(const drogon::HttpResponsePtr &)> &callback);
 }

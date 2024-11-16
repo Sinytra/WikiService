@@ -1,4 +1,5 @@
 add_library(api STATIC
+        browse.cc
         docs.cc
         error.cc
 )
