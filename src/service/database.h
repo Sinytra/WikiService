@@ -1,7 +1,7 @@
 #pragma once
 
 #include "error.h"
-#include "models/Mod.h"
+#include "models/Project.h"
 
 #include <drogon/utils/coroutine.h>
 #include <optional>
@@ -10,18 +10,18 @@
 using namespace drogon_model::postgres;
 
 namespace service {
-    struct BrowseModsResponse {
+    struct ProjectSearchResponse {
         int pages;
         int total;
-        std::vector<Mod> data;
+        std::vector<Project> data;
     };
 
     class Database {
     public:
         explicit Database();
 
-        drogon::Task<std::tuple<std::optional<Mod>, Error>> getModSource(std::string id);
+        drogon::Task<std::tuple<std::optional<Project>, Error>> getProjectSource(std::string id);
 
-        drogon::Task<std::tuple<BrowseModsResponse, Error>> findMods(std::string query, int page);
+        drogon::Task<std::tuple<ProjectSearchResponse, Error>> findProjects(std::string query, int page);
     };
 }

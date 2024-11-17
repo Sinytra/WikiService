@@ -1,7 +1,7 @@
 #include "docs.h"
 
 #include <drogon/HttpClient.h>
-#include <models/Mod.h>
+#include <models/Project.h>
 
 #include "log/log.h"
 
@@ -20,10 +20,10 @@ using namespace drogon::orm;
 using namespace drogon_model::postgres;
 
 namespace api::v1 {
-    Task<std::optional<std::string>> assertLocale(const std::optional<std::string> &locale, Documentation &documentation, const Mod &mod,
-                                                  const std::string &installationToken) {
+    Task<std::optional<std::string>> assertLocale(const std::optional<std::string> &locale, Documentation &documentation,
+                                                  const Project &project, const std::string &installationToken) {
         if (locale) {
-            const auto [hasLocale, hasLocaleError](co_await documentation.hasAvailableLocale(mod, *locale, installationToken));
+            const auto [hasLocale, hasLocaleError](co_await documentation.hasAvailableLocale(project, *locale, installationToken));
             if (hasLocale) {
                 co_return locale;
             }
@@ -31,10 +31,10 @@ namespace api::v1 {
         co_return std::nullopt;
     }
 
-    Task<std::optional<std::string>> getDocsVersion(const std::optional<std::string> &version, Documentation &documentation, const Mod &mod,
-                                                    const std::string &installationToken) {
+    Task<std::optional<std::string>> getDocsVersion(const std::optional<std::string> &version, Documentation &documentation,
+                                                    const Project &project, const std::string &installationToken) {
         if (version) {
-            const auto [versions, versionsError](co_await documentation.getAvailableVersionsFiltered(mod, installationToken));
+            const auto [versions, versionsError](co_await documentation.getAvailableVersionsFiltered(project, installationToken));
             if (versions) {
                 for (auto it = versions->begin(); it != versions->end(); it++) {
                     if (it.key().isString() && it->isString() && it.key().asString() == *version) {
@@ -48,45 +48,54 @@ namespace api::v1 {
 
     DocsController::DocsController(GitHub &g, Database &db, Documentation &d) : github_(g), database_(db), documentation_(d) {}
 
-    Task<> DocsController::mod(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback, std::string mod) const {
+    Task<std::optional<ProjectDetails>> DocsController::getProject(const std::string &project,
+                                                                   std::function<void(const drogon::HttpResponsePtr &)> callback) const {
+        if (project.empty()) {
+            errorResponse(Error::ErrBadRequest, "Missing project parameter", callback);
+            co_return std::nullopt;
+        }
+
+        const auto [proj, projErr] = co_await database_.getProjectSource(project);
+        if (!proj) {
+            errorResponse(projErr, "Project not found", callback);
+            co_return std::nullopt;
+        }
+        const std::string repo = *proj->getSourceRepo();
+
+        const auto [installationId, installationIdError](co_await github_.getRepositoryInstallation(repo));
+        if (!installationId) {
+            errorResponse(installationIdError, "Missing repository installation", callback);
+            co_return std::nullopt;
+        }
+
+        const auto [installationToken, error3](co_await github_.getInstallationToken(installationId.value()));
+        if (!installationToken) {
+            errorResponse(installationIdError, "GitHub authentication failure", callback);
+            co_return std::nullopt;
+        }
+
+        co_return ProjectDetails{*proj, *installationToken};
+    }
+
+    Task<> DocsController::project(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
+                               std::string project) const {
         try {
-            if (mod.empty()) {
-                co_return errorResponse(Error::ErrBadRequest, "Missing mod parameter", callback);
+            const auto proj = co_await getProject(project, callback);
+            if (!proj) {
+                co_return;
             }
 
-            const auto [modResult, modError] = co_await database_.getModSource(mod);
-            if (!modResult) {
-                co_return errorResponse(modError, "Mod not found", callback);
-            }
-            const std::string repo = *modResult->getSourceRepo();
-
-            const auto [installationId, installationIdError](co_await github_.getRepositoryInstallation(repo));
-            if (!installationId) {
-                co_return errorResponse(installationIdError, "Missing repository installation", callback);
-            }
-
-            const auto [installationToken, error3](co_await github_.getInstallationToken(installationId.value()));
-            if (!installationToken) {
-                co_return errorResponse(installationIdError, "GitHub authentication failure", callback);
-            }
-
-            const auto [isPublic, publicError](co_await github_.isPublicRepository(modResult->getValueOfSourceRepo(), *installationToken));
-            const auto [versions, versionsError](co_await documentation_.getAvailableVersionsFiltered(*modResult, *installationToken));
+            const auto [isPublic, publicError](co_await github_.isPublicRepository(proj->project.getValueOfSourceRepo(), proj->token));
+            const auto [versions, versionsError](co_await documentation_.getAvailableVersionsFiltered(proj->project, proj->token));
 
             Json::Value root;
             {
-                Json::Value modJson;
-                modJson["id"] = modResult->getValueOfId();
-                modJson["name"] = modResult->getValueOfName();
-                modJson["platform"] = modResult->getValueOfPlatform();
-                modJson["slug"] = modResult->getValueOfSlug();
-                modJson["source_repo"] = modResult->getValueOfSourceRepo();
-                modJson["is_community"] = modResult->getValueOfIsCommunity();
-                modJson["is_public"] = isPublic;
+                Json::Value projectJson = proj->project.toJson();
+                projectJson["is_public"] = isPublic;
                 if (versions) {
-                    modJson["versions"] = *versions;
+                    projectJson["versions"] = *versions;
                 }
-                root["mod"] = modJson;
+                root["project"] = projectJson;
             }
 
             const auto resp = HttpResponse::newHttpJsonResponse(root);
@@ -101,66 +110,46 @@ namespace api::v1 {
         co_return;
     }
 
-    Task<> DocsController::page(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string mod) const {
+    Task<> DocsController::page(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string project) const {
         try {
-            if (mod.empty()) {
-                co_return errorResponse(Error::ErrBadRequest, "Missing mod parameter", callback);
+            const auto proj = co_await getProject(project, callback);
+            if (!proj) {
+                co_return;
             }
 
-            std::string prefix = std::format("/api/v1/mod/{}/page/", mod);
+            std::string prefix = std::format("/api/v1/project/{}/page/", project);
             std::string path = req->getPath().substr(prefix.size());
 
             if (path.empty()) {
                 co_return errorResponse(Error::ErrBadRequest, "Missing path parameter", callback);
             }
 
-            const auto [modResult, modError] = co_await database_.getModSource(mod);
-            if (!modResult) {
-                co_return errorResponse(modError, "Mod not found", callback);
-            }
-            const std::string repo = *modResult->getSourceRepo();
-
-            const auto [installationId, installationIdError](co_await github_.getRepositoryInstallation(repo));
-            if (!installationId) {
-                co_return errorResponse(installationIdError, "Missing repository installation", callback);
-            }
-
-            const auto [installationToken, error3](co_await github_.getInstallationToken(installationId.value()));
-            if (!installationToken) {
-                co_return errorResponse(installationIdError, "GitHub authentication failure", callback);
-            }
-
             const auto locale =
-                    co_await assertLocale(req->getOptionalParameter<std::string>("locale"), documentation_, *modResult, *installationToken);
-            const auto ref = (co_await getDocsVersion(req->getOptionalParameter<std::string>("version"), documentation_, *modResult, *installationToken))
-                                     .value_or(modResult->getValueOfSourceBranch());
-            const auto prefixedPath = *modResult->getSourcePath() + '/' + path;
+                co_await assertLocale(req->getOptionalParameter<std::string>("locale"), documentation_, proj->project, proj->token);
+            const auto ref =
+                (co_await getDocsVersion(req->getOptionalParameter<std::string>("version"), documentation_, proj->project, proj->token))
+                    .value_or(proj->project.getValueOfSourceBranch());
+            const auto prefixedPath = proj->project.getValueOfSourcePath() + '/' + path;
             const auto [contents,
-                        contentsError](co_await documentation_.getDocumentationPage(*modResult, path, locale, ref, *installationToken));
+                        contentsError](co_await documentation_.getDocumentationPage(proj->project, path, locale, ref, proj->token));
             if (!contents) {
                 co_return errorResponse(contentsError, "File not found", callback);
             }
 
             const auto [updatedAt,
-                        updatedAtError](co_await github_.getFileLastUpdateTime(repo, ref, prefixedPath, installationToken.value()));
+                        updatedAtError](co_await github_.getFileLastUpdateTime(proj->project.getValueOfSourceRepo(), ref, prefixedPath, proj->token));
 
-            const auto [isPublic, publicError](co_await github_.isPublicRepository(modResult->getValueOfSourceRepo(), *installationToken));
-            const auto [versions, versionsError](co_await documentation_.getAvailableVersionsFiltered(*modResult, *installationToken));
+            const auto [isPublic, publicError](co_await github_.isPublicRepository(proj->project.getValueOfSourceRepo(), proj->token));
+            const auto [versions, versionsError](co_await documentation_.getAvailableVersionsFiltered(proj->project, proj->token));
 
             Json::Value root;
             {
-                Json::Value modJson;
-                modJson["id"] = modResult->getValueOfId();
-                modJson["name"] = modResult->getValueOfName();
-                modJson["platform"] = modResult->getValueOfPlatform();
-                modJson["slug"] = modResult->getValueOfSlug();
-                modJson["source_repo"] = modResult->getValueOfSourceRepo();
-                modJson["is_community"] = modResult->getValueOfIsCommunity();
-                modJson["is_public"] = isPublic;
+                Json::Value projectJson = proj->project.toJson();
+                projectJson["is_public"] = isPublic;
                 if (versions) {
-                    modJson["versions"] = *versions;
+                    projectJson["versions"] = *versions;
                 }
-                root["mod"] = modJson;
+                root["project"] = projectJson;
             }
             root["content"] = (*contents)["content"];
             if (isPublic) {
@@ -182,54 +171,34 @@ namespace api::v1 {
         co_return;
     }
 
-    Task<> DocsController::tree(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string mod) const {
+    Task<> DocsController::tree(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string project) const {
         try {
-            if (mod.empty()) {
-                co_return errorResponse(Error::ErrBadRequest, "Missing mod parameter", callback);
-            }
-
-            const auto [modResult, modError] = co_await database_.getModSource(mod);
-            if (!modResult) {
-                co_return errorResponse(modError, "Mod not found", callback);
-            }
-            const std::string repo = modResult->getValueOfSourceRepo();
-
-            const auto [installationId, installationIdError](co_await github_.getRepositoryInstallation(repo));
-            if (!installationId) {
-                co_return errorResponse(installationIdError, "Missing repository installation", callback);
-            }
-
-            const auto [installationToken, error3](co_await github_.getInstallationToken(installationId.value()));
-            if (!installationToken) {
-                co_return errorResponse(installationIdError, "GitHub authentication failure", callback);
+            const auto proj = co_await getProject(project, callback);
+            if (!proj) {
+                co_return;
             }
 
             const auto locale =
-                    co_await assertLocale(req->getOptionalParameter<std::string>("locale"), documentation_, *modResult, *installationToken);
-            const auto version = (co_await getDocsVersion(req->getOptionalParameter<std::string>("version"), documentation_, *modResult, *installationToken))
-                                         .value_or(modResult->getValueOfSourceBranch());
-            const auto [contents, contentsError](co_await documentation_.getDirectoryTree(*modResult, version, locale, *installationToken));
+                co_await assertLocale(req->getOptionalParameter<std::string>("locale"), documentation_, proj->project, proj->token);
+            const auto version =
+                (co_await getDocsVersion(req->getOptionalParameter<std::string>("version"), documentation_, proj->project, proj->token))
+                    .value_or(proj->project.getValueOfSourceBranch());
+            const auto [contents, contentsError](co_await documentation_.getDirectoryTree(proj->project, version, locale, proj->token));
             if (!contents) {
                 co_return errorResponse(contentsError, "Error getting dir tree", callback);
             }
 
-            const auto [isPublic, publicError](co_await github_.isPublicRepository(modResult->getValueOfSourceRepo(), *installationToken));
-            const auto [versions, versionsError](co_await documentation_.getAvailableVersionsFiltered(*modResult, *installationToken));
+            const auto [isPublic, publicError](co_await github_.isPublicRepository(proj->project.getValueOfSourceRepo(), proj->token));
+            const auto [versions, versionsError](co_await documentation_.getAvailableVersionsFiltered(proj->project, proj->token));
 
             Json::Value root;
             {
-                Json::Value modJson;
-                modJson["id"] = modResult->getValueOfId();
-                modJson["name"] = modResult->getValueOfName();
-                modJson["platform"] = modResult->getValueOfPlatform();
-                modJson["slug"] = modResult->getValueOfSlug();
-                modJson["source_repo"] = modResult->getValueOfSourceRepo();
-                modJson["is_community"] = modResult->getValueOfIsCommunity();
-                modJson["is_public"] = isPublic;
+                Json::Value projectJson = proj->project.toJson();
+                projectJson["is_public"] = isPublic;
                 if (versions) {
-                    modJson["versions"] = *versions;
+                    projectJson["versions"] = *versions;
                 }
-                root["mod"] = modJson;
+                root["project"] = projectJson;
             }
             root["tree"] = contents;
 
@@ -246,33 +215,19 @@ namespace api::v1 {
         co_return;
     }
 
-    Task<> DocsController::asset(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback, std::string mod) const {
+    Task<> DocsController::asset(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
+                                 std::string project) const {
         try {
-            if (mod.empty()) {
-                co_return errorResponse(Error::ErrBadRequest, "Missing mod parameter", callback);
+            const auto proj = co_await getProject(project, callback);
+            if (!proj) {
+                co_return;
             }
 
-            std::string prefix = std::format("/api/v1/mod/{}/asset/", mod);
+            std::string prefix = std::format("/api/v1/project/{}/asset/", project);
             std::string location = req->getPath().substr(prefix.size());
 
             if (location.empty()) {
                 co_return errorResponse(Error::ErrBadRequest, "Missing location parameter", callback);
-            }
-
-            const auto [modResult, modError] = co_await database_.getModSource(mod);
-            if (!modResult) {
-                co_return errorResponse(modError, "Mod not found", callback);
-            }
-            const std::string repo = modResult->getValueOfSourceRepo();
-
-            const auto [installationId, installationIdError](co_await github_.getRepositoryInstallation(repo));
-            if (!installationId) {
-                co_return errorResponse(installationIdError, "Missing repository installation", callback);
-            }
-
-            const auto [installationToken, error3](co_await github_.getInstallationToken(installationId.value()));
-            if (!installationToken) {
-                co_return errorResponse(installationIdError, "GitHub authentication failure", callback);
             }
 
             const auto resourceLocation = ResourceLocation::parse(location);
@@ -280,10 +235,11 @@ namespace api::v1 {
                 co_return errorResponse(Error::ErrBadRequest, "Invalid location specified", callback);
             }
 
-            const auto version = (co_await getDocsVersion(req->getOptionalParameter<std::string>("version"), documentation_, *modResult, *installationToken))
-                                         .value_or(modResult->getValueOfSourceBranch());
+            const auto version =
+                (co_await getDocsVersion(req->getOptionalParameter<std::string>("version"), documentation_, proj->project, proj->token))
+                    .value_or(proj->project.getValueOfSourceBranch());
             const auto [asset,
-                        assetError](co_await documentation_.getAssetResource(*modResult, *resourceLocation, version, *installationToken));
+                        assetError](co_await documentation_.getAssetResource(proj->project, *resourceLocation, version, proj->token));
             if (!asset) {
                 co_return errorResponse(assetError, "Asset not found", callback);
             }
@@ -305,21 +261,22 @@ namespace api::v1 {
     }
 
     // TODO Invalidation rate limit
-    Task<> DocsController::invalidate(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback, std::string mod) const {
-        if (mod.empty()) {
-            co_return errorResponse(Error::ErrBadRequest, "Missing mod parameter", callback);
+    Task<> DocsController::invalidate(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
+                                      std::string project) const {
+        if (project.empty()) {
+            co_return errorResponse(Error::ErrBadRequest, "Missing project parameter", callback);
         }
 
-        const auto [modResult, modError] = co_await database_.getModSource(mod);
-        if (!modResult) {
-            co_return errorResponse(modError, "Mod not found", callback);
+        const auto [proj, projErr] = co_await database_.getProjectSource(project);
+        if (!proj) {
+            co_return errorResponse(projErr, "Project not found", callback);
         }
 
-        co_await github_.invalidateCache(modResult->getValueOfSourceRepo());
-        co_await documentation_.invalidateCache(*modResult);
+        co_await github_.invalidateCache(proj->getValueOfSourceRepo());
+        co_await documentation_.invalidateCache(*proj);
 
         Json::Value root;
-        root["message"] = "Caches for mod invalidated successfully";
+        root["message"] = "Caches for project invalidated successfully";
         const auto resp = HttpResponse::newHttpJsonResponse(root);
         resp->setStatusCode(k200OK);
         callback(resp);

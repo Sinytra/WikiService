@@ -1,4 +1,4 @@
-create table mod
+create table project
 (
     id            text                                   not null
         primary key,
@@ -12,6 +12,6 @@ create table mod
     is_community  boolean      default false             not null
 );
 
-create unique index "mod_source_repo_source_path_key"
-    on mod (source_repo, source_path);
+create unique index "project_source_repo_source_path_key"
+    on project (source_repo, source_path);
 

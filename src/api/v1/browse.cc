@@ -1,6 +1,6 @@
 #include "browse.h"
 
-#include <models/Mod.h>
+#include <models/Project.h>
 
 #include "log/log.h"
 
@@ -18,26 +18,15 @@ using namespace drogon::orm;
 using namespace drogon_model::postgres;
 
 namespace api::v1 {
-    Json::Value modToJson(const Mod& mod) {
-        Json::Value json;
-        json["id"] = mod.getValueOfId();
-        json["name"] = mod.getValueOfName();
-        json["platform"] = mod.getValueOfPlatform();
-        json["slug"] = mod.getValueOfSlug();
-        json["source_repo"] = mod.getValueOfSourceRepo();
-        json["is_community"] = mod.getValueOfIsCommunity();
-        return json;
-    }
-
     BrowseController::BrowseController(Database &db) : database_(db) {}
 
     Task<> BrowseController::browse(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback, std::string query, int page) const {
-        const auto [searchResults, searchError] = co_await database_.findMods(query, page);
+        const auto [searchResults, searchError] = co_await database_.findProjects(query, page);
 
         Json::Value root;
         Json::Value data(Json::arrayValue);
         for (const auto &item: searchResults.data) {
-            data.append(modToJson(item));
+            data.append(item.toJson());
         }
         root["pages"] = searchResults.pages;
         root["total"] = searchResults.total;

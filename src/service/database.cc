@@ -11,10 +11,10 @@ using namespace drogon::orm;
 namespace service {
     Database::Database() = default;
 
-    Task<std::tuple<std::optional<Mod>, Error>> Database::getModSource(std::string id) {
+    Task<std::tuple<std::optional<Project>, Error>> Database::getProjectSource(std::string id) {
         try {
             const auto clientPtr = app().getFastDbClient();
-            CoroMapper<Mod> mapper(clientPtr);
+            CoroMapper<Project> mapper(clientPtr);
 
             const auto result = co_await mapper.findByPrimaryKey(id);
             co_return {result, Error::Ok};
@@ -40,14 +40,14 @@ namespace service {
         return result_stream.str();
     }
 
-    Task<std::tuple<BrowseModsResponse, Error>> Database::findMods(std::string query, int page) {
+    Task<std::tuple<ProjectSearchResponse, Error>> Database::findProjects(std::string query, int page) {
         try {
             // TODO Improve sorting
             const auto clientPtr = app().getFastDbClient();
             const auto results = co_await clientPtr->execSqlCoro(
                 "WITH search_data AS ("
                 "    SELECT *"
-                "    FROM mod"
+                "    FROM project"
                 "    WHERE (cast($1 as varchar) IS NULL OR $1 = '' OR search_vector @@ to_tsquery('simple', $1))"
                 "    ORDER BY \"createdAt\" desc"
                 "),"
@@ -63,17 +63,17 @@ namespace service {
                 buildQuery(query), page < 1 ? 1 : page);
 
             if (results.empty()) {
-                co_return {{0, 0, std::vector<Mod>()}, Error::Ok};
+                co_return {{0, 0, std::vector<Project>()}, Error::Ok};
             }
 
             int totalRows = results[0]["total_rows"].as<int>();
             int totalPages = results[0]["total_pages"].as<int>();
-            std::vector<Mod> mods;
+            std::vector<Project> projects;
             for (const auto &row: results) {
-                mods.emplace_back(row);
+                projects.emplace_back(row);
             }
 
-            co_return {BrowseModsResponse{.pages = totalPages, .total = totalRows, .data = mods}, Error::Ok};
+            co_return {ProjectSearchResponse{.pages = totalPages, .total = totalRows, .data = projects}, Error::Ok};
         } catch (const Failure &e) {
             // SQL Error
             logger.error("Error querying database: {}", e.what());
