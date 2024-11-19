@@ -15,9 +15,13 @@ namespace service {
     public:
         explicit GitHub(service::MemoryCache &, const std::string &, const std::string &);
 
+        drogon::Task<std::tuple<std::optional<std::string>, Error>> getUsername(std::string token);
+
         drogon::Task<std::tuple<std::optional<std::string>, Error>> getApplicationJWTToken();
         drogon::Task<std::tuple<std::optional<std::string>, Error>> getRepositoryInstallation(std::string repo);
         drogon::Task<std::tuple<std::optional<std::string>, Error>> getInstallationToken(std::string installationId);
+        drogon::Task<std::tuple<std::optional<std::string>, Error>> getCollaboratorPermissionLevel(std::string repo, std::string username, std::string installationToken);
+        drogon::Task<std::tuple<std::vector<std::string>, Error>> getRepositoryBranches(std::string repo, std::string installationToken);
         drogon::Task<std::tuple<std::optional<Json::Value>, Error>> getRepositoryJSONFile(std::string repo, std::string ref,
                                                                                           std::string path, std::string installationToken);
         drogon::Task<std::tuple<std::optional<Json::Value>, Error>> getRepositoryContents(std::string repo, std::string ref,

@@ -3,7 +3,6 @@
 #include <drogon/HttpController.h>
 
 #include "service/database.h"
-#include "service/github.h"
 
 namespace api::v1 {
     class BrowseController : public drogon::HttpController<BrowseController, false> {

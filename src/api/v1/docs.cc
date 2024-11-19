@@ -62,15 +62,15 @@ namespace api::v1 {
         }
         const std::string repo = *proj->getSourceRepo();
 
-        const auto [installationId, installationIdError](co_await github_.getRepositoryInstallation(repo));
+        const auto [installationId, idErr](co_await github_.getRepositoryInstallation(repo));
         if (!installationId) {
-            errorResponse(installationIdError, "Missing repository installation", callback);
+            errorResponse(idErr, "Missing repository installation", callback);
             co_return std::nullopt;
         }
 
-        const auto [installationToken, error3](co_await github_.getInstallationToken(installationId.value()));
+        const auto [installationToken, tokenErr](co_await github_.getInstallationToken(installationId.value()));
         if (!installationToken) {
-            errorResponse(installationIdError, "GitHub authentication failure", callback);
+            errorResponse(tokenErr, "GitHub authentication failure", callback);
             co_return std::nullopt;
         }
 
