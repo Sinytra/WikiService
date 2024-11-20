@@ -8,68 +8,87 @@
 
 #include <drogon/drogon.h>
 
-#include <utility>
 #include "log/log.h"
+#include "util.h"
 
 using namespace logging;
 using namespace drogon;
 
-// TODO Common HTTP utils
+namespace service {
+    ModrinthPlatform::ModrinthPlatform(const std::string &clientId, const std::string &clientSecret, const std::string &redirectUrl) :
+        clientId_(clientId), clientSecret_(clientSecret), redirectUrl_(redirectUrl) {}
 
-bool isSuccessCode(const HttpStatusCode &code) { return code == k200OK || code == k201Created || code == k202Accepted; }
+    bool ModrinthPlatform::isOAuthConfigured() const {
+        return !clientId_.empty() && clientSecret_.empty() && !redirectUrl_.empty();
+    }
 
-HttpClientPtr createHttpClientPlatforms(std::string baseUrl) {
-    auto currentLoop = trantor::EventLoop::getEventLoopOfCurrentThread();
-    auto client = HttpClient::newHttpClient(baseUrl, currentLoop);
-    return client;
-}
+    Task<std::optional<std::string>> ModrinthPlatform::getOAuthToken(std::string code) const {
+        const auto client = createHttpClient(MODRINTH_API_URL);
+        auto httpReq = HttpRequest::newHttpFormPostRequest();
+        httpReq->setPath("/_internal/oauth/token");
+        httpReq->addHeader("Authorization", clientSecret_);
+        httpReq->setBody(std::format("grant_type=authorization_code&client_id={}&code={}&redirect_uri={}", clientId_, code, redirectUrl_));
 
-Task<std::optional<Json::Value>> sendPlatformApiRequest(HttpClientPtr client, HttpMethod method, std::string path, std::string token = "") {
-    try {
-        auto httpReq = HttpRequest::newHttpRequest();
-        httpReq->setMethod(method);
-        httpReq->setPath(path);
-        httpReq->addHeader("User-Agent", WIKI_USER_AGENT);
-        if (!token.empty()) {
-            httpReq->addHeader("x-api-key", token);
-        }
-
-        logger.trace("=> Request to {}", path);
-        const auto response = co_await client->sendRequestCoro(httpReq);
-        const auto status = response->getStatusCode();
-        if (isSuccessCode(status)) {
+        if (const auto response = co_await client->sendRequestCoro(httpReq); response && isSuccess(response->getStatusCode())) {
             if (const auto jsonResp = response->getJsonObject()) {
-                logger.trace("<= Response ({}) from {}", std::to_string(status), path);
-                co_return std::make_optional(*jsonResp);
+                const auto accessToken = (*jsonResp)["access_token"].asString();
+                co_return accessToken;
             }
         }
 
-        logger.trace("Unexpected api response: ({}) {}", std::to_string(status), response->getBody());
-        co_return std::nullopt;
-    } catch (std::exception &e) {
-        logger.error(e.what());
         co_return std::nullopt;
     }
-}
 
-namespace service {
-    drogon::Task<std::optional<PlatformProject>> ModrinthPlatform::getProject(std::string slug) {
-        const auto client = createHttpClientPlatforms(MODRINTH_API_URL);
-        if (const auto resp = co_await sendPlatformApiRequest(client, Get, "/v3/project/" + slug); resp && resp->isObject()) {
+    Task<std::optional<std::string>> ModrinthPlatform::getAuthenticatedUser(std::string token) const {
+        const auto client = createHttpClient(MODRINTH_API_URL);
+        if (const auto resp = co_await sendApiRequest(client, Get, "/v3/user", [&token](const HttpRequestPtr& req) {
+            req->addHeader("Authorization", token);
+        }); resp && resp->isObject()) {
+            const auto username = (*resp)["username"].asString();
+            co_return username;
+        }
+        co_return std::nullopt;
+    }
+
+    Task<bool> ModrinthPlatform::isProjectMember(std::string slug, std::string username) const {
+        const auto client = createHttpClient(MODRINTH_API_URL);
+        // Check direct project members
+        if (const auto resp = co_await sendApiRequest(client, Get, std::format("/v3/project/{}/members", slug)); resp && resp->isArray()) {
+            for (const auto &item : *resp) {
+                if (const auto memberUsername = item["user"]["username"].asString(); memberUsername == username) {
+                    co_return true;
+                }
+            }
+        }
+        // Check organization members
+        if (const auto resp = co_await sendApiRequest(client, Get, std::format("/v3/project/{}/organization", slug)); resp && resp->isObject()) {
+            for (const auto members = (*resp)["members"]; const auto &item : members) {
+                if (const auto memberUsername = item["user"]["username"].asString(); memberUsername == username) {
+                    co_return true;
+                }
+            }
+        }
+        co_return false;
+    }
+
+    Task<std::optional<PlatformProject>> ModrinthPlatform::getProject(std::string slug) {
+        const auto client = createHttpClient(MODRINTH_API_URL);
+        if (const auto resp = co_await sendApiRequest(client, Get, "/v3/project/" + slug); resp && resp->isObject()) {
             const auto projectSlug = (*resp)["slug"].asString();
+            const auto name = (*resp)["name"].asString();
             const auto sourceUrl = resp->isMember("link_urls") && (*resp)["link_urls"].isMember("source")
                                        ? (*resp)["link_urls"]["source"]["url"].asString()
                                        : "";
-            co_return PlatformProject{.slug = projectSlug, .sourceUrl = sourceUrl};
+            co_return PlatformProject{.slug = projectSlug, .name = name, .sourceUrl = sourceUrl};
         }
         co_return std::nullopt;
     }
 
     CurseForgePlatform::CurseForgePlatform(std::string apiKey) : apiKey_(std::move(apiKey)) {}
 
-    drogon::Task<std::optional<PlatformProject>> CurseForgePlatform::getProject(std::string slug) {
-        const auto client = createHttpClientPlatforms(CURSEFORGE_API_URL);
-        if (const auto resp = co_await sendPlatformApiRequest(
+    Task<std::optional<PlatformProject>> CurseForgePlatform::getProject(std::string slug) {
+        const auto client = createHttpClient(CURSEFORGE_API_URL);
+        if (const auto resp = co_await sendAuthenticatedRequest(
                 client, Get, std::format("/v1/mods/search?gameId={}&classId={}&slug={}", MC_GAME_ID, MC_MODS_CAT, slug), apiKey_);
             resp && resp->isObject())
         {
@@ -79,17 +98,19 @@ namespace service {
             if (resultCount == 1 && data.size() == 1) {
                 const auto &proj = data[0];
                 const auto projectSlug = proj["slug"].asString();
-                const auto sourceUrl = proj.isMember("links") && proj["links"].isMember("sourceUrl") ? proj["links"]["sourceUrl"].asString() : "";
+                const auto name = proj["name"].asString();
+                const auto sourceUrl =
+                    proj.isMember("links") && proj["links"].isMember("sourceUrl") ? proj["links"]["sourceUrl"].asString() : "";
 
-                co_return PlatformProject{.slug = projectSlug, .sourceUrl = sourceUrl};
+                co_return PlatformProject{.slug = projectSlug, .name = name, .sourceUrl = sourceUrl};
             }
         }
         co_return std::nullopt;
     }
 
-    Platforms::Platforms(const std::map<std::string, DistributionPlatform &> &map) : platforms_(map) {}
+    Platforms::Platforms(ModrinthPlatform &mr, const std::map<std::string, DistributionPlatform &> &map) : modrinth_(mr), platforms_(map) {}
 
-    drogon::Task<std::optional<PlatformProject>> Platforms::getProject(std::string platform, std::string slug) {
+    Task<std::optional<PlatformProject>> Platforms::getProject(std::string platform, std::string slug) {
         const auto plat = platforms_.find(platform);
 
         if (plat == platforms_.end()) {

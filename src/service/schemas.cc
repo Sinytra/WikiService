@@ -1,6 +1,6 @@
 #include "schemas.h"
 
-nlohmann::json schemas::projectRegisterSchema = R"(
+nlohmann::json schemas::projectRegister = R"(
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "title": "Project registration",

@@ -28,6 +28,23 @@ namespace service {
         }
     }
 
+    Task<std::tuple<std::optional<Project>, Error>> Database::createProject(const Project &project) {
+        try {
+            const auto clientPtr = app().getFastDbClient();
+            CoroMapper<Project> mapper(clientPtr);
+
+            const auto result = co_await mapper.insert(project);
+            co_return {result, Error::Ok};
+        } catch (const Failure &e) {
+            // SQL Error
+            logger.error("Error querying database: {}", e.what());
+            co_return {std::nullopt, Error::ErrInternal};
+        } catch (const DrogonDbException &e) {
+            // Not found
+            co_return {std::nullopt, Error::ErrNotFound};
+        }
+    }
+
     std::string buildQuery(std::string query) {
         auto result = query | std::ranges::views::split(' ') |
                       std::views::transform([](auto rng) { return std::string(rng.data(), rng.size()) + ":*"; });

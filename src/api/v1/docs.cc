@@ -49,7 +49,7 @@ namespace api::v1 {
     DocsController::DocsController(GitHub &g, Database &db, Documentation &d) : github_(g), database_(db), documentation_(d) {}
 
     Task<std::optional<ProjectDetails>> DocsController::getProject(const std::string &project,
-                                                                   std::function<void(const drogon::HttpResponsePtr &)> callback) const {
+                                                                   std::function<void(const HttpResponsePtr &)> callback) const {
         if (project.empty()) {
             errorResponse(Error::ErrBadRequest, "Missing project parameter", callback);
             co_return std::nullopt;
@@ -77,7 +77,7 @@ namespace api::v1 {
         co_return ProjectDetails{*proj, *installationToken};
     }
 
-    Task<> DocsController::project(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
+    Task<> DocsController::project(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback,
                                std::string project) const {
         try {
             const auto proj = co_await getProject(project, callback);
@@ -215,7 +215,7 @@ namespace api::v1 {
         co_return;
     }
 
-    Task<> DocsController::asset(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
+    Task<> DocsController::asset(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback,
                                  std::string project) const {
         try {
             const auto proj = co_await getProject(project, callback);
@@ -261,7 +261,7 @@ namespace api::v1 {
     }
 
     // TODO Invalidation rate limit
-    Task<> DocsController::invalidate(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
+    Task<> DocsController::invalidate(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback,
                                       std::string project) const {
         if (project.empty()) {
             co_return errorResponse(Error::ErrBadRequest, "Missing project parameter", callback);

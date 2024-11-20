@@ -9,7 +9,6 @@
 
 #define DOCS_FILE_EXT ".mdx"
 #define META_FILE_PATH "/_meta.json"
-#define DOCS_META_FILE_PATH "/sinytra-wiki.json"
 #define I18N_FILE_PATH "/.translated"
 #define TYPE_FILE "file"
 #define TYPE_DIR "dir"
@@ -117,14 +116,14 @@ Task<Json::Value> crawlDocsTree(service::GitHub &github, std::string repo, std::
 }
 
 namespace service {
-    Documentation::Documentation(service::GitHub &g, service::MemoryCache &c) : github_(g), cache_(c) {}
+    Documentation::Documentation(GitHub &g, MemoryCache &c) : github_(g), cache_(c) {}
 
     Task<std::tuple<bool, Error>> Documentation::hasAvailableLocale(const Project &project, std::string locale,
                                                                     std::string installationToken) {
         const auto cacheKey = createLocalesCacheKey(project.getValueOfId());
 
         if (const auto exists = co_await cache_.exists(cacheKey); !exists) {
-            if (const auto pending = co_await CacheableServiceBase::getOrStartTask<std::tuple<bool, Error>>(cacheKey)) {
+            if (const auto pending = co_await getOrStartTask<std::tuple<bool, Error>>(cacheKey)) {
                 co_return pending->get();
             }
 
@@ -132,7 +131,7 @@ namespace service {
             co_await cache_.updateCacheSet(cacheKey, *locales, 7 * 24h);
 
             const auto cached = co_await cache_.isSetMember(cacheKey, locale);
-            co_return co_await CacheableServiceBase::completeTask<std::tuple<bool, Error>>(cacheKey, {cached, Error::Ok});
+            co_return co_await completeTask<std::tuple<bool, Error>>(cacheKey, {cached, Error::Ok});
         }
 
         if (const auto cached = co_await cache_.isSetMember(cacheKey, locale)) {
@@ -166,7 +165,7 @@ namespace service {
             }
         }
 
-        if (const auto pending = co_await CacheableServiceBase::getOrStartTask<std::tuple<Json::Value, Error>>(cacheKey)) {
+        if (const auto pending = co_await getOrStartTask<std::tuple<Json::Value, Error>>(cacheKey)) {
             co_return pending->get();
         }
 
@@ -181,7 +180,7 @@ namespace service {
         pool.wait();
 
         co_await cache_.updateCache(cacheKey, serializeJsonString(root), 7 * 24h);
-        co_return co_await CacheableServiceBase::completeTask<std::tuple<Json::Value, Error>>(cacheKey, {root, Error::Ok});
+        co_return co_await completeTask<std::tuple<Json::Value, Error>>(cacheKey, {root, Error::Ok});
     }
 
     Task<std::tuple<std::optional<std::vector<std::string>>, Error>> Documentation::computeAvailableLocales(const Project &project,
@@ -238,7 +237,7 @@ namespace service {
         const auto cacheKey = createVersionsCacheKey(project.getValueOfId());
 
         if (const auto exists = co_await cache_.exists(cacheKey); !exists) {
-            if (const auto pending = co_await CacheableServiceBase::getOrStartTask<std::tuple<std::optional<Json::Value>, Error>>(cacheKey))
+            if (const auto pending = co_await getOrStartTask<std::tuple<std::optional<Json::Value>, Error>>(cacheKey))
             {
                 co_return pending->get();
             }
@@ -246,7 +245,7 @@ namespace service {
             const auto [versions, versionsError] = co_await computeAvailableVersions(project, installationToken);
             co_await cache_.updateCache(cacheKey, serializeJsonString(versions), 7 * 24h);
 
-            co_return co_await CacheableServiceBase::completeTask<std::tuple<std::optional<Json::Value>, Error>>(cacheKey,
+            co_return co_await completeTask<std::tuple<std::optional<Json::Value>, Error>>(cacheKey,
                                                                                                                  {versions, versionsError});
         }
 

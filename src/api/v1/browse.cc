@@ -20,7 +20,7 @@ using namespace drogon_model::postgres;
 namespace api::v1 {
     BrowseController::BrowseController(Database &db) : database_(db) {}
 
-    Task<> BrowseController::browse(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback, std::string query, int page) const {
+    Task<> BrowseController::browse(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string query, int page) const {
         const auto [searchResults, searchError] = co_await database_.findProjects(query, page);
 
         Json::Value root;

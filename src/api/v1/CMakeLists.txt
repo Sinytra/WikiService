@@ -8,6 +8,6 @@ add_library(api STATIC
 target_link_libraries(api PRIVATE
         service
         log
-        drogon
+        Drogon::Drogon
         nlohmann_json_schema_validator
 )

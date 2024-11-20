@@ -8,11 +8,11 @@ using namespace service;
 
 namespace {
     const unordered_map<Error, HttpStatusCode> errorMap = {
-            {Error::Ok, k200OK}, {Error::ErrNotFound, k404NotFound}, {Error::ErrBadRequest, k400BadRequest}};
+        {Error::Ok, k200OK}, {Error::ErrNotFound, k404NotFound}, {Error::ErrBadRequest, k400BadRequest}};
 }
 
 namespace api::v1 {
-    HttpStatusCode mapError(const Error err) {
+    HttpStatusCode mapError(const Error &err) {
         auto cit(errorMap.find(err));
         if (cit != errorMap.cend()) {
             return cit->second;
@@ -26,6 +26,16 @@ namespace api::v1 {
         const auto resp = HttpResponse::newHttpJsonResponse(std::move(json));
         resp->setStatusCode(mapError(error));
 
+        callback(resp);
+    }
+
+    void simpleError(const Error &error, const std::string &message, const std::function<void(const HttpResponsePtr &)> &callback,
+                     const std::function<void(Json::Value &)> &jsonBuilder) {
+        Json::Value root;
+        root["error"] = message;
+        jsonBuilder(root);
+        const auto resp = HttpResponse::newHttpJsonResponse(root);
+        resp->setStatusCode(mapError(error));
         callback(resp);
     }
 }

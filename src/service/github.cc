@@ -1,7 +1,9 @@
 #define GITHUB_API_URL "https://api.github.com/"
+#define GITHUB_APP_INSTALL_BASE_URL "https://github.com/apps/{}/installations/new"
 
 #include "github.h"
 #include "log/log.h"
+#include "util.h"
 
 #include <drogon/drogon.h>
 
@@ -10,75 +12,41 @@
 #include <jwt-cpp/jwt.h>
 #include <map>
 
-#include "util.h"
-
 using namespace logging;
 using namespace drogon;
 using namespace std::chrono_literals;
-
-bool isSuccess(const HttpStatusCode &code) { return code == k200OK || code == k201Created || code == k202Accepted; }
 
 std::string createAppJWTTokenCacheKey(const std::string &appClientId) { return "jwt:" + appClientId; }
 
 std::string createRepoInstallIdCacheKey(const std::string &repo) { return "repo_install_id:" + repo; }
 
-Task<std::optional<Json::Value>> sendApiRequest(HttpClientPtr client, HttpMethod method, std::string path, std::string token,
-                                                const std::map<std::string, std::string> &params = {}) {
-    try {
-        auto httpReq = HttpRequest::newHttpRequest();
-        httpReq->setMethod(method);
-        httpReq->setPath(path);
-        httpReq->addHeader("Accept", "application/vnd.github+json");
-        httpReq->addHeader("Authorization", "Bearer " + token);
-        httpReq->addHeader("X-GitHub-Api-Version", "2022-11-28");
-        for (const auto &[key, val]: params) {
-            httpReq->setParameter(key, val);
-        }
-
-        logger.trace("=> Request to {}", path);
-        const auto response = co_await client->sendRequestCoro(httpReq);
-        const auto status = response->getStatusCode();
-        if (isSuccess(status)) {
-            if (const auto jsonResp = response->getJsonObject()) {
-                logger.trace("<= Response ({}) from {}", std::to_string(status), path);
-                co_return std::make_optional(*jsonResp);
-            }
-        }
-
-        logger.trace("Unexpected api response: ({}) {}", std::to_string(status), response->getBody());
-        co_return std::nullopt;
-    } catch (std::exception &e) {
-        logger.error(e.what());
-        co_return std::nullopt;
-    }
-}
-
-HttpClientPtr createHttpClient() {
-    auto currentLoop = trantor::EventLoop::getEventLoopOfCurrentThread();
-    auto client = HttpClient::newHttpClient(GITHUB_API_URL, currentLoop);
-    return client;
-}
-
 std::optional<std::chrono::system_clock::time_point> parseISO8601(const std::string &iso_time) {
     std::istringstream ss(iso_time);
-    std::chrono::system_clock::time_point tp;
-    ss >> std::chrono::parse("%Y-%m-%dT%H:%M:%SZ", tp);
+    std::tm tm = {};
+
+    // Parse the ISO 8601 date-time string into a tm struct.
+    ss >> std::get_time(&tm, "%Y-%m-%dT%H:%M:%SZ");
 
     if (ss.fail()) {
         logger.error("Not a valid ISO 8601 string: {}", iso_time);
         return std::nullopt;
     }
-    return std::optional{tp};
+
+    // Convert tm to time_t (seconds since epoch)
+    const std::time_t time_since_epoch = std::mktime(&tm) - timezone;
+
+    // Convert time_t to system_clock::time_point
+    return std::chrono::system_clock::from_time_t(time_since_epoch);
 }
 
 namespace service {
-    GitHub::GitHub(service::MemoryCache &cache_, const std::string &appClientId_, const std::string &appPrivateKeyPath_) :
-        cache_(cache_), appClientId_(appClientId_), appPrivateKeyPath_(appPrivateKeyPath_) {}
+    GitHub::GitHub(MemoryCache &cache_, const std::string &appName_, const std::string &appClientId_,
+                   const std::string &appPrivateKeyPath_) :
+        cache_(cache_), appName_(appName_), appClientId_(appClientId_), appPrivateKeyPath_(appPrivateKeyPath_) {}
 
-    Task<std::tuple<std::optional<std::string>, Error>> GitHub::getUsername(std::string token) {
-        const auto client = createHttpClient();
-        if (auto user = co_await sendApiRequest(client, Get, "/user", token);
-            user && user->isObject() && user->isMember("login"))
+    Task<std::tuple<std::optional<std::string>, Error>> GitHub::getUsername(std::string token) const {
+        const auto client = createHttpClient(GITHUB_API_URL);
+        if (auto user = co_await sendAuthenticatedRequest(client, Get, "/user", token); user && user->isObject() && user->isMember("login"))
         {
             const auto login = (*user)["login"].asString();
             co_return {login, Error::Ok};
@@ -86,7 +54,9 @@ namespace service {
         co_return {std::nullopt, Error::Ok};
     }
 
-    Task<std::tuple<std::optional<std::string>, Error>> GitHub::getApplicationJWTToken() {
+    std::string GitHub::getAppInstallUrl() const { return std::format(GITHUB_APP_INSTALL_BASE_URL, appName_); }
+
+    Task<std::tuple<std::optional<std::string>, Error>> GitHub::getApplicationJWTToken() const {
         const auto key = createAppJWTTokenCacheKey(appClientId_);
 
         if (const auto cached = co_await cache_.getFromCache(key)) {
@@ -119,7 +89,7 @@ namespace service {
         co_return {std::optional{token}, Error::Ok};
     }
 
-    Task<std::tuple<std::optional<std::string>, Error>> GitHub::getRepositoryInstallation(const std::string repo) {
+    Task<std::tuple<std::optional<std::string>, Error>> GitHub::getRepositoryInstallation(const std::string repo) const {
         const auto key = createRepoInstallIdCacheKey(repo);
 
         if (const auto cached = co_await cache_.getFromCache(key)) {
@@ -129,8 +99,8 @@ namespace service {
 
         const auto [jwt, error](co_await getApplicationJWTToken());
 
-        const auto client = createHttpClient();
-        if (auto installation = co_await sendApiRequest(client, Get, std::format("/repos/{}/installation", repo), *jwt)) {
+        const auto client = createHttpClient(GITHUB_API_URL);
+        if (auto installation = co_await sendAuthenticatedRequest(client, Get, std::format("/repos/{}/installation", repo), *jwt)) {
             const std::string installationId = (*installation)["id"].asString();
 
             logger.trace("Storing installation ID for {} in cache", repo);
@@ -143,7 +113,7 @@ namespace service {
         co_return {std::nullopt, Error::ErrNotFound};
     }
 
-    Task<std::tuple<std::optional<std::string>, Error>> GitHub::getInstallationToken(const std::string installationId) {
+    Task<std::tuple<std::optional<std::string>, Error>> GitHub::getInstallationToken(const std::string installationId) const {
         if (const auto cached = co_await cache_.getFromCache("installation_token:" + installationId)) {
             logger.trace("Reusing cached repo installation token for {}", installationId);
             co_return {cached, Error::Ok};
@@ -151,9 +121,9 @@ namespace service {
 
         const auto [jwt, error](co_await getApplicationJWTToken());
 
-        const auto client = createHttpClient();
+        const auto client = createHttpClient(GITHUB_API_URL);
         if (auto installationToken =
-                co_await sendApiRequest(client, Post, std::format("/app/installations/{}/access_tokens", installationId), *jwt))
+                co_await sendAuthenticatedRequest(client, Post, std::format("/app/installations/{}/access_tokens", installationId), *jwt))
         {
             const std::string expiryString = (*installationToken)["expires_at"].asString();
             const std::string token = (*installationToken)["token"].asString();
@@ -172,9 +142,9 @@ namespace service {
     }
 
     Task<std::tuple<std::optional<std::string>, Error>> GitHub::getCollaboratorPermissionLevel(std::string repo, std::string username,
-                                                                                       std::string installationToken) {
-        const auto client = createHttpClient();
-        if (auto permissions = co_await sendApiRequest(
+                                                                                               std::string installationToken) const {
+        const auto client = createHttpClient(GITHUB_API_URL);
+        if (auto permissions = co_await sendAuthenticatedRequest(
                 client, Get, std::format("/repos/{}/collaborators/{}/permission", repo, username), installationToken);
             permissions && permissions->isObject() && permissions->isMember("permission"))
         {
@@ -184,10 +154,10 @@ namespace service {
         co_return {std::nullopt, Error::Ok};
     }
 
-    drogon::Task<std::tuple<std::vector<std::string>, Error>> GitHub::getRepositoryBranches(std::string repo, std::string installationToken) {
-        const auto client = createHttpClient();
+    Task<std::tuple<std::vector<std::string>, Error>> GitHub::getRepositoryBranches(std::string repo, std::string installationToken) const {
+        const auto client = createHttpClient(GITHUB_API_URL);
         std::vector<std::string> repoBranches;
-        if (auto branches = co_await sendApiRequest(client, Get, std::format("/repos/{}/branches", repo), installationToken);
+        if (auto branches = co_await sendAuthenticatedRequest(client, Get, std::format("/repos/{}/branches", repo), installationToken);
             branches && branches->isArray())
         {
             for (const auto &item: *branches) {
@@ -199,7 +169,7 @@ namespace service {
     }
 
     Task<std::tuple<std::optional<Json::Value>, Error>> GitHub::getRepositoryJSONFile(std::string repo, std::string ref, std::string path,
-                                                                                      std::string installationToken) {
+                                                                                      std::string installationToken) const {
         const auto [contents, contentsError](co_await getRepositoryContents(repo, ref, path, installationToken));
         if (contents) {
             const auto body = decodeBase64((*contents)["content"].asString());
@@ -213,14 +183,15 @@ namespace service {
 
     Task<std::tuple<std::optional<Json::Value>, Error>> GitHub::getRepositoryContents(const std::string repo, const std::string ref,
                                                                                       const std::string path,
-                                                                                      const std::string installationToken) {
-        const auto client = createHttpClient();
+                                                                                      const std::string installationToken) const {
+        const auto client = createHttpClient(GITHUB_API_URL);
         std::map<std::string, std::string> params;
         params.try_emplace("ref", ref);
 
         const auto normalizedPath = removeLeadingSlash(removeTrailingSlash(path));
         if (auto repositoryContents =
-                co_await sendApiRequest(client, Get, std::format("/repos/{}/contents/{}", repo, normalizedPath), installationToken, params))
+                co_await sendAuthenticatedRequest(client, Get, std::format("/repos/{}/contents/{}", repo, normalizedPath),
+                                                  installationToken, [&ref](const HttpRequestPtr &req) { req->setParameter("ref", ref); }))
         {
             co_return {std::optional(repositoryContents), Error::Ok};
         }
@@ -229,21 +200,27 @@ namespace service {
         co_return {std::nullopt, Error::ErrNotFound};
     }
 
-    Task<std::tuple<bool, Error>> GitHub::isPublicRepository(std::string repo, std::string installationToken) {
-        const auto client = createHttpClient();
-        if (auto repositoryContents = co_await sendApiRequest(client, Get, "/repos/" + repo, installationToken)) {
+    Task<std::tuple<bool, Error>> GitHub::isPublicRepository(std::string repo, std::string installationToken) const {
+        const auto client = createHttpClient(GITHUB_API_URL);
+        if (auto repositoryContents = co_await sendAuthenticatedRequest(client, Get, "/repos/" + repo, installationToken)) {
             co_return {!(*repositoryContents)["private"].asBool(), Error::Ok};
         }
         co_return {false, Error::ErrNotFound};
     }
 
     Task<std::tuple<std::optional<std::string>, Error>> GitHub::getFileLastUpdateTime(std::string repo, std::string ref, std::string path,
-                                                                                      std::string installationToken) {
-        const auto client = createHttpClient();
+                                                                                      std::string installationToken) const {
+        const auto client = createHttpClient(GITHUB_API_URL);
         std::map<std::string, std::string> params = {{"page", "1"}, {"per_page", "1"}};
         params.try_emplace("path", path);
         params.try_emplace("sha", ref);
-        if (auto commits = co_await sendApiRequest(client, Get, std::format("/repos/{}/commits", repo), installationToken, params);
+        if (auto commits = co_await sendAuthenticatedRequest(client, Get, std::format("/repos/{}/commits", repo), installationToken,
+                                                             [&path, &ref](const HttpRequestPtr &req) {
+                                                                 req->setParameter("page", "1");
+                                                                 req->setParameter("per_page", "1");
+                                                                 req->setParameter("path", path);
+                                                                 req->setParameter("sha", ref);
+                                                             });
             commits && commits->isArray())
         {
             const auto entry = commits->front();
@@ -256,5 +233,5 @@ namespace service {
         co_return {std::nullopt, Error::ErrNotFound};
     }
 
-    Task<> GitHub::invalidateCache(std::string repo) { co_await cache_.erase(createRepoInstallIdCacheKey(repo)); }
+    Task<> GitHub::invalidateCache(std::string repo) const { co_await cache_.erase(createRepoInstallIdCacheKey(repo)); }
 }
