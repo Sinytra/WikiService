@@ -13,8 +13,7 @@ namespace {
 
 namespace api::v1 {
     HttpStatusCode mapError(const Error &err) {
-        auto cit(errorMap.find(err));
-        if (cit != errorMap.cend()) {
+        if (const auto cit(errorMap.find(err)); cit != errorMap.cend()) {
             return cit->second;
         }
         return k500InternalServerError;

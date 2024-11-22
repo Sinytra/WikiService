@@ -1,6 +1,6 @@
 #include "schemas.h"
 
-nlohmann::json schemas::projectRegister = R"(
+auto schemas::projectRegister = R"(
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "title": "Project registration",
@@ -16,7 +16,7 @@ nlohmann::json schemas::projectRegister = R"(
 }
 )"_json;
 
-nlohmann::json schemas::projectMetadata = R"(
+auto schemas::projectMetadata = R"(
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "title": "Sinytra Wiki Documentation Metadata",
@@ -45,5 +45,35 @@ nlohmann::json schemas::projectMetadata = R"(
         }
     },
     "required": ["id", "platform", "slug"]
+}
+)"_json;
+
+auto schemas::systemConfig = R"(
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Modded MC Wiki System Configuration",
+    "type": "object",
+    "properties": {
+        "github_app": {
+            "type": "object",
+            "properties": {
+                "name": { "type": "string" },
+                "client_id": { "type": "string" },
+                "private_key_path": { "type": "string"}
+            },
+            "required": ["name", "client_id", "private_key_path"]
+        },
+        "modrinth_app": {
+            "type": "object",
+            "properties": {
+                "client_id": { "type": "string" },
+                "client_secret": { "type": "string" },
+                "redirect_url": { "type": "string" }
+            }
+        },
+        "curseforge_key": { "type": "string" },
+        "api_key": { "type": "string" }
+    },
+    "required": ["github_app"]
 }
 )"_json;

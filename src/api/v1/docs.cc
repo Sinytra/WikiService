@@ -3,9 +3,6 @@
 #include <drogon/HttpClient.h>
 #include <models/Project.h>
 
-#include "log/log.h"
-
-#include <fstream>
 #include <string>
 
 #include <service/util.h>

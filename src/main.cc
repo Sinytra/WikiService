@@ -1,4 +1,5 @@
 #include <drogon/drogon.h>
+#include <stdexcept>
 
 #include "api/v1/browse.h"
 #include "api/v1/docs.h"
@@ -6,6 +7,8 @@
 #include "log/log.h"
 #include "service/github.h"
 #include "service/platforms.h"
+#include "service/schemas.h"
+#include "service/util.h"
 
 using namespace std;
 using namespace drogon;
@@ -19,7 +22,11 @@ int main() {
         app().loadConfigFile("config.json");
 
         const Json::Value &customConfig = app().getCustomConfig();
-        // TODO validate config using json schema
+
+        if (const auto error = validateJson(schemas::systemConfig, customConfig)) {
+            logger.error("App config validation failed at {}: {}", error->pointer.to_string(), error->msg);
+            throw std::runtime_error("Invalid configuration");
+        }
 
         const Json::Value &githubAppConfig = customConfig["github_app"];
         const std::string &appName = githubAppConfig["name"].asString();
@@ -42,7 +49,7 @@ int main() {
 
         auto modrinth(service::ModrinthPlatform{mrAppClientId, mrAppClientSecret, mrAppRedirectUrl});
         auto curseForge(service::CurseForgePlatform{curseForgeKey});
-        auto platforms(service::Platforms(modrinth, {{PLATFORM_MODRINTH, modrinth}, {PLATFORM_CURSEFORGE, curseForge}}));
+        auto platforms(service::Platforms(curseForge, modrinth));
 
         auto controller(make_shared<api::v1::DocsController>(github, database, documentation));
         auto browseController(make_shared<api::v1::BrowseController>(database));

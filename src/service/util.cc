@@ -136,7 +136,7 @@ std::optional<JsonValidationError> validateJson(const nlohmann::json &schema, co
     public:
         void error(const nlohmann::json_pointer<std::basic_string<char>> &pointer, const nlohmann::json &json1,
                    const std::string &string1) override {
-            error_ = std::make_unique<JsonValidationError>(json1, string1);
+            error_ = std::make_unique<JsonValidationError>(pointer, string1);
         }
 
         const std::unique_ptr<JsonValidationError> &getError() { return error_; }
@@ -155,7 +155,7 @@ std::optional<JsonValidationError> validateJson(const nlohmann::json &schema, co
         }
         return std::nullopt;
     } catch ([[maybe_unused]] const std::exception &e) {
-        return JsonValidationError{json, e.what()};
+        return JsonValidationError{nlohmann::json::json_pointer{"/"}, e.what()};
     }
 }
 

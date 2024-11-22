@@ -31,6 +31,11 @@
       "client_id": "",
       "private_key_path": ""
     },
-    "api_key": ""
+    "modrinth_app": {
+      "client_id": "",
+      "client_secret": "",
+      "redirect_url": ""
+    },
+    "curseforge_key": ""
   }
 }

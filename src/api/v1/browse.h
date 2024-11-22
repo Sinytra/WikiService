@@ -5,11 +5,10 @@
 #include "service/database.h"
 
 namespace api::v1 {
-    class BrowseController : public drogon::HttpController<BrowseController, false> {
+    class BrowseController final : public drogon::HttpController<BrowseController, false> {
     public:
         explicit BrowseController(service::Database &);
 
-    public:
         METHOD_LIST_BEGIN
         ADD_METHOD_TO(BrowseController::browse, "/api/v1/browse?query={query}&page={page}", drogon::Get, "AuthFilter");
         METHOD_LIST_END

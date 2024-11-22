@@ -12,11 +12,10 @@ namespace api::v1 {
         std::string token;
     };
 
-    class DocsController : public drogon::HttpController<DocsController, false> {
+    class DocsController final : public drogon::HttpController<DocsController, false> {
     public:
         explicit DocsController(service::GitHub &, service::Database &, service::Documentation &);
 
-    public:
         METHOD_LIST_BEGIN
         ADD_METHOD_TO(DocsController::project, "/api/v1/project/{1:project}", drogon::Get, "AuthFilter");
         ADD_METHOD_TO(DocsController::page, "/api/v1/project/{1:project}/page/.*", drogon::Get, "AuthFilter");

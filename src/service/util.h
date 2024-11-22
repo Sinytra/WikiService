@@ -20,7 +20,7 @@ struct ResourceLocation {
 };
 
 struct JsonValidationError {
-    const nlohmann::json &root;
+    const nlohmann::json_pointer<std::basic_string<char>> pointer;
     const std::string msg;
 };
 

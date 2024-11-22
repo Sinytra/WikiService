@@ -41,6 +41,8 @@ namespace service {
     public:
         explicit CurseForgePlatform(std::string);
 
+        bool isAvailable() const;
+
         virtual drogon::Task<std::optional<PlatformProject>> getProject(std::string slug) override;
     private:
         const std::string apiKey_;
@@ -48,10 +50,11 @@ namespace service {
 
     class Platforms {
     public:
-        explicit Platforms(ModrinthPlatform&, const std::map<std::string, DistributionPlatform&>&);
+        explicit Platforms(CurseForgePlatform&, ModrinthPlatform&);
 
         drogon::Task<std::optional<PlatformProject>> getProject(std::string platform, std::string slug);
 
+        CurseForgePlatform& curseforge_;
         ModrinthPlatform& modrinth_;
     private:
         std::map<std::string, DistributionPlatform&> platforms_;
