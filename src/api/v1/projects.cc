@@ -34,7 +34,8 @@ namespace api::v1 {
         co_return false;
     }
 
-    ProjectsController::ProjectsController(GitHub &gh, Platforms &pf, Database &db) : github_(gh), platforms_(pf), database_(db) {}
+    ProjectsController::ProjectsController(GitHub &gh, Platforms &pf, Database &db, Documentation &dc) :
+        github_(gh), platforms_(pf), database_(db), documentation_(dc) {}
 
     /**
      * Possible errors:
@@ -139,6 +140,68 @@ namespace api::v1 {
         co_return project;
     }
 
+    Task<std::optional<Project>> ProjectsController::validateProjectAccess(const std::string &id, const std::string &token,
+                                                                           std::function<void(const HttpResponsePtr &)> callback) const {
+        if (id.empty()) {
+            errorResponse(Error::ErrBadRequest, "Missing id route parameter", callback);
+            co_return std::nullopt;
+        }
+
+        if (token.empty()) {
+            errorResponse(Error::ErrBadRequest, "Missing token parameter", callback);
+            co_return std::nullopt;
+        }
+
+        const auto [project, projectErr] = co_await database_.getProjectSource(id);
+        if (!project) {
+            simpleError(Error::ErrBadRequest, "not_found", callback);
+            co_return std::nullopt;
+        }
+        const auto repo = project->getValueOfSourceRepo();
+
+        // Verify repository permissions
+
+        const auto [username, usernameError](co_await github_.getUsername(token));
+        if (!username) {
+            simpleError(Error::ErrBadRequest, "user_github_auth", callback);
+            co_return std::nullopt;
+        }
+
+        const auto [installationId, installationIdError](co_await github_.getRepositoryInstallation(repo));
+        if (!installationId) {
+            simpleError(Error::ErrBadRequest, "missing_installation", callback);
+            co_return std::nullopt;
+        }
+
+        const auto [installationToken, tokenErr](co_await github_.getInstallationToken(installationId.value()));
+        if (!installationToken) {
+            simpleError(Error::ErrInternal, "internal", callback);
+            co_return std::nullopt;
+        }
+
+        if (const auto [perms, permsError](co_await github_.getCollaboratorPermissionLevel(repo, *username, *installationToken));
+            !perms || perms != "admin" && perms != "write")
+        {
+            simpleError(Error::ErrBadRequest, "insufficient_repo_perms", callback);
+            co_return std::nullopt;
+        }
+
+        co_return project;
+    }
+
+    Task<> ProjectsController::listIDs(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback) const {
+        const auto ids = co_await database_.getProjectIDs();
+
+        Json::Value root(Json::arrayValue);
+        for (const auto &id : ids) {
+            root.append(id);
+        }
+
+        const auto resp = HttpResponse::newHttpJsonResponse(root);
+        resp->setStatusCode(k200OK);
+        callback(resp);
+    }
+
     Task<> ProjectsController::create(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string token) const {
         if (token.empty()) {
             co_return errorResponse(Error::ErrBadRequest, "Missing token parameter", callback);
@@ -179,8 +242,6 @@ namespace api::v1 {
         const auto resp = HttpResponse::newHttpJsonResponse(root);
         resp->setStatusCode(k200OK);
         callback(resp);
-
-        co_return;
     }
 
     Task<> ProjectsController::update(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string token) const {
@@ -210,6 +271,9 @@ namespace api::v1 {
             co_return simpleError(Error::ErrInternal, "internal", callback);
         }
 
+        co_await github_.invalidateCache(project->getValueOfSourceRepo());
+        co_await documentation_.invalidateCache(*project);
+
         Json::Value root;
         root["message"] = "Project updated successfully";
         root["project"] = project->toJson();
@@ -222,40 +286,9 @@ namespace api::v1 {
 
     Task<> ProjectsController::remove(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, const std::string id,
                                       const std::string token) const {
-        if (id.empty()) {
-            co_return errorResponse(Error::ErrBadRequest, "Missing id route parameter", callback);
-        }
-        if (token.empty()) {
-            co_return errorResponse(Error::ErrBadRequest, "Missing token parameter", callback);
-        }
-
-        const auto [project, projectErr] = co_await database_.getProjectSource(id);
+        const auto project = co_await validateProjectAccess(id, token, callback);
         if (!project) {
-            co_return simpleError(Error::ErrBadRequest, "not_found", callback);
-        }
-        const auto repo = project->getValueOfSourceRepo();
-
-        // Verify repository permissions
-
-        const auto [username, usernameError](co_await github_.getUsername(token));
-        if (!username) {
-            co_return simpleError(Error::ErrBadRequest, "user_github_auth", callback);
-        }
-
-        const auto [installationId, installationIdError](co_await github_.getRepositoryInstallation(repo));
-        if (!installationId) {
-            co_return simpleError(Error::ErrBadRequest, "missing_installation", callback);
-        }
-
-        const auto [installationToken, tokenErr](co_await github_.getInstallationToken(installationId.value()));
-        if (!installationToken) {
-            co_return simpleError(Error::ErrInternal, "internal", callback);
-        }
-
-        if (const auto [perms, permsError](co_await github_.getCollaboratorPermissionLevel(repo, *username, *installationToken));
-            !perms || perms != "admin" && perms != "write")
-        {
-            co_return simpleError(Error::ErrBadRequest, "insufficient_repo_perms", callback);
+            co_return;
         }
 
         // Repo perms verified, proceed to deletion
@@ -265,8 +298,32 @@ namespace api::v1 {
             co_return simpleError(Error::ErrInternal, "internal", callback);
         }
 
+        co_await github_.invalidateCache(project->getValueOfSourceRepo());
+        co_await documentation_.invalidateCache(*project);
+
         Json::Value root;
         root["message"] = "Project deleted successfully";
+        const auto resp = HttpResponse::newHttpJsonResponse(root);
+        resp->setStatusCode(k200OK);
+        callback(resp);
+
+        co_return;
+    }
+
+    Task<> ProjectsController::invalidate(HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+                                          const std::string id, const std::string token) const {
+        const auto project = co_await validateProjectAccess(id, token, callback);
+        if (!project) {
+            co_return;
+        }
+
+        // Repo perms verified, proceed to deletion
+
+        co_await github_.invalidateCache(project->getValueOfSourceRepo());
+        co_await documentation_.invalidateCache(*project);
+
+        Json::Value root;
+        root["message"] = "Project cache invalidated successfully";
         const auto resp = HttpResponse::newHttpJsonResponse(root);
         resp->setStatusCode(k200OK);
         callback(resp);

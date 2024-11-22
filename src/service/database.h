@@ -20,6 +20,8 @@ namespace service {
     public:
         explicit Database();
 
+        drogon::Task<std::vector<std::string>> getProjectIDs() const;
+
         drogon::Task<std::tuple<std::optional<Project>, Error>> createProject(const Project &project) const;
 
         drogon::Task<Error> updateProject(const Project &project) const;

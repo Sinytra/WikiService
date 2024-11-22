@@ -28,6 +28,23 @@ namespace service {
         }
     }
 
+    Task<std::vector<std::string>> Database::getProjectIDs() const {
+        std::vector<std::string> ids;
+        try {
+            const auto clientPtr = app().getFastDbClient();
+            for (const auto result = co_await clientPtr->execSqlCoro("SELECT id FROM projects"); const auto &row : result) {
+                ids.push_back(row["id"].as<std::string>());
+            }
+        } catch (const Failure &e) {
+            // SQL Error
+            logger.error("Error querying database: {}", e.what());
+        } catch (const DrogonDbException &e) {
+            // Not found
+        }
+
+        co_return ids;
+    }
+
     Task<std::tuple<std::optional<Project>, Error>> Database::createProject(const Project &project) const {
         try {
             const auto clientPtr = app().getFastDbClient();

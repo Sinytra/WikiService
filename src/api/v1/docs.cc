@@ -256,28 +256,4 @@ namespace api::v1 {
 
         co_return;
     }
-
-    // TODO Invalidation rate limit
-    Task<> DocsController::invalidate(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback,
-                                      std::string project) const {
-        if (project.empty()) {
-            co_return errorResponse(Error::ErrBadRequest, "Missing project parameter", callback);
-        }
-
-        const auto [proj, projErr] = co_await database_.getProjectSource(project);
-        if (!proj) {
-            co_return errorResponse(projErr, "Project not found", callback);
-        }
-
-        co_await github_.invalidateCache(proj->getValueOfSourceRepo());
-        co_await documentation_.invalidateCache(*proj);
-
-        Json::Value root;
-        root["message"] = "Caches for project invalidated successfully";
-        const auto resp = HttpResponse::newHttpJsonResponse(root);
-        resp->setStatusCode(k200OK);
-        callback(resp);
-
-        co_return;
-    }
 }

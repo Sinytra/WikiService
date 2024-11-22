@@ -1,7 +1,5 @@
 #pragma once
 
-#include "error.h"
-
 #include <any>
 #include <chrono>
 #include <drogon/utils/coroutine.h>
@@ -16,15 +14,14 @@ namespace service {
     public:
         MemoryCache();
 
-    public:
-        drogon::Task<bool> exists(std::string key);
-        drogon::Task<std::optional<std::string>> getFromCache(std::string key);
-        drogon::Task<bool> isSetMember(std::string key, std::string value);
-        drogon::Task<> updateCache(std::string key, std::string value, std::chrono::duration<long> expire);
-        drogon::Task<> updateCacheSet(std::string key, std::vector<std::string> value, std::chrono::duration<long> expire);
-        drogon::Task<> erase(std::string key);
-        drogon::Task<> erase(std::vector<std::string> keys);
-        drogon::Task<> eraseNamespace(std::string key);
+        drogon::Task<bool> exists(std::string key) const;
+        drogon::Task<std::optional<std::string>> getFromCache(std::string key) const;
+        drogon::Task<bool> isSetMember(std::string key, std::string value) const;
+        drogon::Task<> updateCache(std::string key, std::string value, std::chrono::duration<long> expire) const;
+        drogon::Task<> updateCacheSet(std::string key, std::vector<std::string> value, std::chrono::duration<long> expire) const;
+        drogon::Task<> erase(std::string key) const;
+        drogon::Task<> erase(std::vector<std::string> keys) const;
+        drogon::Task<> eraseNamespace(std::string key) const;
     };
 
     class CacheableServiceBase {
