@@ -16,10 +16,24 @@ auto schemas::projectRegister = R"(
 }
 )"_json;
 
+auto schemas::projectUpdate = R"(
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Project update",
+    "type": "object",
+    "properties": {
+        "repo": { "type": "string" },
+        "branch": { "type": "string" },
+        "path": { "type": "string" }
+    },
+    "required": ["repo", "branch", "path"]
+}
+)"_json;
+
 auto schemas::projectMetadata = R"(
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "title": "Sinytra Wiki Documentation Metadata",
+    "title": "Wiki Documentation Metadata",
     "description": "Provides documentation project meta information",
     "type": "object",
     "properties": {

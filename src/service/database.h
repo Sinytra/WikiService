@@ -20,10 +20,14 @@ namespace service {
     public:
         explicit Database();
 
-        drogon::Task<std::tuple<std::optional<Project>, Error>> createProject(const Project &project);
+        drogon::Task<std::tuple<std::optional<Project>, Error>> createProject(const Project &project) const;
 
-        drogon::Task<std::tuple<std::optional<Project>, Error>> getProjectSource(std::string id);
+        drogon::Task<Error> updateProject(const Project &project) const;
 
-        drogon::Task<std::tuple<ProjectSearchResponse, Error>> findProjects(std::string query, int page);
+        drogon::Task<Error> removeProject(const std::string &id) const;
+
+        drogon::Task<std::tuple<std::optional<Project>, Error>> getProjectSource(std::string id) const;
+
+        drogon::Task<std::tuple<ProjectSearchResponse, Error>> findProjects(std::string query, int page) const;
     };
 }

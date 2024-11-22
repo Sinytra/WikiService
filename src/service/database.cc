@@ -11,7 +11,7 @@ using namespace drogon::orm;
 namespace service {
     Database::Database() = default;
 
-    Task<std::tuple<std::optional<Project>, Error>> Database::getProjectSource(std::string id) {
+    Task<std::tuple<std::optional<Project>, Error>> Database::getProjectSource(std::string id) const {
         try {
             const auto clientPtr = app().getFastDbClient();
             CoroMapper<Project> mapper(clientPtr);
@@ -28,7 +28,7 @@ namespace service {
         }
     }
 
-    Task<std::tuple<std::optional<Project>, Error>> Database::createProject(const Project &project) {
+    Task<std::tuple<std::optional<Project>, Error>> Database::createProject(const Project &project) const {
         try {
             const auto clientPtr = app().getFastDbClient();
             CoroMapper<Project> mapper(clientPtr);
@@ -45,6 +45,42 @@ namespace service {
         }
     }
 
+    Task<Error> Database::updateProject(const Project &project) const {
+        try {
+            const auto clientPtr = app().getFastDbClient();
+            CoroMapper<Project> mapper(clientPtr);
+
+            co_await mapper.update(project);
+
+            co_return Error::Ok;
+        } catch (const Failure &e) {
+            // SQL Error
+            logger.error("Error querying database: {}", e.what());
+            co_return Error::ErrInternal;
+        } catch (const DrogonDbException &e) {
+            // Not found
+            co_return Error::ErrNotFound;
+        }
+    }
+
+    Task<Error> Database::removeProject(const std::string &id) const {
+        try {
+            const auto clientPtr = app().getFastDbClient();
+            CoroMapper<Project> mapper(clientPtr);
+
+            co_await mapper.deleteByPrimaryKey(id);
+
+            co_return Error::Ok;
+        } catch (const Failure &e) {
+            // SQL Error
+            logger.error("Error querying database: {}", e.what());
+            co_return Error::ErrInternal;
+        } catch (const DrogonDbException &e) {
+            // Not found
+            co_return Error::ErrNotFound;
+        }
+    }
+
     std::string buildQuery(std::string query) {
         auto result = query | std::ranges::views::split(' ') |
                       std::views::transform([](auto rng) { return std::string(rng.data(), rng.size()) + ":*"; });
@@ -57,7 +93,7 @@ namespace service {
         return result_stream.str();
     }
 
-    Task<std::tuple<ProjectSearchResponse, Error>> Database::findProjects(std::string query, int page) {
+    Task<std::tuple<ProjectSearchResponse, Error>> Database::findProjects(std::string query, int page) const {
         try {
             // TODO Improve sorting
             const auto clientPtr = app().getFastDbClient();

@@ -66,13 +66,6 @@ namespace api::v1 {
         const auto path = json["path"].asString();
         // Optional
         const auto mrCode = json["mr_code"].asString();
-        const auto isCommunity = json["is_community"].asBool();
-
-        // TODO Add support for community projects
-        if (isCommunity) {
-            simpleError(Error::ErrInternal, "unsupported", callback);
-            co_return std::nullopt;
-        }
 
         const auto [installationId, installationIdError](co_await github_.getRepositoryInstallation(repo));
         if (!installationId) {
@@ -116,11 +109,6 @@ namespace api::v1 {
         const auto platform = jsonContent["platform"].asString();
         const auto slug = jsonContent["slug"].asString();
 
-        if (const auto [proj, projErr] = co_await database_.getProjectSource(id); proj) {
-            simpleError(Error::ErrBadRequest, "exists", callback);
-            co_return std::nullopt;
-        }
-
         if (platform == PLATFORM_CURSEFORGE && !platforms_.curseforge_.isAvailable()) {
             simpleError(Error::ErrBadRequest, "cf_unavailable", callback);
             co_return std::nullopt;
@@ -147,7 +135,6 @@ namespace api::v1 {
         project.setSourcePath(path);
         project.setPlatform(platform);
         project.setSlug(slug);
-        project.setIsCommunity(isCommunity);
 
         co_return project;
     }
@@ -165,9 +152,21 @@ namespace api::v1 {
             co_return simpleError(Error::ErrBadRequest, error->msg, callback);
         }
 
-        const auto project = co_await validateProjectData(*json, token, callback);
+        const auto isCommunity = (*json)["is_community"].asBool();
+
+        // TODO Add support for community projects
+        if (isCommunity) {
+            co_return simpleError(Error::ErrInternal, "unsupported", callback);
+        }
+
+        auto project = co_await validateProjectData(*json, token, callback);
         if (!project) {
             co_return;
+        }
+        project->setIsCommunity(isCommunity);
+
+        if (const auto [proj, projErr] = co_await database_.getProjectSource(project->getValueOfId()); proj) {
+            co_return simpleError(Error::ErrBadRequest, "exists", callback);
         }
 
         if (const auto [result, resultErr] = co_await database_.createProject(*project); resultErr != Error::Ok) {
@@ -177,6 +176,97 @@ namespace api::v1 {
 
         Json::Value root;
         root["message"] = "Project registered successfully";
+        const auto resp = HttpResponse::newHttpJsonResponse(root);
+        resp->setStatusCode(k200OK);
+        callback(resp);
+
+        co_return;
+    }
+
+    Task<> ProjectsController::update(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string token) const {
+        if (token.empty()) {
+            co_return errorResponse(Error::ErrBadRequest, "Missing token parameter", callback);
+        }
+
+        auto json(req->getJsonObject());
+        if (!json) {
+            co_return errorResponse(Error::ErrBadRequest, req->getJsonError(), callback);
+        }
+        if (const auto error = validateJson(schemas::projectRegister, *json)) {
+            co_return simpleError(Error::ErrBadRequest, error->msg, callback);
+        }
+
+        auto project = co_await validateProjectData(*json, token, callback);
+        if (!project) {
+            co_return;
+        }
+
+        if (const auto [proj, projErr] = co_await database_.getProjectSource(project->getValueOfId()); !proj) {
+            co_return simpleError(Error::ErrBadRequest, "not_found", callback);
+        }
+
+        if (const auto error = co_await database_.updateProject(*project); error != Error::Ok) {
+            logger.error("Failed to update project {} in database: {}", project->getValueOfId(), error);
+            co_return simpleError(Error::ErrInternal, "internal", callback);
+        }
+
+        Json::Value root;
+        root["message"] = "Project updated successfully";
+        root["project"] = project->toJson();
+        const auto resp = HttpResponse::newHttpJsonResponse(root);
+        resp->setStatusCode(k200OK);
+        callback(resp);
+
+        co_return;
+    }
+
+    Task<> ProjectsController::remove(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, const std::string id,
+                                      const std::string token) const {
+        if (id.empty()) {
+            co_return errorResponse(Error::ErrBadRequest, "Missing id route parameter", callback);
+        }
+        if (token.empty()) {
+            co_return errorResponse(Error::ErrBadRequest, "Missing token parameter", callback);
+        }
+
+        const auto [project, projectErr] = co_await database_.getProjectSource(id);
+        if (!project) {
+            co_return simpleError(Error::ErrBadRequest, "not_found", callback);
+        }
+        const auto repo = project->getValueOfSourceRepo();
+
+        // Verify repository permissions
+
+        const auto [username, usernameError](co_await github_.getUsername(token));
+        if (!username) {
+            co_return simpleError(Error::ErrBadRequest, "user_github_auth", callback);
+        }
+
+        const auto [installationId, installationIdError](co_await github_.getRepositoryInstallation(repo));
+        if (!installationId) {
+            co_return simpleError(Error::ErrBadRequest, "missing_installation", callback);
+        }
+
+        const auto [installationToken, tokenErr](co_await github_.getInstallationToken(installationId.value()));
+        if (!installationToken) {
+            co_return simpleError(Error::ErrInternal, "internal", callback);
+        }
+
+        if (const auto [perms, permsError](co_await github_.getCollaboratorPermissionLevel(repo, *username, *installationToken));
+            !perms || perms != "admin" && perms != "write")
+        {
+            co_return simpleError(Error::ErrBadRequest, "insufficient_repo_perms", callback);
+        }
+
+        // Repo perms verified, proceed to deletion
+
+        if (const auto error = co_await database_.removeProject(id); error != Error::Ok) {
+            logger.error("Failed to delete project {} in database: {}", id, error);
+            co_return simpleError(Error::ErrInternal, "internal", callback);
+        }
+
+        Json::Value root;
+        root["message"] = "Project deleted successfully";
         const auto resp = HttpResponse::newHttpJsonResponse(root);
         resp->setStatusCode(k200OK);
         callback(resp);
