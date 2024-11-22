@@ -3,7 +3,6 @@
 #include <drogon/drogon.h>
 
 #include <map>
-#include <mutex>
 
 #include <trantor/net/EventLoopThreadPool.h>
 
@@ -23,7 +22,10 @@ struct FolderMetadataEntry {
     const std::string name;
     const std::string icon;
 };
-using FolderMetadata = std::map<std::string, FolderMetadataEntry>;
+struct FolderMetadata {
+    std::vector<std::string> keys;
+    std::map<std::string, FolderMetadataEntry> entries;
+};
 
 std::string createLocalesCacheKey(const std::string &id) { return "project:" + id + ":locales"; }
 
@@ -51,14 +53,14 @@ Task<FolderMetadata> getFolderMetadata(service::GitHub &github, std::string repo
     const auto filePath = rootPath + (locale ? "/.translated/" + *locale : "") + path + META_FILE_PATH;
     if (const auto [contents, contentsError](co_await github.getRepositoryContents(repo, version, filePath, installationToken)); contents) {
         const auto body = decodeBase64((*contents)["content"].asString());
-        if (const auto parsed = parseJsonString(body); parsed->isObject()) {
-            for (auto it = parsed->begin(); it != parsed->end(); it++) {
-                if (it->isString()) {
-                    metadata.try_emplace(it.key().asString(), it->asString(), "");
-                } else if (it->isObject()) {
-                    metadata.try_emplace(it.key().asString(),
-                                         it->isMember("name") ? (*it)["name"].asString() : getTreeEntryName(it.key().asString()),
-                                         it->get("icon", "").asString());
+        if (const auto parsed = tryParseJson<nlohmann::ordered_json>(body); parsed->is_object()) {
+            for (auto &[key, val]: parsed->items()) {
+                metadata.keys.push_back(key);
+                if (val.is_string()) {
+                    metadata.entries.try_emplace(key, val, "");
+                } else if (val.is_object()) {
+                    metadata.entries.try_emplace(key, val.contains("name") ? val["name"].get<std::string>() : getTreeEntryName(key),
+                                                 val.value("icon", ""));
                 }
             }
         }
@@ -68,47 +70,66 @@ Task<FolderMetadata> getFolderMetadata(service::GitHub &github, std::string repo
     co_return metadata;
 }
 
-bool isValidEntry(const Json::Value &value) {
+bool isValidEntry(const nlohmann::json &value) {
     return
         // Check structure
-        value.isObject() && value.isMember("type") && value.isMember("name") &&
+        value.is_object() && value.contains("type") && value.contains("name") &&
         // Exclude "hidden" files
-        !value["name"].asString().starts_with('.') && !value["name"].asString().starts_with('_') &&
+        !value["name"].get<std::string>().starts_with('.') && !value["name"].get<std::string>().starts_with('_') &&
         // Filter our non-docs
-        (value["type"] != TYPE_FILE || value["name"].asString().ends_with(DOCS_FILE_EXT));
+        (value["type"] != TYPE_FILE || value["name"].get<std::string>().ends_with(DOCS_FILE_EXT));
 }
 
-Task<Json::Value> crawlDocsTree(service::GitHub &github, std::string repo, std::string version, std::string rootPath, std::string path,
-                                std::optional<std::string> locale, std::string installationToken, trantor::EventLoopThreadPool &pool) {
+auto createComparator(const std::vector<std::string>& keys) {
+    return [&keys](const nlohmann::ordered_json &a, const nlohmann::ordered_json &b) {
+        if (keys.empty()) {
+            return a["name"].get<std::string>() < b["name"].get<std::string>();
+        }
+        const auto aPos = std::find(keys.begin(), keys.end(), a["name"]);
+        const auto bPos = std::find(keys.begin(), keys.end(), b["name"]);
+        if (aPos == keys.end() || bPos == keys.end()) {
+            return false;
+        }
+        const auto aIdx = std::distance(keys.begin(), aPos);
+        const auto bIdx = std::distance(keys.begin(), bPos);
+        return aIdx < bIdx;
+    };
+}
+
+Task<nlohmann::ordered_json> crawlDocsTree(service::GitHub &github, std::string repo, std::string version, std::string rootPath,
+                                           std::string path, std::optional<std::string> locale, std::string installationToken,
+                                           trantor::EventLoopThreadPool &pool) {
     auto currentLoop = trantor::EventLoop::getEventLoopOfCurrentThread();
     co_await switchThreadCoro(pool.getNextLoop());
 
-    Json::Value root{Json::arrayValue};
+    nlohmann::ordered_json root(nlohmann::json::value_t::array);
     if (const auto [contents, contentsError](co_await github.getRepositoryContents(repo, version, rootPath + path, installationToken));
         contents && contents->isArray())
     {
-        FolderMetadata metadata = co_await getFolderMetadata(github, repo, version, rootPath, path, locale, installationToken);
+        auto json = parkourJson(*contents);
+        json.erase(std::ranges::remove_if(json, [](const nlohmann::json &val) { return !isValidEntry(val); }).begin(), json.end());
 
-        for (const auto &child: *contents) {
-            if (isValidEntry(child)) {
-                const auto childName = child["name"].asString();
-                const auto childMeta =
-                    metadata.contains(childName) ? metadata[childName] : FolderMetadataEntry{getTreeEntryName(childName), ""};
-                const auto relativePath = getTreeEntryPath(child["path"].asString(), rootPath.size());
-                Json::Value obj;
-                obj["name"] = childMeta.name;
-                if (!childMeta.icon.empty()) {
-                    obj["icon"] = childMeta.icon;
-                }
-                obj["path"] = relativePath;
-                obj["type"] = child["type"];
-                if (child["type"] == TYPE_DIR) {
-                    Json::Value children =
-                        co_await crawlDocsTree(github, repo, version, rootPath, "/" + relativePath, locale, installationToken, pool);
-                    obj["children"] = children;
-                }
-                root.append(obj);
+        auto [keys, entries] = co_await getFolderMetadata(github, repo, version, rootPath, path, locale, installationToken);
+        std::sort(json.begin(), json.end(), createComparator(keys));
+
+        for (const auto &child: json) {
+            const std::string childName(child["name"]);
+            const auto [name, icon] =
+                entries.contains(childName) ? entries[childName] : FolderMetadataEntry{getTreeEntryName(childName), ""};
+            const auto relativePath = getTreeEntryPath(child["path"], rootPath.size());
+            nlohmann::ordered_json obj;
+            obj["name"] = name;
+            if (!icon.empty()) {
+                obj["icon"] = icon;
             }
+            obj["path"] = relativePath;
+            obj["type"] = child["type"];
+            if (child["type"] == TYPE_DIR) {
+                nlohmann::ordered_json children =
+                    co_await crawlDocsTree(github, repo, version, rootPath, "/" + relativePath, locale, installationToken, pool);
+                obj["children"] = children;
+            }
+            root.push_back(obj);
         }
     }
     co_await switchThreadCoro(currentLoop);
@@ -155,32 +176,34 @@ namespace service {
         co_return {contents, contentsError};
     }
 
-    Task<std::tuple<Json::Value, Error>> Documentation::getDirectoryTree(const Project &project, std::string version,
-                                                                         std::optional<std::string> locale, std::string installationToken) {
+    Task<std::tuple<nlohmann::ordered_json, Error>> Documentation::getDirectoryTree(const Project &project, std::string version,
+                                                                                    std::optional<std::string> locale,
+                                                                                    std::string installationToken) {
         const auto cacheKey = createDocsTreeCacheKey(project.getValueOfId(), version, locale);
 
         if (const auto cached = co_await cache_.getFromCache(cacheKey)) {
-            if (const auto parsed = parseJsonString(*cached)) {
+            if (const auto parsed = tryParseJson<nlohmann::ordered_json>(*cached)) {
                 co_return {*parsed, Error::Ok};
             }
         }
 
-        if (const auto pending = co_await getOrStartTask<std::tuple<Json::Value, Error>>(cacheKey)) {
+        if (const auto pending = co_await getOrStartTask<std::tuple<nlohmann::ordered_json, Error>>(cacheKey)) {
             co_return pending->get();
         }
 
         trantor::EventLoopThreadPool pool{10};
         pool.start();
 
-        Json::Value root = co_await crawlDocsTree(github_, project.getValueOfSourceRepo(), version,
-                                                  removeTrailingSlash(project.getValueOfSourcePath()), "", locale, installationToken, pool);
+        nlohmann::ordered_json root =
+            co_await crawlDocsTree(github_, project.getValueOfSourceRepo(), version, removeTrailingSlash(project.getValueOfSourcePath()),
+                                   "", locale, installationToken, pool);
 
         for (int16_t i = 0; i < 10; i++)
             pool.getLoop(i)->quit();
         pool.wait();
 
-        co_await cache_.updateCache(cacheKey, serializeJsonString(root), 7 * 24h);
-        co_return co_await completeTask<std::tuple<Json::Value, Error>>(cacheKey, {root, Error::Ok});
+        co_await cache_.updateCache(cacheKey, root.dump(), 7 * 24h);
+        co_return co_await completeTask<std::tuple<nlohmann::ordered_json, Error>>(cacheKey, {root, Error::Ok});
     }
 
     Task<std::tuple<std::optional<std::vector<std::string>>, Error>> Documentation::computeAvailableLocales(const Project &project,
@@ -237,16 +260,14 @@ namespace service {
         const auto cacheKey = createVersionsCacheKey(project.getValueOfId());
 
         if (const auto exists = co_await cache_.exists(cacheKey); !exists) {
-            if (const auto pending = co_await getOrStartTask<std::tuple<std::optional<Json::Value>, Error>>(cacheKey))
-            {
+            if (const auto pending = co_await getOrStartTask<std::tuple<std::optional<Json::Value>, Error>>(cacheKey)) {
                 co_return pending->get();
             }
 
             const auto [versions, versionsError] = co_await computeAvailableVersions(project, installationToken);
             co_await cache_.updateCache(cacheKey, serializeJsonString(versions), 7 * 24h);
 
-            co_return co_await completeTask<std::tuple<std::optional<Json::Value>, Error>>(cacheKey,
-                                                                                                                 {versions, versionsError});
+            co_return co_await completeTask<std::tuple<std::optional<Json::Value>, Error>>(cacheKey, {versions, versionsError});
         }
 
         if (const auto cached = co_await cache_.getFromCache(cacheKey)) {

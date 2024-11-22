@@ -50,9 +50,10 @@ std::string decodeBase64(std::string encoded) {
 std::optional<Json::Value> parseJsonString(const std::string &str) {
     Json::Value root;
     JSONCPP_STRING err;
-    Json::CharReaderBuilder builder;
-    const std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
-    if (!reader->parse(str.c_str(), str.c_str() + str.size(), &root, &err)) {
+    const Json::CharReaderBuilder builder;
+    if (const std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
+        !reader->parse(str.c_str(), str.c_str() + str.size(), &root, &err))
+    {
         return std::nullopt;
     }
     return root;
@@ -65,7 +66,7 @@ std::string toCamelCase(std::string s) {
         previous = current;
         return result;
     };
-    std::transform(s.begin(), s.end(), s.begin(), f);
+    std::ranges::transform(s, s.begin(), f);
     return s;
 }
 
@@ -119,11 +120,18 @@ Task<std::optional<Json::Value>> sendApiRequest(HttpClientPtr client, HttpMethod
     }
 }
 
-std::optional<JsonValidationError> validateJson(const nlohmann::json &schema, const Json::Value &json) {
+nlohmann::json parkourJson(const Json::Value &json) {
     // Jump from one json library to the other. Parkour!
     const auto ser = serializeJsonString(json);
-    const auto nlJson = nlohmann::json::parse(ser);
+    return nlohmann::json::parse(ser);
+}
 
+std::optional<JsonValidationError> validateJson(const nlohmann::json &schema, const Json::Value &json) {
+    const auto newJson = parkourJson(json);
+    return validateJson(schema, newJson);
+}
+
+std::optional<JsonValidationError> validateJson(const nlohmann::json &schema, const nlohmann::json &json) {
     class CustomJsonErrorHandler : public nlohmann::json_schema::basic_error_handler {
     public:
         void error(const nlohmann::json_pointer<std::basic_string<char>> &pointer, const nlohmann::json &json1,
@@ -131,9 +139,8 @@ std::optional<JsonValidationError> validateJson(const nlohmann::json &schema, co
             error_ = std::make_unique<JsonValidationError>(json1, string1);
         }
 
-        const std::unique_ptr<JsonValidationError>& getError() {
-            return error_;
-        }
+        const std::unique_ptr<JsonValidationError> &getError() { return error_; }
+
     private:
         std::unique_ptr<JsonValidationError> error_;
     };
@@ -142,12 +149,19 @@ std::optional<JsonValidationError> validateJson(const nlohmann::json &schema, co
     validator.set_root_schema(schema);
     try {
         CustomJsonErrorHandler err;
-        validator.validate(nlJson, err);
+        validator.validate(json, err);
         if (const auto &error = err.getError()) {
             return *error;
         }
         return std::nullopt;
     } catch ([[maybe_unused]] const std::exception &e) {
-        return JsonValidationError{nlJson, e.what()};
+        return JsonValidationError{json, e.what()};
     }
+}
+
+HttpResponsePtr jsonResponse(const nlohmann::json &json) {
+    const auto resp = HttpResponse::newHttpResponse();
+    resp->setContentTypeCode(CT_APPLICATION_JSON);
+    resp->setBody(json.dump());
+    return resp;
 }
