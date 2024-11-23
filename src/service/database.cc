@@ -28,6 +28,21 @@ namespace service {
         }
     }
 
+    Task<std::vector<Project>> Database::getProjectsForRepos(std::vector<std::string> repos) const {
+        try {
+            const auto clientPtr = app().getFastDbClient();
+            CoroMapper<Project> mapper(clientPtr);
+
+            co_return co_await mapper.findBy(Criteria(Project::Cols::_source_repo, CompareOperator::In, repos));
+        } catch (const Failure &e) {
+            // SQL Error
+            logger.error("Error querying database: {}", e.what());
+        } catch (const DrogonDbException &e) {
+            // Not found
+        }
+        co_return std::vector<Project>();
+    }
+
     Task<std::vector<std::string>> Database::getProjectIDs() const {
         std::vector<std::string> ids;
         try {

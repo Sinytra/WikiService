@@ -122,6 +122,76 @@ namespace service {
         co_return {std::nullopt, Error::ErrNotFound};
     }
 
+    Task<std::tuple<std::set<std::string>, Error>> GitHub::getInstallationAccessibleRepos(const std::string installationId,
+                                                                                          const std::string token) const {
+        const auto client = createHttpClient(GITHUB_API_URL);
+
+        // TODO Expand pagination
+        if (const auto data =
+                co_await sendAuthenticatedRequest(client, Get, std::format("/user/installations/{}/repositories", installationId), token);
+            data && data->isObject() && data->isMember("repositories") && (*data)["repositories"].isArray())
+        {
+            std::set<std::string> set;
+            for (const auto repos = (*data)["repositories"]; const auto &repo: repos) {
+                if (const auto permissions = repo["permissions"]; permissions["admin"].asBool() || permissions["maintain"].asBool()) {
+                    set.insert(repo["full_name"].asString());
+                }
+            }
+
+            co_return {set, Error::Ok};
+        }
+
+        co_return {std::set<std::string>(), Error::Ok};
+    }
+
+    Task<std::tuple<Json::Value, Error>> GitHub::computeUserAccessibleInstallations(std::string token) const {
+        const auto client = createHttpClient(GITHUB_API_URL);
+        if (auto data = co_await sendAuthenticatedRequest(client, Get, "/user/installations", token);
+            data && data->isObject() && data->isMember("installations") && (*data)["installations"].isArray())
+        {
+            const auto installations = (*data)["installations"];
+            Json::Value result(Json::arrayValue);
+            for (const auto &item: installations) {
+                result.append(item["id"].asString());
+            }
+            co_return {result, Error::Ok};
+        }
+        co_return {Json::Value(Json::arrayValue), Error::ErrNotFound};
+    }
+
+    Task<std::set<std::string>> GitHub::getUserAccessibleInstallations(std::string token) {
+        const auto [username, usernameErr] = co_await getUsername(token);
+        if (!username) {
+            co_return std::set<std::string>();
+        }
+
+        const auto cacheKey = "user_installations:" + *username;
+
+        if (const auto cached = co_await cache_.getFromCache(cacheKey)) {
+            if (const auto parsed = parseJsonString(*cached)) {
+                std::set<std::string> set;
+                for (const auto &item: *parsed) {
+                    set.insert(item.asString());
+                }
+                co_return set;
+            }
+        }
+
+        if (const auto pending = co_await getOrStartTask<std::set<std::string>>(cacheKey)) {
+            co_return pending->get();
+        }
+
+        const auto [installations, installationsError] = co_await computeUserAccessibleInstallations(token);
+        co_await cache_.updateCache(cacheKey, serializeJsonString(installations), 7 * 24h);
+
+        std::set<std::string> set;
+        for (const auto &item: installations) {
+            set.insert(item.asString());
+        }
+
+        co_return co_await completeTask<std::set<std::string>>(cacheKey, std::move(set));
+    }
+
     Task<std::tuple<std::optional<std::string>, Error>> GitHub::getInstallationToken(const std::string installationId) const {
         if (const auto cached = co_await cache_.getFromCache("installation_token:" + installationId)) {
             logger.trace("Reusing cached repo installation token for {}", installationId);
@@ -232,8 +302,9 @@ namespace service {
                                                              });
             commits && commits->isArray())
         {
-            const auto entry = commits->front();
-            if (entry.isMember("commit") && entry["commit"].isMember("committer") && entry["commit"]["committer"].isMember("date")) {
+            if (const auto entry = commits->front();
+                entry.isMember("commit") && entry["commit"].isMember("committer") && entry["commit"]["committer"].isMember("date"))
+            {
                 const auto date = entry["commit"]["committer"]["date"].asString();
                 co_return {date, Error::Ok};
             }
@@ -242,7 +313,7 @@ namespace service {
         co_return {std::nullopt, Error::ErrNotFound};
     }
 
-    Task<> GitHub::invalidateCache(std::string repo) const { co_await cache_.erase(createRepoInstallIdCacheKey(repo)); }
+    Task<> GitHub::invalidateCache(const std::string repo) const { co_await cache_.erase(createRepoInstallIdCacheKey(repo)); }
 
     Task<std::string> GitHub::getNewRepositoryLocation(std::string repo) const {
         const auto client = createHttpClient(GITHUB_API_URL);

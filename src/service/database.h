@@ -32,6 +32,8 @@ namespace service {
 
         drogon::Task<std::tuple<std::optional<Project>, Error>> getProjectSource(std::string id) const;
 
+        drogon::Task<std::vector<Project>> getProjectsForRepos(std::vector<std::string> repos) const;
+
         drogon::Task<std::tuple<ProjectSearchResponse, Error>> findProjects(std::string query, int page) const;
     };
 }

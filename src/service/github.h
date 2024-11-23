@@ -5,21 +5,25 @@
 #include <drogon/utils/coroutine.h>
 #include <json/value.h>
 #include <optional>
+#include <set>
 #include <string>
 #include <tuple>
 
 #include "cache.h"
 
 namespace service {
-    class GitHub {
+    class GitHub : public CacheableServiceBase {
     public:
         explicit GitHub(MemoryCache &, const std::string &, const std::string &, const std::string &);
 
         drogon::Task<std::tuple<std::optional<std::string>, Error>> getUsername(std::string token) const;
+        drogon::Task<std::set<std::string>> getUserAccessibleInstallations(std::string token);
         [[nodiscard]] std::string getAppInstallUrl() const;
 
         drogon::Task<std::tuple<std::optional<std::string>, Error>> getApplicationJWTToken() const;
         drogon::Task<std::tuple<std::optional<std::string>, Error>> getRepositoryInstallation(std::string repo) const;
+        drogon::Task<std::tuple<std::set<std::string>, Error>> getInstallationAccessibleRepos(std::string installationId,
+                                                                                                 std::string token) const;
         drogon::Task<std::tuple<std::optional<std::string>, Error>> getInstallationToken(std::string installationId) const;
         drogon::Task<std::tuple<std::optional<std::string>, Error>> getCollaboratorPermissionLevel(std::string repo, std::string username,
                                                                                                    std::string installationToken) const;
@@ -36,6 +40,8 @@ namespace service {
         drogon::Task<std::string> getNewRepositoryLocation(std::string repo) const;
 
     private:
+        drogon::Task<std::tuple<Json::Value, Error>> computeUserAccessibleInstallations(std::string token) const;
+
         MemoryCache &cache_;
         const std::string &appName_;
         const std::string &appClientId_;

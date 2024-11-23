@@ -209,6 +209,38 @@ namespace api::v1 {
         callback(resp);
     }
 
+    Task<> ProjectsController::listUserProjects(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback,
+                                                const std::string token) const {
+        if (token.empty()) {
+            co_return errorResponse(Error::ErrBadRequest, "Missing token parameter", callback);
+        }
+
+        Json::Value projectRepos(Json::arrayValue);
+        std::vector<std::string> candidateRepos;
+
+        // TODO Multithread
+        for (const auto installations = co_await github_.getUserAccessibleInstallations(token); const auto &id: installations) {
+            for (const auto [repos, reposErr] = co_await github_.getInstallationAccessibleRepos(id, token); const auto &repo: repos) {
+                projectRepos.append(repo);
+                candidateRepos.push_back(repo);
+            }
+        }
+
+        // TODO Include community projects
+        const auto projects = co_await database_.getProjectsForRepos(candidateRepos);
+        Json::Value projectsJson(Json::arrayValue);
+        for (const auto &project: projects) {
+            projectsJson.append(project.toJson());
+        }
+
+        Json::Value root;
+        root["repositories"] = projectRepos;
+        root["projects"] = projectsJson;
+        const auto resp = HttpResponse::newHttpJsonResponse(root);
+        resp->setStatusCode(k200OK);
+        callback(resp);
+    }
+
     Task<> ProjectsController::create(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string token) const {
         if (token.empty()) {
             co_return errorResponse(Error::ErrBadRequest, "Missing token parameter", callback);
@@ -315,7 +347,8 @@ namespace api::v1 {
         co_return;
     }
 
-    Task<> ProjectsController::migrate(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, const std::string token) const {
+    Task<> ProjectsController::migrate(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback,
+                                       const std::string token) const {
         if (token.empty()) {
             co_return errorResponse(Error::ErrBadRequest, "Missing token parameter", callback);
         }
