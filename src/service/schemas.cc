@@ -62,6 +62,18 @@ auto schemas::projectMetadata = R"(
 }
 )"_json;
 
+auto schemas::repositoryMigration = R"(
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Repository migration",
+    "type": "object",
+    "properties": {
+        "repo": { "type": "string" }
+    },
+    "required": ["repo"]
+}
+)"_json;
+
 auto schemas::systemConfig = R"(
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",

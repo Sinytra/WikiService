@@ -28,6 +28,8 @@ namespace service {
 
         drogon::Task<Error> removeProject(const std::string &id) const;
 
+        drogon::Task<Error> updateRepository(const std::string &repo, const std::string &newRepo) const;
+
         drogon::Task<std::tuple<std::optional<Project>, Error>> getProjectSource(std::string id) const;
 
         drogon::Task<std::tuple<ProjectSearchResponse, Error>> findProjects(std::string query, int page) const;

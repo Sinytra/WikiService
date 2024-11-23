@@ -32,7 +32,7 @@ namespace service {
         std::vector<std::string> ids;
         try {
             const auto clientPtr = app().getFastDbClient();
-            for (const auto result = co_await clientPtr->execSqlCoro("SELECT id FROM projects"); const auto &row : result) {
+            for (const auto result = co_await clientPtr->execSqlCoro("SELECT id FROM projects"); const auto &row: result) {
                 ids.push_back(row["id"].as<std::string>());
             }
         } catch (const Failure &e) {
@@ -86,6 +86,26 @@ namespace service {
             CoroMapper<Project> mapper(clientPtr);
 
             co_await mapper.deleteByPrimaryKey(id);
+
+            co_return Error::Ok;
+        } catch (const Failure &e) {
+            // SQL Error
+            logger.error("Error querying database: {}", e.what());
+            co_return Error::ErrInternal;
+        } catch (const DrogonDbException &e) {
+            // Not found
+            co_return Error::ErrNotFound;
+        }
+    }
+
+    Task<Error> Database::updateRepository(const std::string &repo, const std::string &newRepo) const {
+        try {
+            const auto clientPtr = app().getFastDbClient();
+            CoroMapper<Project> mapper(clientPtr);
+
+            const auto count =
+                co_await mapper.updateBy({Project::Cols::_source_repo}, Criteria(Project::Cols::_source_repo, repo), newRepo);
+            logger.info("Updated {} rows", count);
 
             co_return Error::Ok;
         } catch (const Failure &e) {

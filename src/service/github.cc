@@ -39,6 +39,15 @@ std::optional<std::chrono::system_clock::time_point> parseISO8601(const std::str
     return std::chrono::system_clock::from_time_t(time_since_epoch);
 }
 
+HttpRequestPtr newGithubApiRequest(const HttpMethod method, const std::string &path) {
+    const auto req = HttpRequest::newHttpRequest();
+    req->setMethod(method);
+    req->setPath(path);
+    req->addHeader("Accept", "application/vnd.github+json");
+    req->addHeader("X-GitHub-Api-Version", "2022-11-28");
+    return req;
+}
+
 namespace service {
     GitHub::GitHub(MemoryCache &cache_, const std::string &appName_, const std::string &appClientId_,
                    const std::string &appPrivateKeyPath_) :
@@ -234,4 +243,33 @@ namespace service {
     }
 
     Task<> GitHub::invalidateCache(std::string repo) const { co_await cache_.erase(createRepoInstallIdCacheKey(repo)); }
+
+    Task<std::string> GitHub::getNewRepositoryLocation(std::string repo) const {
+        const auto client = createHttpClient(GITHUB_API_URL);
+        const auto path = std::format("/repos/{}", repo);
+        try {
+            const auto httpReq = newGithubApiRequest(Get, path);
+            const auto response = co_await client->sendRequestCoro(httpReq);
+            // Check if repo was moved
+            if (const auto status = response->getStatusCode(); status == k301MovedPermanently) {
+                if (const auto location = response->getHeader("location"); !location.empty()) {
+                    // Send request to new location
+                    const auto redirectClient = createHttpClient(location);
+                    const auto redirectPath = location.substr((redirectClient->secure() ? 8 : 7) + redirectClient->getHost().size());
+
+                    const auto redirectReq = newGithubApiRequest(Get, redirectPath);
+
+                    if (const auto redirectResp = co_await client->sendRequestCoro(redirectReq); isSuccess(redirectResp->getStatusCode())) {
+                        if (const auto jsonResp = redirectResp->getJsonObject(); jsonResp->isObject() && jsonResp->isMember("full_name")) {
+                            co_return (*jsonResp)["full_name"].asString();
+                        }
+                    }
+                }
+            }
+        } catch (std::exception &e) {
+            logger.error(e.what());
+        }
+
+        co_return "";
+    }
 }

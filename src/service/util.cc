@@ -79,9 +79,8 @@ std::string serializeJsonString(const Json::Value &value) {
 bool isSuccess(const HttpStatusCode &code) { return code == k200OK || code == k201Created || code == k202Accepted; }
 
 HttpClientPtr createHttpClient(const std::string &url) {
-    auto currentLoop = trantor::EventLoop::getEventLoopOfCurrentThread();
-    auto client = HttpClient::newHttpClient(url, currentLoop);
-    return client;
+    const auto currentLoop = trantor::EventLoop::getEventLoopOfCurrentThread();
+    return HttpClient::newHttpClient(url, currentLoop);
 }
 
 Task<std::optional<Json::Value>> sendAuthenticatedRequest(HttpClientPtr client, HttpMethod method, std::string path, std::string token,
@@ -108,7 +107,7 @@ Task<std::optional<Json::Value>> sendApiRequest(HttpClientPtr client, HttpMethod
         if (isSuccess(status)) {
             if (const auto jsonResp = response->getJsonObject()) {
                 logger.trace("<= Response ({}) from {}", std::to_string(status), path);
-                co_return std::make_optional(*jsonResp);
+                co_return *jsonResp;
             }
         }
 

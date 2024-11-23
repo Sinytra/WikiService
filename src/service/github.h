@@ -33,6 +33,7 @@ namespace service {
         drogon::Task<std::tuple<std::optional<std::string>, Error>>
         getFileLastUpdateTime(std::string repo, std::string ref, std::string path, std::string installationToken) const;
         drogon::Task<> invalidateCache(std::string repo) const;
+        drogon::Task<std::string> getNewRepositoryLocation(std::string repo) const;
 
     private:
         MemoryCache &cache_;
