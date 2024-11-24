@@ -53,14 +53,22 @@ namespace service {
                    const std::string &appPrivateKeyPath_) :
         cache_(cache_), appName_(appName_), appClientId_(appClientId_), appPrivateKeyPath_(appPrivateKeyPath_) {}
 
-    Task<std::tuple<std::optional<std::string>, Error>> GitHub::getUsername(std::string token) const {
+    Task<std::tuple<std::optional<Json::Value>, Error>> GitHub::getAuthenticatedUser(const std::string token) const {
         const auto client = createHttpClient(GITHUB_API_URL);
-        if (auto user = co_await sendAuthenticatedRequest(client, Get, "/user", token); user && user->isObject() && user->isMember("login"))
-        {
-            const auto login = (*user)["login"].asString();
-            co_return {login, Error::Ok};
+        auto [user, err] = co_await sendAuthenticatedRequest(client, Get, "/user", token);
+        if (user && user->isObject()) {
+            co_return {*user, err};
         }
-        co_return {std::nullopt, Error::Ok};
+        co_return {std::nullopt, err};
+    }
+
+    Task<std::tuple<std::optional<std::string>, Error>> GitHub::getUsername(const std::string token) const {
+        const auto [user, err] = co_await getAuthenticatedUser(token);
+        if (user) {
+            const auto login = (*user)["login"].asString();
+            co_return {login, err};
+        }
+        co_return {std::nullopt, err};
     }
 
     std::string GitHub::getAppInstallUrl() const { return std::format(GITHUB_APP_INSTALL_BASE_URL, appName_); }
@@ -109,7 +117,9 @@ namespace service {
         const auto [jwt, error](co_await getApplicationJWTToken());
 
         const auto client = createHttpClient(GITHUB_API_URL);
-        if (auto installation = co_await sendAuthenticatedRequest(client, Get, std::format("/repos/{}/installation", repo), *jwt)) {
+        if (auto [installation, err] = co_await sendAuthenticatedRequest(client, Get, std::format("/repos/{}/installation", repo), *jwt);
+            installation)
+        {
             const std::string installationId = (*installation)["id"].asString();
 
             logger.trace("Storing installation ID for {} in cache", repo);
@@ -127,7 +137,7 @@ namespace service {
         const auto client = createHttpClient(GITHUB_API_URL);
 
         // TODO Expand pagination
-        if (const auto data =
+        if (const auto [data, err] =
                 co_await sendAuthenticatedRequest(client, Get, std::format("/user/installations/{}/repositories", installationId), token);
             data && data->isObject() && data->isMember("repositories") && (*data)["repositories"].isArray())
         {
@@ -146,7 +156,7 @@ namespace service {
 
     Task<std::tuple<Json::Value, Error>> GitHub::computeUserAccessibleInstallations(std::string token) const {
         const auto client = createHttpClient(GITHUB_API_URL);
-        if (auto data = co_await sendAuthenticatedRequest(client, Get, "/user/installations", token);
+        if (auto [data, err] = co_await sendAuthenticatedRequest(client, Get, "/user/installations", token);
             data && data->isObject() && data->isMember("installations") && (*data)["installations"].isArray())
         {
             const auto installations = (*data)["installations"];
@@ -159,13 +169,9 @@ namespace service {
         co_return {Json::Value(Json::arrayValue), Error::ErrNotFound};
     }
 
-    Task<std::set<std::string>> GitHub::getUserAccessibleInstallations(std::string token) {
-        const auto [username, usernameErr] = co_await getUsername(token);
-        if (!username) {
-            co_return std::set<std::string>();
-        }
-
-        const auto cacheKey = "user_installations:" + *username;
+    Task<std::tuple<std::set<std::string>, Error>> GitHub::getUserAccessibleInstallations(const std::string username,
+                                                                                          const std::string token) {
+        const auto cacheKey = "user_installations:" + username;
 
         if (const auto cached = co_await cache_.getFromCache(cacheKey)) {
             if (const auto parsed = parseJsonString(*cached)) {
@@ -173,12 +179,12 @@ namespace service {
                 for (const auto &item: *parsed) {
                     set.insert(item.asString());
                 }
-                co_return set;
+                co_return {set, Error::Ok};
             }
         }
 
         if (const auto pending = co_await getOrStartTask<std::set<std::string>>(cacheKey)) {
-            co_return pending->get();
+            co_return {pending->get(), Error::Ok};
         }
 
         const auto [installations, installationsError] = co_await computeUserAccessibleInstallations(token);
@@ -189,7 +195,8 @@ namespace service {
             set.insert(item.asString());
         }
 
-        co_return co_await completeTask<std::set<std::string>>(cacheKey, std::move(set));
+        const auto result = co_await completeTask<std::set<std::string>>(cacheKey, std::move(set));
+        co_return {result, Error::Ok};
     }
 
     Task<std::tuple<std::optional<std::string>, Error>> GitHub::getInstallationToken(const std::string installationId) const {
@@ -201,8 +208,9 @@ namespace service {
         const auto [jwt, error](co_await getApplicationJWTToken());
 
         const auto client = createHttpClient(GITHUB_API_URL);
-        if (auto installationToken =
-                co_await sendAuthenticatedRequest(client, Post, std::format("/app/installations/{}/access_tokens", installationId), *jwt))
+        if (auto [installationToken, err] =
+                co_await sendAuthenticatedRequest(client, Post, std::format("/app/installations/{}/access_tokens", installationId), *jwt);
+            installationToken)
         {
             const std::string expiryString = (*installationToken)["expires_at"].asString();
             const std::string token = (*installationToken)["token"].asString();
@@ -223,7 +231,7 @@ namespace service {
     Task<std::tuple<std::optional<std::string>, Error>> GitHub::getCollaboratorPermissionLevel(std::string repo, std::string username,
                                                                                                std::string installationToken) const {
         const auto client = createHttpClient(GITHUB_API_URL);
-        if (auto permissions = co_await sendAuthenticatedRequest(
+        if (auto [permissions, err] = co_await sendAuthenticatedRequest(
                 client, Get, std::format("/repos/{}/collaborators/{}/permission", repo, username), installationToken);
             permissions && permissions->isObject() && permissions->isMember("permission"))
         {
@@ -236,7 +244,8 @@ namespace service {
     Task<std::tuple<std::vector<std::string>, Error>> GitHub::getRepositoryBranches(std::string repo, std::string installationToken) const {
         const auto client = createHttpClient(GITHUB_API_URL);
         std::vector<std::string> repoBranches;
-        if (auto branches = co_await sendAuthenticatedRequest(client, Get, std::format("/repos/{}/branches", repo), installationToken);
+        if (auto [branches, err] =
+                co_await sendAuthenticatedRequest(client, Get, std::format("/repos/{}/branches", repo), installationToken);
             branches && branches->isArray())
         {
             for (const auto &item: *branches) {
@@ -268,9 +277,10 @@ namespace service {
         params.try_emplace("ref", ref);
 
         const auto normalizedPath = removeLeadingSlash(removeTrailingSlash(path));
-        if (auto repositoryContents =
+        if (auto [repositoryContents, err] =
                 co_await sendAuthenticatedRequest(client, Get, std::format("/repos/{}/contents/{}", repo, normalizedPath),
-                                                  installationToken, [&ref](const HttpRequestPtr &req) { req->setParameter("ref", ref); }))
+                                                  installationToken, [&ref](const HttpRequestPtr &req) { req->setParameter("ref", ref); });
+            repositoryContents)
         {
             co_return {std::optional(repositoryContents), Error::Ok};
         }
@@ -281,7 +291,9 @@ namespace service {
 
     Task<std::tuple<bool, Error>> GitHub::isPublicRepository(std::string repo, std::string installationToken) const {
         const auto client = createHttpClient(GITHUB_API_URL);
-        if (auto repositoryContents = co_await sendAuthenticatedRequest(client, Get, "/repos/" + repo, installationToken)) {
+        if (const auto [repositoryContents, err] = co_await sendAuthenticatedRequest(client, Get, "/repos/" + repo, installationToken);
+            repositoryContents)
+        {
             co_return {!(*repositoryContents)["private"].asBool(), Error::Ok};
         }
         co_return {false, Error::ErrNotFound};
@@ -293,13 +305,13 @@ namespace service {
         std::map<std::string, std::string> params = {{"page", "1"}, {"per_page", "1"}};
         params.try_emplace("path", path);
         params.try_emplace("sha", ref);
-        if (auto commits = co_await sendAuthenticatedRequest(client, Get, std::format("/repos/{}/commits", repo), installationToken,
-                                                             [&path, &ref](const HttpRequestPtr &req) {
-                                                                 req->setParameter("page", "1");
-                                                                 req->setParameter("per_page", "1");
-                                                                 req->setParameter("path", path);
-                                                                 req->setParameter("sha", ref);
-                                                             });
+        if (auto [commits, err] = co_await sendAuthenticatedRequest(client, Get, std::format("/repos/{}/commits", repo), installationToken,
+                                                                    [&path, &ref](const HttpRequestPtr &req) {
+                                                                        req->setParameter("page", "1");
+                                                                        req->setParameter("per_page", "1");
+                                                                        req->setParameter("path", path);
+                                                                        req->setParameter("sha", ref);
+                                                                    });
             commits && commits->isArray())
         {
             if (const auto entry = commits->front();

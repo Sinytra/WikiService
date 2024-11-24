@@ -18,7 +18,7 @@ namespace service {
     ModrinthPlatform::ModrinthPlatform(const std::string &clientId, const std::string &clientSecret, const std::string &redirectUrl) :
         clientId_(clientId), clientSecret_(clientSecret), redirectUrl_(redirectUrl) {}
 
-    bool ModrinthPlatform::isOAuthConfigured() const { return !clientId_.empty() && clientSecret_.empty() && !redirectUrl_.empty(); }
+    bool ModrinthPlatform::isOAuthConfigured() const { return !clientId_.empty() && !clientSecret_.empty() && !redirectUrl_.empty(); }
 
     Task<std::optional<std::string>> ModrinthPlatform::getOAuthToken(std::string code) const {
         const auto client = createHttpClient(MODRINTH_API_URL);
@@ -39,8 +39,8 @@ namespace service {
 
     Task<std::optional<std::string>> ModrinthPlatform::getAuthenticatedUser(std::string token) const {
         const auto client = createHttpClient(MODRINTH_API_URL);
-        if (const auto resp = co_await sendApiRequest(client, Get, "/v3/user",
-                                                      [&token](const HttpRequestPtr &req) { req->addHeader("Authorization", token); });
+        if (const auto [resp, err] = co_await sendApiRequest(
+                client, Get, "/v3/user", [&token](const HttpRequestPtr &req) { req->addHeader("Authorization", token); });
             resp && resp->isObject())
         {
             const auto username = (*resp)["username"].asString();
@@ -52,7 +52,9 @@ namespace service {
     Task<bool> ModrinthPlatform::isProjectMember(std::string slug, std::string username) const {
         const auto client = createHttpClient(MODRINTH_API_URL);
         // Check direct project members
-        if (const auto resp = co_await sendApiRequest(client, Get, std::format("/v3/project/{}/members", slug)); resp && resp->isArray()) {
+        if (const auto [resp, err] = co_await sendApiRequest(client, Get, std::format("/v3/project/{}/members", slug));
+            resp && resp->isArray())
+        {
             for (const auto &item: *resp) {
                 if (const auto memberUsername = item["user"]["username"].asString(); memberUsername == username) {
                     co_return true;
@@ -60,7 +62,7 @@ namespace service {
             }
         }
         // Check organization members
-        if (const auto resp = co_await sendApiRequest(client, Get, std::format("/v3/project/{}/organization", slug));
+        if (const auto [resp, err] = co_await sendApiRequest(client, Get, std::format("/v3/project/{}/organization", slug));
             resp && resp->isObject())
         {
             for (const auto members = (*resp)["members"]; const auto &item: members) {
@@ -72,9 +74,9 @@ namespace service {
         co_return false;
     }
 
-    Task<std::optional<PlatformProject>> ModrinthPlatform::getProject(std::string slug) {
+    Task<std::optional<PlatformProject>> ModrinthPlatform::getProject(const std::string slug) {
         const auto client = createHttpClient(MODRINTH_API_URL);
-        if (const auto resp = co_await sendApiRequest(client, Get, "/v3/project/" + slug); resp && resp->isObject()) {
+        if (const auto [resp, err] = co_await sendApiRequest(client, Get, "/v3/project/" + slug); resp && resp->isObject()) {
             const auto projectSlug = (*resp)["slug"].asString();
             const auto name = (*resp)["name"].asString();
             const auto sourceUrl = resp->isMember("link_urls") && (*resp)["link_urls"].isMember("source")
@@ -91,7 +93,7 @@ namespace service {
 
     Task<std::optional<PlatformProject>> CurseForgePlatform::getProject(std::string slug) {
         const auto client = createHttpClient(CURSEFORGE_API_URL);
-        if (const auto resp = co_await sendAuthenticatedRequest(
+        if (const auto [resp, err] = co_await sendAuthenticatedRequest(
                 client, Get, std::format("/v1/mods/search?gameId={}&classId={}&slug={}", MC_GAME_ID, MC_MODS_CAT, slug), apiKey_);
             resp && resp->isObject())
         {

@@ -1,6 +1,7 @@
 #include "util.h"
 #include <log/log.h>
 
+#include <api/v1/error.h>
 #include <base64.hpp>
 
 using namespace drogon;
@@ -61,7 +62,7 @@ std::optional<Json::Value> parseJsonString(const std::string &str) {
 
 std::string toCamelCase(std::string s) {
     char previous = ' ';
-    auto f = [&](char current) {
+    auto f = [&](const char current) {
         char result = (std::isblank(previous) && std::isalpha(current)) ? std::toupper(current) : std::tolower(current);
         previous = current;
         return result;
@@ -83,16 +84,17 @@ HttpClientPtr createHttpClient(const std::string &url) {
     return HttpClient::newHttpClient(url, currentLoop);
 }
 
-Task<std::optional<Json::Value>> sendAuthenticatedRequest(HttpClientPtr client, HttpMethod method, std::string path, std::string token,
-                                                          std::function<void(HttpRequestPtr &)> callback) {
+Task<std::tuple<std::optional<Json::Value>, Error>> sendAuthenticatedRequest(const HttpClientPtr client, const HttpMethod method,
+                                                                             const std::string path, const std::string token,
+                                                                             const std::function<void(HttpRequestPtr &)> callback) {
     co_return co_await sendApiRequest(client, method, path, [&](HttpRequestPtr &req) {
         req->addHeader("Authorization", "Bearer " + token);
         callback(req);
     });
 }
 
-Task<std::optional<Json::Value>> sendApiRequest(HttpClientPtr client, HttpMethod method, std::string path,
-                                                std::function<void(HttpRequestPtr &)> callback) {
+Task<std::tuple<std::optional<Json::Value>, Error>> sendApiRequest(const HttpClientPtr client, const HttpMethod method, std::string path,
+                                                                   const std::function<void(HttpRequestPtr &)> callback) {
     try {
         auto httpReq = HttpRequest::newHttpRequest();
         httpReq->setMethod(method);
@@ -107,15 +109,15 @@ Task<std::optional<Json::Value>> sendApiRequest(HttpClientPtr client, HttpMethod
         if (isSuccess(status)) {
             if (const auto jsonResp = response->getJsonObject()) {
                 logger.trace("<= Response ({}) from {}", std::to_string(status), path);
-                co_return *jsonResp;
+                co_return {*jsonResp, Error::Ok};
             }
         }
 
         logger.trace("Unexpected api response: ({}) {}", std::to_string(status), response->getBody());
-        co_return std::nullopt;
+        co_return {std::nullopt, api::v1::mapStatusCode(status)};
     } catch (std::exception &e) {
         logger.error(e.what());
-        co_return std::nullopt;
+        co_return {std::nullopt, Error::ErrInternal};
     }
 }
 

@@ -9,8 +9,10 @@
 
 namespace api::v1 {
     drogon::HttpStatusCode mapError(const service::Error&);
+    service::Error mapStatusCode(const drogon::HttpStatusCode&);
 
-    void errorResponse(const service::Error &error, const std::string &message, std::function<void(const drogon::HttpResponsePtr &)> &callback);
+    void errorResponse(const service::Error &error, const std::string &message,
+                       const std::function<void(const drogon::HttpResponsePtr &)> &callback);
 
     void simpleError(
         const service::Error &error, const std::string &message, const std::function<void(const drogon::HttpResponsePtr &)> &callback,

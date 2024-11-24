@@ -10,7 +10,7 @@
 namespace api::v1 {
     class ProjectsController final : public drogon::HttpController<ProjectsController, false> {
     public:
-        explicit ProjectsController(service::GitHub &, service::Platforms &, service::Database &, service::Documentation &);
+        explicit ProjectsController(GitHub &, Platforms &, Database &, Documentation &);
 
         METHOD_LIST_BEGIN
         ADD_METHOD_TO(ProjectsController::listIDs, "/api/v1/projects", drogon::Get, "AuthFilter");
@@ -44,7 +44,8 @@ namespace api::v1 {
 
     private:
         drogon::Task<std::optional<Project>> validateProjectData(const Json::Value &json, const std::string &token,
-                                                                 std::function<void(const drogon::HttpResponsePtr &)> callback) const;
+                                                                 std::function<void(const drogon::HttpResponsePtr &)> callback,
+                                                                 const bool checkExisting) const;
 
         drogon::Task<std::optional<Project>> validateProjectAccess(const std::string &id, const std::string &token,
                                                                    std::function<void(const drogon::HttpResponsePtr &)> callback) const;
@@ -52,9 +53,9 @@ namespace api::v1 {
         drogon::Task<bool> validateRepositoryAccess(const std::string &repo, const std::string &token,
                                                     std::function<void(const drogon::HttpResponsePtr &)> callback) const;
 
-        service::GitHub &github_;
-        service::Platforms &platforms_;
-        service::Database &database_;
-        service::Documentation &documentation_;
+        GitHub &github_;
+        Platforms &platforms_;
+        Database &database_;
+        Documentation &documentation_;
     };
 }

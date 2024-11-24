@@ -16,8 +16,9 @@ namespace service {
     public:
         explicit GitHub(MemoryCache &, const std::string &, const std::string &, const std::string &);
 
+        drogon::Task<std::tuple<std::optional<Json::Value>, Error>> getAuthenticatedUser(std::string token) const;
         drogon::Task<std::tuple<std::optional<std::string>, Error>> getUsername(std::string token) const;
-        drogon::Task<std::set<std::string>> getUserAccessibleInstallations(std::string token);
+        drogon::Task<std::tuple<std::set<std::string>, Error>> getUserAccessibleInstallations(std::string username, std::string token);
         [[nodiscard]] std::string getAppInstallUrl() const;
 
         drogon::Task<std::tuple<std::optional<std::string>, Error>> getApplicationJWTToken() const;

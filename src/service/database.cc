@@ -154,7 +154,7 @@ namespace service {
                 "    SELECT *"
                 "    FROM project"
                 "    WHERE (cast($1 as varchar) IS NULL OR $1 = '' OR search_vector @@ to_tsquery('simple', $1))"
-                "    ORDER BY \"createdAt\" desc"
+                "    ORDER BY \"created_at\" desc"
                 "),"
                 "     total_count AS ("
                 "         SELECT COUNT(*) AS total_rows FROM search_data"
@@ -186,6 +186,46 @@ namespace service {
         } catch (const DrogonDbException &e) {
             // Not found
             co_return {{}, Error::ErrNotFound};
+        }
+    }
+
+    Task<bool> Database::existsForRepo(const std::string repo, const std::string branch, const std::string path) const {
+        try {
+            const auto clientPtr = app().getFastDbClient();
+            CoroMapper<Project> mapper(clientPtr);
+
+            const auto results = co_await mapper.findBy(Criteria(Project::Cols::_source_repo, CompareOperator::EQ, repo) &&
+                                                        Criteria(Project::Cols::_source_branch, CompareOperator::EQ, branch) &&
+                                                        Criteria(Project::Cols::_source_path, CompareOperator::EQ, path));
+
+            co_return !results.empty();
+        } catch (const Failure &e) {
+            // SQL Error
+            logger.error("Error querying database: {}", e.what());
+            co_return false;
+        } catch (const DrogonDbException &e) {
+            // Not found
+            co_return false;
+        }
+    }
+
+    Task<bool> Database::existsForData(const std::string id, const std::string platform, const std::string slug) const {
+        try {
+            const auto clientPtr = app().getFastDbClient();
+            CoroMapper<Project> mapper(clientPtr);
+
+            const auto results = co_await mapper.findBy(Criteria(Project::Cols::_id, CompareOperator::EQ, id) ||
+                                                        (Criteria(Project::Cols::_platform, CompareOperator::EQ, platform) &&
+                                                         Criteria(Project::Cols::_slug, CompareOperator::EQ, slug)));
+
+            co_return !results.empty();
+        } catch (const Failure &e) {
+            // SQL Error
+            logger.error("Error querying database: {}", e.what());
+            co_return false;
+        } catch (const DrogonDbException &e) {
+            // Not found
+            co_return false;
         }
     }
 }

@@ -54,7 +54,8 @@ namespace api::v1 {
      * - internal: Internal server error
      */
     Task<std::optional<Project>> ProjectsController::validateProjectData(const Json::Value &json, const std::string &token,
-                                                                         std::function<void(const HttpResponsePtr &)> callback) const {
+                                                                         std::function<void(const HttpResponsePtr &)> callback,
+                                                                         const bool checkExisting) const {
         const auto [username, usernameError](co_await github_.getUsername(token));
         if (!username) {
             simpleError(Error::ErrBadRequest, "user_github_auth", callback);
@@ -121,11 +122,20 @@ namespace api::v1 {
             co_return std::nullopt;
         }
 
-        if (const auto verified = co_await verifyProjectOwnership(platforms_, *platformProj, repo, mrCode); !verified) {
-            simpleError(Error::ErrBadRequest, "ownership", callback, [&](Json::Value &root) {
-                root["can_verify_mr"] = platform == PLATFORM_MODRINTH && platforms_.modrinth_.isOAuthConfigured();
-            });
-            co_return std::nullopt;
+        bool skipCheck = false;
+        if (checkExisting) {
+            if (const auto [proj, projErr] = co_await database_.getProjectSource(id);
+                proj && proj->getValueOfPlatform() == platform && proj->getValueOfSlug() == slug) {
+                skipCheck = true;
+            }
+        }
+        if (!skipCheck) {
+            if (const auto verified = co_await verifyProjectOwnership(platforms_, *platformProj, repo, mrCode); !verified) {
+                simpleError(Error::ErrBadRequest, "ownership", callback, [&](Json::Value &root) {
+                    root["can_verify_mr"] = platform == PLATFORM_MODRINTH && platforms_.modrinth_.isOAuthConfigured();
+                });
+                co_return std::nullopt;
+            }
         }
 
         Project project;
@@ -215,11 +225,23 @@ namespace api::v1 {
             co_return errorResponse(Error::ErrBadRequest, "Missing token parameter", callback);
         }
 
+        const auto [user, usernameErr] = co_await github_.getAuthenticatedUser(token);
+        if (!user) {
+            co_return errorResponse(usernameErr, "Couldn't fetch GitHub profile", callback);
+        }
+        const auto username = (*user)["login"].asString();
+
         Json::Value projectRepos(Json::arrayValue);
         std::vector<std::string> candidateRepos;
 
         // TODO Multithread
-        for (const auto installations = co_await github_.getUserAccessibleInstallations(token); const auto &id: installations) {
+        for (const auto [installations, installationsErr] = co_await github_.getUserAccessibleInstallations(username, token);
+             const auto &id: installations)
+        {
+            if (installationsErr != Error::Ok) {
+                co_return errorResponse(installationsErr, "Error fetching installations", callback);
+            }
+
             for (const auto [repos, reposErr] = co_await github_.getInstallationAccessibleRepos(id, token); const auto &repo: repos) {
                 projectRepos.append(repo);
                 candidateRepos.push_back(repo);
@@ -234,6 +256,15 @@ namespace api::v1 {
         }
 
         Json::Value root;
+        {
+            Json::Value profile;
+            profile["name"] = (*user)["name"].asString();
+            profile["bio"] = (*user)["bio"].asString();
+            profile["avatar_url"] = (*user)["avatar_url"].asString();
+            profile["login"] = (*user)["login"].asString();
+            profile["email"] = (*user)["email"].asString();
+            root["profile"] = profile;
+        }
         root["repositories"] = projectRepos;
         root["projects"] = projectsJson;
         const auto resp = HttpResponse::newHttpJsonResponse(root);
@@ -261,13 +292,21 @@ namespace api::v1 {
             co_return simpleError(Error::ErrInternal, "unsupported", callback);
         }
 
-        auto project = co_await validateProjectData(*json, token, callback);
+        const auto repo = (*json)["repo"].asString();
+        const auto branch = (*json)["branch"].asString();
+        const auto path = (*json)["path"].asString();
+
+        if (co_await database_.existsForRepo(repo, branch, path)) {
+            co_return simpleError(Error::ErrBadRequest, "exists", callback);
+        }
+
+        auto project = co_await validateProjectData(*json, token, callback, false);
         if (!project) {
             co_return;
         }
         project->setIsCommunity(isCommunity);
 
-        if (const auto [proj, projErr] = co_await database_.getProjectSource(project->getValueOfId()); proj) {
+        if (co_await database_.existsForData(project->getValueOfId(), project->getValueOfPlatform(), project->getValueOfSlug())) {
             co_return simpleError(Error::ErrBadRequest, "exists", callback);
         }
 
@@ -296,7 +335,7 @@ namespace api::v1 {
             co_return simpleError(Error::ErrBadRequest, error->msg, callback);
         }
 
-        auto project = co_await validateProjectData(*json, token, callback);
+        auto project = co_await validateProjectData(*json, token, callback, true);
         if (!project) {
             co_return;
         }

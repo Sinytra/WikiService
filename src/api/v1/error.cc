@@ -7,8 +7,10 @@ using namespace drogon;
 using namespace service;
 
 namespace {
-    const unordered_map<Error, HttpStatusCode> errorMap = {
-        {Error::Ok, k200OK}, {Error::ErrNotFound, k404NotFound}, {Error::ErrBadRequest, k400BadRequest}};
+    const unordered_map<Error, HttpStatusCode> errorMap = {{Error::Ok, k200OK},
+                                                           {Error::ErrNotFound, k404NotFound},
+                                                           {Error::ErrBadRequest, k400BadRequest},
+                                                           {Error::ErrUnauthorized, k401Unauthorized}};
 }
 
 namespace api::v1 {
@@ -19,7 +21,16 @@ namespace api::v1 {
         return k500InternalServerError;
     }
 
-    void errorResponse(const Error &error, const std::string &message, std::function<void(const HttpResponsePtr &)> &callback) {
+    Error mapStatusCode(const HttpStatusCode& code) {
+        for (const auto &[error, statusCode] : errorMap) {
+            if (code == statusCode) {
+                return error;
+            }
+        }
+        return Error::ErrInternal;
+    }
+
+    void errorResponse(const Error &error, const std::string &message, const std::function<void(const HttpResponsePtr &)> &callback) {
         Json::Value json;
         json["error"] = message;
         const auto resp = HttpResponse::newHttpJsonResponse(std::move(json));
