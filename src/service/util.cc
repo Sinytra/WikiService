@@ -116,7 +116,7 @@ Task<std::tuple<std::optional<Json::Value>, Error>> sendApiRequest(const HttpCli
         logger.trace("Unexpected api response: ({}) {}", std::to_string(status), response->getBody());
         co_return {std::nullopt, api::v1::mapStatusCode(status)};
     } catch (std::exception &e) {
-        logger.error(e.what());
+        logger.error("Error sending HTTP request: {}", e.what());
         co_return {std::nullopt, Error::ErrInternal};
     }
 }

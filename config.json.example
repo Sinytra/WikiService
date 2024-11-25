@@ -26,6 +26,16 @@
       "timeout": -1.0
     }
   ],
+  "app": {
+    "log": {
+      "use_spdlog": true,
+      "log_path": "./logs",
+      "log_size_limit": 100000000,
+      "max_files": 10,
+      "log_level": "DEBUG"
+      "display_local_time": false
+    }
+  },
   "custom_config": {
     "github_app": {
       "client_id": "",

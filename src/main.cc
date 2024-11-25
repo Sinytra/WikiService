@@ -21,6 +21,10 @@ int main() {
     try {
         app().loadConfigFile("config.json");
 
+        const auto level = trantor::Logger::logLevel();
+        app().setLogLevel(level).addListener("0.0.0.0", port).setThreadNum(16);
+        configureLoggingLevel();
+
         const Json::Value &customConfig = app().getCustomConfig();
 
         if (const auto error = validateJson(schemas::systemConfig, customConfig)) {
@@ -54,8 +58,6 @@ int main() {
         auto controller(make_shared<api::v1::DocsController>(github, database, documentation));
         auto browseController(make_shared<api::v1::BrowseController>(database));
         auto projectsController(make_shared<api::v1::ProjectsController>(github, platforms, database, documentation));
-
-        app().setLogLevel(trantor::Logger::kDebug).addListener("0.0.0.0", port).setThreadNum(16);
 
         app().registerController(controller);
         app().registerController(browseController);
