@@ -173,6 +173,10 @@ namespace service {
         if (!contents && locale) {
             co_return co_await getDocumentationPage(project, path, std::nullopt, version, installationToken);
         }
+        if (const auto actualPath = "/" + (*contents)["path"].asString(); !actualPath.starts_with(resourcePath)) {
+            // Forbid access to resources outside docs path
+            co_return {std::nullopt, Error::ErrUnauthorized};
+        }
         co_return {contents, contentsError};
     }
 
