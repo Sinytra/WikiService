@@ -9,9 +9,9 @@ create table project
     source_repo   text                                   not null,
     source_branch text                                   not null,
     is_community  boolean      default false             not null,
+    type          varchar(255)                           not null,
     created_at    timestamp(3) default CURRENT_TIMESTAMP not null
 );
 
 create unique index "project_source_repo_source_path_key"
     on project (source_repo, source_path);
-

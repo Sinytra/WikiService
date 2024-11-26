@@ -4,17 +4,39 @@
 #define MODRINTH_API_URL "https://api.modrinth.com/"
 #define CURSEFORGE_API_URL "https://api.curseforge.com/"
 #define MC_GAME_ID 432
-#define MC_MODS_CAT 6
 
 #include <drogon/drogon.h>
 
 #include "log/log.h"
 #include "util.h"
 
+const std::map<int, ProjectType> curseforgeProjectTypes = {{6, mod},       {12, resourcepack}, {6945, datapack},
+                                                           {6552, shader}, {4471, modpack},    {5, plugin}};
+
+static std::unordered_map<std::string, ProjectType> const projectTypeLookup = {
+    {"mod", mod}, {"resourcepack", resourcepack}, {"datapack", datapack}, {"shader", shader}, {"modpack", modpack}, {"plugin", plugin}};
+
 using namespace logging;
 using namespace drogon;
 
 namespace service {
+    ProjectType getProjectType(const std::string &name) {
+        if (const auto it = projectTypeLookup.find(name); it != projectTypeLookup.end()) {
+            return it->second;
+        }
+        logger.error("Unknown project type '{}'", name);
+        return _unknown;
+    }
+
+    std::string projectTypeToString(const ProjectType &type) {
+        for (const auto &[key, val] : projectTypeLookup) {
+            if (type == val) {
+                return key;
+            }
+        }
+        throw std::runtime_error("Cannot stringify unknown project type");
+    }
+
     ModrinthPlatform::ModrinthPlatform(const std::string &clientId, const std::string &clientSecret, const std::string &redirectUrl) :
         clientId_(clientId), clientSecret_(clientSecret), redirectUrl_(redirectUrl) {}
 
@@ -22,7 +44,7 @@ namespace service {
 
     Task<std::optional<std::string>> ModrinthPlatform::getOAuthToken(std::string code) const {
         const auto client = createHttpClient(MODRINTH_API_URL);
-        auto httpReq = HttpRequest::newHttpFormPostRequest();
+        const auto httpReq = HttpRequest::newHttpFormPostRequest();
         httpReq->setPath("/_internal/oauth/token");
         httpReq->addHeader("Authorization", clientSecret_);
         httpReq->setBody(std::format("grant_type=authorization_code&client_id={}&code={}&redirect_uri={}", clientId_, code, redirectUrl_));
@@ -82,7 +104,9 @@ namespace service {
             const auto sourceUrl = resp->isMember("link_urls") && (*resp)["link_urls"].isMember("source")
                                        ? (*resp)["link_urls"]["source"]["url"].asString()
                                        : "";
-            co_return PlatformProject{.slug = projectSlug, .name = name, .sourceUrl = sourceUrl};
+            const auto projectTypes = (*resp)["project_types"];
+            const auto type = projectTypes.empty() ? _unknown : getProjectType(projectTypes.front().asString());
+            co_return PlatformProject{.slug = projectSlug, .name = name, .sourceUrl = sourceUrl, .type = type};
         }
         co_return std::nullopt;
     }
@@ -93,21 +117,24 @@ namespace service {
 
     Task<std::optional<PlatformProject>> CurseForgePlatform::getProject(std::string slug) {
         const auto client = createHttpClient(CURSEFORGE_API_URL);
-        if (const auto [resp, err] = co_await sendAuthenticatedRequest(
-                client, Get, std::format("/v1/mods/search?gameId={}&classId={}&slug={}", MC_GAME_ID, MC_MODS_CAT, slug), apiKey_);
+        if (const auto [resp, err] =
+                co_await sendAuthenticatedRequest(client, Get, std::format("/v1/mods/search?gameId={}&slug={}", MC_GAME_ID, slug), apiKey_);
             resp && resp->isObject())
         {
             const auto pagination = (*resp)["pagination"];
             const auto resultCount = pagination["resultCount"].asInt();
-            const auto data = (*resp)["data"];
-            if (resultCount == 1 && data.size() == 1) {
+            if (const auto data = (*resp)["data"]; resultCount == 1 && data.size() == 1) {
                 const auto &proj = data[0];
                 const auto projectSlug = proj["slug"].asString();
                 const auto name = proj["name"].asString();
                 const auto sourceUrl =
                     proj.isMember("links") && proj["links"].isMember("sourceUrl") ? proj["links"]["sourceUrl"].asString() : "";
+                const auto classId = proj["classId"].asInt();
 
-                co_return PlatformProject{.slug = projectSlug, .name = name, .sourceUrl = sourceUrl};
+                const auto type = curseforgeProjectTypes.find(classId);
+                const auto actualType = type == curseforgeProjectTypes.end() ? _unknown : type->second;
+
+                co_return PlatformProject{.slug = projectSlug, .name = name, .sourceUrl = sourceUrl, .type = actualType};
             }
         }
         co_return std::nullopt;

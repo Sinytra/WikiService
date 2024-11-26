@@ -22,6 +22,8 @@ const std::string Project::Cols::_source_repo = "\"source_repo\"";
 const std::string Project::Cols::_source_branch = "\"source_branch\"";
 const std::string Project::Cols::_is_community = "\"is_community\"";
 const std::string Project::Cols::_created_at = "\"created_at\"";
+const std::string Project::Cols::_search_vector = "\"search_vector\"";
+const std::string Project::Cols::_type = "\"type\"";
 const std::string Project::primaryKeyName = "id";
 const bool Project::hasPrimaryKey = true;
 const std::string Project::tableName = "\"project\"";
@@ -35,7 +37,9 @@ const std::vector<typename Project::MetaData> Project::metaData_={
 {"source_repo","std::string","text",0,0,0,1},
 {"source_branch","std::string","text",0,0,0,1},
 {"is_community","bool","boolean",1,0,0,1},
-{"created_at","::trantor::Date","timestamp without time zone",0,0,0,1}
+{"created_at","::trantor::Date","timestamp without time zone",0,0,0,1},
+{"search_vector","std::string","tsvector",0,0,0,0},
+{"type","std::string","character varying",255,0,0,1}
 };
 const std::string &Project::getColumnName(size_t index) noexcept(false)
 {
@@ -100,11 +104,19 @@ Project::Project(const Row &r, const ssize_t indexOffset) noexcept
                 createdAt_=std::make_shared<::trantor::Date>(t*1000000+decimalNum);
             }
         }
+        if(!r["search_vector"].isNull())
+        {
+            searchVector_=std::make_shared<std::string>(r["search_vector"].as<std::string>());
+        }
+        if(!r["type"].isNull())
+        {
+            type_=std::make_shared<std::string>(r["type"].as<std::string>());
+        }
     }
     else
     {
         size_t offset = (size_t)indexOffset;
-        if(offset + 9 > r.size())
+        if(offset + 11 > r.size())
         {
             LOG_FATAL << "Invalid SQL result for this model";
             return;
@@ -173,13 +185,23 @@ Project::Project(const Row &r, const ssize_t indexOffset) noexcept
                 createdAt_=std::make_shared<::trantor::Date>(t*1000000+decimalNum);
             }
         }
+        index = offset + 9;
+        if(!r[index].isNull())
+        {
+            searchVector_=std::make_shared<std::string>(r[index].as<std::string>());
+        }
+        index = offset + 10;
+        if(!r[index].isNull())
+        {
+            type_=std::make_shared<std::string>(r[index].as<std::string>());
+        }
     }
 
 }
 
 Project::Project(const Json::Value &pJson, const std::vector<std::string> &pMasqueradingVector) noexcept(false)
 {
-    if(pMasqueradingVector.size() != 9)
+    if(pMasqueradingVector.size() != 11)
     {
         LOG_ERROR << "Bad masquerading vector";
         return;
@@ -272,6 +294,22 @@ Project::Project(const Json::Value &pJson, const std::vector<std::string> &pMasq
                 }
                 createdAt_=std::make_shared<::trantor::Date>(t*1000000+decimalNum);
             }
+        }
+    }
+    if(!pMasqueradingVector[9].empty() && pJson.isMember(pMasqueradingVector[9]))
+    {
+        dirtyFlag_[9] = true;
+        if(!pJson[pMasqueradingVector[9]].isNull())
+        {
+            searchVector_=std::make_shared<std::string>(pJson[pMasqueradingVector[9]].asString());
+        }
+    }
+    if(!pMasqueradingVector[10].empty() && pJson.isMember(pMasqueradingVector[10]))
+    {
+        dirtyFlag_[10] = true;
+        if(!pJson[pMasqueradingVector[10]].isNull())
+        {
+            type_=std::make_shared<std::string>(pJson[pMasqueradingVector[10]].asString());
         }
     }
 }
@@ -368,12 +406,28 @@ Project::Project(const Json::Value &pJson) noexcept(false)
             }
         }
     }
+    if(pJson.isMember("search_vector"))
+    {
+        dirtyFlag_[9]=true;
+        if(!pJson["search_vector"].isNull())
+        {
+            searchVector_=std::make_shared<std::string>(pJson["search_vector"].asString());
+        }
+    }
+    if(pJson.isMember("type"))
+    {
+        dirtyFlag_[10]=true;
+        if(!pJson["type"].isNull())
+        {
+            type_=std::make_shared<std::string>(pJson["type"].asString());
+        }
+    }
 }
 
 void Project::updateByMasqueradedJson(const Json::Value &pJson,
                                             const std::vector<std::string> &pMasqueradingVector) noexcept(false)
 {
-    if(pMasqueradingVector.size() != 9)
+    if(pMasqueradingVector.size() != 11)
     {
         LOG_ERROR << "Bad masquerading vector";
         return;
@@ -467,6 +521,22 @@ void Project::updateByMasqueradedJson(const Json::Value &pJson,
             }
         }
     }
+    if(!pMasqueradingVector[9].empty() && pJson.isMember(pMasqueradingVector[9]))
+    {
+        dirtyFlag_[9] = true;
+        if(!pJson[pMasqueradingVector[9]].isNull())
+        {
+            searchVector_=std::make_shared<std::string>(pJson[pMasqueradingVector[9]].asString());
+        }
+    }
+    if(!pMasqueradingVector[10].empty() && pJson.isMember(pMasqueradingVector[10]))
+    {
+        dirtyFlag_[10] = true;
+        if(!pJson[pMasqueradingVector[10]].isNull())
+        {
+            type_=std::make_shared<std::string>(pJson[pMasqueradingVector[10]].asString());
+        }
+    }
 }
 
 void Project::updateByJson(const Json::Value &pJson) noexcept(false)
@@ -558,6 +628,22 @@ void Project::updateByJson(const Json::Value &pJson) noexcept(false)
                 }
                 createdAt_=std::make_shared<::trantor::Date>(t*1000000+decimalNum);
             }
+        }
+    }
+    if(pJson.isMember("search_vector"))
+    {
+        dirtyFlag_[9] = true;
+        if(!pJson["search_vector"].isNull())
+        {
+            searchVector_=std::make_shared<std::string>(pJson["search_vector"].asString());
+        }
+    }
+    if(pJson.isMember("type"))
+    {
+        dirtyFlag_[10] = true;
+        if(!pJson["type"].isNull())
+        {
+            type_=std::make_shared<std::string>(pJson["type"].asString());
         }
     }
 }
@@ -755,6 +841,55 @@ void Project::setCreatedAt(const ::trantor::Date &pCreatedAt) noexcept
     dirtyFlag_[8] = true;
 }
 
+const std::string &Project::getValueOfSearchVector() const noexcept
+{
+    static const std::string defaultValue = std::string();
+    if(searchVector_)
+        return *searchVector_;
+    return defaultValue;
+}
+const std::shared_ptr<std::string> &Project::getSearchVector() const noexcept
+{
+    return searchVector_;
+}
+void Project::setSearchVector(const std::string &pSearchVector) noexcept
+{
+    searchVector_ = std::make_shared<std::string>(pSearchVector);
+    dirtyFlag_[9] = true;
+}
+void Project::setSearchVector(std::string &&pSearchVector) noexcept
+{
+    searchVector_ = std::make_shared<std::string>(std::move(pSearchVector));
+    dirtyFlag_[9] = true;
+}
+void Project::setSearchVectorToNull() noexcept
+{
+    searchVector_.reset();
+    dirtyFlag_[9] = true;
+}
+
+const std::string &Project::getValueOfType() const noexcept
+{
+    static const std::string defaultValue = std::string();
+    if(type_)
+        return *type_;
+    return defaultValue;
+}
+const std::shared_ptr<std::string> &Project::getType() const noexcept
+{
+    return type_;
+}
+void Project::setType(const std::string &pType) noexcept
+{
+    type_ = std::make_shared<std::string>(pType);
+    dirtyFlag_[10] = true;
+}
+void Project::setType(std::string &&pType) noexcept
+{
+    type_ = std::make_shared<std::string>(std::move(pType));
+    dirtyFlag_[10] = true;
+}
+
 void Project::updateId(const uint64_t id)
 {
 }
@@ -770,7 +905,9 @@ const std::vector<std::string> &Project::insertColumns() noexcept
         "source_repo",
         "source_branch",
         "is_community",
-        "created_at"
+        "created_at",
+        "search_vector",
+        "type"
     };
     return inCols;
 }
@@ -876,6 +1013,28 @@ void Project::outputArgs(drogon::orm::internal::SqlBinder &binder) const
             binder << nullptr;
         }
     }
+    if(dirtyFlag_[9])
+    {
+        if(getSearchVector())
+        {
+            binder << getValueOfSearchVector();
+        }
+        else
+        {
+            binder << nullptr;
+        }
+    }
+    if(dirtyFlag_[10])
+    {
+        if(getType())
+        {
+            binder << getValueOfType();
+        }
+        else
+        {
+            binder << nullptr;
+        }
+    }
 }
 
 const std::vector<std::string> Project::updateColumns() const
@@ -916,6 +1075,14 @@ const std::vector<std::string> Project::updateColumns() const
     if(dirtyFlag_[8])
     {
         ret.push_back(getColumnName(8));
+    }
+    if(dirtyFlag_[9])
+    {
+        ret.push_back(getColumnName(9));
+    }
+    if(dirtyFlag_[10])
+    {
+        ret.push_back(getColumnName(10));
     }
     return ret;
 }
@@ -1021,6 +1188,28 @@ void Project::updateArgs(drogon::orm::internal::SqlBinder &binder) const
             binder << nullptr;
         }
     }
+    if(dirtyFlag_[9])
+    {
+        if(getSearchVector())
+        {
+            binder << getValueOfSearchVector();
+        }
+        else
+        {
+            binder << nullptr;
+        }
+    }
+    if(dirtyFlag_[10])
+    {
+        if(getType())
+        {
+            binder << getValueOfType();
+        }
+        else
+        {
+            binder << nullptr;
+        }
+    }
 }
 Json::Value Project::toJson() const
 {
@@ -1097,6 +1286,22 @@ Json::Value Project::toJson() const
     {
         ret["created_at"]=Json::Value();
     }
+    if(getSearchVector())
+    {
+        ret["search_vector"]=getValueOfSearchVector();
+    }
+    else
+    {
+        ret["search_vector"]=Json::Value();
+    }
+    if(getType())
+    {
+        ret["type"]=getValueOfType();
+    }
+    else
+    {
+        ret["type"]=Json::Value();
+    }
     return ret;
 }
 
@@ -1104,7 +1309,7 @@ Json::Value Project::toMasqueradedJson(
     const std::vector<std::string> &pMasqueradingVector) const
 {
     Json::Value ret;
-    if(pMasqueradingVector.size() == 9)
+    if(pMasqueradingVector.size() == 11)
     {
         if(!pMasqueradingVector[0].empty())
         {
@@ -1205,6 +1410,28 @@ Json::Value Project::toMasqueradedJson(
                 ret[pMasqueradingVector[8]]=Json::Value();
             }
         }
+        if(!pMasqueradingVector[9].empty())
+        {
+            if(getSearchVector())
+            {
+                ret[pMasqueradingVector[9]]=getValueOfSearchVector();
+            }
+            else
+            {
+                ret[pMasqueradingVector[9]]=Json::Value();
+            }
+        }
+        if(!pMasqueradingVector[10].empty())
+        {
+            if(getType())
+            {
+                ret[pMasqueradingVector[10]]=getValueOfType();
+            }
+            else
+            {
+                ret[pMasqueradingVector[10]]=Json::Value();
+            }
+        }
         return ret;
     }
     LOG_ERROR << "Masquerade failed";
@@ -1279,6 +1506,22 @@ Json::Value Project::toMasqueradedJson(
     else
     {
         ret["created_at"]=Json::Value();
+    }
+    if(getSearchVector())
+    {
+        ret["search_vector"]=getValueOfSearchVector();
+    }
+    else
+    {
+        ret["search_vector"]=Json::Value();
+    }
+    if(getType())
+    {
+        ret["type"]=getValueOfType();
+    }
+    else
+    {
+        ret["type"]=Json::Value();
     }
     return ret;
 }
@@ -1365,13 +1608,23 @@ bool Project::validateJsonForCreation(const Json::Value &pJson, std::string &err
         if(!validJsonOfField(8, "created_at", pJson["created_at"], err, true))
             return false;
     }
+    if(pJson.isMember("search_vector"))
+    {
+        if(!validJsonOfField(9, "search_vector", pJson["search_vector"], err, true))
+            return false;
+    }
+    if(pJson.isMember("type"))
+    {
+        if(!validJsonOfField(10, "type", pJson["type"], err, true))
+            return false;
+    }
     return true;
 }
 bool Project::validateMasqueradedJsonForCreation(const Json::Value &pJson,
                                                  const std::vector<std::string> &pMasqueradingVector,
                                                  std::string &err)
 {
-    if(pMasqueradingVector.size() != 9)
+    if(pMasqueradingVector.size() != 11)
     {
         err = "Bad masquerading vector";
         return false;
@@ -1484,6 +1737,22 @@ bool Project::validateMasqueradedJsonForCreation(const Json::Value &pJson,
                   return false;
           }
       }
+      if(!pMasqueradingVector[9].empty())
+      {
+          if(pJson.isMember(pMasqueradingVector[9]))
+          {
+              if(!validJsonOfField(9, pMasqueradingVector[9], pJson[pMasqueradingVector[9]], err, true))
+                  return false;
+          }
+      }
+      if(!pMasqueradingVector[10].empty())
+      {
+          if(pJson.isMember(pMasqueradingVector[10]))
+          {
+              if(!validJsonOfField(10, pMasqueradingVector[10], pJson[pMasqueradingVector[10]], err, true))
+                  return false;
+          }
+      }
     }
     catch(const Json::LogicError &e)
     {
@@ -1544,13 +1813,23 @@ bool Project::validateJsonForUpdate(const Json::Value &pJson, std::string &err)
         if(!validJsonOfField(8, "created_at", pJson["created_at"], err, false))
             return false;
     }
+    if(pJson.isMember("search_vector"))
+    {
+        if(!validJsonOfField(9, "search_vector", pJson["search_vector"], err, false))
+            return false;
+    }
+    if(pJson.isMember("type"))
+    {
+        if(!validJsonOfField(10, "type", pJson["type"], err, false))
+            return false;
+    }
     return true;
 }
 bool Project::validateMasqueradedJsonForUpdate(const Json::Value &pJson,
                                                const std::vector<std::string> &pMasqueradingVector,
                                                std::string &err)
 {
-    if(pMasqueradingVector.size() != 9)
+    if(pMasqueradingVector.size() != 11)
     {
         err = "Bad masquerading vector";
         return false;
@@ -1604,6 +1883,16 @@ bool Project::validateMasqueradedJsonForUpdate(const Json::Value &pJson,
       if(!pMasqueradingVector[8].empty() && pJson.isMember(pMasqueradingVector[8]))
       {
           if(!validJsonOfField(8, pMasqueradingVector[8], pJson[pMasqueradingVector[8]], err, false))
+              return false;
+      }
+      if(!pMasqueradingVector[9].empty() && pJson.isMember(pMasqueradingVector[9]))
+      {
+          if(!validJsonOfField(9, pMasqueradingVector[9], pJson[pMasqueradingVector[9]], err, false))
+              return false;
+      }
+      if(!pMasqueradingVector[10].empty() && pJson.isMember(pMasqueradingVector[10]))
+      {
+          if(!validJsonOfField(10, pMasqueradingVector[10], pJson[pMasqueradingVector[10]], err, false))
               return false;
       }
     }
@@ -1737,6 +2026,37 @@ bool Project::validJsonOfField(size_t index,
                 err="Type error in the "+fieldName+" field";
                 return false;
             }
+            break;
+        case 9:
+            if(pJson.isNull())
+            {
+                return true;
+            }
+            if(!pJson.isString())
+            {
+                err="Type error in the "+fieldName+" field";
+                return false;
+            }
+            break;
+        case 10:
+            if(pJson.isNull())
+            {
+                err="The " + fieldName + " column cannot be null";
+                return false;
+            }
+            if(!pJson.isString())
+            {
+                err="Type error in the "+fieldName+" field";
+                return false;
+            }
+            if(pJson.isString() && std::strlen(pJson.asCString()) > 255)
+            {
+                err="String length exceeds limit for the " +
+                    fieldName +
+                    " field (the maximum value is 255)";
+                return false;
+            }
+
             break;
         default:
             err="Internal error in the server";

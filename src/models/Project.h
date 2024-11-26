@@ -53,6 +53,8 @@ class Project
         static const std::string _source_branch;
         static const std::string _is_community;
         static const std::string _created_at;
+        static const std::string _search_vector;
+        static const std::string _type;
     };
 
     static const int primaryKeyNumber;
@@ -183,8 +185,27 @@ class Project
     ///Set the value of the column created_at
     void setCreatedAt(const ::trantor::Date &pCreatedAt) noexcept;
 
+    /**  For column search_vector  */
+    ///Get the value of the column search_vector, returns the default value if the column is null
+    const std::string &getValueOfSearchVector() const noexcept;
+    ///Return a shared_ptr object pointing to the column const value, or an empty shared_ptr object if the column is null
+    const std::shared_ptr<std::string> &getSearchVector() const noexcept;
+    ///Set the value of the column search_vector
+    void setSearchVector(const std::string &pSearchVector) noexcept;
+    void setSearchVector(std::string &&pSearchVector) noexcept;
+    void setSearchVectorToNull() noexcept;
 
-    static size_t getColumnNumber() noexcept {  return 9;  }
+    /**  For column type  */
+    ///Get the value of the column type, returns the default value if the column is null
+    const std::string &getValueOfType() const noexcept;
+    ///Return a shared_ptr object pointing to the column const value, or an empty shared_ptr object if the column is null
+    const std::shared_ptr<std::string> &getType() const noexcept;
+    ///Set the value of the column type
+    void setType(const std::string &pType) noexcept;
+    void setType(std::string &&pType) noexcept;
+
+
+    static size_t getColumnNumber() noexcept {  return 11;  }
     static const std::string &getColumnName(size_t index) noexcept(false);
 
     Json::Value toJson() const;
@@ -214,6 +235,8 @@ class Project
     std::shared_ptr<std::string> sourceBranch_;
     std::shared_ptr<bool> isCommunity_;
     std::shared_ptr<::trantor::Date> createdAt_;
+    std::shared_ptr<std::string> searchVector_;
+    std::shared_ptr<std::string> type_;
     struct MetaData
     {
         const std::string colName_;
@@ -225,7 +248,7 @@ class Project
         const bool notNull_;
     };
     static const std::vector<MetaData> metaData_;
-    bool dirtyFlag_[9]={ false };
+    bool dirtyFlag_[11]={ false };
   public:
     static const std::string &sqlForFindingByPrimaryKey()
     {
@@ -290,6 +313,17 @@ class Project
         {
             needSelection=true;
         }
+        if(dirtyFlag_[9])
+        {
+            sql += "search_vector,";
+            ++parametersCount;
+        }
+        sql += "type,";
+        ++parametersCount;
+        if(!dirtyFlag_[10])
+        {
+            needSelection=true;
+        }
         if(parametersCount > 0)
         {
             sql[sql.length()-1]=')';
@@ -346,6 +380,20 @@ class Project
             sql +="default,";
         }
         if(dirtyFlag_[8])
+        {
+            n = snprintf(placeholderStr,sizeof(placeholderStr),"$%d,",placeholder++);
+            sql.append(placeholderStr, n);
+        }
+        else
+        {
+            sql +="default,";
+        }
+        if(dirtyFlag_[9])
+        {
+            n = snprintf(placeholderStr,sizeof(placeholderStr),"$%d,",placeholder++);
+            sql.append(placeholderStr, n);
+        }
+        if(dirtyFlag_[10])
         {
             n = snprintf(placeholderStr,sizeof(placeholderStr),"$%d,",placeholder++);
             sql.append(placeholderStr, n);

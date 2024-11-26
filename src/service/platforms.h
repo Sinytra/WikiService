@@ -9,10 +9,24 @@
 #include <string>
 
 namespace service {
+    enum ProjectType {
+        mod,
+        resourcepack,
+        datapack,
+        shader,
+        modpack,
+        plugin,
+
+        _unknown
+    };
+
+    std::string projectTypeToString(const ProjectType &type);
+
     struct PlatformProject {
         std::string slug;
         std::string name;
         std::string sourceUrl;
+        ProjectType type;
     };
 
     class DistributionPlatform {

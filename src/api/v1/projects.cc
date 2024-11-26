@@ -50,6 +50,7 @@ namespace api::v1 {
      * - exists: Duplicate project ID
      * - cf_unavailable: CF Project registration unavailable due to missing API key
      * - no_project: Platform project not found
+     * - unsupported_type: Unsupported platform project type
      * - ownership: Failed to verify platform project ownership (data: can_verify_mr)
      * - internal: Internal server error
      */
@@ -122,6 +123,11 @@ namespace api::v1 {
             co_return std::nullopt;
         }
 
+        if (platformProj->type == _unknown) {
+            simpleError(Error::ErrBadRequest, "unsupported_type", callback);
+            co_return std::nullopt;
+        }
+
         bool skipCheck = false;
         if (checkExisting) {
             if (const auto [proj, projErr] = co_await database_.getProjectSource(id);
@@ -145,6 +151,7 @@ namespace api::v1 {
         project.setSourceBranch(branch);
         project.setSourcePath(path);
         project.setPlatform(platform);
+        project.setType(projectTypeToString(platformProj->type));
         project.setSlug(slug);
 
         co_return project;
