@@ -133,7 +133,7 @@ namespace service {
         }
     }
 
-    std::string buildQuery(std::string query) {
+    std::string buildSearchVectorQuery(std::string query) {
         auto result = query | std::ranges::views::split(' ') |
                       std::views::transform([](auto rng) { return std::string(rng.data(), rng.size()) + ":*"; });
         std::ostringstream result_stream;
@@ -145,7 +145,7 @@ namespace service {
         return result_stream.str();
     }
 
-    Task<std::tuple<ProjectSearchResponse, Error>> Database::findProjects(std::string query, int page) const {
+    Task<std::tuple<ProjectSearchResponse, Error>> Database::findProjects(const std::string query, const std::string types, int page) const {
         try {
             // TODO Improve sorting
             const auto clientPtr = app().getFastDbClient();
@@ -153,7 +153,8 @@ namespace service {
                 "WITH search_data AS ("
                 "    SELECT *"
                 "    FROM project"
-                "    WHERE (cast($1 as varchar) IS NULL OR $1 = '' OR search_vector @@ to_tsquery('simple', $1))"
+                "    WHERE ((cast($1 as varchar) IS NULL OR $1 = '' OR search_vector @@ to_tsquery('simple', $1))"
+                "    AND ((cast($2 as varchar) IS NULL OR $2 = '' OR type = ANY (STRING_TO_ARRAY($2, ',')))))"
                 "    ORDER BY \"created_at\" desc"
                 "),"
                 "     total_count AS ("
@@ -164,8 +165,8 @@ namespace service {
                 "    total_count.total_rows,"
                 "    CEIL(total_count.total_rows::DECIMAL / 20) AS total_pages "
                 "FROM search_data, total_count "
-                "LIMIT 20 OFFSET ($2 - 1) * 20;",
-                buildQuery(query), page < 1 ? 1 : page);
+                "LIMIT 20 OFFSET ($3 - 1) * 20;",
+                buildSearchVectorQuery(query), types, page < 1 ? 1 : page);
 
             if (results.empty()) {
                 co_return {{0, 0, std::vector<Project>()}, Error::Ok};
