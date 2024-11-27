@@ -20,8 +20,8 @@ namespace api::v1 {
     BrowseController::BrowseController(Database &db) : database_(db) {}
 
     Task<> BrowseController::browse(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, const std::string query,
-                                    const std::string types, const int page) const {
-        const auto [searchResults, searchError] = co_await database_.findProjects(query, types, page);
+                                    const std::string types, const std::string sort, const int page) const {
+        const auto [searchResults, searchError] = co_await database_.findProjects(query, types, sort, page);
 
         Json::Value root;
         Json::Value data(Json::arrayValue);

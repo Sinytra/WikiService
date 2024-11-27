@@ -134,7 +134,8 @@ namespace service {
     }
 
     std::string buildSearchVectorQuery(std::string query) {
-        auto result = query | std::ranges::views::split(' ') |
+        auto result = query | std::views::split(' ') |
+                      std::views::filter([](auto const &str) { return !std::all_of(str.begin(), str.end(), isspace); }) |
                       std::views::transform([](auto rng) { return std::string(rng.data(), rng.size()) + ":*"; });
         std::ostringstream result_stream;
         for (auto it = result.begin(); it != result.end(); ++it) {
@@ -145,17 +146,28 @@ namespace service {
         return result_stream.str();
     }
 
-    Task<std::tuple<ProjectSearchResponse, Error>> Database::findProjects(const std::string query, const std::string types, int page) const {
+    Task<std::tuple<ProjectSearchResponse, Error>> Database::findProjects(const std::string query, const std::string types,
+                                                                          const std::string sort, int page) const {
         try {
-            // TODO Improve sorting
+            std::string sortQuery = "ORDER BY \"created_at\" desc";
+            if (sort == "az")
+                sortQuery = "ORDER BY \"name\" asc";
+            else if (sort == "za")
+                sortQuery = "ORDER BY \"name\" desc";
+            else if (sort == "popularity") {
+                // TODO
+            } else if (sort == "relevance")
+                sortQuery = "ORDER BY ts_rank(search_vector, to_tsquery('simple', $1)) DESC";
+
             const auto clientPtr = app().getFastDbClient();
+            // clang-format off
             const auto results = co_await clientPtr->execSqlCoro(
                 "WITH search_data AS ("
                 "    SELECT *"
                 "    FROM project"
                 "    WHERE ((cast($1 as varchar) IS NULL OR $1 = '' OR search_vector @@ to_tsquery('simple', $1))"
                 "    AND ((cast($2 as varchar) IS NULL OR $2 = '' OR type = ANY (STRING_TO_ARRAY($2, ',')))))"
-                "    ORDER BY \"created_at\" desc"
+                "    " + sortQuery +
                 "),"
                 "     total_count AS ("
                 "         SELECT COUNT(*) AS total_rows FROM search_data"
@@ -167,13 +179,14 @@ namespace service {
                 "FROM search_data, total_count "
                 "LIMIT 20 OFFSET ($3 - 1) * 20;",
                 buildSearchVectorQuery(query), types, page < 1 ? 1 : page);
+            // clang-format on
 
             if (results.empty()) {
                 co_return {{0, 0, std::vector<Project>()}, Error::Ok};
             }
 
-            int totalRows = results[0]["total_rows"].as<int>();
-            int totalPages = results[0]["total_pages"].as<int>();
+            const int totalRows = results[0]["total_rows"].as<int>();
+            const int totalPages = results[0]["total_pages"].as<int>();
             std::vector<Project> projects;
             for (const auto &row: results) {
                 projects.emplace_back(row);
