@@ -1,9 +1,7 @@
 #include "documentation.h"
 
 #include <drogon/drogon.h>
-
 #include <map>
-
 #include <trantor/net/EventLoopThreadPool.h>
 
 #define DOCS_FILE_EXT ".mdx"
@@ -85,8 +83,8 @@ auto createComparator(const std::vector<std::string>& keys) {
         if (keys.empty()) {
             return a["name"].get<std::string>() < b["name"].get<std::string>();
         }
-        const auto aPos = std::find(keys.begin(), keys.end(), a["name"]);
-        const auto bPos = std::find(keys.begin(), keys.end(), b["name"]);
+        const auto aPos = std::ranges::find(keys, a["name"].get<std::string>());
+        const auto bPos = std::ranges::find(keys, b["name"].get<std::string>());
         if (aPos == keys.end() || bPos == keys.end()) {
             return false;
         }

@@ -1,6 +1,6 @@
 #include "schemas.h"
 
-auto schemas::projectRegister = R"(
+nlohmann::json schemas::projectRegister = R"(
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "title": "Project registration",
@@ -16,7 +16,7 @@ auto schemas::projectRegister = R"(
 }
 )"_json;
 
-auto schemas::projectUpdate = R"(
+nlohmann::json schemas::projectUpdate = R"(
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "title": "Project update",
@@ -30,7 +30,7 @@ auto schemas::projectUpdate = R"(
 }
 )"_json;
 
-auto schemas::projectMetadata = R"(
+nlohmann::json schemas::projectMetadata = R"(
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "title": "Wiki Documentation Metadata",
@@ -62,7 +62,7 @@ auto schemas::projectMetadata = R"(
 }
 )"_json;
 
-auto schemas::repositoryMigration = R"(
+nlohmann::json schemas::repositoryMigration = R"(
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "title": "Repository migration",
@@ -74,7 +74,7 @@ auto schemas::repositoryMigration = R"(
 }
 )"_json;
 
-auto schemas::systemConfig = R"(
+nlohmann::json schemas::systemConfig = R"(
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "title": "Modded MC Wiki System Configuration",
