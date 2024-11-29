@@ -1,19 +1,10 @@
 #include "cache.h"
 
 #include <drogon/drogon.h>
+#include "util.h"
 
 using namespace drogon;
 using namespace std::chrono_literals;
-
-std::string join(const std::vector<std::string> &lst, const std::string &delim) {
-    std::string ret;
-    for (const auto &s: lst) {
-        if (!ret.empty())
-            ret += delim;
-        ret += s;
-    }
-    return ret;
-}
 
 namespace service {
     MemoryCache::MemoryCache() = default;

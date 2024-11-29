@@ -70,3 +70,5 @@ std::optional<JsonValidationError> validateJson(const nlohmann::json &schema, co
 std::optional<JsonValidationError> validateJson(const nlohmann::json &schema, const nlohmann::json &json);
 
 drogon::HttpResponsePtr jsonResponse(const nlohmann::json &json);
+
+std::string join(const std::vector<std::string> &lst, const std::string &delim);

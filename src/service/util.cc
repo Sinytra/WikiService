@@ -166,3 +166,13 @@ HttpResponsePtr jsonResponse(const nlohmann::json &json) {
     resp->setBody(json.dump());
     return resp;
 }
+
+std::string join(const std::vector<std::string> &lst, const std::string &delim) {
+    std::string ret;
+    for (const auto &s: lst) {
+        if (!ret.empty())
+            ret += delim;
+        ret += s;
+    }
+    return ret;
+}

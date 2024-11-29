@@ -1,5 +1,6 @@
 #include "database.h"
 #include "log/log.h"
+#include "util.h"
 
 #include <drogon/drogon.h>
 #include <ranges>
@@ -28,12 +29,13 @@ namespace service {
         }
     }
 
-    Task<std::vector<Project>> Database::getProjectsForRepos(std::vector<std::string> repos) const {
+    Task<std::vector<Project>> Database::getProjectsForRepos(const std::vector<std::string> repos) const {
         try {
             const auto clientPtr = app().getFastDbClient();
             CoroMapper<Project> mapper(clientPtr);
 
-            co_return co_await mapper.findBy(Criteria(Project::Cols::_source_repo, CompareOperator::In, repos));
+            co_return co_await mapper.findBy(
+                Criteria(CustomSql(Project::Cols::_source_repo + " ILIKE ANY (STRING_TO_ARRAY($?, ','))"), join(repos, ",")));
         } catch (const Failure &e) {
             // SQL Error
             logger.error("Error querying database: {}", e.what());
