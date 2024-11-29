@@ -4,4 +4,6 @@
 
 namespace logging {
     extern spdlog::logger &logger;
+
+    void configureLoggingLevel();
 }

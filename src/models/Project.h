@@ -48,12 +48,13 @@ class Project
         static const std::string _name;
         static const std::string _platform;
         static const std::string _slug;
-        static const std::string _createdAt;
         static const std::string _source_path;
         static const std::string _source_repo;
         static const std::string _source_branch;
         static const std::string _is_community;
+        static const std::string _created_at;
         static const std::string _search_vector;
+        static const std::string _type;
     };
 
     static const int primaryKeyNumber;
@@ -141,14 +142,6 @@ class Project
     void setSlug(const std::string &pSlug) noexcept;
     void setSlug(std::string &&pSlug) noexcept;
 
-    /**  For column createdAt  */
-    ///Get the value of the column createdAt, returns the default value if the column is null
-    const ::trantor::Date &getValueOfCreatedat() const noexcept;
-    ///Return a shared_ptr object pointing to the column const value, or an empty shared_ptr object if the column is null
-    const std::shared_ptr<::trantor::Date> &getCreatedat() const noexcept;
-    ///Set the value of the column createdAt
-    void setCreatedat(const ::trantor::Date &pCreatedat) noexcept;
-
     /**  For column source_path  */
     ///Get the value of the column source_path, returns the default value if the column is null
     const std::string &getValueOfSourcePath() const noexcept;
@@ -184,6 +177,14 @@ class Project
     ///Set the value of the column is_community
     void setIsCommunity(const bool &pIsCommunity) noexcept;
 
+    /**  For column created_at  */
+    ///Get the value of the column created_at, returns the default value if the column is null
+    const ::trantor::Date &getValueOfCreatedAt() const noexcept;
+    ///Return a shared_ptr object pointing to the column const value, or an empty shared_ptr object if the column is null
+    const std::shared_ptr<::trantor::Date> &getCreatedAt() const noexcept;
+    ///Set the value of the column created_at
+    void setCreatedAt(const ::trantor::Date &pCreatedAt) noexcept;
+
     /**  For column search_vector  */
     ///Get the value of the column search_vector, returns the default value if the column is null
     const std::string &getValueOfSearchVector() const noexcept;
@@ -194,8 +195,17 @@ class Project
     void setSearchVector(std::string &&pSearchVector) noexcept;
     void setSearchVectorToNull() noexcept;
 
+    /**  For column type  */
+    ///Get the value of the column type, returns the default value if the column is null
+    const std::string &getValueOfType() const noexcept;
+    ///Return a shared_ptr object pointing to the column const value, or an empty shared_ptr object if the column is null
+    const std::shared_ptr<std::string> &getType() const noexcept;
+    ///Set the value of the column type
+    void setType(const std::string &pType) noexcept;
+    void setType(std::string &&pType) noexcept;
 
-    static size_t getColumnNumber() noexcept {  return 10;  }
+
+    static size_t getColumnNumber() noexcept {  return 11;  }
     static const std::string &getColumnName(size_t index) noexcept(false);
 
     Json::Value toJson() const;
@@ -220,12 +230,13 @@ class Project
     std::shared_ptr<std::string> name_;
     std::shared_ptr<std::string> platform_;
     std::shared_ptr<std::string> slug_;
-    std::shared_ptr<::trantor::Date> createdat_;
     std::shared_ptr<std::string> sourcePath_;
     std::shared_ptr<std::string> sourceRepo_;
     std::shared_ptr<std::string> sourceBranch_;
     std::shared_ptr<bool> isCommunity_;
+    std::shared_ptr<::trantor::Date> createdAt_;
     std::shared_ptr<std::string> searchVector_;
+    std::shared_ptr<std::string> type_;
     struct MetaData
     {
         const std::string colName_;
@@ -237,7 +248,7 @@ class Project
         const bool notNull_;
     };
     static const std::vector<MetaData> metaData_;
-    bool dirtyFlag_[10]={ false };
+    bool dirtyFlag_[11]={ false };
   public:
     static const std::string &sqlForFindingByPrimaryKey()
     {
@@ -275,28 +286,28 @@ class Project
             sql += "slug,";
             ++parametersCount;
         }
-        sql += "createdAt,";
-        ++parametersCount;
-        if(!dirtyFlag_[4])
-        {
-            needSelection=true;
-        }
-        if(dirtyFlag_[5])
+        if(dirtyFlag_[4])
         {
             sql += "source_path,";
             ++parametersCount;
         }
-        if(dirtyFlag_[6])
+        if(dirtyFlag_[5])
         {
             sql += "source_repo,";
             ++parametersCount;
         }
-        if(dirtyFlag_[7])
+        if(dirtyFlag_[6])
         {
             sql += "source_branch,";
             ++parametersCount;
         }
         sql += "is_community,";
+        ++parametersCount;
+        if(!dirtyFlag_[7])
+        {
+            needSelection=true;
+        }
+        sql += "created_at,";
         ++parametersCount;
         if(!dirtyFlag_[8])
         {
@@ -306,6 +317,12 @@ class Project
         {
             sql += "search_vector,";
             ++parametersCount;
+        }
+        sql += "type,";
+        ++parametersCount;
+        if(!dirtyFlag_[10])
+        {
+            needSelection=true;
         }
         if(parametersCount > 0)
         {
@@ -343,10 +360,6 @@ class Project
             n = snprintf(placeholderStr,sizeof(placeholderStr),"$%d,",placeholder++);
             sql.append(placeholderStr, n);
         }
-        else
-        {
-            sql +="default,";
-        }
         if(dirtyFlag_[5])
         {
             n = snprintf(placeholderStr,sizeof(placeholderStr),"$%d,",placeholder++);
@@ -362,6 +375,10 @@ class Project
             n = snprintf(placeholderStr,sizeof(placeholderStr),"$%d,",placeholder++);
             sql.append(placeholderStr, n);
         }
+        else
+        {
+            sql +="default,";
+        }
         if(dirtyFlag_[8])
         {
             n = snprintf(placeholderStr,sizeof(placeholderStr),"$%d,",placeholder++);
@@ -375,6 +392,15 @@ class Project
         {
             n = snprintf(placeholderStr,sizeof(placeholderStr),"$%d,",placeholder++);
             sql.append(placeholderStr, n);
+        }
+        if(dirtyFlag_[10])
+        {
+            n = snprintf(placeholderStr,sizeof(placeholderStr),"$%d,",placeholder++);
+            sql.append(placeholderStr, n);
+        }
+        else
+        {
+            sql +="default,";
         }
         if(parametersCount > 0)
         {

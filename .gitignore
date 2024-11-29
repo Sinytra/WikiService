@@ -563,3 +563,6 @@ FodyWeavers.xsd
 !src/log/
 run
 config.json
+build
+compile_commands.json
+.zed

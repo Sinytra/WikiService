@@ -3,9 +3,6 @@
 #include <drogon/HttpClient.h>
 #include <models/Project.h>
 
-#include "log/log.h"
-
-#include <fstream>
 #include <string>
 
 #include <service/util.h>
@@ -23,8 +20,9 @@ namespace api::v1 {
     Task<std::optional<std::string>> assertLocale(const std::optional<std::string> &locale, Documentation &documentation,
                                                   const Project &project, const std::string &installationToken) {
         if (locale) {
-            const auto [hasLocale, hasLocaleError](co_await documentation.hasAvailableLocale(project, *locale, installationToken));
-            if (hasLocale) {
+            if (const auto [hasLocale, hasLocaleError](co_await documentation.hasAvailableLocale(project, *locale, installationToken));
+                hasLocale)
+            {
                 co_return locale;
             }
         }
@@ -34,8 +32,9 @@ namespace api::v1 {
     Task<std::optional<std::string>> getDocsVersion(const std::optional<std::string> &version, Documentation &documentation,
                                                     const Project &project, const std::string &installationToken) {
         if (version) {
-            const auto [versions, versionsError](co_await documentation.getAvailableVersionsFiltered(project, installationToken));
-            if (versions) {
+            if (const auto [versions, versionsError](co_await documentation.getAvailableVersionsFiltered(project, installationToken));
+                versions)
+            {
                 for (auto it = versions->begin(); it != versions->end(); it++) {
                     if (it.key().isString() && it->isString() && it.key().asString() == *version) {
                         co_return it->asString();
@@ -49,7 +48,7 @@ namespace api::v1 {
     DocsController::DocsController(GitHub &g, Database &db, Documentation &d) : github_(g), database_(db), documentation_(d) {}
 
     Task<std::optional<ProjectDetails>> DocsController::getProject(const std::string &project,
-                                                                   std::function<void(const drogon::HttpResponsePtr &)> callback) const {
+                                                                   std::function<void(const HttpResponsePtr &)> callback) const {
         if (project.empty()) {
             errorResponse(Error::ErrBadRequest, "Missing project parameter", callback);
             co_return std::nullopt;
@@ -62,23 +61,22 @@ namespace api::v1 {
         }
         const std::string repo = *proj->getSourceRepo();
 
-        const auto [installationId, installationIdError](co_await github_.getRepositoryInstallation(repo));
+        const auto [installationId, idErr](co_await github_.getRepositoryInstallation(repo));
         if (!installationId) {
-            errorResponse(installationIdError, "Missing repository installation", callback);
+            errorResponse(idErr, "Missing repository installation", callback);
             co_return std::nullopt;
         }
 
-        const auto [installationToken, error3](co_await github_.getInstallationToken(installationId.value()));
+        const auto [installationToken, tokenErr](co_await github_.getInstallationToken(installationId.value()));
         if (!installationToken) {
-            errorResponse(installationIdError, "GitHub authentication failure", callback);
+            errorResponse(tokenErr, "GitHub authentication failure", callback);
             co_return std::nullopt;
         }
 
         co_return ProjectDetails{*proj, *installationToken};
     }
 
-    Task<> DocsController::project(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
-                               std::string project) const {
+    Task<> DocsController::project(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string project) const {
         try {
             const auto proj = co_await getProject(project, callback);
             if (!proj) {
@@ -136,8 +134,8 @@ namespace api::v1 {
                 co_return errorResponse(contentsError, "File not found", callback);
             }
 
-            const auto [updatedAt,
-                        updatedAtError](co_await github_.getFileLastUpdateTime(proj->project.getValueOfSourceRepo(), ref, prefixedPath, proj->token));
+            const auto [updatedAt, updatedAtError](
+                co_await github_.getFileLastUpdateTime(proj->project.getValueOfSourceRepo(), ref, prefixedPath, proj->token));
 
             const auto [isPublic, publicError](co_await github_.isPublicRepository(proj->project.getValueOfSourceRepo(), proj->token));
             const auto [versions, versionsError](co_await documentation_.getAvailableVersionsFiltered(proj->project, proj->token));
@@ -184,25 +182,25 @@ namespace api::v1 {
                 (co_await getDocsVersion(req->getOptionalParameter<std::string>("version"), documentation_, proj->project, proj->token))
                     .value_or(proj->project.getValueOfSourceBranch());
             const auto [contents, contentsError](co_await documentation_.getDirectoryTree(proj->project, version, locale, proj->token));
-            if (!contents) {
+            if (contents.empty()) {
                 co_return errorResponse(contentsError, "Error getting dir tree", callback);
             }
 
             const auto [isPublic, publicError](co_await github_.isPublicRepository(proj->project.getValueOfSourceRepo(), proj->token));
             const auto [versions, versionsError](co_await documentation_.getAvailableVersionsFiltered(proj->project, proj->token));
 
-            Json::Value root;
+            nlohmann::json root;
             {
                 Json::Value projectJson = proj->project.toJson();
                 projectJson["is_public"] = isPublic;
                 if (versions) {
                     projectJson["versions"] = *versions;
                 }
-                root["project"] = projectJson;
+                root["project"] = parkourJson(projectJson);
             }
             root["tree"] = contents;
 
-            const auto resp = HttpResponse::newHttpJsonResponse(root);
+            const auto resp = jsonResponse(root);
             resp->setStatusCode(k200OK);
             callback(resp);
         } catch (const HttpException &err) {
@@ -215,8 +213,7 @@ namespace api::v1 {
         co_return;
     }
 
-    Task<> DocsController::asset(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
-                                 std::string project) const {
+    Task<> DocsController::asset(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string project) const {
         try {
             const auto proj = co_await getProject(project, callback);
             if (!proj) {
@@ -256,30 +253,6 @@ namespace api::v1 {
             resp->setStatusCode(k500InternalServerError);
             callback(resp);
         }
-
-        co_return;
-    }
-
-    // TODO Invalidation rate limit
-    Task<> DocsController::invalidate(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
-                                      std::string project) const {
-        if (project.empty()) {
-            co_return errorResponse(Error::ErrBadRequest, "Missing project parameter", callback);
-        }
-
-        const auto [proj, projErr] = co_await database_.getProjectSource(project);
-        if (!proj) {
-            co_return errorResponse(projErr, "Project not found", callback);
-        }
-
-        co_await github_.invalidateCache(proj->getValueOfSourceRepo());
-        co_await documentation_.invalidateCache(*proj);
-
-        Json::Value root;
-        root["message"] = "Caches for project invalidated successfully";
-        const auto resp = HttpResponse::newHttpJsonResponse(root);
-        resp->setStatusCode(k200OK);
-        callback(resp);
 
         co_return;
     }

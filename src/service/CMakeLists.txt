@@ -4,13 +4,16 @@ add_library(service STATIC
         cache.cc
         database.cc
         documentation.cc
+        platforms.cc
+        schemas.cc
 )
 
 target_link_libraries(service PRIVATE
         log
-        drogon
+        Drogon::Drogon
         jwt-cpp
         base64
+        nlohmann_json_schema_validator
 )
 
 target_include_directories(service PUBLIC

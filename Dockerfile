@@ -1,4 +1,4 @@
-FROM debian:sid-slim as build
+FROM debian:sid-slim AS build
 
 WORKDIR /build
 
@@ -29,7 +29,7 @@ COPY $PWD/CMakeLists.txt /build/src/
 
 RUN cmake -S . -B build -G "Ninja" && cmake --build build --config Release
 
-FROM debian:sid-slim as main
+FROM debian:sid-slim AS main
 
 WORKDIR /app
 

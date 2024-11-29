@@ -4,6 +4,7 @@ add_library(log STATIC
 
 target_link_libraries(log PUBLIC
         spdlog::spdlog
+        Drogon::Drogon
 )
 
 target_include_directories(log PUBLIC
