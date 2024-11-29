@@ -158,7 +158,7 @@ namespace service {
                 sortQuery = "ORDER BY \"name\" desc";
             else if (sort == "popularity") {
                 // TODO
-            } else if (sort == "creation_date")
+            } else if (sort == "creation_date" || query.empty())
                 sortQuery = "ORDER BY \"created_at\" desc";
             else /*if (sort == "relevance")*/
                 sortQuery = "ORDER BY ts_rank(search_vector, to_tsquery('simple', $1)) DESC";

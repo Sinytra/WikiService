@@ -182,7 +182,7 @@ namespace api::v1 {
                 (co_await getDocsVersion(req->getOptionalParameter<std::string>("version"), documentation_, proj->project, proj->token))
                     .value_or(proj->project.getValueOfSourceBranch());
             const auto [contents, contentsError](co_await documentation_.getDirectoryTree(proj->project, version, locale, proj->token));
-            if (contents.empty()) {
+            if (contentsError != Error::Ok) {
                 co_return errorResponse(contentsError, "Error getting dir tree", callback);
             }
 
