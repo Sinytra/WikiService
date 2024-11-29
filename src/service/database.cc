@@ -47,7 +47,7 @@ namespace service {
         std::vector<std::string> ids;
         try {
             const auto clientPtr = app().getFastDbClient();
-            for (const auto result = co_await clientPtr->execSqlCoro("SELECT id FROM projects"); const auto &row: result) {
+            for (const auto result = co_await clientPtr->execSqlCoro("SELECT id FROM project"); const auto &row: result) {
                 ids.push_back(row["id"].as<std::string>());
             }
         } catch (const Failure &e) {
