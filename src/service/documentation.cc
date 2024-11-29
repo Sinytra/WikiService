@@ -168,12 +168,13 @@ namespace service {
         const auto resourcePath = sourcePath + (locale ? "/.translated/" + *locale : "") + "/" + removeLeadingSlash(path);
         const auto [contents, contentsError](
             co_await github_.getRepositoryContents(project.getValueOfSourceRepo(), version, resourcePath, installationToken));
-        if (!contents && locale) {
+        if (contents) {
+            if (const auto actualPath = "/" + (*contents)["path"].asString(); !actualPath.starts_with(resourcePath)) {
+                // Forbid access to resources outside docs path
+                co_return {std::nullopt, Error::ErrUnauthorized};
+            }
+        } else if (locale) {
             co_return co_await getDocumentationPage(project, path, std::nullopt, version, installationToken);
-        }
-        if (const auto actualPath = "/" + (*contents)["path"].asString(); !actualPath.starts_with(resourcePath)) {
-            // Forbid access to resources outside docs path
-            co_return {std::nullopt, Error::ErrUnauthorized};
         }
         co_return {contents, contentsError};
     }
