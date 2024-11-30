@@ -36,11 +36,12 @@ namespace service {
     Task<> MemoryCache::updateCacheSet(std::string key, std::vector<std::string> value, std::chrono::duration<long> expire) const {
         const auto client = app().getFastRedisClient();
         const auto expireSeconds = std::chrono::seconds(expire).count();
-        std::string entries = join(value, " ");
 
         const auto trans = co_await client->newTransactionCoro();
-        co_await client->execCommandCoro("SADD %s %s", key.data(), entries.data());
-        co_await client->execCommandCoro("EXPIRE %s %ld", key.data(), expireSeconds);
+        for (const auto &item : value) {
+            co_await trans->execCommandCoro("SADD %s %s", key.data(), item.data());
+        }
+        co_await trans->execCommandCoro("EXPIRE %s %ld", key.data(), expireSeconds);
         co_await trans->executeCoro();
     }
 
