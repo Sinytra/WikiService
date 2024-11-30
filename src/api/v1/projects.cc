@@ -19,7 +19,7 @@ using namespace drogon_model::postgres;
 namespace api::v1 {
     Task<bool> verifyProjectOwnership(const Platforms &pf, const PlatformProject &project, const std::string &repo,
                                       const std::string &mrCode) {
-        if (const auto expected = "https://github.com/" + repo; !project.sourceUrl.empty() && expected.starts_with(repo)) {
+        if (const auto expected = "https://github.com/" + repo; !project.sourceUrl.empty() && project.sourceUrl.starts_with(expected)) {
             co_return true;
         }
 
