@@ -14,7 +14,7 @@ namespace api::v1 {
 
     class DocsController final : public drogon::HttpController<DocsController, false> {
     public:
-        explicit DocsController(service::GitHub &, service::Database &, service::Documentation &);
+        explicit DocsController(GitHub &, Database &, Documentation &);
 
         METHOD_LIST_BEGIN
         ADD_METHOD_TO(DocsController::project, "/api/v1/project/{1:project}", drogon::Get, "AuthFilter");
@@ -33,9 +33,9 @@ namespace api::v1 {
         drogon::Task<> asset(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback, std::string project) const;
 
     private:
-        service::GitHub &github_;
-        service::Database &database_;
-        service::Documentation &documentation_;
+        GitHub &github_;
+        Database &database_;
+        Documentation &documentation_;
 
         drogon::Task<std::optional<ProjectDetails>> getProject(const std::string& project, std::function<void(const drogon::HttpResponsePtr &)> callback) const;
     };
