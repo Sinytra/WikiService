@@ -54,7 +54,7 @@ namespace api::v1 {
      * - ownership: Failed to verify platform project ownership (data: can_verify_mr)
      * - internal: Internal server error
      */
-    Task<std::optional<Project>> ProjectsController::validateProjectData(const Json::Value &json, const std::string &token,
+    Task<std::optional<std::pair<std::string, Project>>> ProjectsController::validateProjectData(const Json::Value &json, const std::string &token,
                                                                          std::function<void(const HttpResponsePtr &)> callback,
                                                                          const bool checkExisting) const {
         const auto [username, usernameError](co_await github_.getUsername(token));
@@ -154,7 +154,7 @@ namespace api::v1 {
         project.setType(projectTypeToString(platformProj->type));
         project.setSlug(slug);
 
-        co_return project;
+        co_return std::pair{*username, project};
     }
 
     Task<std::optional<Project>> ProjectsController::validateProjectAccess(const std::string &id, const std::string &token,
@@ -307,20 +307,24 @@ namespace api::v1 {
             co_return simpleError(Error::ErrBadRequest, "exists", callback);
         }
 
-        auto project = co_await validateProjectData(*json, token, callback, false);
-        if (!project) {
+        auto validated = co_await validateProjectData(*json, token, callback, false);
+        if (!validated) {
             co_return;
         }
-        project->setIsCommunity(isCommunity);
+        auto [username, project] = *validated;
+        project.setIsCommunity(isCommunity);
 
-        if (co_await database_.existsForData(project->getValueOfId(), project->getValueOfPlatform(), project->getValueOfSlug())) {
+        if (co_await database_.existsForData(project.getValueOfId(), project.getValueOfPlatform(), project.getValueOfSlug())) {
             co_return simpleError(Error::ErrBadRequest, "exists", callback);
         }
 
-        if (const auto [result, resultErr] = co_await database_.createProject(*project); resultErr != Error::Ok) {
-            logger.error("Failed to create project {} in database", project->getValueOfId());
+        if (const auto [result, resultErr] = co_await database_.createProject(project); resultErr != Error::Ok) {
+            logger.error("Failed to create project {} in database", project.getValueOfId());
             co_return simpleError(Error::ErrInternal, "internal", callback);
         }
+
+        // Invalidate user installation cache to ensure project shows up on dev dashboard
+        co_await github_.invalidateUserInstallations(username);
 
         Json::Value root;
         root["message"] = "Project registered successfully";
@@ -342,26 +346,27 @@ namespace api::v1 {
             co_return simpleError(Error::ErrBadRequest, error->msg, callback);
         }
 
-        auto project = co_await validateProjectData(*json, token, callback, true);
-        if (!project) {
+        auto validated = co_await validateProjectData(*json, token, callback, true);
+        if (!validated) {
             co_return;
         }
+        auto [username, project] = *validated;
 
-        if (const auto [proj, projErr] = co_await database_.getProjectSource(project->getValueOfId()); !proj) {
+        if (const auto [proj, projErr] = co_await database_.getProjectSource(project.getValueOfId()); !proj) {
             co_return simpleError(Error::ErrBadRequest, "not_found", callback);
         }
 
-        if (const auto error = co_await database_.updateProject(*project); error != Error::Ok) {
-            logger.error("Failed to update project {} in database", project->getValueOfId());
+        if (const auto error = co_await database_.updateProject(project); error != Error::Ok) {
+            logger.error("Failed to update project {} in database", project.getValueOfId());
             co_return simpleError(Error::ErrInternal, "internal", callback);
         }
 
-        co_await github_.invalidateCache(project->getValueOfSourceRepo());
-        co_await documentation_.invalidateCache(*project);
+        co_await github_.invalidateCache(project.getValueOfSourceRepo());
+        co_await documentation_.invalidateCache(project);
 
         Json::Value root;
         root["message"] = "Project updated successfully";
-        root["project"] = project->toJson();
+        root["project"] = project.toJson();
         const auto resp = HttpResponse::newHttpJsonResponse(root);
         resp->setStatusCode(k200OK);
         callback(resp);

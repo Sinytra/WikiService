@@ -20,6 +20,8 @@ std::string createAppJWTTokenCacheKey(const std::string &appClientId) { return "
 
 std::string createRepoInstallIdCacheKey(const std::string &repo) { return "repo_install_id:" + repo; }
 
+std::string createUserInstallationsCacheKey(const std::string &username) { return "user_installations:" + username; }
+
 std::optional<std::chrono::system_clock::time_point> parseISO8601(const std::string &iso_time) {
     std::istringstream ss(iso_time);
     std::tm tm = {};
@@ -154,7 +156,7 @@ namespace service {
         co_return {std::set<std::string>(), Error::Ok};
     }
 
-    Task<std::tuple<Json::Value, Error>> GitHub::computeUserAccessibleInstallations(std::string token) const {
+    Task<std::tuple<Json::Value, Error>> GitHub::computeUserAccessibleInstallations(const std::string token) const {
         const auto client = createHttpClient(GITHUB_API_URL);
         if (auto [data, err] = co_await sendAuthenticatedRequest(client, Get, "/user/installations", token);
             data && data->isObject() && data->isMember("installations") && (*data)["installations"].isArray())
@@ -171,7 +173,7 @@ namespace service {
 
     Task<std::tuple<std::set<std::string>, Error>> GitHub::getUserAccessibleInstallations(const std::string username,
                                                                                           const std::string token) {
-        const auto cacheKey = "user_installations:" + username;
+        const auto cacheKey = createUserInstallationsCacheKey(username);
 
         if (const auto cached = co_await cache_.getFromCache(cacheKey)) {
             if (const auto parsed = parseJsonString(*cached)) {
@@ -197,6 +199,10 @@ namespace service {
 
         const auto result = co_await completeTask<std::set<std::string>>(cacheKey, std::move(set));
         co_return {result, Error::Ok};
+    }
+
+    Task<> GitHub::invalidateUserInstallations(const std::string username) const {
+        co_await cache_.erase(createUserInstallationsCacheKey(username));
     }
 
     Task<std::tuple<std::optional<std::string>, Error>> GitHub::getInstallationToken(const std::string installationId) const {

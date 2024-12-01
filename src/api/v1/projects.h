@@ -43,9 +43,9 @@ namespace api::v1 {
                                   std::string token) const;
 
     private:
-        drogon::Task<std::optional<Project>> validateProjectData(const Json::Value &json, const std::string &token,
-                                                                 std::function<void(const drogon::HttpResponsePtr &)> callback,
-                                                                 const bool checkExisting) const;
+        drogon::Task<std::optional<std::pair<std::string, Project>>>
+        validateProjectData(const Json::Value &json, const std::string &token,
+                            std::function<void(const drogon::HttpResponsePtr &)> callback, bool checkExisting) const;
 
         drogon::Task<std::optional<Project>> validateProjectAccess(const std::string &id, const std::string &token,
                                                                    std::function<void(const drogon::HttpResponsePtr &)> callback) const;
