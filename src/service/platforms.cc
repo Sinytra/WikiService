@@ -29,7 +29,7 @@ namespace service {
     }
 
     std::string projectTypeToString(const ProjectType &type) {
-        for (const auto &[key, val] : projectTypeLookup) {
+        for (const auto &[key, val]: projectTypeLookup) {
             if (type == val) {
                 return key;
             }
@@ -118,7 +118,8 @@ namespace service {
     Task<std::optional<PlatformProject>> CurseForgePlatform::getProject(std::string slug) {
         const auto client = createHttpClient(CURSEFORGE_API_URL);
         if (const auto [resp, err] =
-                co_await sendAuthenticatedRequest(client, Get, std::format("/v1/mods/search?gameId={}&slug={}", MC_GAME_ID, slug), apiKey_);
+                co_await sendApiRequest(client, Get, std::format("/v1/mods/search?gameId={}&slug={}", MC_GAME_ID, slug),
+                                        [&](const HttpRequestPtr &req) { req->addHeader("x-api-key", apiKey_); });
             resp && resp->isObject())
         {
             const auto pagination = (*resp)["pagination"];
