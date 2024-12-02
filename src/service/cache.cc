@@ -59,15 +59,24 @@ namespace service {
 
     Task<> MemoryCache::eraseNamespace(std::string key) const {
         const auto client = app().getFastRedisClient();
-        if (const auto result = (co_await client->execCommandCoro("SCAN 0 MATCH %s:*", key.data())).asArray(); result.size() > 1) {
-            if (const auto keys = result[1].asArray(); !keys.empty()) {
-                std::string entries;
-                for (const auto &entry: keys) {
-                    if (!entries.empty())
-                        entries += " ";
-                    entries += entry.asString();
+        std::string cursor = "0";
+        while (true) {
+            if (const auto result = (co_await client->execCommandCoro("SCAN %s MATCH %s:*", cursor.data(), key.data())).asArray(); result.size() > 1) {
+                cursor = result[0].asString();
+                if (const auto keys = result[1].asArray(); !keys.empty()) {
+                    std::string entries;
+                    for (const auto &entry: keys) {
+                        if (!entries.empty())
+                            entries += " ";
+                        entries += entry.asString();
+                    }
+                    co_await client->execCommandCoro("DEL " + entries);
                 }
-                co_await client->execCommandCoro("DEL " + entries);
+                if (cursor == "0") {
+                    break;
+                }
+            } else {
+                break;
             }
         }
         co_return;
