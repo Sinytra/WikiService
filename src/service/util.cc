@@ -93,8 +93,28 @@ Task<std::tuple<std::optional<Json::Value>, Error>> sendAuthenticatedRequest(con
     });
 }
 
-Task<std::tuple<std::optional<Json::Value>, Error>> sendApiRequest(const HttpClientPtr client, const HttpMethod method, std::string path,
+Task<std::tuple<std::optional<std::pair<HttpResponsePtr, Json::Value>>, Error>>
+sendRawAuthenticatedRequest(const HttpClientPtr client, const HttpMethod method, const std::string path, const std::string token,
+                            const std::function<void(HttpRequestPtr &)> callback) {
+    co_return co_await sendRawApiRequest(client, method, path, [&](HttpRequestPtr &req) {
+        req->addHeader("Authorization", "Bearer " + token);
+        callback(req);
+    });
+}
+
+Task<std::tuple<std::optional<Json::Value>, Error>> sendApiRequest(const HttpClientPtr client, const HttpMethod method,
+                                                                   const std::string path,
                                                                    const std::function<void(HttpRequestPtr &)> callback) {
+    const auto [resp, err] = co_await sendRawApiRequest(client, method, path, callback);
+    if (resp) {
+        co_return {resp->second, err};
+    }
+    co_return {std::nullopt, err};
+}
+
+Task<std::tuple<std::optional<std::pair<HttpResponsePtr, Json::Value>>, Error>>
+sendRawApiRequest(const HttpClientPtr client, const HttpMethod method, std::string path,
+                  const std::function<void(HttpRequestPtr &)> callback) {
     try {
         auto httpReq = HttpRequest::newHttpRequest();
         httpReq->setMethod(method);
@@ -109,7 +129,7 @@ Task<std::tuple<std::optional<Json::Value>, Error>> sendApiRequest(const HttpCli
         if (isSuccess(status)) {
             if (const auto jsonResp = response->getJsonObject()) {
                 logger.trace("<= Response ({}) from {}", std::to_string(status), path);
-                co_return {*jsonResp, Error::Ok};
+                co_return {std::pair{response, *jsonResp}, Error::Ok};
             }
         }
 
@@ -119,6 +139,11 @@ Task<std::tuple<std::optional<Json::Value>, Error>> sendApiRequest(const HttpCli
         logger.error("Error sending HTTP request: {}", e.what());
         co_return {std::nullopt, Error::ErrInternal};
     }
+}
+
+bool hasMorePages(const HttpResponsePtr response) {
+    const auto link = response->getHeader("link");
+    return !link.empty() && link.find("rel=\"next\"") != std::string::npos;
 }
 
 nlohmann::json parkourJson(const Json::Value &json) {

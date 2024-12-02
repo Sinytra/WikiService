@@ -53,6 +53,16 @@ drogon::Task<std::tuple<std::optional<Json::Value>, Error>> sendApiRequest(
     drogon::HttpClientPtr client, drogon::HttpMethod method, std::string path,
     std::function<void(drogon::HttpRequestPtr &)> callback = [](drogon::HttpRequestPtr &) {});
 
+drogon::Task<std::tuple<std::optional<std::pair<drogon::HttpResponsePtr, Json::Value>>, Error>> sendRawAuthenticatedRequest(
+    drogon::HttpClientPtr client, drogon::HttpMethod method, std::string path, std::string token,
+    std::function<void(drogon::HttpRequestPtr &)> callback = [](drogon::HttpRequestPtr &) {});
+
+drogon::Task<std::tuple<std::optional<std::pair<drogon::HttpResponsePtr, Json::Value>>, Error>> sendRawApiRequest(
+    drogon::HttpClientPtr client, drogon::HttpMethod method, std::string path,
+    std::function<void(drogon::HttpRequestPtr &)> callback = [](drogon::HttpRequestPtr &) {});
+
+bool hasMorePages(drogon::HttpResponsePtr response);
+
 template <class T = nlohmann::json>
 std::optional<T> tryParseJson(const std::string_view json) {
     try {

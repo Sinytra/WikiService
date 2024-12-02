@@ -137,23 +137,26 @@ namespace service {
     Task<std::tuple<std::set<std::string>, Error>> GitHub::getInstallationAccessibleRepos(const std::string installationId,
                                                                                           const std::string token) const {
         const auto client = createHttpClient(GITHUB_API_URL);
+        std::set<std::string> set;
 
-        // TODO Expand pagination
-        if (const auto [data, err] =
-                co_await sendAuthenticatedRequest(client, Get, std::format("/user/installations/{}/repositories", installationId), token);
-            data && data->isObject() && data->isMember("repositories") && (*data)["repositories"].isArray())
-        {
-            std::set<std::string> set;
-            for (const auto repos = (*data)["repositories"]; const auto &repo: repos) {
-                if (const auto permissions = repo["permissions"]; permissions["admin"].asBool() || permissions["maintain"].asBool()) {
-                    set.insert(repo["full_name"].asString());
+        for (int page = 1;; ++page) {
+            if (const auto [resp, err] = co_await sendRawAuthenticatedRequest(
+                    client, Get, std::format("/user/installations/{}/repositories?per_page=100&page={}", installationId, page), token);
+                resp && resp->second.isObject() && resp->second.isMember("repositories") && resp->second["repositories"].isArray())
+            {
+                for (const auto repos = resp->second["repositories"]; const auto &repo: repos) {
+                    if (const auto permissions = repo["permissions"]; permissions["admin"].asBool() || permissions["maintain"].asBool()) {
+                        set.insert(repo["full_name"].asString());
+                    }
+                }
+                if (hasMorePages(resp->first)) {
+                    continue;
                 }
             }
-
-            co_return {set, Error::Ok};
+            break;
         }
 
-        co_return {std::set<std::string>(), Error::Ok};
+        co_return {set, Error::Ok};
     }
 
     Task<std::tuple<Json::Value, Error>> GitHub::computeUserAccessibleInstallations(const std::string token) const {
