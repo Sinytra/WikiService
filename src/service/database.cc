@@ -227,14 +227,19 @@ namespace service {
         }
     }
 
-    Task<bool> Database::existsForData(const std::string id, const std::string platform, const std::string slug) const {
+    Task<bool> Database::existsForData(const std::string id, const nlohmann::json platforms) const {
         try {
             const auto clientPtr = app().getFastDbClient();
             CoroMapper<Project> mapper(clientPtr);
 
-            const auto results = co_await mapper.findBy(Criteria(Project::Cols::_id, CompareOperator::EQ, id) ||
-                                                        (Criteria(Project::Cols::_platform, CompareOperator::EQ, platform) &&
-                                                         Criteria(Project::Cols::_slug, CompareOperator::EQ, slug)));
+            auto criteria = Criteria(Project::Cols::_id, CompareOperator::EQ, id);
+            for (const auto &[key, val]: platforms.items()) {
+                criteria = criteria ||
+                           Criteria(CustomSql(Project::Cols::_platforms + " ILIKE '%\"' || $? || '\":\"' || $? || '\"%'"),
+                                    key, val.get<std::string>());
+            }
+
+            const auto results = co_await mapper.findBy(criteria);
 
             co_return !results.empty();
         } catch (const Failure &e) {

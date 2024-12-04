@@ -45,7 +45,7 @@ std::string getTreeEntryPath(const std::string &s, size_t pathPrefix) {
     return relative.ends_with(DOCS_FILE_EXT) ? relative.substr(0, relative.size() - 4) : relative;
 }
 
-Task<FolderMetadata> getFolderMetadata(service::GitHub &github, std::string repo, std::string version, std::string rootPath,
+Task<FolderMetadata> getFolderMetadata(GitHub &github, std::string repo, std::string version, std::string rootPath,
                                        std::string path, std::optional<std::string> locale, std::string installationToken) {
     FolderMetadata metadata;
     const auto filePath = rootPath + (locale ? "/.translated/" + *locale : "") + path + META_FILE_PATH;
@@ -94,7 +94,7 @@ auto createComparator(const std::vector<std::string>& keys) {
     };
 }
 
-Task<nlohmann::ordered_json> crawlDocsTree(service::GitHub &github, std::string repo, std::string version, std::string rootPath,
+Task<nlohmann::ordered_json> crawlDocsTree(GitHub &github, std::string repo, std::string version, std::string rootPath,
                                            std::string path, std::optional<std::string> locale, std::string installationToken,
                                            trantor::EventLoopThreadPool &pool) {
     auto currentLoop = trantor::EventLoop::getEventLoopOfCurrentThread();

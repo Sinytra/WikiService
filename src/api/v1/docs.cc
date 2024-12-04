@@ -35,7 +35,7 @@ namespace api::v1 {
             if (const auto [versions, versionsError](co_await documentation.getAvailableVersionsFiltered(project, installationToken));
                 versions)
             {
-                for (auto it = versions->begin(); it != versions->end(); it++) {
+                for (auto it = versions->begin(); it != versions->end(); ++it) {
                     if (it.key().isString() && it->isString() && it.key().asString() == *version) {
                         co_return it->asString();
                     }
@@ -88,7 +88,7 @@ namespace api::v1 {
 
             Json::Value root;
             {
-                Json::Value projectJson = proj->project.toJson();
+                Json::Value projectJson = projectToJson(proj->project);
                 projectJson["is_public"] = isPublic;
                 if (versions) {
                     projectJson["versions"] = *versions;
@@ -145,7 +145,7 @@ namespace api::v1 {
 
             Json::Value root;
             {
-                Json::Value projectJson = proj->project.toJson();
+                Json::Value projectJson = projectToJson(proj->project);
                 projectJson["is_public"] = isPublic;
                 if (versions) {
                     projectJson["versions"] = *versions;
@@ -194,7 +194,7 @@ namespace api::v1 {
 
             nlohmann::json root;
             {
-                Json::Value projectJson = proj->project.toJson();
+                Json::Value projectJson = projectToJson(proj->project);
                 projectJson["is_public"] = isPublic;
                 if (versions) {
                     projectJson["versions"] = *versions;

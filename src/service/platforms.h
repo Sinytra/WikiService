@@ -68,6 +68,8 @@ namespace service {
 
         drogon::Task<std::optional<PlatformProject>> getProject(std::string platform, std::string slug);
 
+        std::vector<std::string> getAvailablePlatforms();
+
         CurseForgePlatform& curseforge_;
         ModrinthPlatform& modrinth_;
     private:

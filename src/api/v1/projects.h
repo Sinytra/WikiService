@@ -8,6 +8,12 @@
 #include "service/platforms.h"
 
 namespace api::v1 {
+    struct ValidatedProjectData {
+        std::string username;
+        Project project;
+        nlohmann::json platforms;
+    };
+
     class ProjectsController final : public drogon::HttpController<ProjectsController, false> {
     public:
         explicit ProjectsController(GitHub &, Platforms &, Database &, Documentation &);
@@ -43,7 +49,12 @@ namespace api::v1 {
                                   std::string token) const;
 
     private:
-        drogon::Task<std::optional<std::pair<std::string, Project>>>
+        drogon::Task<std::optional<PlatformProject>>
+        validatePlatform(const std::string &id, const std::string &repo, const std::string &mrCode,
+                                             const std::string &platform, const std::string &slug, bool checkExisting,
+                                             std::function<void(const drogon::HttpResponsePtr &)> callback) const;
+
+        drogon::Task<std::optional<ValidatedProjectData>>
         validateProjectData(const Json::Value &json, const std::string &token,
                             std::function<void(const drogon::HttpResponsePtr &)> callback, bool checkExisting) const;
 

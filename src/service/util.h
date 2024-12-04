@@ -9,6 +9,7 @@
 #include <drogon/HttpTypes.h>
 #include <json/json.h>
 #include <log/log.h>
+#include <models/Project.h>
 #include <nlohmann/json-schema.hpp>
 #include <optional>
 #include <string>
@@ -82,3 +83,5 @@ std::optional<JsonValidationError> validateJson(const nlohmann::json &schema, co
 drogon::HttpResponsePtr jsonResponse(const nlohmann::json &json);
 
 std::string join(const std::vector<std::string> &lst, const std::string &delim);
+
+Json::Value projectToJson(const drogon_model::postgres::Project &project);
