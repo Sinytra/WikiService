@@ -122,9 +122,6 @@ namespace api::v1 {
                 co_return errorResponse(Error::ErrBadRequest, "Missing path parameter", callback);
             }
 
-            const auto optionalParam = req->getOptionalParameter<std::string>("optional");
-            const auto optional = optionalParam.has_value() && optionalParam == "true";
-
             const auto locale =
                 co_await assertLocale(req->getOptionalParameter<std::string>("locale"), documentation_, proj->project, proj->token);
             const auto ref =
@@ -134,6 +131,9 @@ namespace api::v1 {
             const auto [contents,
                         contentsError](co_await documentation_.getDocumentationPage(proj->project, path, locale, ref, proj->token));
             if (!contents) {
+                const auto optionalParam = req->getOptionalParameter<std::string>("optional");
+                const auto optional = optionalParam.has_value() && optionalParam == "true";
+
                 co_return errorResponse(optional ? Error::Ok : contentsError, "File not found", callback);
             }
 
@@ -241,7 +241,10 @@ namespace api::v1 {
             const auto [asset,
                         assetError](co_await documentation_.getAssetResource(proj->project, *resourceLocation, version, proj->token));
             if (!asset) {
-                co_return errorResponse(assetError, "Asset not found", callback);
+                const auto optionalParam = req->getOptionalParameter<std::string>("optional");
+                const auto optional = optionalParam.has_value() && optionalParam == "true";
+
+                co_return errorResponse(optional ? Error::Ok : assetError, "Asset not found", callback);
             }
 
             Json::Value root;
