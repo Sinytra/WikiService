@@ -140,6 +140,7 @@ namespace api::v1 {
             const auto [updatedAt, updatedAtError](
                 co_await github_.getFileLastUpdateTime(proj->project.getValueOfSourceRepo(), ref, prefixedPath, proj->token));
 
+            const auto [locales, localesErr](co_await documentation_.getAvailableLocales(proj->project, proj->token));
             const auto [isPublic, publicError](co_await github_.isPublicRepository(proj->project.getValueOfSourceRepo(), proj->token));
             const auto [versions, versionsError](co_await documentation_.getAvailableVersionsFiltered(proj->project, proj->token));
 
@@ -149,6 +150,13 @@ namespace api::v1 {
                 projectJson["is_public"] = isPublic;
                 if (versions) {
                     projectJson["versions"] = *versions;
+                }
+                if (!locales.empty()) {
+                    Json::Value localesJson(Json::arrayValue);
+                    for (const auto &item : locales) {
+                        localesJson.append(item);
+                    }
+                    projectJson["locales"] = localesJson;
                 }
                 root["project"] = projectJson;
             }
@@ -189,6 +197,7 @@ namespace api::v1 {
                 co_return errorResponse(contentsError, "Error getting dir tree", callback);
             }
 
+            const auto [locales, localesErr](co_await documentation_.getAvailableLocales(proj->project, proj->token));
             const auto [isPublic, publicError](co_await github_.isPublicRepository(proj->project.getValueOfSourceRepo(), proj->token));
             const auto [versions, versionsError](co_await documentation_.getAvailableVersionsFiltered(proj->project, proj->token));
 
@@ -198,6 +207,13 @@ namespace api::v1 {
                 projectJson["is_public"] = isPublic;
                 if (versions) {
                     projectJson["versions"] = *versions;
+                }
+                if (!locales.empty()) {
+                    Json::Value localesJson(Json::arrayValue);
+                    for (const auto &item : locales) {
+                        localesJson.append(item);
+                    }
+                    projectJson["locales"] = localesJson;
                 }
                 root["project"] = parkourJson(projectJson);
             }

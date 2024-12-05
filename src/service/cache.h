@@ -7,6 +7,7 @@
 #include <shared_mutex>
 #include <string>
 #include <vector>
+#include <set>
 #include "log/log.h"
 
 namespace service {
@@ -17,6 +18,7 @@ namespace service {
         drogon::Task<bool> exists(std::string key) const;
         drogon::Task<std::optional<std::string>> getFromCache(std::string key) const;
         drogon::Task<bool> isSetMember(std::string key, std::string value) const;
+        drogon::Task<std::set<std::string>> getSetMembers(std::string key) const;
         drogon::Task<> updateCache(std::string key, std::string value, std::chrono::duration<long> expire) const;
         drogon::Task<> updateCacheSet(std::string key, std::vector<std::string> value, std::chrono::duration<long> expire) const;
         drogon::Task<> erase(std::string key) const;
