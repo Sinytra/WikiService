@@ -119,6 +119,15 @@ nlohmann::json schemas::systemConfig = R"(
                 "redirect_url": { "type": "string" }
             }
         },
+        "cloudflare": {
+            "type": "object",
+            "properties": {
+                "token": { "type": "string" },
+                "account_tag": { "type": "string" },
+                "site_tag": { "type": "string"}
+            },
+            "required": ["token", "account_tag", "site_tag"]
+        },
         "curseforge_key": { "type": "string" },
         "api_key": { "type": "string" }
     },

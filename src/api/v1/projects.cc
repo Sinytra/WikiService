@@ -52,8 +52,8 @@ namespace api::v1 {
         return projects;
     }
 
-    ProjectsController::ProjectsController(GitHub &gh, Platforms &pf, Database &db, Documentation &dc) :
-        github_(gh), platforms_(pf), database_(db), documentation_(dc) {}
+    ProjectsController::ProjectsController(GitHub &gh, Platforms &pf, Database &db, Documentation &dc, CloudFlare &cf) :
+        github_(gh), platforms_(pf), database_(db), documentation_(dc), cloudflare(cf) {}
 
     Task<std::optional<PlatformProject>> ProjectsController::validatePlatform(const std::string &id, const std::string &repo,
                                                                               const std::string &mrCode, const std::string &platform,
@@ -320,6 +320,19 @@ namespace api::v1 {
         }
         root["repositories"] = projectRepos;
         root["projects"] = projectsJson;
+        const auto resp = HttpResponse::newHttpJsonResponse(root);
+        resp->setStatusCode(k200OK);
+        callback(resp);
+    }
+
+    Task<> ProjectsController::listPopularProjects(HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
+        const std::vector<std::string> ids = co_await cloudflare.getMostVisitedProjectIDs();
+        Json::Value root(Json::arrayValue);
+        for (const auto &id: ids) {
+            if (const auto [project, error] = co_await database_.getProjectSource(id); project) {
+                root.append(projectToJson(*project));
+            }
+        }
         const auto resp = HttpResponse::newHttpJsonResponse(root);
         resp->setStatusCode(k200OK);
         callback(resp);

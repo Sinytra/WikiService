@@ -8,7 +8,7 @@ namespace logging {
     spdlog::logger &logger([]() -> spdlog::logger & {
         std::vector<spdlog::sink_ptr> sinks;
         sinks.push_back(std::make_shared<spdlog::sinks::stdout_color_sink_mt>());
-        sinks.push_back(std::make_shared<spdlog::sinks::daily_file_sink_mt>("logs/logfile", 23, 59));
+        sinks.push_back(std::make_shared<spdlog::sinks::daily_file_sink_mt>("logs/logfile.log", 23, 59));
         const auto combined_logger = std::make_shared<spdlog::logger>("main", begin(sinks), end(sinks));
         combined_logger->set_pattern("[%^%L%$] [%H:%M:%S %z] [thread %t] %v");
         register_logger(combined_logger);
@@ -16,6 +16,10 @@ namespace logging {
     }());
 
     void configureLoggingLevel() {
+        if (trantor::Logger::hasSpdLogSupport()) {
+            trantor::Logger::enableSpdLog(std::make_shared<spdlog::logger>(logger));
+        }
+
         switch (trantor::Logger::logLevel()) {
             case trantor::Logger::LogLevel::kTrace:
                 spdlog::set_level(spdlog::level::trace);

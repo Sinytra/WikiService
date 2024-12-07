@@ -66,6 +66,10 @@ namespace service {
 
         template<class T>
         drogon::Task<T> completeTask(const std::string &key, T &&value) {
+            if (!pendingTasks_.contains(key)) {
+                throw std::invalid_argument("No task for key " + key);
+            }
+
             auto pair = std::any_cast<std::pair<std::shared_ptr<std::promise<T>>, std::shared_future<T>> &>(pendingTasks_[key]);
             pair.first->set_value(value);
 

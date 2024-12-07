@@ -6,6 +6,7 @@ add_library(service STATIC
         documentation.cc
         platforms.cc
         schemas.cc
+        cloudflare.cc
 )
 
 target_link_libraries(service PRIVATE

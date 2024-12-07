@@ -41,6 +41,7 @@ std::optional<std::chrono::system_clock::time_point> parseISO8601(const std::str
     return std::chrono::system_clock::from_time_t(time_since_epoch);
 }
 
+// TODO REMOVE
 HttpRequestPtr newGithubApiRequest(const HttpMethod method, const std::string &path) {
     const auto req = HttpRequest::newHttpRequest();
     req->setMethod(method);
