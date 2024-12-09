@@ -259,6 +259,14 @@ namespace api::v1 {
         co_return true;
     }
 
+    Task<> ProjectsController::greet(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback) const {
+        const auto resp = HttpResponse::newHttpResponse();
+        resp->setStatusCode(k200OK);
+        resp->setBody("Service operational");
+        callback(resp);
+        co_return;
+    }
+
     Task<> ProjectsController::listIDs(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback) const {
         const auto ids = co_await database_.getProjectIDs();
 

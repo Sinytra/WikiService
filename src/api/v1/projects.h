@@ -21,6 +21,7 @@ namespace api::v1 {
         explicit ProjectsController(GitHub &, Platforms &, Database &, Documentation &, CloudFlare &);
 
         METHOD_LIST_BEGIN
+        ADD_METHOD_TO(ProjectsController::greet, "/", drogon::Get);
         ADD_METHOD_TO(ProjectsController::listIDs, "/api/v1/projects", drogon::Get, "AuthFilter");
         ADD_METHOD_TO(ProjectsController::listUserProjects, "/api/v1/projects/dev?token={1:token}", drogon::Get, "AuthFilter");
         ADD_METHOD_TO(ProjectsController::listPopularProjects, "/api/v1/projects/popular", drogon::Get, "AuthFilter");
@@ -30,6 +31,8 @@ namespace api::v1 {
         ADD_METHOD_TO(ProjectsController::migrate, "/api/v1/project/migrate?token={1:token}", drogon::Post, "AuthFilter");
         ADD_METHOD_TO(ProjectsController::invalidate, "/api/v1/project/{1:id}/invalidate?token={2:token}", drogon::Post, "AuthFilter");
         METHOD_LIST_END
+
+        drogon::Task<> greet(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback) const;
 
         drogon::Task<> listIDs(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback) const;
 
