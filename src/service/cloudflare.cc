@@ -104,6 +104,10 @@ namespace service {
             }
         }
 
+        if (const auto pending = co_await getOrStartTask<std::vector<std::string>>(cacheKey)) {
+            co_return pending->get();
+        }
+
         auto result = co_await computeMostVisitedProjectIDs();
         const auto serialized = nlohmann::json(result).dump();
 
