@@ -19,10 +19,10 @@ const std::string Project::Cols::_source_path = "\"source_path\"";
 const std::string Project::Cols::_source_repo = "\"source_repo\"";
 const std::string Project::Cols::_source_branch = "\"source_branch\"";
 const std::string Project::Cols::_is_community = "\"is_community\"";
-const std::string Project::Cols::_created_at = "\"created_at\"";
-const std::string Project::Cols::_search_vector = "\"search_vector\"";
 const std::string Project::Cols::_type = "\"type\"";
 const std::string Project::Cols::_platforms = "\"platforms\"";
+const std::string Project::Cols::_search_vector = "\"search_vector\"";
+const std::string Project::Cols::_created_at = "\"created_at\"";
 const std::string Project::primaryKeyName = "id";
 const bool Project::hasPrimaryKey = true;
 const std::string Project::tableName = "\"project\"";
@@ -34,10 +34,10 @@ const std::vector<typename Project::MetaData> Project::metaData_={
 {"source_repo","std::string","text",0,0,0,1},
 {"source_branch","std::string","text",0,0,0,1},
 {"is_community","bool","boolean",1,0,0,1},
-{"created_at","::trantor::Date","timestamp without time zone",0,0,0,1},
-{"search_vector","std::string","tsvector",0,0,0,0},
 {"type","std::string","character varying",255,0,0,1},
-{"platforms","std::string","character varying",255,0,0,0}
+{"platforms","std::string","character varying",255,0,0,1},
+{"search_vector","std::string","tsvector",0,0,0,0},
+{"created_at","::trantor::Date","timestamp without time zone",0,0,0,1}
 };
 const std::string &Project::getColumnName(size_t index) noexcept(false)
 {
@@ -72,6 +72,18 @@ Project::Project(const Row &r, const ssize_t indexOffset) noexcept
         {
             isCommunity_=std::make_shared<bool>(r["is_community"].as<bool>());
         }
+        if(!r["type"].isNull())
+        {
+            type_=std::make_shared<std::string>(r["type"].as<std::string>());
+        }
+        if(!r["platforms"].isNull())
+        {
+            platforms_=std::make_shared<std::string>(r["platforms"].as<std::string>());
+        }
+        if(!r["search_vector"].isNull())
+        {
+            searchVector_=std::make_shared<std::string>(r["search_vector"].as<std::string>());
+        }
         if(!r["created_at"].isNull())
         {
             auto timeStr = r["created_at"].as<std::string>();
@@ -93,18 +105,6 @@ Project::Project(const Row &r, const ssize_t indexOffset) noexcept
                 }
                 createdAt_=std::make_shared<::trantor::Date>(t*1000000+decimalNum);
             }
-        }
-        if(!r["search_vector"].isNull())
-        {
-            searchVector_=std::make_shared<std::string>(r["search_vector"].as<std::string>());
-        }
-        if(!r["type"].isNull())
-        {
-            type_=std::make_shared<std::string>(r["type"].as<std::string>());
-        }
-        if(!r["platforms"].isNull())
-        {
-            platforms_=std::make_shared<std::string>(r["platforms"].as<std::string>());
         }
     }
     else
@@ -149,6 +149,21 @@ Project::Project(const Row &r, const ssize_t indexOffset) noexcept
         index = offset + 6;
         if(!r[index].isNull())
         {
+            type_=std::make_shared<std::string>(r[index].as<std::string>());
+        }
+        index = offset + 7;
+        if(!r[index].isNull())
+        {
+            platforms_=std::make_shared<std::string>(r[index].as<std::string>());
+        }
+        index = offset + 8;
+        if(!r[index].isNull())
+        {
+            searchVector_=std::make_shared<std::string>(r[index].as<std::string>());
+        }
+        index = offset + 9;
+        if(!r[index].isNull())
+        {
             auto timeStr = r[index].as<std::string>();
             struct tm stm;
             memset(&stm,0,sizeof(stm));
@@ -168,21 +183,6 @@ Project::Project(const Row &r, const ssize_t indexOffset) noexcept
                 }
                 createdAt_=std::make_shared<::trantor::Date>(t*1000000+decimalNum);
             }
-        }
-        index = offset + 7;
-        if(!r[index].isNull())
-        {
-            searchVector_=std::make_shared<std::string>(r[index].as<std::string>());
-        }
-        index = offset + 8;
-        if(!r[index].isNull())
-        {
-            type_=std::make_shared<std::string>(r[index].as<std::string>());
-        }
-        index = offset + 9;
-        if(!r[index].isNull())
-        {
-            platforms_=std::make_shared<std::string>(r[index].as<std::string>());
         }
     }
 
@@ -248,7 +248,31 @@ Project::Project(const Json::Value &pJson, const std::vector<std::string> &pMasq
         dirtyFlag_[6] = true;
         if(!pJson[pMasqueradingVector[6]].isNull())
         {
-            auto timeStr = pJson[pMasqueradingVector[6]].asString();
+            type_=std::make_shared<std::string>(pJson[pMasqueradingVector[6]].asString());
+        }
+    }
+    if(!pMasqueradingVector[7].empty() && pJson.isMember(pMasqueradingVector[7]))
+    {
+        dirtyFlag_[7] = true;
+        if(!pJson[pMasqueradingVector[7]].isNull())
+        {
+            platforms_=std::make_shared<std::string>(pJson[pMasqueradingVector[7]].asString());
+        }
+    }
+    if(!pMasqueradingVector[8].empty() && pJson.isMember(pMasqueradingVector[8]))
+    {
+        dirtyFlag_[8] = true;
+        if(!pJson[pMasqueradingVector[8]].isNull())
+        {
+            searchVector_=std::make_shared<std::string>(pJson[pMasqueradingVector[8]].asString());
+        }
+    }
+    if(!pMasqueradingVector[9].empty() && pJson.isMember(pMasqueradingVector[9]))
+    {
+        dirtyFlag_[9] = true;
+        if(!pJson[pMasqueradingVector[9]].isNull())
+        {
+            auto timeStr = pJson[pMasqueradingVector[9]].asString();
             struct tm stm;
             memset(&stm,0,sizeof(stm));
             auto p = strptime(timeStr.c_str(),"%Y-%m-%d %H:%M:%S",&stm);
@@ -267,30 +291,6 @@ Project::Project(const Json::Value &pJson, const std::vector<std::string> &pMasq
                 }
                 createdAt_=std::make_shared<::trantor::Date>(t*1000000+decimalNum);
             }
-        }
-    }
-    if(!pMasqueradingVector[7].empty() && pJson.isMember(pMasqueradingVector[7]))
-    {
-        dirtyFlag_[7] = true;
-        if(!pJson[pMasqueradingVector[7]].isNull())
-        {
-            searchVector_=std::make_shared<std::string>(pJson[pMasqueradingVector[7]].asString());
-        }
-    }
-    if(!pMasqueradingVector[8].empty() && pJson.isMember(pMasqueradingVector[8]))
-    {
-        dirtyFlag_[8] = true;
-        if(!pJson[pMasqueradingVector[8]].isNull())
-        {
-            type_=std::make_shared<std::string>(pJson[pMasqueradingVector[8]].asString());
-        }
-    }
-    if(!pMasqueradingVector[9].empty() && pJson.isMember(pMasqueradingVector[9]))
-    {
-        dirtyFlag_[9] = true;
-        if(!pJson[pMasqueradingVector[9]].isNull())
-        {
-            platforms_=std::make_shared<std::string>(pJson[pMasqueradingVector[9]].asString());
         }
     }
 }
@@ -345,9 +345,33 @@ Project::Project(const Json::Value &pJson) noexcept(false)
             isCommunity_=std::make_shared<bool>(pJson["is_community"].asBool());
         }
     }
-    if(pJson.isMember("created_at"))
+    if(pJson.isMember("type"))
     {
         dirtyFlag_[6]=true;
+        if(!pJson["type"].isNull())
+        {
+            type_=std::make_shared<std::string>(pJson["type"].asString());
+        }
+    }
+    if(pJson.isMember("platforms"))
+    {
+        dirtyFlag_[7]=true;
+        if(!pJson["platforms"].isNull())
+        {
+            platforms_=std::make_shared<std::string>(pJson["platforms"].asString());
+        }
+    }
+    if(pJson.isMember("search_vector"))
+    {
+        dirtyFlag_[8]=true;
+        if(!pJson["search_vector"].isNull())
+        {
+            searchVector_=std::make_shared<std::string>(pJson["search_vector"].asString());
+        }
+    }
+    if(pJson.isMember("created_at"))
+    {
+        dirtyFlag_[9]=true;
         if(!pJson["created_at"].isNull())
         {
             auto timeStr = pJson["created_at"].asString();
@@ -369,30 +393,6 @@ Project::Project(const Json::Value &pJson) noexcept(false)
                 }
                 createdAt_=std::make_shared<::trantor::Date>(t*1000000+decimalNum);
             }
-        }
-    }
-    if(pJson.isMember("search_vector"))
-    {
-        dirtyFlag_[7]=true;
-        if(!pJson["search_vector"].isNull())
-        {
-            searchVector_=std::make_shared<std::string>(pJson["search_vector"].asString());
-        }
-    }
-    if(pJson.isMember("type"))
-    {
-        dirtyFlag_[8]=true;
-        if(!pJson["type"].isNull())
-        {
-            type_=std::make_shared<std::string>(pJson["type"].asString());
-        }
-    }
-    if(pJson.isMember("platforms"))
-    {
-        dirtyFlag_[9]=true;
-        if(!pJson["platforms"].isNull())
-        {
-            platforms_=std::make_shared<std::string>(pJson["platforms"].asString());
         }
     }
 }
@@ -457,7 +457,31 @@ void Project::updateByMasqueradedJson(const Json::Value &pJson,
         dirtyFlag_[6] = true;
         if(!pJson[pMasqueradingVector[6]].isNull())
         {
-            auto timeStr = pJson[pMasqueradingVector[6]].asString();
+            type_=std::make_shared<std::string>(pJson[pMasqueradingVector[6]].asString());
+        }
+    }
+    if(!pMasqueradingVector[7].empty() && pJson.isMember(pMasqueradingVector[7]))
+    {
+        dirtyFlag_[7] = true;
+        if(!pJson[pMasqueradingVector[7]].isNull())
+        {
+            platforms_=std::make_shared<std::string>(pJson[pMasqueradingVector[7]].asString());
+        }
+    }
+    if(!pMasqueradingVector[8].empty() && pJson.isMember(pMasqueradingVector[8]))
+    {
+        dirtyFlag_[8] = true;
+        if(!pJson[pMasqueradingVector[8]].isNull())
+        {
+            searchVector_=std::make_shared<std::string>(pJson[pMasqueradingVector[8]].asString());
+        }
+    }
+    if(!pMasqueradingVector[9].empty() && pJson.isMember(pMasqueradingVector[9]))
+    {
+        dirtyFlag_[9] = true;
+        if(!pJson[pMasqueradingVector[9]].isNull())
+        {
+            auto timeStr = pJson[pMasqueradingVector[9]].asString();
             struct tm stm;
             memset(&stm,0,sizeof(stm));
             auto p = strptime(timeStr.c_str(),"%Y-%m-%d %H:%M:%S",&stm);
@@ -476,30 +500,6 @@ void Project::updateByMasqueradedJson(const Json::Value &pJson,
                 }
                 createdAt_=std::make_shared<::trantor::Date>(t*1000000+decimalNum);
             }
-        }
-    }
-    if(!pMasqueradingVector[7].empty() && pJson.isMember(pMasqueradingVector[7]))
-    {
-        dirtyFlag_[7] = true;
-        if(!pJson[pMasqueradingVector[7]].isNull())
-        {
-            searchVector_=std::make_shared<std::string>(pJson[pMasqueradingVector[7]].asString());
-        }
-    }
-    if(!pMasqueradingVector[8].empty() && pJson.isMember(pMasqueradingVector[8]))
-    {
-        dirtyFlag_[8] = true;
-        if(!pJson[pMasqueradingVector[8]].isNull())
-        {
-            type_=std::make_shared<std::string>(pJson[pMasqueradingVector[8]].asString());
-        }
-    }
-    if(!pMasqueradingVector[9].empty() && pJson.isMember(pMasqueradingVector[9]))
-    {
-        dirtyFlag_[9] = true;
-        if(!pJson[pMasqueradingVector[9]].isNull())
-        {
-            platforms_=std::make_shared<std::string>(pJson[pMasqueradingVector[9]].asString());
         }
     }
 }
@@ -553,9 +553,33 @@ void Project::updateByJson(const Json::Value &pJson) noexcept(false)
             isCommunity_=std::make_shared<bool>(pJson["is_community"].asBool());
         }
     }
-    if(pJson.isMember("created_at"))
+    if(pJson.isMember("type"))
     {
         dirtyFlag_[6] = true;
+        if(!pJson["type"].isNull())
+        {
+            type_=std::make_shared<std::string>(pJson["type"].asString());
+        }
+    }
+    if(pJson.isMember("platforms"))
+    {
+        dirtyFlag_[7] = true;
+        if(!pJson["platforms"].isNull())
+        {
+            platforms_=std::make_shared<std::string>(pJson["platforms"].asString());
+        }
+    }
+    if(pJson.isMember("search_vector"))
+    {
+        dirtyFlag_[8] = true;
+        if(!pJson["search_vector"].isNull())
+        {
+            searchVector_=std::make_shared<std::string>(pJson["search_vector"].asString());
+        }
+    }
+    if(pJson.isMember("created_at"))
+    {
+        dirtyFlag_[9] = true;
         if(!pJson["created_at"].isNull())
         {
             auto timeStr = pJson["created_at"].asString();
@@ -577,30 +601,6 @@ void Project::updateByJson(const Json::Value &pJson) noexcept(false)
                 }
                 createdAt_=std::make_shared<::trantor::Date>(t*1000000+decimalNum);
             }
-        }
-    }
-    if(pJson.isMember("search_vector"))
-    {
-        dirtyFlag_[7] = true;
-        if(!pJson["search_vector"].isNull())
-        {
-            searchVector_=std::make_shared<std::string>(pJson["search_vector"].asString());
-        }
-    }
-    if(pJson.isMember("type"))
-    {
-        dirtyFlag_[8] = true;
-        if(!pJson["type"].isNull())
-        {
-            type_=std::make_shared<std::string>(pJson["type"].asString());
-        }
-    }
-    if(pJson.isMember("platforms"))
-    {
-        dirtyFlag_[9] = true;
-        if(!pJson["platforms"].isNull())
-        {
-            platforms_=std::make_shared<std::string>(pJson["platforms"].asString());
         }
     }
 }
@@ -737,50 +737,6 @@ void Project::setIsCommunity(const bool &pIsCommunity) noexcept
     dirtyFlag_[5] = true;
 }
 
-const ::trantor::Date &Project::getValueOfCreatedAt() const noexcept
-{
-    static const ::trantor::Date defaultValue = ::trantor::Date();
-    if(createdAt_)
-        return *createdAt_;
-    return defaultValue;
-}
-const std::shared_ptr<::trantor::Date> &Project::getCreatedAt() const noexcept
-{
-    return createdAt_;
-}
-void Project::setCreatedAt(const ::trantor::Date &pCreatedAt) noexcept
-{
-    createdAt_ = std::make_shared<::trantor::Date>(pCreatedAt);
-    dirtyFlag_[6] = true;
-}
-
-const std::string &Project::getValueOfSearchVector() const noexcept
-{
-    static const std::string defaultValue = std::string();
-    if(searchVector_)
-        return *searchVector_;
-    return defaultValue;
-}
-const std::shared_ptr<std::string> &Project::getSearchVector() const noexcept
-{
-    return searchVector_;
-}
-void Project::setSearchVector(const std::string &pSearchVector) noexcept
-{
-    searchVector_ = std::make_shared<std::string>(pSearchVector);
-    dirtyFlag_[7] = true;
-}
-void Project::setSearchVector(std::string &&pSearchVector) noexcept
-{
-    searchVector_ = std::make_shared<std::string>(std::move(pSearchVector));
-    dirtyFlag_[7] = true;
-}
-void Project::setSearchVectorToNull() noexcept
-{
-    searchVector_.reset();
-    dirtyFlag_[7] = true;
-}
-
 const std::string &Project::getValueOfType() const noexcept
 {
     static const std::string defaultValue = std::string();
@@ -795,12 +751,12 @@ const std::shared_ptr<std::string> &Project::getType() const noexcept
 void Project::setType(const std::string &pType) noexcept
 {
     type_ = std::make_shared<std::string>(pType);
-    dirtyFlag_[8] = true;
+    dirtyFlag_[6] = true;
 }
 void Project::setType(std::string &&pType) noexcept
 {
     type_ = std::make_shared<std::string>(std::move(pType));
-    dirtyFlag_[8] = true;
+    dirtyFlag_[6] = true;
 }
 
 const std::string &Project::getValueOfPlatforms() const noexcept
@@ -817,16 +773,55 @@ const std::shared_ptr<std::string> &Project::getPlatforms() const noexcept
 void Project::setPlatforms(const std::string &pPlatforms) noexcept
 {
     platforms_ = std::make_shared<std::string>(pPlatforms);
-    dirtyFlag_[9] = true;
+    dirtyFlag_[7] = true;
 }
 void Project::setPlatforms(std::string &&pPlatforms) noexcept
 {
     platforms_ = std::make_shared<std::string>(std::move(pPlatforms));
-    dirtyFlag_[9] = true;
+    dirtyFlag_[7] = true;
 }
-void Project::setPlatformsToNull() noexcept
+
+const std::string &Project::getValueOfSearchVector() const noexcept
 {
-    platforms_.reset();
+    static const std::string defaultValue = std::string();
+    if(searchVector_)
+        return *searchVector_;
+    return defaultValue;
+}
+const std::shared_ptr<std::string> &Project::getSearchVector() const noexcept
+{
+    return searchVector_;
+}
+void Project::setSearchVector(const std::string &pSearchVector) noexcept
+{
+    searchVector_ = std::make_shared<std::string>(pSearchVector);
+    dirtyFlag_[8] = true;
+}
+void Project::setSearchVector(std::string &&pSearchVector) noexcept
+{
+    searchVector_ = std::make_shared<std::string>(std::move(pSearchVector));
+    dirtyFlag_[8] = true;
+}
+void Project::setSearchVectorToNull() noexcept
+{
+    searchVector_.reset();
+    dirtyFlag_[8] = true;
+}
+
+const ::trantor::Date &Project::getValueOfCreatedAt() const noexcept
+{
+    static const ::trantor::Date defaultValue = ::trantor::Date();
+    if(createdAt_)
+        return *createdAt_;
+    return defaultValue;
+}
+const std::shared_ptr<::trantor::Date> &Project::getCreatedAt() const noexcept
+{
+    return createdAt_;
+}
+void Project::setCreatedAt(const ::trantor::Date &pCreatedAt) noexcept
+{
+    createdAt_ = std::make_shared<::trantor::Date>(pCreatedAt);
     dirtyFlag_[9] = true;
 }
 
@@ -843,10 +838,10 @@ const std::vector<std::string> &Project::insertColumns() noexcept
         "source_repo",
         "source_branch",
         "is_community",
-        "created_at",
-        "search_vector",
         "type",
-        "platforms"
+        "platforms",
+        "search_vector",
+        "created_at"
     };
     return inCols;
 }
@@ -921,9 +916,9 @@ void Project::outputArgs(drogon::orm::internal::SqlBinder &binder) const
     }
     if(dirtyFlag_[6])
     {
-        if(getCreatedAt())
+        if(getType())
         {
-            binder << getValueOfCreatedAt();
+            binder << getValueOfType();
         }
         else
         {
@@ -931,6 +926,17 @@ void Project::outputArgs(drogon::orm::internal::SqlBinder &binder) const
         }
     }
     if(dirtyFlag_[7])
+    {
+        if(getPlatforms())
+        {
+            binder << getValueOfPlatforms();
+        }
+        else
+        {
+            binder << nullptr;
+        }
+    }
+    if(dirtyFlag_[8])
     {
         if(getSearchVector())
         {
@@ -941,22 +947,11 @@ void Project::outputArgs(drogon::orm::internal::SqlBinder &binder) const
             binder << nullptr;
         }
     }
-    if(dirtyFlag_[8])
-    {
-        if(getType())
-        {
-            binder << getValueOfType();
-        }
-        else
-        {
-            binder << nullptr;
-        }
-    }
     if(dirtyFlag_[9])
     {
-        if(getPlatforms())
+        if(getCreatedAt())
         {
-            binder << getValueOfPlatforms();
+            binder << getValueOfCreatedAt();
         }
         else
         {
@@ -1081,9 +1076,9 @@ void Project::updateArgs(drogon::orm::internal::SqlBinder &binder) const
     }
     if(dirtyFlag_[6])
     {
-        if(getCreatedAt())
+        if(getType())
         {
-            binder << getValueOfCreatedAt();
+            binder << getValueOfType();
         }
         else
         {
@@ -1091,6 +1086,17 @@ void Project::updateArgs(drogon::orm::internal::SqlBinder &binder) const
         }
     }
     if(dirtyFlag_[7])
+    {
+        if(getPlatforms())
+        {
+            binder << getValueOfPlatforms();
+        }
+        else
+        {
+            binder << nullptr;
+        }
+    }
+    if(dirtyFlag_[8])
     {
         if(getSearchVector())
         {
@@ -1101,22 +1107,11 @@ void Project::updateArgs(drogon::orm::internal::SqlBinder &binder) const
             binder << nullptr;
         }
     }
-    if(dirtyFlag_[8])
-    {
-        if(getType())
-        {
-            binder << getValueOfType();
-        }
-        else
-        {
-            binder << nullptr;
-        }
-    }
     if(dirtyFlag_[9])
     {
-        if(getPlatforms())
+        if(getCreatedAt())
         {
-            binder << getValueOfPlatforms();
+            binder << getValueOfCreatedAt();
         }
         else
         {
@@ -1175,22 +1170,6 @@ Json::Value Project::toJson() const
     {
         ret["is_community"]=Json::Value();
     }
-    if(getCreatedAt())
-    {
-        ret["created_at"]=getCreatedAt()->toDbStringLocal();
-    }
-    else
-    {
-        ret["created_at"]=Json::Value();
-    }
-    if(getSearchVector())
-    {
-        ret["search_vector"]=getValueOfSearchVector();
-    }
-    else
-    {
-        ret["search_vector"]=Json::Value();
-    }
     if(getType())
     {
         ret["type"]=getValueOfType();
@@ -1206,6 +1185,22 @@ Json::Value Project::toJson() const
     else
     {
         ret["platforms"]=Json::Value();
+    }
+    if(getSearchVector())
+    {
+        ret["search_vector"]=getValueOfSearchVector();
+    }
+    else
+    {
+        ret["search_vector"]=Json::Value();
+    }
+    if(getCreatedAt())
+    {
+        ret["created_at"]=getCreatedAt()->toDbStringLocal();
+    }
+    else
+    {
+        ret["created_at"]=Json::Value();
     }
     return ret;
 }
@@ -1284,9 +1279,9 @@ Json::Value Project::toMasqueradedJson(
         }
         if(!pMasqueradingVector[6].empty())
         {
-            if(getCreatedAt())
+            if(getType())
             {
-                ret[pMasqueradingVector[6]]=getCreatedAt()->toDbStringLocal();
+                ret[pMasqueradingVector[6]]=getValueOfType();
             }
             else
             {
@@ -1295,9 +1290,9 @@ Json::Value Project::toMasqueradedJson(
         }
         if(!pMasqueradingVector[7].empty())
         {
-            if(getSearchVector())
+            if(getPlatforms())
             {
-                ret[pMasqueradingVector[7]]=getValueOfSearchVector();
+                ret[pMasqueradingVector[7]]=getValueOfPlatforms();
             }
             else
             {
@@ -1306,9 +1301,9 @@ Json::Value Project::toMasqueradedJson(
         }
         if(!pMasqueradingVector[8].empty())
         {
-            if(getType())
+            if(getSearchVector())
             {
-                ret[pMasqueradingVector[8]]=getValueOfType();
+                ret[pMasqueradingVector[8]]=getValueOfSearchVector();
             }
             else
             {
@@ -1317,9 +1312,9 @@ Json::Value Project::toMasqueradedJson(
         }
         if(!pMasqueradingVector[9].empty())
         {
-            if(getPlatforms())
+            if(getCreatedAt())
             {
-                ret[pMasqueradingVector[9]]=getValueOfPlatforms();
+                ret[pMasqueradingVector[9]]=getCreatedAt()->toDbStringLocal();
             }
             else
             {
@@ -1377,22 +1372,6 @@ Json::Value Project::toMasqueradedJson(
     {
         ret["is_community"]=Json::Value();
     }
-    if(getCreatedAt())
-    {
-        ret["created_at"]=getCreatedAt()->toDbStringLocal();
-    }
-    else
-    {
-        ret["created_at"]=Json::Value();
-    }
-    if(getSearchVector())
-    {
-        ret["search_vector"]=getValueOfSearchVector();
-    }
-    else
-    {
-        ret["search_vector"]=Json::Value();
-    }
     if(getType())
     {
         ret["type"]=getValueOfType();
@@ -1408,6 +1387,22 @@ Json::Value Project::toMasqueradedJson(
     else
     {
         ret["platforms"]=Json::Value();
+    }
+    if(getSearchVector())
+    {
+        ret["search_vector"]=getValueOfSearchVector();
+    }
+    else
+    {
+        ret["search_vector"]=Json::Value();
+    }
+    if(getCreatedAt())
+    {
+        ret["created_at"]=getCreatedAt()->toDbStringLocal();
+    }
+    else
+    {
+        ret["created_at"]=Json::Value();
     }
     return ret;
 }
@@ -1469,24 +1464,34 @@ bool Project::validateJsonForCreation(const Json::Value &pJson, std::string &err
         if(!validJsonOfField(5, "is_community", pJson["is_community"], err, true))
             return false;
     }
-    if(pJson.isMember("created_at"))
-    {
-        if(!validJsonOfField(6, "created_at", pJson["created_at"], err, true))
-            return false;
-    }
-    if(pJson.isMember("search_vector"))
-    {
-        if(!validJsonOfField(7, "search_vector", pJson["search_vector"], err, true))
-            return false;
-    }
     if(pJson.isMember("type"))
     {
-        if(!validJsonOfField(8, "type", pJson["type"], err, true))
+        if(!validJsonOfField(6, "type", pJson["type"], err, true))
             return false;
+    }
+    else
+    {
+        err="The type column cannot be null";
+        return false;
     }
     if(pJson.isMember("platforms"))
     {
-        if(!validJsonOfField(9, "platforms", pJson["platforms"], err, true))
+        if(!validJsonOfField(7, "platforms", pJson["platforms"], err, true))
+            return false;
+    }
+    else
+    {
+        err="The platforms column cannot be null";
+        return false;
+    }
+    if(pJson.isMember("search_vector"))
+    {
+        if(!validJsonOfField(8, "search_vector", pJson["search_vector"], err, true))
+            return false;
+    }
+    if(pJson.isMember("created_at"))
+    {
+        if(!validJsonOfField(9, "created_at", pJson["created_at"], err, true))
             return false;
     }
     return true;
@@ -1581,6 +1586,11 @@ bool Project::validateMasqueradedJsonForCreation(const Json::Value &pJson,
               if(!validJsonOfField(6, pMasqueradingVector[6], pJson[pMasqueradingVector[6]], err, true))
                   return false;
           }
+        else
+        {
+            err="The " + pMasqueradingVector[6] + " column cannot be null";
+            return false;
+        }
       }
       if(!pMasqueradingVector[7].empty())
       {
@@ -1589,6 +1599,11 @@ bool Project::validateMasqueradedJsonForCreation(const Json::Value &pJson,
               if(!validJsonOfField(7, pMasqueradingVector[7], pJson[pMasqueradingVector[7]], err, true))
                   return false;
           }
+        else
+        {
+            err="The " + pMasqueradingVector[7] + " column cannot be null";
+            return false;
+        }
       }
       if(!pMasqueradingVector[8].empty())
       {
@@ -1651,24 +1666,24 @@ bool Project::validateJsonForUpdate(const Json::Value &pJson, std::string &err)
         if(!validJsonOfField(5, "is_community", pJson["is_community"], err, false))
             return false;
     }
-    if(pJson.isMember("created_at"))
-    {
-        if(!validJsonOfField(6, "created_at", pJson["created_at"], err, false))
-            return false;
-    }
-    if(pJson.isMember("search_vector"))
-    {
-        if(!validJsonOfField(7, "search_vector", pJson["search_vector"], err, false))
-            return false;
-    }
     if(pJson.isMember("type"))
     {
-        if(!validJsonOfField(8, "type", pJson["type"], err, false))
+        if(!validJsonOfField(6, "type", pJson["type"], err, false))
             return false;
     }
     if(pJson.isMember("platforms"))
     {
-        if(!validJsonOfField(9, "platforms", pJson["platforms"], err, false))
+        if(!validJsonOfField(7, "platforms", pJson["platforms"], err, false))
+            return false;
+    }
+    if(pJson.isMember("search_vector"))
+    {
+        if(!validJsonOfField(8, "search_vector", pJson["search_vector"], err, false))
+            return false;
+    }
+    if(pJson.isMember("created_at"))
+    {
+        if(!validJsonOfField(9, "created_at", pJson["created_at"], err, false))
             return false;
     }
     return true;
@@ -1837,19 +1852,16 @@ bool Project::validJsonOfField(size_t index,
                 err="Type error in the "+fieldName+" field";
                 return false;
             }
-            break;
-        case 7:
-            if(pJson.isNull())
+            if(pJson.isString() && std::strlen(pJson.asCString()) > 255)
             {
-                return true;
-            }
-            if(!pJson.isString())
-            {
-                err="Type error in the "+fieldName+" field";
+                err="String length exceeds limit for the " +
+                    fieldName +
+                    " field (the maximum value is 255)";
                 return false;
             }
+
             break;
-        case 8:
+        case 7:
             if(pJson.isNull())
             {
                 err="The " + fieldName + " column cannot be null";
@@ -1869,7 +1881,7 @@ bool Project::validJsonOfField(size_t index,
             }
 
             break;
-        case 9:
+        case 8:
             if(pJson.isNull())
             {
                 return true;
@@ -1879,14 +1891,18 @@ bool Project::validJsonOfField(size_t index,
                 err="Type error in the "+fieldName+" field";
                 return false;
             }
-            if(pJson.isString() && std::strlen(pJson.asCString()) > 255)
+            break;
+        case 9:
+            if(pJson.isNull())
             {
-                err="String length exceeds limit for the " +
-                    fieldName +
-                    " field (the maximum value is 255)";
+                err="The " + fieldName + " column cannot be null";
                 return false;
             }
-
+            if(!pJson.isString())
+            {
+                err="Type error in the "+fieldName+" field";
+                return false;
+            }
             break;
         default:
             err="Internal error in the server";

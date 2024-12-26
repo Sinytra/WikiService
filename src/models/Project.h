@@ -50,10 +50,10 @@ class Project
         static const std::string _source_repo;
         static const std::string _source_branch;
         static const std::string _is_community;
-        static const std::string _created_at;
-        static const std::string _search_vector;
         static const std::string _type;
         static const std::string _platforms;
+        static const std::string _search_vector;
+        static const std::string _created_at;
     };
 
     static const int primaryKeyNumber;
@@ -158,24 +158,6 @@ class Project
     ///Set the value of the column is_community
     void setIsCommunity(const bool &pIsCommunity) noexcept;
 
-    /**  For column created_at  */
-    ///Get the value of the column created_at, returns the default value if the column is null
-    const ::trantor::Date &getValueOfCreatedAt() const noexcept;
-    ///Return a shared_ptr object pointing to the column const value, or an empty shared_ptr object if the column is null
-    const std::shared_ptr<::trantor::Date> &getCreatedAt() const noexcept;
-    ///Set the value of the column created_at
-    void setCreatedAt(const ::trantor::Date &pCreatedAt) noexcept;
-
-    /**  For column search_vector  */
-    ///Get the value of the column search_vector, returns the default value if the column is null
-    const std::string &getValueOfSearchVector() const noexcept;
-    ///Return a shared_ptr object pointing to the column const value, or an empty shared_ptr object if the column is null
-    const std::shared_ptr<std::string> &getSearchVector() const noexcept;
-    ///Set the value of the column search_vector
-    void setSearchVector(const std::string &pSearchVector) noexcept;
-    void setSearchVector(std::string &&pSearchVector) noexcept;
-    void setSearchVectorToNull() noexcept;
-
     /**  For column type  */
     ///Get the value of the column type, returns the default value if the column is null
     const std::string &getValueOfType() const noexcept;
@@ -193,7 +175,24 @@ class Project
     ///Set the value of the column platforms
     void setPlatforms(const std::string &pPlatforms) noexcept;
     void setPlatforms(std::string &&pPlatforms) noexcept;
-    void setPlatformsToNull() noexcept;
+
+    /**  For column search_vector  */
+    ///Get the value of the column search_vector, returns the default value if the column is null
+    const std::string &getValueOfSearchVector() const noexcept;
+    ///Return a shared_ptr object pointing to the column const value, or an empty shared_ptr object if the column is null
+    const std::shared_ptr<std::string> &getSearchVector() const noexcept;
+    ///Set the value of the column search_vector
+    void setSearchVector(const std::string &pSearchVector) noexcept;
+    void setSearchVector(std::string &&pSearchVector) noexcept;
+    void setSearchVectorToNull() noexcept;
+
+    /**  For column created_at  */
+    ///Get the value of the column created_at, returns the default value if the column is null
+    const ::trantor::Date &getValueOfCreatedAt() const noexcept;
+    ///Return a shared_ptr object pointing to the column const value, or an empty shared_ptr object if the column is null
+    const std::shared_ptr<::trantor::Date> &getCreatedAt() const noexcept;
+    ///Set the value of the column created_at
+    void setCreatedAt(const ::trantor::Date &pCreatedAt) noexcept;
 
 
     static size_t getColumnNumber() noexcept {  return 10;  }
@@ -223,10 +222,10 @@ class Project
     std::shared_ptr<std::string> sourceRepo_;
     std::shared_ptr<std::string> sourceBranch_;
     std::shared_ptr<bool> isCommunity_;
-    std::shared_ptr<::trantor::Date> createdAt_;
-    std::shared_ptr<std::string> searchVector_;
     std::shared_ptr<std::string> type_;
     std::shared_ptr<std::string> platforms_;
+    std::shared_ptr<std::string> searchVector_;
+    std::shared_ptr<::trantor::Date> createdAt_;
     struct MetaData
     {
         const std::string colName_;
@@ -287,27 +286,26 @@ class Project
         {
             needSelection=true;
         }
-        sql += "created_at,";
-        ++parametersCount;
-        if(!dirtyFlag_[6])
+        if(dirtyFlag_[6])
         {
-            needSelection=true;
+            sql += "type,";
+            ++parametersCount;
         }
         if(dirtyFlag_[7])
+        {
+            sql += "platforms,";
+            ++parametersCount;
+        }
+        if(dirtyFlag_[8])
         {
             sql += "search_vector,";
             ++parametersCount;
         }
-        sql += "type,";
+        sql += "created_at,";
         ++parametersCount;
-        if(!dirtyFlag_[8])
+        if(!dirtyFlag_[9])
         {
             needSelection=true;
-        }
-        if(dirtyFlag_[9])
-        {
-            sql += "platforms,";
-            ++parametersCount;
         }
         if(parametersCount > 0)
         {
@@ -359,10 +357,6 @@ class Project
             n = snprintf(placeholderStr,sizeof(placeholderStr),"$%d,",placeholder++);
             sql.append(placeholderStr, n);
         }
-        else
-        {
-            sql +="default,";
-        }
         if(dirtyFlag_[7])
         {
             n = snprintf(placeholderStr,sizeof(placeholderStr),"$%d,",placeholder++);
@@ -373,14 +367,14 @@ class Project
             n = snprintf(placeholderStr,sizeof(placeholderStr),"$%d,",placeholder++);
             sql.append(placeholderStr, n);
         }
-        else
-        {
-            sql +="default,";
-        }
         if(dirtyFlag_[9])
         {
             n = snprintf(placeholderStr,sizeof(placeholderStr),"$%d,",placeholder++);
             sql.append(placeholderStr, n);
+        }
+        else
+        {
+            sql +="default,";
         }
         if(parametersCount > 0)
         {
