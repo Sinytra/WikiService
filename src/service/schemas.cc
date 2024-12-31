@@ -33,32 +33,54 @@ nlohmann::json schemas::projectUpdate = R"(
 nlohmann::json schemas::projectMetadata = R"(
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "title": "Wiki Documentation Metadata",
+    "title": "Sinytra Wiki Documentation Metadata",
     "description": "Provides documentation project meta information",
     "type": "object",
     "properties": {
         "id": {
-            "description": "Unique project ID that identifies the project across the wiki. We recommend using your modid.",
+            "description": "Unique project ID that identifies the project across the wiki. We recommend using your projectid.",
             "type": "string",
             "minLength": 2,
             "maxLength": 126,
             "pattern": "^[a-z]+[a-z0-9-]+$"
         },
-        "platform": {
-            "description": "Your mod's distribution platform.",
-            "enum": ["curseforge", "modrinth"]
-        },
-        "slug": {
-            "description": "The host platform's project slug.",
-            "type": "string"
+        "platforms": {
+            "description": "A map of your project's available distribution platforms to platform project slugs.",
+            "type": "object",
+            "additionalProperties": { "type": "string" }
         },
         "versions": {
             "description": "A map of additional minecraft versions to git branch names to make available.",
             "type": "object",
             "additionalProperties": { "type": "string" }
+        },
+        "platform": {
+            "description": "Your project's distribution platform. Deprecated: use 'platforms' instead",
+            "enum": ["curseforge", "modrinth"],
+            "deprecated": true
+        },
+        "slug": {
+            "description": "The host platform's project slug. Deprecated: use 'platforms' instead",
+            "type": "string",
+            "deprecated": true
         }
     },
-    "required": ["id", "platform", "slug"]
+    "allOf": [
+        {
+            "required": ["id"]
+        },
+        {
+            "oneOf": [
+                {
+                    "required": ["platform", "slug"],
+                    "deprecated": true
+                },
+                {
+                    "required": ["platforms"]
+                }
+            ]
+        }
+    ]
 }
 )"_json;
 
@@ -96,6 +118,15 @@ nlohmann::json schemas::systemConfig = R"(
                 "client_secret": { "type": "string" },
                 "redirect_url": { "type": "string" }
             }
+        },
+        "cloudflare": {
+            "type": "object",
+            "properties": {
+                "token": { "type": "string" },
+                "account_tag": { "type": "string" },
+                "site_tag": { "type": "string"}
+            },
+            "required": ["token", "account_tag", "site_tag"]
         },
         "curseforge_key": { "type": "string" },
         "api_key": { "type": "string" }

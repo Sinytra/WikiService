@@ -34,8 +34,71 @@ namespace api::v1 {
         co_return false;
     }
 
-    ProjectsController::ProjectsController(GitHub &gh, Platforms &pf, Database &db, Documentation &dc) :
-        github_(gh), platforms_(pf), database_(db), documentation_(dc) {}
+    nlohmann::json processPlatforms(const std::vector<std::string> &valid, const Json::Value &metadata) {
+        nlohmann::json projects(nlohmann::json::value_t::object);
+        if (metadata.isMember("platforms") && metadata["platforms"].isObject()) {
+            const auto platforms = metadata["platforms"];
+            for (const auto &platform: valid) {
+                if (platforms.isMember(platform) && platforms[platform].isString()) {
+                    projects[platform] = platforms[platform].asString();
+                }
+            }
+        }
+        if (metadata.isMember("platform") && metadata["platform"].isString() && !projects.contains(metadata["platform"].asString()) &&
+            metadata.isMember("slug") && metadata["slug"].isString())
+        {
+            projects[metadata["platform"].asString()] = metadata["slug"].asString();
+        }
+        return projects;
+    }
+
+    ProjectsController::ProjectsController(GitHub &gh, Platforms &pf, Database &db, Documentation &dc, CloudFlare &cf) :
+        github_(gh), platforms_(pf), database_(db), documentation_(dc), cloudflare(cf) {}
+
+    Task<std::optional<PlatformProject>> ProjectsController::validatePlatform(const std::string &id, const std::string &repo,
+                                                                              const std::string &mrCode, const std::string &platform,
+                                                                              const std::string &slug, const bool checkExisting,
+                                                                              std::function<void(const HttpResponsePtr &)> callback) const {
+        if (platform == PLATFORM_CURSEFORGE && !platforms_.curseforge_.isAvailable()) {
+            simpleError(Error::ErrBadRequest, "cf_unavailable", callback);
+            co_return std::nullopt;
+        }
+
+        const auto platformProj = co_await platforms_.getProject(platform, slug);
+        if (!platformProj) {
+            simpleError(Error::ErrBadRequest, "no_project", callback,
+                        [&](Json::Value &root) { root["details"] = "Platform: " + platform; });
+            co_return std::nullopt;
+        }
+
+        if (platformProj->type == _unknown) {
+            simpleError(Error::ErrBadRequest, "unsupported_type", callback,
+                        [&](Json::Value &root) { root["details"] = "Platform: " + platform; });
+            co_return std::nullopt;
+        }
+
+        bool skipCheck = false;
+        if (checkExisting) {
+            if (const auto [proj, projErr] = co_await database_.getProjectSource(id); proj) {
+                if (const auto platforms = parseJsonString(proj->getValueOfPlatforms());
+                    platforms && platforms->isMember(platform) && (*platforms)[platform] == slug)
+                {
+                    skipCheck = true;
+                }
+            }
+        }
+        if (!skipCheck) {
+            if (const auto verified = co_await verifyProjectOwnership(platforms_, *platformProj, repo, mrCode); !verified) {
+                simpleError(Error::ErrBadRequest, "ownership", callback, [&](Json::Value &root) {
+                    root["details"] = "Platform: " + platform;
+                    root["can_verify_mr"] = platform == PLATFORM_MODRINTH && platforms_.modrinth_.isOAuthConfigured();
+                });
+                co_return std::nullopt;
+            }
+        }
+
+        co_return platformProj;
+    }
 
     /**
      * Possible errors:
@@ -48,15 +111,16 @@ namespace api::v1 {
      * - no_meta: No metadata file
      * - invalid_meta: Metadata file format is invalid
      * - exists: Duplicate project ID
+     * - no_platforms: No defined platform projects
      * - cf_unavailable: CF Project registration unavailable due to missing API key
      * - no_project: Platform project not found
      * - unsupported_type: Unsupported platform project type
      * - ownership: Failed to verify platform project ownership (data: can_verify_mr)
      * - internal: Internal server error
      */
-    Task<std::optional<std::pair<std::string, Project>>> ProjectsController::validateProjectData(const Json::Value &json, const std::string &token,
-                                                                         std::function<void(const HttpResponsePtr &)> callback,
-                                                                         const bool checkExisting) const {
+    Task<std::optional<ValidatedProjectData>>
+    ProjectsController::validateProjectData(const Json::Value &json, const std::string &token,
+                                            std::function<void(const HttpResponsePtr &)> callback, const bool checkExisting) const {
         const auto [username, usernameError](co_await github_.getUsername(token));
         if (!username) {
             simpleError(Error::ErrBadRequest, "user_github_auth", callback);
@@ -109,52 +173,34 @@ namespace api::v1 {
         }
         const auto jsonContent = *contents;
         const auto id = jsonContent["id"].asString();
-        const auto platform = jsonContent["platform"].asString();
-        const auto slug = jsonContent["slug"].asString();
 
-        if (platform == PLATFORM_CURSEFORGE && !platforms_.curseforge_.isAvailable()) {
-            simpleError(Error::ErrBadRequest, "cf_unavailable", callback);
+        const auto platforms = processPlatforms(platforms_.getAvailablePlatforms(), jsonContent);
+        if (platforms.empty()) {
+            simpleError(Error::ErrBadRequest, "no_platforms", callback);
             co_return std::nullopt;
         }
 
-        const auto platformProj = co_await platforms_.getProject(platform, slug);
-        if (!platformProj) {
-            simpleError(Error::ErrBadRequest, "no_project", callback);
-            co_return std::nullopt;
-        }
-
-        if (platformProj->type == _unknown) {
-            simpleError(Error::ErrBadRequest, "unsupported_type", callback);
-            co_return std::nullopt;
-        }
-
-        bool skipCheck = false;
-        if (checkExisting) {
-            if (const auto [proj, projErr] = co_await database_.getProjectSource(id);
-                proj && proj->getValueOfPlatform() == platform && proj->getValueOfSlug() == slug) {
-                skipCheck = true;
-            }
-        }
-        if (!skipCheck) {
-            if (const auto verified = co_await verifyProjectOwnership(platforms_, *platformProj, repo, mrCode); !verified) {
-                simpleError(Error::ErrBadRequest, "ownership", callback, [&](Json::Value &root) {
-                    root["can_verify_mr"] = platform == PLATFORM_MODRINTH && platforms_.modrinth_.isOAuthConfigured();
-                });
+        std::unordered_map<std::string, PlatformProject> platformProjects;
+        for (const auto &[key, val]: platforms.items()) {
+            const auto platformProj = co_await validatePlatform(id, repo, mrCode, key, val, checkExisting, callback);
+            if (!platformProj) {
                 co_return std::nullopt;
             }
+            platformProjects.emplace(key, *platformProj);
         }
+        const auto &preferredProj =
+            platforms.contains(PLATFORM_MODRINTH) ? platformProjects[PLATFORM_MODRINTH] : platformProjects.begin()->second;
 
         Project project;
         project.setId(id);
-        project.setName(platformProj->name);
+        project.setName(preferredProj.name);
         project.setSourceRepo(repo);
         project.setSourceBranch(branch);
         project.setSourcePath(path);
-        project.setPlatform(platform);
-        project.setType(projectTypeToString(platformProj->type));
-        project.setSlug(slug);
+        project.setType(projectTypeToString(preferredProj.type));
+        project.setPlatforms(platforms.dump());
 
-        co_return std::pair{*username, project};
+        co_return ValidatedProjectData{*username, project, platforms};
     }
 
     Task<std::optional<Project>> ProjectsController::validateProjectAccess(const std::string &id, const std::string &token,
@@ -213,6 +259,14 @@ namespace api::v1 {
         co_return true;
     }
 
+    Task<> ProjectsController::greet(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback) const {
+        const auto resp = HttpResponse::newHttpResponse();
+        resp->setStatusCode(k200OK);
+        resp->setBody("Service operational");
+        callback(resp);
+        co_return;
+    }
+
     Task<> ProjectsController::listIDs(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback) const {
         const auto ids = co_await database_.getProjectIDs();
 
@@ -259,7 +313,7 @@ namespace api::v1 {
         const auto projects = co_await database_.getProjectsForRepos(candidateRepos);
         Json::Value projectsJson(Json::arrayValue);
         for (const auto &project: projects) {
-            projectsJson.append(project.toJson());
+            projectsJson.append(projectToJson(project));
         }
 
         Json::Value root;
@@ -274,6 +328,19 @@ namespace api::v1 {
         }
         root["repositories"] = projectRepos;
         root["projects"] = projectsJson;
+        const auto resp = HttpResponse::newHttpJsonResponse(root);
+        resp->setStatusCode(k200OK);
+        callback(resp);
+    }
+
+    Task<> ProjectsController::listPopularProjects(HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
+        const std::vector<std::string> ids = co_await cloudflare.getMostVisitedProjectIDs();
+        Json::Value root(Json::arrayValue);
+        for (const auto &id: ids) {
+            if (const auto [project, error] = co_await database_.getProjectSource(id); project) {
+                root.append(projectToJson(*project));
+            }
+        }
         const auto resp = HttpResponse::newHttpJsonResponse(root);
         resp->setStatusCode(k200OK);
         callback(resp);
@@ -311,10 +378,10 @@ namespace api::v1 {
         if (!validated) {
             co_return;
         }
-        auto [username, project] = *validated;
+        auto [username, project, platforms] = *validated;
         project.setIsCommunity(isCommunity);
 
-        if (co_await database_.existsForData(project.getValueOfId(), project.getValueOfPlatform(), project.getValueOfSlug())) {
+        if (co_await database_.existsForData(project.getValueOfId(), platforms)) {
             co_return simpleError(Error::ErrBadRequest, "exists", callback);
         }
 
@@ -350,7 +417,7 @@ namespace api::v1 {
         if (!validated) {
             co_return;
         }
-        auto [username, project] = *validated;
+        auto [username, project, platforms] = *validated;
 
         if (const auto [proj, projErr] = co_await database_.getProjectSource(project.getValueOfId()); !proj) {
             co_return simpleError(Error::ErrBadRequest, "not_found", callback);
@@ -366,7 +433,7 @@ namespace api::v1 {
 
         Json::Value root;
         root["message"] = "Project updated successfully";
-        root["project"] = project.toJson();
+        root["project"] = projectToJson(project);
         const auto resp = HttpResponse::newHttpJsonResponse(root);
         resp->setStatusCode(k200OK);
         callback(resp);

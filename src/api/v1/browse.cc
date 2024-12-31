@@ -3,6 +3,7 @@
 #include <models/Project.h>
 
 #include "log/log.h"
+#include <service/util.h>
 
 #include <string>
 
@@ -30,8 +31,7 @@ namespace api::v1 {
             itemJson["id"] = item.getValueOfId();
             itemJson["name"] = item.getValueOfName();
             itemJson["type"] = item.getValueOfType();
-            itemJson["platform"] = item.getValueOfPlatform();
-            itemJson["slug"] = item.getValueOfSlug();
+            itemJson["platforms"] = parseJsonString(item.getValueOfPlatforms()).value_or(Json::Value());
             itemJson["is_community"] = item.getValueOfIsCommunity();
             itemJson["created_at"] = item.getValueOfCreatedAt().toDbStringLocal();
             data.append(itemJson);

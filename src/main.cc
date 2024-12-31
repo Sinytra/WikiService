@@ -1,4 +1,5 @@
 #include <drogon/drogon.h>
+#include <service/cloudflare.h>
 #include <stdexcept>
 
 #include "api/v1/browse.h"
@@ -41,23 +42,28 @@ int main() {
         const std::string &mrAppClientId = mrApp["client_id"].asString();
         const std::string &mrAppClientSecret = mrApp["client_secret"].asString();
         const std::string &mrAppRedirectUrl = mrApp["redirect_url"].asString();
+        const Json::Value &cloudFlareConfig = customConfig["cloudflare"];
+        const std::string &cloudFlareToken = cloudFlareConfig["token"].asString();
+        const std::string &cloudFlareAccTag = cloudFlareConfig["account_tag"].asString();
+        const std::string &cloudFlareSiteTag = cloudFlareConfig["site_tag"].asString();
 
         if (!customConfig.isMember("api_key") || customConfig["api_key"].asString().empty()) {
             logger.warn("No API key configured, allowing public API access.");
         }
 
-        auto cache(service::MemoryCache{});
-        auto github(service::GitHub{cache, appName, appClientId, appPrivateKeyPath});
-        auto database(service::Database{});
-        auto documentation(service::Documentation{github, cache});
+        auto cache(MemoryCache{});
+        auto github(GitHub{cache, appName, appClientId, appPrivateKeyPath});
+        auto database(Database{});
+        auto documentation(Documentation{github, cache});
+        auto cloudflare(CloudFlare{cloudFlareToken, cloudFlareAccTag, cloudFlareSiteTag, cache});
 
-        auto modrinth(service::ModrinthPlatform{mrAppClientId, mrAppClientSecret, mrAppRedirectUrl});
-        auto curseForge(service::CurseForgePlatform{curseForgeKey});
-        auto platforms(service::Platforms(curseForge, modrinth));
+        auto modrinth(ModrinthPlatform{mrAppClientId, mrAppClientSecret, mrAppRedirectUrl});
+        auto curseForge(CurseForgePlatform{curseForgeKey});
+        auto platforms(Platforms(curseForge, modrinth));
 
         auto controller(make_shared<api::v1::DocsController>(github, database, documentation));
         auto browseController(make_shared<api::v1::BrowseController>(database));
-        auto projectsController(make_shared<api::v1::ProjectsController>(github, platforms, database, documentation));
+        auto projectsController(make_shared<api::v1::ProjectsController>(github, platforms, database, documentation, cloudflare));
 
         app().registerController(controller);
         app().registerController(browseController);

@@ -45,8 +45,8 @@ std::string getTreeEntryPath(const std::string &s, size_t pathPrefix) {
     return relative.ends_with(DOCS_FILE_EXT) ? relative.substr(0, relative.size() - 4) : relative;
 }
 
-Task<FolderMetadata> getFolderMetadata(service::GitHub &github, std::string repo, std::string version, std::string rootPath,
-                                       std::string path, std::optional<std::string> locale, std::string installationToken) {
+Task<FolderMetadata> getFolderMetadata(GitHub &github, std::string repo, std::string version, std::string rootPath, std::string path,
+                                       std::optional<std::string> locale, std::string installationToken) {
     FolderMetadata metadata;
     const auto filePath = rootPath + (locale ? "/.translated/" + *locale : "") + path + META_FILE_PATH;
     if (const auto [contents, contentsError](co_await github.getRepositoryContents(repo, version, filePath, installationToken)); contents) {
@@ -78,24 +78,31 @@ bool isValidEntry(const nlohmann::json &value) {
         (value["type"] != TYPE_FILE || value["name"].get<std::string>().ends_with(DOCS_FILE_EXT));
 }
 
-auto createComparator(const std::vector<std::string>& keys) {
+auto createComparator(const std::vector<std::string> &keys) {
     return [&keys](const nlohmann::ordered_json &a, const nlohmann::ordered_json &b) {
         if (keys.empty()) {
             return a["name"].get<std::string>() < b["name"].get<std::string>();
         }
         const auto aPos = std::ranges::find(keys, a["name"].get<std::string>());
         const auto bPos = std::ranges::find(keys, b["name"].get<std::string>());
-        if (aPos == keys.end() || bPos == keys.end()) {
+        if (aPos == keys.end() && bPos == keys.end()) {
             return false;
         }
+        if (aPos == keys.end()) {
+            return false;
+        }
+        if (bPos == keys.end()) {
+            return true;
+        }
+
         const auto aIdx = std::distance(keys.begin(), aPos);
         const auto bIdx = std::distance(keys.begin(), bPos);
         return aIdx < bIdx;
     };
 }
 
-Task<nlohmann::ordered_json> crawlDocsTree(service::GitHub &github, std::string repo, std::string version, std::string rootPath,
-                                           std::string path, std::optional<std::string> locale, std::string installationToken,
+Task<nlohmann::ordered_json> crawlDocsTree(GitHub &github, std::string repo, std::string version, std::string rootPath, std::string path,
+                                           std::optional<std::string> locale, std::string installationToken,
                                            trantor::EventLoopThreadPool &pool) {
     auto currentLoop = trantor::EventLoop::getEventLoopOfCurrentThread();
     co_await switchThreadCoro(pool.getNextLoop());
@@ -158,6 +165,29 @@ namespace service {
         }
 
         co_return {false, Error::Ok};
+    }
+
+    Task<std::tuple<std::set<std::string>, Error>> Documentation::getAvailableLocales(const Project &project,
+                                                                                      const std::string installationToken) {
+        const auto cacheKey = createLocalesCacheKey(project.getValueOfId());
+
+        if (const auto exists = co_await cache_.exists(cacheKey); !exists) {
+            if (const auto pending = co_await getOrStartTask<std::tuple<std::set<std::string>, Error>>(cacheKey)) {
+                co_return pending->get();
+            }
+
+            const auto [locales, localesError] = co_await computeAvailableLocales(project, installationToken);
+            co_await cache_.updateCacheSet(cacheKey, *locales, 7 * 24h);
+
+            const auto cached = co_await cache_.getSetMembers(cacheKey);
+            co_return co_await completeTask<std::tuple<std::set<std::string>, Error>>(cacheKey, {cached, Error::Ok});
+        }
+
+        if (const auto cached = co_await cache_.getSetMembers(cacheKey); !cached.empty()) {
+            co_return {cached, Error::Ok};
+        }
+
+        co_return {std::set<std::string>(), Error::Ok};
     }
 
     Task<std::tuple<std::optional<Json::Value>, Error>> Documentation::getDocumentationPage(const Project &project, std::string path,

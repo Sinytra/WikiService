@@ -46,15 +46,14 @@ class Project
     {
         static const std::string _id;
         static const std::string _name;
-        static const std::string _platform;
-        static const std::string _slug;
         static const std::string _source_path;
         static const std::string _source_repo;
         static const std::string _source_branch;
         static const std::string _is_community;
-        static const std::string _created_at;
-        static const std::string _search_vector;
         static const std::string _type;
+        static const std::string _platforms;
+        static const std::string _search_vector;
+        static const std::string _created_at;
     };
 
     static const int primaryKeyNumber;
@@ -124,24 +123,6 @@ class Project
     void setName(const std::string &pName) noexcept;
     void setName(std::string &&pName) noexcept;
 
-    /**  For column platform  */
-    ///Get the value of the column platform, returns the default value if the column is null
-    const std::string &getValueOfPlatform() const noexcept;
-    ///Return a shared_ptr object pointing to the column const value, or an empty shared_ptr object if the column is null
-    const std::shared_ptr<std::string> &getPlatform() const noexcept;
-    ///Set the value of the column platform
-    void setPlatform(const std::string &pPlatform) noexcept;
-    void setPlatform(std::string &&pPlatform) noexcept;
-
-    /**  For column slug  */
-    ///Get the value of the column slug, returns the default value if the column is null
-    const std::string &getValueOfSlug() const noexcept;
-    ///Return a shared_ptr object pointing to the column const value, or an empty shared_ptr object if the column is null
-    const std::shared_ptr<std::string> &getSlug() const noexcept;
-    ///Set the value of the column slug
-    void setSlug(const std::string &pSlug) noexcept;
-    void setSlug(std::string &&pSlug) noexcept;
-
     /**  For column source_path  */
     ///Get the value of the column source_path, returns the default value if the column is null
     const std::string &getValueOfSourcePath() const noexcept;
@@ -177,13 +158,23 @@ class Project
     ///Set the value of the column is_community
     void setIsCommunity(const bool &pIsCommunity) noexcept;
 
-    /**  For column created_at  */
-    ///Get the value of the column created_at, returns the default value if the column is null
-    const ::trantor::Date &getValueOfCreatedAt() const noexcept;
+    /**  For column type  */
+    ///Get the value of the column type, returns the default value if the column is null
+    const std::string &getValueOfType() const noexcept;
     ///Return a shared_ptr object pointing to the column const value, or an empty shared_ptr object if the column is null
-    const std::shared_ptr<::trantor::Date> &getCreatedAt() const noexcept;
-    ///Set the value of the column created_at
-    void setCreatedAt(const ::trantor::Date &pCreatedAt) noexcept;
+    const std::shared_ptr<std::string> &getType() const noexcept;
+    ///Set the value of the column type
+    void setType(const std::string &pType) noexcept;
+    void setType(std::string &&pType) noexcept;
+
+    /**  For column platforms  */
+    ///Get the value of the column platforms, returns the default value if the column is null
+    const std::string &getValueOfPlatforms() const noexcept;
+    ///Return a shared_ptr object pointing to the column const value, or an empty shared_ptr object if the column is null
+    const std::shared_ptr<std::string> &getPlatforms() const noexcept;
+    ///Set the value of the column platforms
+    void setPlatforms(const std::string &pPlatforms) noexcept;
+    void setPlatforms(std::string &&pPlatforms) noexcept;
 
     /**  For column search_vector  */
     ///Get the value of the column search_vector, returns the default value if the column is null
@@ -195,17 +186,16 @@ class Project
     void setSearchVector(std::string &&pSearchVector) noexcept;
     void setSearchVectorToNull() noexcept;
 
-    /**  For column type  */
-    ///Get the value of the column type, returns the default value if the column is null
-    const std::string &getValueOfType() const noexcept;
+    /**  For column created_at  */
+    ///Get the value of the column created_at, returns the default value if the column is null
+    const ::trantor::Date &getValueOfCreatedAt() const noexcept;
     ///Return a shared_ptr object pointing to the column const value, or an empty shared_ptr object if the column is null
-    const std::shared_ptr<std::string> &getType() const noexcept;
-    ///Set the value of the column type
-    void setType(const std::string &pType) noexcept;
-    void setType(std::string &&pType) noexcept;
+    const std::shared_ptr<::trantor::Date> &getCreatedAt() const noexcept;
+    ///Set the value of the column created_at
+    void setCreatedAt(const ::trantor::Date &pCreatedAt) noexcept;
 
 
-    static size_t getColumnNumber() noexcept {  return 11;  }
+    static size_t getColumnNumber() noexcept {  return 10;  }
     static const std::string &getColumnName(size_t index) noexcept(false);
 
     Json::Value toJson() const;
@@ -228,15 +218,14 @@ class Project
     void updateId(const uint64_t id);
     std::shared_ptr<std::string> id_;
     std::shared_ptr<std::string> name_;
-    std::shared_ptr<std::string> platform_;
-    std::shared_ptr<std::string> slug_;
     std::shared_ptr<std::string> sourcePath_;
     std::shared_ptr<std::string> sourceRepo_;
     std::shared_ptr<std::string> sourceBranch_;
     std::shared_ptr<bool> isCommunity_;
-    std::shared_ptr<::trantor::Date> createdAt_;
-    std::shared_ptr<std::string> searchVector_;
     std::shared_ptr<std::string> type_;
+    std::shared_ptr<std::string> platforms_;
+    std::shared_ptr<std::string> searchVector_;
+    std::shared_ptr<::trantor::Date> createdAt_;
     struct MetaData
     {
         const std::string colName_;
@@ -248,7 +237,7 @@ class Project
         const bool notNull_;
     };
     static const std::vector<MetaData> metaData_;
-    bool dirtyFlag_[11]={ false };
+    bool dirtyFlag_[10]={ false };
   public:
     static const std::string &sqlForFindingByPrimaryKey()
     {
@@ -278,49 +267,43 @@ class Project
         }
         if(dirtyFlag_[2])
         {
-            sql += "platform,";
+            sql += "source_path,";
             ++parametersCount;
         }
         if(dirtyFlag_[3])
         {
-            sql += "slug,";
-            ++parametersCount;
-        }
-        if(dirtyFlag_[4])
-        {
-            sql += "source_path,";
-            ++parametersCount;
-        }
-        if(dirtyFlag_[5])
-        {
             sql += "source_repo,";
             ++parametersCount;
         }
-        if(dirtyFlag_[6])
+        if(dirtyFlag_[4])
         {
             sql += "source_branch,";
             ++parametersCount;
         }
         sql += "is_community,";
         ++parametersCount;
-        if(!dirtyFlag_[7])
+        if(!dirtyFlag_[5])
         {
             needSelection=true;
         }
-        sql += "created_at,";
-        ++parametersCount;
-        if(!dirtyFlag_[8])
+        if(dirtyFlag_[6])
         {
-            needSelection=true;
+            sql += "type,";
+            ++parametersCount;
         }
-        if(dirtyFlag_[9])
+        if(dirtyFlag_[7])
+        {
+            sql += "platforms,";
+            ++parametersCount;
+        }
+        if(dirtyFlag_[8])
         {
             sql += "search_vector,";
             ++parametersCount;
         }
-        sql += "type,";
+        sql += "created_at,";
         ++parametersCount;
-        if(!dirtyFlag_[10])
+        if(!dirtyFlag_[9])
         {
             needSelection=true;
         }
@@ -365,6 +348,10 @@ class Project
             n = snprintf(placeholderStr,sizeof(placeholderStr),"$%d,",placeholder++);
             sql.append(placeholderStr, n);
         }
+        else
+        {
+            sql +="default,";
+        }
         if(dirtyFlag_[6])
         {
             n = snprintf(placeholderStr,sizeof(placeholderStr),"$%d,",placeholder++);
@@ -375,25 +362,12 @@ class Project
             n = snprintf(placeholderStr,sizeof(placeholderStr),"$%d,",placeholder++);
             sql.append(placeholderStr, n);
         }
-        else
-        {
-            sql +="default,";
-        }
         if(dirtyFlag_[8])
         {
             n = snprintf(placeholderStr,sizeof(placeholderStr),"$%d,",placeholder++);
             sql.append(placeholderStr, n);
         }
-        else
-        {
-            sql +="default,";
-        }
         if(dirtyFlag_[9])
-        {
-            n = snprintf(placeholderStr,sizeof(placeholderStr),"$%d,",placeholder++);
-            sql.append(placeholderStr, n);
-        }
-        if(dirtyFlag_[10])
         {
             n = snprintf(placeholderStr,sizeof(placeholderStr),"$%d,",placeholder++);
             sql.append(placeholderStr, n);

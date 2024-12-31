@@ -35,7 +35,7 @@ namespace api::v1 {
             if (const auto [versions, versionsError](co_await documentation.getAvailableVersionsFiltered(project, installationToken));
                 versions)
             {
-                for (auto it = versions->begin(); it != versions->end(); it++) {
+                for (auto it = versions->begin(); it != versions->end(); ++it) {
                     if (it.key().isString() && it->isString() && it.key().asString() == *version) {
                         co_return it->asString();
                     }
@@ -88,7 +88,7 @@ namespace api::v1 {
 
             Json::Value root;
             {
-                Json::Value projectJson = proj->project.toJson();
+                Json::Value projectJson = projectToJson(proj->project);
                 projectJson["is_public"] = isPublic;
                 if (versions) {
                     projectJson["versions"] = *versions;
@@ -122,9 +122,6 @@ namespace api::v1 {
                 co_return errorResponse(Error::ErrBadRequest, "Missing path parameter", callback);
             }
 
-            const auto optionalParam = req->getOptionalParameter<std::string>("optional");
-            const auto optional = optionalParam.has_value() && optionalParam == "true";
-
             const auto locale =
                 co_await assertLocale(req->getOptionalParameter<std::string>("locale"), documentation_, proj->project, proj->token);
             const auto ref =
@@ -134,21 +131,32 @@ namespace api::v1 {
             const auto [contents,
                         contentsError](co_await documentation_.getDocumentationPage(proj->project, path, locale, ref, proj->token));
             if (!contents) {
+                const auto optionalParam = req->getOptionalParameter<std::string>("optional");
+                const auto optional = optionalParam.has_value() && optionalParam == "true";
+
                 co_return errorResponse(optional ? Error::Ok : contentsError, "File not found", callback);
             }
 
             const auto [updatedAt, updatedAtError](
                 co_await github_.getFileLastUpdateTime(proj->project.getValueOfSourceRepo(), ref, prefixedPath, proj->token));
 
+            const auto [locales, localesErr](co_await documentation_.getAvailableLocales(proj->project, proj->token));
             const auto [isPublic, publicError](co_await github_.isPublicRepository(proj->project.getValueOfSourceRepo(), proj->token));
             const auto [versions, versionsError](co_await documentation_.getAvailableVersionsFiltered(proj->project, proj->token));
 
             Json::Value root;
             {
-                Json::Value projectJson = proj->project.toJson();
+                Json::Value projectJson = projectToJson(proj->project);
                 projectJson["is_public"] = isPublic;
                 if (versions) {
                     projectJson["versions"] = *versions;
+                }
+                if (!locales.empty()) {
+                    Json::Value localesJson(Json::arrayValue);
+                    for (const auto &item : locales) {
+                        localesJson.append(item);
+                    }
+                    projectJson["locales"] = localesJson;
                 }
                 root["project"] = projectJson;
             }
@@ -189,15 +197,23 @@ namespace api::v1 {
                 co_return errorResponse(contentsError, "Error getting dir tree", callback);
             }
 
+            const auto [locales, localesErr](co_await documentation_.getAvailableLocales(proj->project, proj->token));
             const auto [isPublic, publicError](co_await github_.isPublicRepository(proj->project.getValueOfSourceRepo(), proj->token));
             const auto [versions, versionsError](co_await documentation_.getAvailableVersionsFiltered(proj->project, proj->token));
 
             nlohmann::json root;
             {
-                Json::Value projectJson = proj->project.toJson();
+                Json::Value projectJson = projectToJson(proj->project);
                 projectJson["is_public"] = isPublic;
                 if (versions) {
                     projectJson["versions"] = *versions;
+                }
+                if (!locales.empty()) {
+                    Json::Value localesJson(Json::arrayValue);
+                    for (const auto &item : locales) {
+                        localesJson.append(item);
+                    }
+                    projectJson["locales"] = localesJson;
                 }
                 root["project"] = parkourJson(projectJson);
             }
@@ -241,7 +257,10 @@ namespace api::v1 {
             const auto [asset,
                         assetError](co_await documentation_.getAssetResource(proj->project, *resourceLocation, version, proj->token));
             if (!asset) {
-                co_return errorResponse(assetError, "Asset not found", callback);
+                const auto optionalParam = req->getOptionalParameter<std::string>("optional");
+                const auto optional = optionalParam.has_value() && optionalParam == "true";
+
+                co_return errorResponse(optional ? Error::Ok : assetError, "Asset not found", callback);
             }
 
             Json::Value root;

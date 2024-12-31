@@ -27,6 +27,18 @@ namespace service {
         co_return !resp.isNil() && resp.asInteger() == true;
     }
 
+    Task<std::set<std::string>> MemoryCache::getSetMembers(std::string key) const {
+        const auto client = app().getFastRedisClient();
+        const auto resp = co_await client->execCommandCoro("SMEMBERS %s", key.data());
+        std::set<std::string> members;
+        if (!resp.isNil()) {
+            for (const auto &item : resp.asArray()) {
+                members.insert(item.asString());
+            }
+        }
+        co_return members;
+    }
+
     Task<> MemoryCache::updateCache(std::string key, std::string value, std::chrono::duration<long> expire) const {
         const auto client = app().getFastRedisClient();
         const auto expireSeconds = std::chrono::seconds(expire).count();

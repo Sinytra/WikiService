@@ -4,6 +4,7 @@
 #include "models/Project.h"
 
 #include <drogon/utils/coroutine.h>
+#include <nlohmann/adl_serializer.hpp>
 #include <optional>
 #include <string>
 
@@ -38,6 +39,6 @@ namespace service {
 
         drogon::Task<bool> existsForRepo(std::string repo, std::string branch, std::string path) const;
 
-        drogon::Task<bool> existsForData(std::string id, std::string platform, std::string slug) const;
+        drogon::Task<bool> existsForData(std::string id, nlohmann::json platforms) const;
     };
 }

@@ -38,6 +38,7 @@
   },
   "custom_config": {
     "github_app": {
+      "name": "",
       "client_id": "",
       "private_key_path": ""
     },
@@ -45,6 +46,11 @@
       "client_id": "",
       "client_secret": "",
       "redirect_url": ""
+    },
+    "cloudflare": {
+        "token": "",
+        "account_tag": "",
+        "site_tag": ""
     },
     "curseforge_key": ""
   }

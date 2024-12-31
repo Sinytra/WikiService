@@ -201,3 +201,10 @@ std::string join(const std::vector<std::string> &lst, const std::string &delim) 
     }
     return ret;
 }
+
+Json::Value projectToJson(const drogon_model::postgres::Project &project) {
+    Json::Value json = project.toJson();
+    json["platforms"] = parseJsonString(project.getValueOfPlatforms()).value_or(Json::Value());
+    json.removeMember("search_vector");
+    return json;
+}

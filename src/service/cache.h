@@ -7,6 +7,7 @@
 #include <shared_mutex>
 #include <string>
 #include <vector>
+#include <set>
 #include "log/log.h"
 
 namespace service {
@@ -17,6 +18,7 @@ namespace service {
         drogon::Task<bool> exists(std::string key) const;
         drogon::Task<std::optional<std::string>> getFromCache(std::string key) const;
         drogon::Task<bool> isSetMember(std::string key, std::string value) const;
+        drogon::Task<std::set<std::string>> getSetMembers(std::string key) const;
         drogon::Task<> updateCache(std::string key, std::string value, std::chrono::duration<long> expire) const;
         drogon::Task<> updateCacheSet(std::string key, std::vector<std::string> value, std::chrono::duration<long> expire) const;
         drogon::Task<> erase(std::string key) const;
@@ -64,6 +66,10 @@ namespace service {
 
         template<class T>
         drogon::Task<T> completeTask(const std::string &key, T &&value) {
+            if (!pendingTasks_.contains(key)) {
+                throw std::invalid_argument("No task for key " + key);
+            }
+
             auto pair = std::any_cast<std::pair<std::shared_ptr<std::promise<T>>, std::shared_future<T>> &>(pendingTasks_[key]);
             pair.first->set_value(value);
 

@@ -153,4 +153,9 @@ namespace service {
 
         co_return co_await plat->second.getProject(slug);
     }
+
+    std::vector<std::string> Platforms::getAvailablePlatforms() {
+        auto kv = std::views::keys(platforms_);
+        return { kv.begin(), kv.end() };
+    }
 }
