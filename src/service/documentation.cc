@@ -144,27 +144,13 @@ Task<nlohmann::ordered_json> crawlDocsTree(GitHub &github, std::string repo, std
 namespace service {
     Documentation::Documentation(GitHub &g, MemoryCache &c) : github_(g), cache_(c) {}
 
-    Task<std::tuple<bool, Error>> Documentation::hasAvailableLocale(const Project &project, std::string locale,
-                                                                    std::string installationToken) {
-        const auto cacheKey = createLocalesCacheKey(project.getValueOfId());
-
-        if (const auto exists = co_await cache_.exists(cacheKey); !exists) {
-            if (const auto pending = co_await getOrStartTask<std::tuple<bool, Error>>(cacheKey)) {
-                co_return pending->get();
-            }
-
-            const auto [locales, localesError] = co_await computeAvailableLocales(project, installationToken);
-            co_await cache_.updateCacheSet(cacheKey, *locales, 7 * 24h);
-
-            const auto cached = co_await cache_.isSetMember(cacheKey, locale);
-            co_return co_await completeTask<std::tuple<bool, Error>>(cacheKey, {cached, Error::Ok});
+    Task<std::tuple<bool, Error>> Documentation::hasAvailableLocale(const Project &project, const std::string locale,
+                                                                    const std::string installationToken) {
+        const auto [locales, localesErr](co_await getAvailableLocales(project, installationToken));
+        if (localesErr != Error::Ok) {
+            co_return {false, localesErr};
         }
-
-        if (const auto cached = co_await cache_.isSetMember(cacheKey, locale)) {
-            co_return {cached, Error::Ok};
-        }
-
-        co_return {false, Error::Ok};
+        co_return {locales.contains(locale), Error::Ok};
     }
 
     Task<std::tuple<std::set<std::string>, Error>> Documentation::getAvailableLocales(const Project &project,
@@ -173,10 +159,10 @@ namespace service {
 
         if (const auto exists = co_await cache_.exists(cacheKey); !exists) {
             if (const auto pending = co_await getOrStartTask<std::tuple<std::set<std::string>, Error>>(cacheKey)) {
-                co_return pending->get();
+                co_return co_await patientlyAwaitTaskResult(*pending);
             }
 
-            const auto [locales, localesError] = co_await computeAvailableLocales(project, installationToken);
+            auto [locales, localesError] = co_await computeAvailableLocales(project, installationToken);
             co_await cache_.updateCacheSet(cacheKey, *locales, 7 * 24h);
 
             const auto cached = co_await cache_.getSetMembers(cacheKey);
@@ -221,7 +207,7 @@ namespace service {
         }
 
         if (const auto pending = co_await getOrStartTask<std::tuple<nlohmann::ordered_json, Error>>(cacheKey)) {
-            co_return pending->get();
+            co_return co_await patientlyAwaitTaskResult(*pending);
         }
 
         trantor::EventLoopThreadPool pool{10};
@@ -294,7 +280,7 @@ namespace service {
 
         if (const auto exists = co_await cache_.exists(cacheKey); !exists) {
             if (const auto pending = co_await getOrStartTask<std::tuple<std::optional<Json::Value>, Error>>(cacheKey)) {
-                co_return pending->get();
+                co_return co_await patientlyAwaitTaskResult(*pending);
             }
 
             const auto [versions, versionsError] = co_await computeAvailableVersions(project, installationToken);

@@ -15,6 +15,10 @@ using namespace std;
 using namespace drogon;
 using namespace logging;
 
+namespace service {
+    trantor::EventLoopThreadPool cacheAwaiterThreadPool{1};
+}
+
 int main() {
     constexpr auto port(8080);
     logger.info("Starting wiki service server on port {}", port);
@@ -69,7 +73,12 @@ int main() {
         app().registerController(browseController);
         app().registerController(projectsController);
 
+        cacheAwaiterThreadPool.start();
+
         app().run();
+
+        cacheAwaiterThreadPool.getLoop(0)->quit();
+        cacheAwaiterThreadPool.wait();
     } catch (const std::exception &e) {
         logger.critical("Error running app: {}", e.what());
     }

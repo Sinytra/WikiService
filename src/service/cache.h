@@ -1,16 +1,31 @@
 #pragma once
 
-#include <any>
-#include <chrono>
 #include <drogon/utils/coroutine.h>
+#include <trantor/net/EventLoopThreadPool.h>
+
+#include <any>
 #include <optional>
+#include <set>
 #include <shared_mutex>
 #include <string>
 #include <vector>
-#include <set>
 #include "log/log.h"
 
 namespace service {
+    // TODO Per-task pool
+    extern trantor::EventLoopThreadPool cacheAwaiterThreadPool;
+
+    template<class T>
+    drogon::Task<T> patientlyAwaitTaskResult(const std::shared_future<T> task) {
+        using namespace logging;
+
+        const auto currentLoop = trantor::EventLoop::getEventLoopOfCurrentThread();
+        co_await drogon::switchThreadCoro(cacheAwaiterThreadPool.getNextLoop());
+        const auto result = task.get();
+        co_await drogon::switchThreadCoro(currentLoop);
+        co_return result;
+    }
+
     class MemoryCache {
     public:
         MemoryCache();

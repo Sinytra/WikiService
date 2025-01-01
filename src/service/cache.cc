@@ -3,6 +3,8 @@
 #include <drogon/drogon.h>
 #include "util.h"
 
+#define INVALID_SET_MEMBER "_empty_"
+
 using namespace drogon;
 using namespace std::chrono_literals;
 
@@ -36,6 +38,7 @@ namespace service {
                 members.insert(item.asString());
             }
         }
+        members.erase(INVALID_SET_MEMBER);
         co_return members;
     }
 
@@ -45,12 +48,17 @@ namespace service {
         co_await client->execCommandCoro("SET %s %s EX %ld", key.data(), value.data(), expireSeconds);
     }
 
-    Task<> MemoryCache::updateCacheSet(std::string key, std::vector<std::string> value, std::chrono::duration<long> expire) const {
+    Task<> MemoryCache::updateCacheSet(std::string key, const std::vector<std::string> value, const std::chrono::duration<long> expire) const {
         const auto client = app().getFastRedisClient();
         const auto expireSeconds = std::chrono::seconds(expire).count();
 
+        std::vector valueCopy(value);
+        if (valueCopy.empty()) {
+            valueCopy.push_back(INVALID_SET_MEMBER);
+        }
+
         const auto trans = co_await client->newTransactionCoro();
-        for (const auto &item : value) {
+        for (const auto &item : valueCopy) {
             co_await trans->execCommandCoro("SADD %s %s", key.data(), item.data());
         }
         co_await trans->execCommandCoro("EXPIRE %s %ld", key.data(), expireSeconds);

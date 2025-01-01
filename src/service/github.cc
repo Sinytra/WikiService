@@ -190,7 +190,8 @@ namespace service {
         }
 
         if (const auto pending = co_await getOrStartTask<std::set<std::string>>(cacheKey)) {
-            co_return {pending->get(), Error::Ok};
+            const auto result = co_await patientlyAwaitTaskResult(*pending);
+            co_return {result, Error::Ok};
         }
 
         const auto [installations, installationsError] = co_await computeUserAccessibleInstallations(token);
