@@ -4,12 +4,15 @@
 #include <map>
 #include <trantor/net/EventLoopThreadPool.h>
 
+#include "schemas.h"
+
 #define DOCS_FILE_EXT ".mdx"
 #define META_FILE_PATH "/_meta.json"
 #define I18N_FILE_PATH "/.translated"
 #define TYPE_FILE "file"
 #define TYPE_DIR "dir"
 #define BASE64_PREFIX "data:image/png;base64,"
+#define NO_ICON "_none"
 
 using namespace logging;
 using namespace drogon;
@@ -51,14 +54,18 @@ Task<FolderMetadata> getFolderMetadata(GitHub &github, std::string repo, std::st
     const auto filePath = rootPath + (locale ? "/.translated/" + *locale : "") + path + META_FILE_PATH;
     if (const auto [contents, contentsError](co_await github.getRepositoryContents(repo, version, filePath, installationToken)); contents) {
         const auto body = decodeBase64((*contents)["content"].asString());
-        if (const auto parsed = tryParseJson<nlohmann::ordered_json>(body); parsed->is_object()) {
-            for (auto &[key, val]: parsed->items()) {
-                metadata.keys.push_back(key);
-                if (val.is_string()) {
-                    metadata.entries.try_emplace(key, val, "");
-                } else if (val.is_object()) {
-                    metadata.entries.try_emplace(key, val.contains("name") ? val["name"].get<std::string>() : getTreeEntryName(key),
-                                                 val.value("icon", ""));
+        if (const auto parsed = tryParseJson<nlohmann::ordered_json>(body)) {
+            if (const auto error = validateJson(schemas::folderMetadata, *parsed)) {
+                logger.error("Invalid folder metadata: Repo: {} Path: {} Error: {}", repo, path,error->msg);
+            } else {
+                for (auto &[key, val]: parsed->items()) {
+                    metadata.keys.push_back(key);
+                    if (val.is_string()) {
+                        metadata.entries.try_emplace(key, val, "");
+                    } else if (val.is_object()) {
+                        metadata.entries.try_emplace(key, val.contains("name") ? val["name"].get<std::string>() : getTreeEntryName(key),
+                                                     val.contains("icon") ? (val["icon"].is_null() ? NO_ICON : val.value("icon", "")) : "");
+                    }
                 }
             }
         }

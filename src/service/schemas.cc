@@ -84,6 +84,36 @@ nlohmann::json schemas::projectMetadata = R"(
 }
 )"_json;
 
+nlohmann::json schemas::folderMetadata = R"(
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Sinytra Wiki Folder Layout Metadata",
+    "description": "Provides file naming information for a directory",
+    "type": "object",
+    "required": [],
+    "additionalProperties": {
+        "oneOf": [
+            {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Page display name"
+                    },
+                    "icon": {
+                        "type": ["string", "null"],
+                        "description": "Display icon name"
+                    }
+                }
+            },
+            {
+                "type": "string"
+            }
+        ]
+    }
+}
+)"_json;
+
 nlohmann::json schemas::repositoryMigration = R"(
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
