@@ -18,7 +18,7 @@ namespace api::v1 {
 
     class ProjectsController final : public drogon::HttpController<ProjectsController, false> {
     public:
-        explicit ProjectsController(GitHub &, Platforms &, Database &, Documentation &, CloudFlare &);
+        explicit ProjectsController(GitHub &, Platforms &, Database &, Documentation &, Storage &, CloudFlare &);
 
         METHOD_LIST_BEGIN
         ADD_METHOD_TO(ProjectsController::greet, "/", drogon::Get);
@@ -76,6 +76,7 @@ namespace api::v1 {
         Platforms &platforms_;
         Database &database_;
         Documentation &documentation_;
+        Storage &storage_;
         CloudFlare &cloudflare;
     };
 }

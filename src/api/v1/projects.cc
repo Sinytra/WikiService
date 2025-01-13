@@ -52,8 +52,8 @@ namespace api::v1 {
         return projects;
     }
 
-    ProjectsController::ProjectsController(GitHub &gh, Platforms &pf, Database &db, Documentation &dc, CloudFlare &cf) :
-        github_(gh), platforms_(pf), database_(db), documentation_(dc), cloudflare(cf) {}
+    ProjectsController::ProjectsController(GitHub &gh, Platforms &pf, Database &db, Documentation &dc, Storage &s, CloudFlare &cf) :
+        github_(gh), platforms_(pf), database_(db), documentation_(dc), storage_(s), cloudflare(cf) {}
 
     Task<std::optional<PlatformProject>> ProjectsController::validatePlatform(const std::string &id, const std::string &repo,
                                                                               const std::string &mrCode, const std::string &platform,
@@ -513,6 +513,7 @@ namespace api::v1 {
 
         co_await github_.invalidateCache(project->getValueOfSourceRepo());
         co_await documentation_.invalidateCache(*project);
+        co_await storage_.invalidateProject(*project);
 
         Json::Value root;
         root["message"] = "Project cache invalidated successfully";

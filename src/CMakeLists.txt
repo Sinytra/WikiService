@@ -39,6 +39,8 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
         jwt-cpp
         base64
         nlohmann_json_schema_validator
+        libgit2
+        libgit2package
 )
 
 # ##############################################################################

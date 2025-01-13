@@ -10,4 +10,5 @@ target_link_libraries(api PRIVATE
         log
         Drogon::Drogon
         nlohmann_json_schema_validator
+        libgit2
 )
