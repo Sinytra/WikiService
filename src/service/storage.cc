@@ -17,8 +17,8 @@ namespace fs = std::filesystem;
 const std::set<std::string> allowedFileExtensions = {".mdx", ".json", ".png", ".jpg", ".jpeg", ".webp", ".gif"};
 
 struct progress_data {
-    std::shared_ptr<spdlog::logger> logger;
     size_t tick;
+    std::shared_ptr<spdlog::logger> logger;
 };
 
 int fetch_progress(const git_indexer_progress *stats, void *payload) {
