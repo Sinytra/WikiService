@@ -6,6 +6,7 @@
 
 #include <git2.h>
 #include <spdlog/sinks/basic_file_sink.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
 
 #define TEMP_DIR ".temp"
 #define LATEST_VERSION "latest"
@@ -131,9 +132,20 @@ std::unordered_map<std::string, std::string> listRepoBranches(git_repository *re
 std::shared_ptr<spdlog::logger> gerProjectLogger(const std::string &id, const fs::path &dir) {
     const auto file = dir / "project.log";
 
-    auto projectLog = spdlog::basic_logger_mt(id, absolute(file).string());
+    std::vector<spdlog::sink_ptr> sinks;
+
+    const auto consoleSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+    consoleSink->set_pattern("[%^%L%$] [%H:%M:%S %z] [thread %t] [%n] %v");
+    consoleSink->set_level(logger.level());
+    sinks.push_back(consoleSink);
+
+    const auto fileSink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(absolute(file).string());
+    fileSink->set_pattern("[%^%L%$] [%H:%M:%S %z] [%n] %v");
+    sinks.push_back(fileSink);
+
+    const auto projectLog = std::make_shared<spdlog::logger>(id, begin(sinks), end(sinks));
     projectLog->set_level(spdlog::level::trace);
-    projectLog->set_pattern("[%^%L%$] [%H:%M:%S %z] [%n] %v");
+
     return projectLog;
 }
 

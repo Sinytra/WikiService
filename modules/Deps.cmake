@@ -87,4 +87,5 @@ CPMAddPackage(
         GIT_TAG v1.9.0
         OPTIONS
         "BUILD_TESTS OFF"
+        "BUILD_SHARED_LIBS OFF"
 )
