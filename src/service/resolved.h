@@ -18,7 +18,7 @@ namespace service {
 
     class ResolvedProject {
     public:
-        explicit ResolvedProject(const Project &, const std::string &token, const std::filesystem::path &, const std::filesystem::path &);
+        explicit ResolvedProject(const Project &, const std::filesystem::path &, const std::filesystem::path &);
 
         bool setLocale(const std::optional<std::string> &locale);
 
@@ -39,7 +39,6 @@ namespace service {
         Json::Value toJson(bool isPublic) const;
     private:
         Project project_;
-        std::string token_;
 
         std::filesystem::path rootDir_;
         std::filesystem::path docsDir_;

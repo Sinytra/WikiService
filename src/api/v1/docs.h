@@ -8,11 +8,6 @@
 #include "service/storage.h"
 
 namespace api::v1 {
-    struct ProjectDetails {
-        ResolvedProject resolved;
-        std::string token;
-    };
-
     class DocsController final : public drogon::HttpController<DocsController, false> {
     public:
         explicit DocsController(GitHub &, Database &, Documentation &, Storage &);
@@ -42,8 +37,8 @@ namespace api::v1 {
         Documentation &documentation_;
         Storage &storage_;
 
-        drogon::Task<std::optional<ProjectDetails>> getProject(const std::string &project, const std::optional<std::string> &version,
-                                                               const std::optional<std::string> &locale,
-                                                               std::function<void(const drogon::HttpResponsePtr &)> callback) const;
+        drogon::Task<std::optional<ResolvedProject>> getProject(const std::string &project, const std::optional<std::string> &version,
+                                                                const std::optional<std::string> &locale,
+                                                                std::function<void(const drogon::HttpResponsePtr &)> callback) const;
     };
 }

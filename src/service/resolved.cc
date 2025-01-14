@@ -17,6 +17,144 @@ using namespace logging;
 using namespace drogon;
 namespace fs = std::filesystem;
 
+std::string formatISOTime(git_time_t time, const int offset) {
+    // time += offset * 60;
+
+    const std::time_t utc_time = time;
+    const std::tm *tm_ptr = std::gmtime(&utc_time);
+
+    std::ostringstream oss;
+    oss << std::put_time(tm_ptr, "%Y-%m-%dT%H:%M:%SZ");
+    return oss.str();
+}
+
+static int matchWithParent(const git_commit *commit, const size_t i, const git_diff_options *opts) {
+    git_commit *parent;
+    git_tree *a, *b;
+    git_diff *diff;
+
+    if (git_commit_parent(&parent, commit, i)) {
+        return false;
+    }
+    if (git_commit_tree(&a, parent)) {
+        return false;
+    }
+    if (git_commit_tree(&b, commit)) {
+        return false;
+    }
+    if (git_diff_tree_to_tree(&diff, git_commit_owner(commit), a, b, opts)) {
+        return false;
+    }
+
+    const int ndeltas = static_cast<int>(git_diff_num_deltas(diff));
+
+    git_diff_free(diff);
+    git_tree_free(a);
+    git_tree_free(b);
+    git_commit_free(parent);
+
+    return ndeltas > 0;
+}
+
+std::optional<std::string> getLastCommitDate(const std::string &repoPath, std::string path) {
+    git_repository *repo = nullptr;
+    if (git_repository_open(&repo, repoPath.c_str()) != 0) {
+        logger.error("Failed to open repository: {}", repoPath);
+        return std::nullopt;
+    }
+
+    constexpr int limit = 1;
+    int printed = 0;
+
+    git_diff_options diffopts = GIT_DIFF_OPTIONS_INIT;
+    git_oid oid;
+    git_commit *commit = nullptr;
+    git_pathspec *ps = nullptr;
+    git_revwalk *walker = nullptr;
+
+    if (git_revwalk_new(&walker, repo)) {
+        logger.error("Failed to create rev walker");
+        git_repository_free(repo);
+        return std::nullopt;
+    }
+    git_revwalk_sorting(walker, GIT_SORT_TIME);
+    if (git_revwalk_push_head(walker)) {
+        logger.error("Could not find repository HEAD");
+        git_revwalk_free(walker);
+        git_repository_free(repo);
+        return std::nullopt;
+    }
+
+    char *data = path.data();
+    diffopts.pathspec.strings = &data;
+    diffopts.pathspec.count = 1;
+    if (git_pathspec_new(&ps, &diffopts.pathspec)) {
+        logger.error("Error building pathspec");
+        git_pathspec_free(ps);
+        git_revwalk_free(walker);
+        git_repository_free(repo);
+        return std::nullopt;
+    }
+
+    std::string result = "";
+
+    for (; !git_revwalk_next(&oid, walker); git_commit_free(commit)) {
+        if (git_commit_lookup(&commit, repo, &oid)) {
+            logger.error("Failed to look up commit");
+            git_pathspec_free(ps);
+            git_revwalk_free(walker);
+            git_repository_free(repo);
+            return std::nullopt;
+        }
+
+        const int parents = static_cast<int>(git_commit_parentcount(commit));
+
+        int unmatched = parents;
+
+        if (parents == 0) {
+            git_tree *tree;
+            if (git_commit_tree(&tree, commit)) {
+                logger.error("Failed to get commit tree");
+                git_pathspec_free(ps);
+                git_revwalk_free(walker);
+                git_repository_free(repo);
+                git_commit_free(commit);
+                return std::nullopt;
+            }
+            if (git_pathspec_match_tree(nullptr, tree, GIT_PATHSPEC_NO_MATCH_ERROR, ps) != 0) {
+                unmatched = 1;
+            }
+            git_tree_free(tree);
+        } else if (parents == 1) {
+            unmatched = matchWithParent(commit, 0, &diffopts) ? 0 : 1;
+        } else {
+            for (int i = 0; i < parents; ++i) {
+                if (matchWithParent(commit, i, &diffopts))
+                    unmatched--;
+            }
+        }
+
+        if (unmatched > 0)
+            continue;
+
+        if (printed++ >= limit) {
+            git_commit_free(commit);
+            break;
+        }
+
+        const git_time_t commit_time = git_commit_time(commit);
+        const int offset = git_commit_time_offset(commit);
+
+        result = formatISOTime(commit_time, offset);
+    }
+
+    git_pathspec_free(ps);
+    git_revwalk_free(walker);
+    git_repository_free(repo);
+
+    return result.empty() ? std::nullopt : std::optional(result);
+}
+
 struct FolderMetadataEntry {
     const std::string name;
     const std::string icon;
@@ -164,110 +302,9 @@ std::tuple<std::unordered_map<std::string, std::string>, Error> getAvailableDocs
     return {versions, Error::Ok};
 }
 
-std::string formatISOTime(git_time_t time, const int offset) {
-    // time += offset * 60;
-
-    const std::time_t utc_time = time;
-    const std::tm *tm_ptr = std::gmtime(&utc_time);
-
-    std::ostringstream oss;
-    oss << std::put_time(tm_ptr, "%Y-%m-%dT%H:%M:%SZ");
-    return oss.str();
-}
-
-std::optional<std::string> getLastCommitDate(const std::string &repoPath, const std::string &filePath) {
-    git_repository *repo = nullptr;
-    if (git_repository_open(&repo, repoPath.c_str()) != 0) {
-        logger.error("Failed to open repository: {}", repoPath);
-        return std::nullopt;
-    }
-
-    git_revwalk *walker = nullptr;
-    if (git_revwalk_new(&walker, repo) != 0) {
-        logger.error("Failed to create revwalker");
-        git_repository_free(repo);
-        return std::nullopt;
-    }
-
-    git_revwalk_sorting(walker, GIT_SORT_TIME);
-    git_revwalk_push_head(walker);
-
-    git_oid oid;
-    git_commit *commit = nullptr;
-    git_tree *tree = nullptr;
-    git_tree_entry *entry = nullptr;
-
-    while (git_revwalk_next(&oid, walker) == 0) {
-        if (git_commit_lookup(&commit, repo, &oid) != 0)
-            continue;
-
-        if (git_commit_tree(&tree, commit) != 0) {
-            git_commit_free(commit);
-            continue;
-        }
-
-        git_commit *parent_commit = nullptr;
-        if (git_commit_parent(&parent_commit, commit, 0) != 0) {
-            if (git_tree_entry_bypath(&entry, tree, filePath.c_str()) == 0) {
-                const git_time_t commit_time = git_commit_time(commit);
-                const int offset = git_commit_time_offset(commit);
-
-                const auto result = formatISOTime(commit_time, offset);
-
-                git_tree_entry_free(entry);
-                git_tree_free(tree);
-                git_commit_free(commit);
-                git_revwalk_free(walker);
-                git_repository_free(repo);
-                return result;
-            }
-        } else {
-            git_tree *parent_tree = nullptr;
-            if (git_commit_tree(&parent_tree, parent_commit) == 0) {
-                git_diff *diff = nullptr;
-                if (git_diff_tree_to_tree(&diff, repo, parent_tree, tree, nullptr) == 0) {
-                    git_diff_find_options diff_opts = GIT_DIFF_FIND_OPTIONS_INIT;
-                    git_diff_find_similar(diff, &diff_opts);
-
-                    for (size_t i = 0; i < git_diff_num_deltas(diff); ++i) {
-                        if (const git_diff_delta *delta = git_diff_get_delta(diff, i);
-                            delta->new_file.path && filePath == delta->new_file.path)
-                        {
-                            const git_time_t commit_time = git_commit_time(commit);
-                            const int offset = git_commit_time_offset(commit);
-
-                            const auto result = formatISOTime(commit_time, offset);
-
-                            git_diff_free(diff);
-                            git_tree_free(parent_tree);
-                            git_commit_free(parent_commit);
-                            git_tree_free(tree);
-                            git_commit_free(commit);
-                            git_revwalk_free(walker);
-                            git_repository_free(repo);
-                            return result;
-                        }
-                    }
-                    git_diff_free(diff);
-                }
-                git_tree_free(parent_tree);
-            }
-            git_commit_free(parent_commit);
-        }
-
-        git_tree_free(tree);
-        git_commit_free(commit);
-    }
-
-    git_revwalk_free(walker);
-    git_repository_free(repo);
-
-    return std::nullopt;
-}
-
 namespace service {
-    ResolvedProject::ResolvedProject(const Project &p, const std::string &token, const std::filesystem::path &r,
-                                     const std::filesystem::path &d) : project_(p), token_(token), rootDir_(r), docsDir_(d) {}
+    ResolvedProject::ResolvedProject(const Project &p, const std::filesystem::path &r, const std::filesystem::path &d) :
+        project_(p), rootDir_(r), docsDir_(d) {}
 
     bool ResolvedProject::setLocale(const std::optional<std::string> &locale) {
         if (!locale || hasLocale(*locale)) {

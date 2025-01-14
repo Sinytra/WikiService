@@ -59,10 +59,11 @@ int main() {
         }
 
         auto cache(MemoryCache{});
-        auto storage(Storage{storageBasePath, cache});
         auto github(GitHub{cache, appName, appClientId, appPrivateKeyPath});
-        auto database(Database{});
         auto documentation(Documentation{github, cache});
+        auto storage(Storage{storageBasePath, cache, documentation});
+        auto database(Database{});
+
         auto cloudflare(CloudFlare{cloudFlareToken, cloudFlareAccTag, cloudFlareSiteTag, cache});
 
         auto modrinth(ModrinthPlatform{mrAppClientId, mrAppClientSecret, mrAppRedirectUrl});

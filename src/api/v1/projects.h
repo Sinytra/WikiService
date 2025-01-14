@@ -2,12 +2,14 @@
 
 #include <drogon/HttpController.h>
 
-#include "service/database.h"
-#include "service/documentation.h"
-#include "service/github.h"
-#include "service/platforms.h"
-
 #include <service/cloudflare.h>
+#include <service/database.h>
+#include <service/documentation.h>
+#include <service/github.h>
+#include <service/storage.h>
+#include <service/platforms.h>
+
+using namespace service;
 
 namespace api::v1 {
     struct ValidatedProjectData {

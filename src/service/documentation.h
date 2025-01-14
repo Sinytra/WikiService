@@ -3,7 +3,6 @@
 #include "cache.h"
 #include "github.h"
 #include "models/Project.h"
-#include "storage.h"
 
 #include <drogon/utils/coroutine.h>
 
@@ -14,7 +13,8 @@ namespace service {
     public:
         explicit Documentation(GitHub &, MemoryCache &);
 
-        drogon::Task<bool> isPubliclyEditable(const Project &project, std::string installationToken);
+        drogon::Task<std::tuple<std::string, Error>> getIntallationToken(const Project &project) const;
+        drogon::Task<bool> isPubliclyEditable(const Project &project);
         drogon::Task<> invalidateCache(const Project &project) const;
     private:
         GitHub &github_;

@@ -150,7 +150,7 @@ std::shared_ptr<spdlog::logger> gerProjectLogger(const std::string &id, const fs
 }
 
 namespace service {
-    Storage::Storage(const std::string &p, MemoryCache &c) : basePath_(p), cache_(c) {
+    Storage::Storage(const std::string &p, MemoryCache &c, Documentation &d) : basePath_(p), cache_(c), documentation_(d) {
         // Verify base path
         getBaseDir();
     }
@@ -226,7 +226,7 @@ namespace service {
             co_return cloneError;
         }
 
-        ResolvedProject resolved{project, installationToken, clonePath, clonePath / removeLeadingSlash(project.getValueOfSourcePath())};
+        ResolvedProject resolved{project, clonePath, clonePath / removeLeadingSlash(project.getValueOfSourcePath())};
 
         auto versions(resolved.getAvailableVersions());
         const auto branches = listRepoBranches(repo);
@@ -276,15 +276,22 @@ namespace service {
         co_return co_await completeTask<Error>(taskKey, std::move(result));
     }
 
-    Task<std::tuple<std::optional<ResolvedProject>, Error>>
-    Storage::findProject(const Project &project, const std::string installationToken, const std::optional<std::string> &version,
-                         const std::optional<std::string> &locale, const bool setup) {
+    Task<std::tuple<std::optional<ResolvedProject>, Error>> Storage::findProject(const Project &project,
+                                                                                 const std::optional<std::string> &version,
+                                                                                 const std::optional<std::string> &locale,
+                                                                                 const bool setup) {
         const auto branch = project.getValueOfSourceBranch();
         const auto rootDir = getProjectDirPath(project, version.value_or(""));
 
         if (!exists(rootDir)) {
             if (!setup) {
                 co_return {std::nullopt, Error::ErrNotFound};
+            }
+
+            const auto [installationToken, err] = co_await documentation_.getIntallationToken(project);
+            if (err != Error::Ok) {
+                logger.error("Failed to get installation token for project '{}'", project.getValueOfId());
+                co_return {std::nullopt, err};
             }
 
             if (const auto res = co_await setupProjectCached(project, installationToken); res != Error::Ok) {
@@ -295,19 +302,18 @@ namespace service {
 
         const auto docsDir = rootDir / removeLeadingSlash(project.getValueOfSourcePath());
 
-        ResolvedProject resolved{project, installationToken, rootDir, docsDir};
+        ResolvedProject resolved{project, rootDir, docsDir};
         resolved.setLocale(locale);
 
         co_return {resolved, Error::Ok};
     }
 
-    Task<std::tuple<std::optional<ResolvedProject>, Error>> Storage::getProject(const Project &project, const std::string installationToken,
-                                                                                const std::optional<std::string> &version,
-                                                                                const std::optional<std::string> &locale) {
-        const auto [defaultProject, error] = co_await findProject(project, installationToken, std::nullopt, locale, true);
+    Task<std::tuple<std::optional<ResolvedProject>, Error>>
+    Storage::getProject(const Project &project, const std::optional<std::string> &version, const std::optional<std::string> &locale) {
+        const auto [defaultProject, error] = co_await findProject(project, std::nullopt, locale, true);
 
         if (defaultProject && version) {
-            const auto [vProject, vError] = co_await findProject(project, installationToken, version, locale, false);
+            const auto [vProject, vError] = co_await findProject(project, version, locale, false);
             if (!vProject && defaultProject->getAvailableVersions().contains(*version)) {
                 logger.error("Failed to find existing version '{}' for '{}'", *version, project.getValueOfId());
             }
@@ -337,7 +343,7 @@ namespace service {
     }
 
     Task<Error> Storage::invalidateProject(const Project &project) {
-        const auto [resolved, error] = co_await findProject(project, "", std::nullopt, std::nullopt, false);
+        const auto [resolved, error] = co_await findProject(project, std::nullopt, std::nullopt, false);
         if (!resolved) {
             co_return error;
         }

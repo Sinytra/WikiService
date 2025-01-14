@@ -20,7 +20,7 @@ namespace api::v1 {
     DocsController::DocsController(GitHub &g, Database &db, Documentation &d, Storage &s) :
         github_(g), database_(db), documentation_(d), storage_(s) {}
 
-    Task<std::optional<ProjectDetails>> DocsController::getProject(const std::string &project, const std::optional<std::string> &version,
+    Task<std::optional<ResolvedProject>> DocsController::getProject(const std::string &project, const std::optional<std::string> &version,
                                                                    const std::optional<std::string> &locale,
                                                                    std::function<void(const HttpResponsePtr &)> callback) const {
         if (project.empty()) {
@@ -35,39 +35,26 @@ namespace api::v1 {
         }
         const std::string repo = *proj->getSourceRepo();
 
-        const auto [installationId, idErr](co_await github_.getRepositoryInstallation(repo));
-        if (!installationId) {
-            errorResponse(idErr, "Missing repository installation", callback);
-            co_return std::nullopt;
-        }
-
-        const auto [installationToken, tokenErr](co_await github_.getInstallationToken(installationId.value()));
-        if (!installationToken) {
-            errorResponse(tokenErr, "GitHub authentication failure", callback);
-            co_return std::nullopt;
-        }
-
-        const auto [resolved, resErr](co_await storage_.getProject(*proj, *installationToken, version, locale));
+        const auto [resolved, resErr](co_await storage_.getProject(*proj, version, locale));
         if (!resolved) {
             errorResponse(resErr, "Resolution failure", callback);
             co_return std::nullopt;
         }
 
-        co_return ProjectDetails{*resolved, *installationToken};
+        co_return *resolved;
     }
 
     Task<> DocsController::project(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string project) const {
         try {
-            const auto proj = co_await getProject(project, std::nullopt, std::nullopt, callback);
-            if (!proj) {
+            const auto resolved = co_await getProject(project, std::nullopt, std::nullopt, callback);
+            if (!resolved) {
                 co_return;
             }
-            const auto [resolved, token] = *proj;
 
-            const auto isPublic(co_await documentation_.isPubliclyEditable(resolved.getProject(), token));
+            const auto isPublic(co_await documentation_.isPubliclyEditable(resolved->getProject()));
 
             Json::Value root;
-            root["project"] = resolved.toJson(isPublic);
+            root["project"] = resolved->toJson(isPublic);
 
             const auto resp = HttpResponse::newHttpJsonResponse(root);
             resp->setStatusCode(k200OK);
@@ -90,14 +77,13 @@ namespace api::v1 {
                 co_return errorResponse(Error::ErrBadRequest, "Missing path parameter", callback);
             }
 
-            const auto proj = co_await getProject(project, req->getOptionalParameter<std::string>("version"),
+            const auto resolved = co_await getProject(project, req->getOptionalParameter<std::string>("version"),
                                                   req->getOptionalParameter<std::string>("locale"), callback);
-            if (!proj) {
+            if (!resolved) {
                 co_return;
             }
-            const auto [resolved, token] = *proj;
 
-            const auto [page, pageError](resolved.readFile(path));
+            const auto [page, pageError](resolved->readFile(path));
             if (pageError != Error::Ok) {
                 const auto optionalParam = req->getOptionalParameter<std::string>("optional");
                 const auto optional = optionalParam.has_value() && optionalParam == "true";
@@ -105,10 +91,10 @@ namespace api::v1 {
                 co_return errorResponse(optional ? Error::Ok : pageError, "File not found", callback);
             }
 
-            const auto isPublic(co_await documentation_.isPubliclyEditable(resolved.getProject(), token));
+            const auto isPublic(co_await documentation_.isPubliclyEditable(resolved->getProject()));
 
             Json::Value root;
-            root["project"] = resolved.toJson(isPublic);
+            root["project"] = resolved->toJson(isPublic);
             root["content"] = page.content;
             if (isPublic) {
                 root["edit_url"] = page.editUrl;
@@ -131,21 +117,20 @@ namespace api::v1 {
 
     Task<> DocsController::tree(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string project) const {
         try {
-            const auto proj = co_await getProject(project, req->getOptionalParameter<std::string>("version"),
+            const auto resolved = co_await getProject(project, req->getOptionalParameter<std::string>("version"),
                                                   req->getOptionalParameter<std::string>("locale"), callback);
-            if (!proj) {
+            if (!resolved) {
                 co_return;
             }
-            const auto [resolved, token] = *proj;
 
-            const auto [tree, treeError](resolved.getDirectoryTree());
+            const auto [tree, treeError](resolved->getDirectoryTree());
             if (treeError != Error::Ok) {
                 co_return errorResponse(treeError, "Error getting directory tree", callback);
             }
-            const auto isPublic(co_await documentation_.isPubliclyEditable(resolved.getProject(), proj->token));
+            const auto isPublic(co_await documentation_.isPubliclyEditable(resolved->getProject()));
 
             nlohmann::json root;
-            root["project"] = parkourJson(resolved.toJson(isPublic));
+            root["project"] = parkourJson(resolved->toJson(isPublic));
             root["tree"] = tree;
 
             const auto resp = jsonResponse(root);
@@ -163,11 +148,10 @@ namespace api::v1 {
 
     Task<> DocsController::asset(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string project) const {
         try {
-            const auto proj = co_await getProject(project, req->getOptionalParameter<std::string>("version"), std::nullopt, callback);
-            if (!proj) {
+            const auto resolved = co_await getProject(project, req->getOptionalParameter<std::string>("version"), std::nullopt, callback);
+            if (!resolved) {
                 co_return;
             }
-            const auto [resolved, token] = *proj;
 
             std::string prefix = std::format("/api/v1/project/{}/asset/", project);
             std::string location = req->getPath().substr(prefix.size());
@@ -181,7 +165,7 @@ namespace api::v1 {
                 co_return errorResponse(Error::ErrBadRequest, "Invalid location specified", callback);
             }
 
-            const auto assset = resolved.getAsset(*resourceLocation);
+            const auto assset = resolved->getAsset(*resourceLocation);
             if (!assset) {
                 const auto optionalParam = req->getOptionalParameter<std::string>("optional");
                 const auto optional = optionalParam.has_value() && optionalParam == "true";
