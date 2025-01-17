@@ -9,6 +9,7 @@ add_library(service STATIC
         cloudflare.cc
         storage.cc
         resolved.cc
+        users.cc
 )
 
 target_link_libraries(service PRIVATE
@@ -19,6 +20,7 @@ target_link_libraries(service PRIVATE
         nlohmann_json_schema_validator
         libgit2
         libgit2package
+        OpenSSL::Crypto
 )
 
 target_include_directories(service PUBLIC

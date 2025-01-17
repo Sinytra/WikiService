@@ -3,8 +3,6 @@
 #define DOCS_META_FILE_PATH "/sinytra-wiki.json"
 
 #include "error.h"
-
-
 #include <drogon/HttpClient.h>
 #include <drogon/HttpTypes.h>
 #include <json/json.h>
@@ -85,3 +83,5 @@ drogon::HttpResponsePtr jsonResponse(const nlohmann::json &json);
 std::string join(const std::vector<std::string> &lst, const std::string &delim);
 
 Json::Value projectToJson(const drogon_model::postgres::Project &project);
+
+std::string computeSHA256Hash(const std::string& unhashed);

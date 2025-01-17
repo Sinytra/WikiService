@@ -33,7 +33,6 @@ namespace api::v1 {
             errorResponse(projErr, "Project not found", callback);
             co_return std::nullopt;
         }
-        const std::string repo = *proj->getSourceRepo();
 
         const auto [resolved, resErr](co_await storage_.getProject(*proj, version, locale));
         if (!resolved) {

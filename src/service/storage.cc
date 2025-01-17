@@ -6,10 +6,13 @@
 
 #include <git2.h>
 #include <spdlog/sinks/basic_file_sink.h>
+#include <spdlog/sinks/callback_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 
 #define TEMP_DIR ".temp"
 #define LATEST_VERSION "latest"
+
+#define WS_COMPLETE "<<complete"
 
 using namespace logging;
 using namespace drogon;
@@ -129,28 +132,74 @@ std::unordered_map<std::string, std::string> listRepoBranches(git_repository *re
     return branches;
 }
 
-std::shared_ptr<spdlog::logger> gerProjectLogger(const std::string &id, const fs::path &dir) {
-    const auto file = dir / "project.log";
+class FormattedCallbackSink final : public spdlog::sinks::base_sink<std::mutex> {
+public:
+    explicit FormattedCallbackSink(const std::function<void(const std::string &msg)> &callback) : callback_(callback) {}
 
-    std::vector<spdlog::sink_ptr> sinks;
+protected:
+    void sink_it_(const spdlog::details::log_msg &msg) override {
+        spdlog::memory_buf_t formatted;
+        formatter_->format(msg, formatted);
+        callback_(fmt::to_string(formatted));
+    }
+    void flush_() override {}
 
-    const auto consoleSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-    consoleSink->set_pattern("[%^%L%$] [%H:%M:%S %z] [thread %t] [%n] %v");
-    consoleSink->set_level(logger.level());
-    sinks.push_back(consoleSink);
+private:
+    const std::function<void(const std::string &msg)> callback_;
+};
 
-    const auto fileSink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(absolute(file).string());
-    fileSink->set_pattern("[%^%L%$] [%H:%M:%S %z] [%n] %v");
-    sinks.push_back(fileSink);
-
-    const auto projectLog = std::make_shared<spdlog::logger>(id, begin(sinks), end(sinks));
-    projectLog->set_level(spdlog::level::trace);
-
-    return projectLog;
-}
+std::string createProjectSetupKey(const Project &project) { return "setup:" + project.getValueOfId(); }
 
 namespace service {
-    Storage::Storage(const std::string &p, MemoryCache &c, Documentation &d) : basePath_(p), cache_(c), documentation_(d) {
+    std::string projectStatusToString(const ProjectStatus status) {
+        switch (status) {
+            case LOADING:
+                return "loading";
+            case LOADED:
+                return "loaded";
+            case ERROR:
+                return "error";
+            default:
+                return "unknown";
+        }
+    }
+
+    void RealtimeConnectionStorage::connect(const std::string &project, const WebSocketConnectionPtr &connection) {
+        connections_[project].push_back(connection);
+    }
+
+    void RealtimeConnectionStorage::disconnect(const WebSocketConnectionPtr &connection) {
+        for (auto it = connections_.begin(); it != connections_.end();) {
+            auto &vec = it->second;
+
+            std::erase(vec, connection);
+
+            if (vec.empty()) {
+                it = connections_.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
+
+    void RealtimeConnectionStorage::broadcast(const std::string &project, const std::string &message) const {
+        if (const auto conns = connections_.find(project); conns != connections_.end()) {
+            for (const WebSocketConnectionPtr &conn: conns->second) {
+                conn->send(message);
+            }
+        }
+    }
+
+    void RealtimeConnectionStorage::shutdown(const std::string &project) {
+        if (const auto it = connections_.find(project); it != connections_.end()) {
+            for (const std::vector<WebSocketConnectionPtr> copy = it->second; const WebSocketConnectionPtr &conn: copy) {
+                conn->shutdown();
+            }
+        }
+    }
+
+    Storage::Storage(const std::string &p, MemoryCache &c, Documentation &d, RealtimeConnectionStorage &cn) :
+        basePath_(p), cache_(c), documentation_(d), connections_(cn) {
         // Verify base path
         getBaseDir();
     }
@@ -166,10 +215,40 @@ namespace service {
         return baseDir;
     }
 
+    std::filesystem::path Storage::getProjectLogPath(const Project &project) const {
+        return getBaseDir().path() / project.getValueOfId() / "project.log";
+    }
+
     fs::path Storage::getProjectDirPath(const Project &project, const std::string &version = "") const {
         const fs::directory_entry baseDir = getBaseDir();
         const auto targetPath = baseDir.path() / project.getValueOfId() / (version.empty() ? LATEST_VERSION : version);
         return targetPath;
+    }
+
+    std::shared_ptr<spdlog::logger> Storage::getProjectLogger(const Project &project) const {
+        const auto id = project.getValueOfId();
+        const auto file = getProjectLogPath(project);
+
+        std::vector<spdlog::sink_ptr> sinks;
+
+        const auto callbackSink =
+            std::make_shared<FormattedCallbackSink>([&, id](const std::string &msg) { connections_.broadcast(id, msg); });
+        callbackSink->set_pattern("[%^%L%$] [%H:%M:%S] [%n] %v");
+        sinks.push_back(callbackSink);
+
+        const auto consoleSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+        consoleSink->set_pattern("[%^%L%$] [%H:%M:%S %z] [thread %t] [%n] %v");
+        consoleSink->set_level(logger.level());
+        sinks.push_back(consoleSink);
+
+        const auto fileSink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(absolute(file).string());
+        fileSink->set_pattern("[%^%L%$] [%H:%M:%S] [%n] %v");
+        sinks.push_back(fileSink);
+
+        const auto projectLog = std::make_shared<spdlog::logger>(id, begin(sinks), end(sinks));
+        projectLog->set_level(spdlog::level::trace);
+
+        return projectLog;
     }
 
     Task<std::tuple<git_repository *, Error>> gitCloneProject(const Project &project, const fs::path &projectPath,
@@ -216,7 +295,10 @@ namespace service {
         const auto clonePath = baseDir.path() / TEMP_DIR / project.getValueOfId();
         remove_all(clonePath);
 
-        const auto logger = gerProjectLogger(project.getValueOfId(), baseDir.path() / project.getValueOfId());
+        const auto projectBaseDir = getBaseDir().path() / project.getValueOfId();
+        remove_all(projectBaseDir);
+
+        const auto logger = getProjectLogger(project);
 
         logger->info("Setting up project");
 
@@ -265,13 +347,16 @@ namespace service {
     }
 
     Task<Error> Storage::setupProjectCached(const Project &project, const std::string installationToken) {
-        const auto taskKey = "setup:" + project.getValueOfId();
+        const auto taskKey = createProjectSetupKey(project);
 
         if (const auto pending = co_await getOrStartTask<Error>(taskKey)) {
             co_return co_await patientlyAwaitTaskResult(*pending);
         }
 
         auto result = co_await setupProject(project, installationToken);
+
+        connections_.broadcast(project.getValueOfId(), WS_COMPLETE);
+        connections_.shutdown(project.getValueOfId());
 
         co_return co_await completeTask<Error>(taskKey, std::move(result));
     }
@@ -350,9 +435,49 @@ namespace service {
 
         logger.debug("Invalidating project '{}'", project.getValueOfId());
 
-        const auto repoPath = getBaseDir().path() / project.getValueOfId();
-        remove_all(repoPath);
+        const auto basePath = getBaseDir().path() / project.getValueOfId();
+        remove_all(basePath);
 
         co_return Error::Ok;
+    }
+
+    Task<std::optional<ResolvedProject>> Storage::maybeGetProject(const Project &project) {
+        const auto [resolved, error] = co_await findProject(project, std::nullopt, std::nullopt, false);
+        co_return resolved;
+    }
+
+    Task<ProjectStatus> Storage::getProjectStatus(const Project &project) {
+        const auto taskKey = createProjectSetupKey(project);
+
+        if (const auto pending = getPendingTask<Error>(taskKey)) {
+            co_return LOADING;
+        }
+
+        if (const auto resolved = co_await maybeGetProject(project); !resolved) {
+            if (const auto filePath = getProjectLogPath(project); exists(filePath)) {
+                co_return ERROR;
+            }
+
+            co_return UNKNOWN;
+        }
+
+        co_return LOADED;
+    }
+
+    std::optional<std::string> Storage::getProjectLog(const Project &project) const {
+        const auto filePath = getProjectLogPath(project);
+
+        std::ifstream file(filePath);
+
+        if (!file) {
+            return std::nullopt;
+        }
+
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+
+        file.close();
+
+        return buffer.str();
     }
 }

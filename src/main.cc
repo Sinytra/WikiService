@@ -4,6 +4,7 @@
 
 #include "api/v1/browse.h"
 #include "api/v1/docs.h"
+#include "api/v1/websocket.h"
 #include "api/v1/projects.h"
 #include "git2.h"
 #include "log/log.h"
@@ -11,6 +12,7 @@
 #include "service/platforms.h"
 #include "service/schemas.h"
 #include "service/storage.h"
+#include "service/users.h"
 #include "service/util.h"
 
 using namespace std;
@@ -61,8 +63,10 @@ int main() {
         auto cache(MemoryCache{});
         auto github(GitHub{cache, appName, appClientId, appPrivateKeyPath});
         auto documentation(Documentation{github, cache});
-        auto storage(Storage{storageBasePath, cache, documentation});
+        auto connections(RealtimeConnectionStorage{});
+        auto storage(Storage{storageBasePath, cache, documentation, connections});
         auto database(Database{});
+        auto users(Users{database, github, cache});
 
         auto cloudflare(CloudFlare{cloudFlareToken, cloudFlareAccTag, cloudFlareSiteTag, cache});
 
@@ -72,11 +76,13 @@ int main() {
 
         auto controller(make_shared<api::v1::DocsController>(github, database, documentation, storage));
         auto browseController(make_shared<api::v1::BrowseController>(database));
-        auto projectsController(make_shared<api::v1::ProjectsController>(github, platforms, database, documentation, storage, cloudflare));
+        auto projectsController(make_shared<api::v1::ProjectsController>(github, platforms, database, documentation, storage, cloudflare, users));
+        auto projectWSController(make_shared<api::v1::ProjectWebSocketController>(connections, users));
 
         app().registerController(controller);
         app().registerController(browseController);
         app().registerController(projectsController);
+        app().registerController(projectWSController);
 
         cacheAwaiterThreadPool.start();
         git_libgit2_init();

@@ -52,8 +52,9 @@ namespace api::v1 {
         return projects;
     }
 
-    ProjectsController::ProjectsController(GitHub &gh, Platforms &pf, Database &db, Documentation &dc, Storage &s, CloudFlare &cf) :
-        github_(gh), platforms_(pf), database_(db), documentation_(dc), storage_(s), cloudflare(cf) {}
+    ProjectsController::ProjectsController(GitHub &gh, Platforms &pf, Database &db, Documentation &dc, Storage &s, CloudFlare &cf,
+                                           Users &us) :
+        github_(gh), platforms_(pf), database_(db), documentation_(dc), storage_(s), cloudflare_(cf), users_(us) {}
 
     Task<std::optional<PlatformProject>> ProjectsController::validatePlatform(const std::string &id, const std::string &repo,
                                                                               const std::string &mrCode, const std::string &platform,
@@ -118,9 +119,9 @@ namespace api::v1 {
      * - ownership: Failed to verify platform project ownership (data: can_verify_mr)
      * - internal: Internal server error
      */
-    Task<std::optional<ValidatedProjectData>>
-    ProjectsController::validateProjectData(const Json::Value &json, const std::string &token,
-                                            std::function<void(const HttpResponsePtr &)> callback, const bool checkExisting) const {
+    Task<std::optional<ValidatedProjectData>> ProjectsController::validateProjectData(const Json::Value &json, const std::string &token,
+                                                                                      std::function<void(const HttpResponsePtr &)> callback,
+                                                                                      const bool checkExisting) const {
         const auto [username, usernameError](co_await github_.getUsername(token));
         if (!username) {
             simpleError(Error::ErrBadRequest, "user_github_auth", callback);
@@ -203,32 +204,6 @@ namespace api::v1 {
         co_return ValidatedProjectData{*username, project, platforms};
     }
 
-    Task<std::optional<Project>> ProjectsController::validateProjectAccess(const std::string &id, const std::string &token,
-                                                                           std::function<void(const HttpResponsePtr &)> callback) const {
-        if (id.empty()) {
-            errorResponse(Error::ErrBadRequest, "Missing id route parameter", callback);
-            co_return std::nullopt;
-        }
-
-        if (token.empty()) {
-            errorResponse(Error::ErrBadRequest, "Missing token parameter", callback);
-            co_return std::nullopt;
-        }
-
-        const auto [project, projectErr] = co_await database_.getProjectSource(id);
-        if (!project) {
-            simpleError(Error::ErrBadRequest, "not_found", callback);
-            co_return std::nullopt;
-        }
-        const auto repo = project->getValueOfSourceRepo();
-
-        if (const auto canAccess = co_await validateRepositoryAccess(repo, token, callback); !canAccess) {
-            co_return std::nullopt;
-        }
-
-        co_return project;
-    }
-
     Task<bool> ProjectsController::validateRepositoryAccess(const std::string &repo, const std::string &token,
                                                             std::function<void(const HttpResponsePtr &)> callback) const {
         const auto [username, usernameError](co_await github_.getUsername(token));
@@ -259,6 +234,32 @@ namespace api::v1 {
         co_return true;
     }
 
+    Task<std::optional<Project>> ProjectsController::validateProjectAccess(const std::string &id, const std::string &token,
+                                                                           std::function<void(const HttpResponsePtr &)> callback) const {
+        if (id.empty()) {
+            errorResponse(Error::ErrBadRequest, "Missing id route parameter", callback);
+            co_return std::nullopt;
+        }
+
+        if (token.empty()) {
+            errorResponse(Error::ErrBadRequest, "Missing token parameter", callback);
+            co_return std::nullopt;
+        }
+
+        const auto [project, projectErr] = co_await database_.getProjectSource(id);
+        if (!project) {
+            simpleError(Error::ErrBadRequest, "not_found", callback);
+            co_return std::nullopt;
+        }
+        const auto repo = project->getValueOfSourceRepo();
+
+        if (const auto canAccess = co_await validateRepositoryAccess(repo, token, callback); !canAccess) {
+            co_return std::nullopt;
+        }
+
+        co_return project;
+    }
+
     Task<> ProjectsController::greet(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback) const {
         const auto resp = HttpResponse::newHttpResponse();
         resp->setStatusCode(k200OK);
@@ -282,59 +283,106 @@ namespace api::v1 {
 
     Task<> ProjectsController::listUserProjects(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback,
                                                 const std::string token) const {
-        if (token.empty()) {
-            co_return errorResponse(Error::ErrBadRequest, "Missing token parameter", callback);
+        const auto [userInfo, userInfoErr](co_await users_.getUserInfo(token));
+        if (userInfoErr != Error::Ok) {
+            errorResponse(Error::ErrUnauthorized, "Error getting user info", callback);
+            co_return;
         }
+        const auto [profile, repositories, projects] = *userInfo;
 
-        const auto [user, usernameErr] = co_await github_.getAuthenticatedUser(token);
-        if (!user) {
-            co_return errorResponse(usernameErr, "Couldn't fetch GitHub profile", callback);
-        }
-        const auto username = (*user)["login"].asString();
-
-        Json::Value projectRepos(Json::arrayValue);
-        std::vector<std::string> candidateRepos;
-
-        // TODO Multithread
-        for (const auto [installations, installationsErr] = co_await github_.getUserAccessibleInstallations(username, token);
-             const auto &id: installations)
-        {
-            if (installationsErr != Error::Ok) {
-                co_return errorResponse(installationsErr, "Error fetching installations", callback);
-            }
-
-            for (const auto [repos, reposErr] = co_await github_.getInstallationAccessibleRepos(id, token); const auto &repo: repos) {
-                projectRepos.append(repo);
-                candidateRepos.push_back(repo);
-            }
-        }
-
-        // TODO Include community projects
-        const auto projects = co_await database_.getProjectsForRepos(candidateRepos);
         Json::Value projectsJson(Json::arrayValue);
-        for (const auto &project: projects) {
-            projectsJson.append(projectToJson(project));
+        for (const auto &projectID: projects) {
+            const auto [project, err] = co_await database_.getProjectSource(projectID);
+            if (!project) {
+                continue;
+            }
+
+            Json::Value json = projectToJson(*project);
+            json["status"] = projectStatusToString(co_await storage_.getProjectStatus(*project));
+            projectsJson.append(json);
         }
 
         Json::Value root;
-        {
-            Json::Value profile;
-            profile["name"] = (*user)["name"].asString();
-            profile["bio"] = (*user)["bio"].asString();
-            profile["avatar_url"] = (*user)["avatar_url"].asString();
-            profile["login"] = (*user)["login"].asString();
-            profile["email"] = (*user)["email"].asString();
-            root["profile"] = profile;
-        }
-        root["repositories"] = projectRepos;
+        root["profile"] = profile;
+        root["repositories"] = repositories;
         root["projects"] = projectsJson;
+
         const auto resp = HttpResponse::newHttpJsonResponse(root);
         resp->setStatusCode(k200OK);
         callback(resp);
+        co_return;
+    }
+
+    Task<> ProjectsController::getProject(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string id,
+                                          std::string token) const {
+        const auto [userInfo, userInfoErr](co_await users_.getUserInfo(token));
+        if (userInfoErr != Error::Ok) {
+            errorResponse(Error::ErrUnauthorized, "Error getting user info", callback);
+            co_return;
+        }
+        if (!userInfo->projects.contains(id)) {
+            simpleError(Error::ErrBadRequest, "insufficient_repo_perms", callback);
+            co_return;
+        }
+
+        const auto [project, projectErr] = co_await database_.getProjectSource(id);
+        if (!project) {
+            simpleError(Error::ErrBadRequest, "not_found", callback);
+            co_return;
+        }
+
+        const auto isPublic(co_await documentation_.isPubliclyEditable(*project));
+
+        Json::Value root;
+        if (const auto resolved = co_await storage_.maybeGetProject(*project)) {
+            root = resolved->toJson(isPublic);
+        } else {
+            root = projectToJson(*project);
+            root["is_public"] = isPublic;
+        }
+        root["status"] = projectStatusToString(co_await storage_.getProjectStatus(*project));
+
+        const auto resp = HttpResponse::newHttpJsonResponse(root);
+        resp->setStatusCode(k200OK);
+        callback(resp);
+        co_return;
+    }
+
+    Task<> ProjectsController::getProjectLog(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string id,
+                                             std::string token) const {
+        const auto [userInfo, userInfoErr](co_await users_.getUserInfo(token));
+        if (userInfoErr != Error::Ok) {
+            errorResponse(Error::ErrUnauthorized, "Error getting user info", callback);
+            co_return;
+        }
+        if (!userInfo->projects.contains(id)) {
+            simpleError(Error::ErrBadRequest, "insufficient_repo_perms", callback);
+            co_return;
+        }
+
+        const auto [project, projectErr] = co_await database_.getProjectSource(id);
+        if (!project) {
+            simpleError(Error::ErrBadRequest, "not_found", callback);
+            co_return;
+        }
+
+        const auto log = storage_.getProjectLog(*project);
+        if (!log) {
+            simpleError(Error::ErrNotFound, "not_found", callback);
+            co_return;
+        }
+
+        Json::Value root;
+        root["content"] = *log;
+
+        const auto resp = HttpResponse::newHttpJsonResponse(root);
+        resp->setStatusCode(k200OK);
+        callback(resp);
+        co_return;
     }
 
     Task<> ProjectsController::listPopularProjects(HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
-        const std::vector<std::string> ids = co_await cloudflare.getMostVisitedProjectIDs();
+        const std::vector<std::string> ids = co_await cloudflare_.getMostVisitedProjectIDs();
         Json::Value root(Json::arrayValue);
         for (const auto &id: ids) {
             if (const auto [project, error] = co_await database_.getProjectSource(id); project) {
@@ -393,7 +441,10 @@ namespace api::v1 {
         // Invalidate user installation cache to ensure project shows up on dev dashboard
         co_await github_.invalidateUserInstallations(username);
 
+        reloadProject(project);
+
         Json::Value root;
+        root["project"] = projectToJson(project);
         root["message"] = "Project registered successfully";
         const auto resp = HttpResponse::newHttpJsonResponse(root);
         resp->setStatusCode(k200OK);
@@ -428,8 +479,7 @@ namespace api::v1 {
             co_return simpleError(Error::ErrInternal, "internal", callback);
         }
 
-        co_await github_.invalidateCache(project.getValueOfSourceRepo());
-        co_await documentation_.invalidateCache(project);
+        reloadProject(project);
 
         Json::Value root;
         root["message"] = "Project updated successfully";
@@ -455,6 +505,7 @@ namespace api::v1 {
 
         co_await github_.invalidateCache(project->getValueOfSourceRepo());
         co_await documentation_.invalidateCache(*project);
+        co_await storage_.invalidateProject(*project);
 
         Json::Value root;
         root["message"] = "Project deleted successfully";
@@ -511,14 +562,29 @@ namespace api::v1 {
             co_return;
         }
 
-        co_await github_.invalidateCache(project->getValueOfSourceRepo());
-        co_await documentation_.invalidateCache(*project);
-        co_await storage_.invalidateProject(*project);
+        reloadProject(*project);
 
         Json::Value root;
         root["message"] = "Project cache invalidated successfully";
         const auto resp = HttpResponse::newHttpJsonResponse(root);
         resp->setStatusCode(k200OK);
         callback(resp);
+    }
+
+    void ProjectsController::reloadProject(const Project &project) const {
+        const auto currentLoop = trantor::EventLoop::getEventLoopOfCurrentThread();
+        currentLoop->queueInLoop(async_func([this, project]() -> Task<> {
+            co_await github_.invalidateCache(project.getValueOfSourceRepo());
+            co_await documentation_.invalidateCache(project);
+            co_await storage_.invalidateProject(project);
+
+            logger.debug("Reloading project {}", project.getValueOfId());
+
+            if (const auto [resolved, resErr](co_await storage_.getProject(project, std::nullopt, std::nullopt)); resErr == Error::Ok) {
+                logger.debug("Project '{}' reloaded successfully", project.getValueOfId());
+            } else {
+                logger.error("Encountered error while reloading project '{}'", project.getValueOfId());
+            }
+        }));
     }
 }
