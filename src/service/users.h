@@ -21,6 +21,8 @@ namespace service {
     drogon::Task<std::tuple<std::optional<UserInfo>, Error>> getUserInfo(std::string token) const;
 
     drogon::Task<std::optional<UserInfo>> getExistingUserInfo(std::string token) const;
+
+    drogon::Task<Error> refreshUserInfo(std::string username, std::string token) const;
   private:
     Database &database_;
     GitHub &github_;

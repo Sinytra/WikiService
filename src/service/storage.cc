@@ -12,7 +12,8 @@
 #define TEMP_DIR ".temp"
 #define LATEST_VERSION "latest"
 
-#define WS_COMPLETE "<<complete"
+#define WS_SUCCESS "<<success"
+#define WS_ERROR "<<error"
 
 using namespace logging;
 using namespace drogon;
@@ -354,8 +355,12 @@ namespace service {
         }
 
         auto result = co_await setupProject(project, installationToken);
+        if (result == Error::Ok) {
+            connections_.broadcast(project.getValueOfId(), WS_SUCCESS);
+        } else {
+            connections_.broadcast(project.getValueOfId(), WS_ERROR);
+        }
 
-        connections_.broadcast(project.getValueOfId(), WS_COMPLETE);
         connections_.shutdown(project.getValueOfId());
 
         co_return co_await completeTask<Error>(taskKey, std::move(result));

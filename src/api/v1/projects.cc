@@ -17,13 +17,13 @@ using namespace drogon::orm;
 using namespace drogon_model::postgres;
 
 namespace api::v1 {
-    Task<bool> verifyProjectOwnership(const Platforms &pf, const PlatformProject &project, const std::string &repo,
+    Task<bool> verifyProjectOwnership(const Platforms &pf, const std::string &platform, const PlatformProject &project, const std::string &repo,
                                       const std::string &mrCode) {
         if (const auto expected = "https://github.com/" + repo; !project.sourceUrl.empty() && project.sourceUrl.starts_with(expected)) {
             co_return true;
         }
 
-        if (!mrCode.empty()) {
+        if (platform == PLATFORM_MODRINTH && !mrCode.empty()) {
             if (const auto token = co_await pf.modrinth_.getOAuthToken(mrCode)) {
                 if (const auto mrUsername = co_await pf.modrinth_.getAuthenticatedUser(*token)) {
                     co_return co_await pf.modrinth_.isProjectMember(project.slug, *mrUsername);
@@ -89,7 +89,7 @@ namespace api::v1 {
             }
         }
         if (!skipCheck) {
-            if (const auto verified = co_await verifyProjectOwnership(platforms_, *platformProj, repo, mrCode); !verified) {
+            if (const auto verified = co_await verifyProjectOwnership(platforms_, platform, *platformProj, repo, mrCode); !verified) {
                 simpleError(Error::ErrBadRequest, "ownership", callback, [&](Json::Value &root) {
                     root["details"] = "Platform: " + platform;
                     root["can_verify_mr"] = platform == PLATFORM_MODRINTH && platforms_.modrinth_.isOAuthConfigured();
@@ -208,19 +208,19 @@ namespace api::v1 {
                                                             std::function<void(const HttpResponsePtr &)> callback) const {
         const auto [username, usernameError](co_await github_.getUsername(token));
         if (!username) {
-            simpleError(Error::ErrBadRequest, "user_github_auth", callback);
+            simpleError(usernameError, "user_github_auth", callback);
             co_return false;
         }
 
         const auto [installationId, installationIdError](co_await github_.getRepositoryInstallation(repo));
         if (!installationId) {
-            simpleError(Error::ErrBadRequest, "missing_installation", callback);
+            simpleError(installationIdError, "missing_installation", callback);
             co_return false;
         }
 
         const auto [installationToken, tokenErr](co_await github_.getInstallationToken(installationId.value()));
         if (!installationToken) {
-            simpleError(Error::ErrInternal, "internal", callback);
+            simpleError(tokenErr, "internal", callback);
             co_return false;
         }
 
@@ -439,7 +439,7 @@ namespace api::v1 {
         }
 
         // Invalidate user installation cache to ensure project shows up on dev dashboard
-        co_await github_.invalidateUserInstallations(username);
+        co_await users_.refreshUserInfo(username, token);
 
         reloadProject(project);
 
@@ -562,7 +562,14 @@ namespace api::v1 {
             co_return;
         }
 
-        reloadProject(*project);
+        // Invalidate ahead of reloading
+        co_await github_.invalidateCache(project->getValueOfSourceRepo());
+        co_await documentation_.invalidateCache(*project);
+        co_await storage_.invalidateProject(*project);
+        // Prepare cache
+        co_await documentation_.isPubliclyEditable(*project);
+
+        reloadProject(*project, false);
 
         Json::Value root;
         root["message"] = "Project cache invalidated successfully";
@@ -571,14 +578,17 @@ namespace api::v1 {
         callback(resp);
     }
 
-    void ProjectsController::reloadProject(const Project &project) const {
+    void ProjectsController::reloadProject(const Project &project, bool invalidate) const {
         const auto currentLoop = trantor::EventLoop::getEventLoopOfCurrentThread();
-        currentLoop->queueInLoop(async_func([this, project]() -> Task<> {
-            co_await github_.invalidateCache(project.getValueOfSourceRepo());
-            co_await documentation_.invalidateCache(project);
-            co_await storage_.invalidateProject(project);
+        currentLoop->queueInLoop(async_func([this, project, invalidate]() -> Task<> {
+            if (invalidate) {
+                logger.debug("Invalidating project '{}'", project.getValueOfId());
+                co_await github_.invalidateCache(project.getValueOfSourceRepo());
+                co_await documentation_.invalidateCache(project);
+                co_await storage_.invalidateProject(project);
+            }
 
-            logger.debug("Reloading project {}", project.getValueOfId());
+            logger.debug("Reloading project '{}'", project.getValueOfId());
 
             if (const auto [resolved, resErr](co_await storage_.getProject(project, std::nullopt, std::nullopt)); resErr == Error::Ok) {
                 logger.debug("Project '{}' reloaded successfully", project.getValueOfId());

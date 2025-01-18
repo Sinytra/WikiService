@@ -68,7 +68,7 @@ namespace service {
         json["repositories"] = parkourJson(projectRepos);
         json["projects"] = projectIDs;
 
-        co_await cache_.updateCache(hashed, json.dump(), 24h);
+        co_await cache_.updateCache(hashed, json.dump(), 24h); // TODO unreliable cache time, handle OAuth on BE
 
         co_return {UserInfo{.profile = profile, .repositories = projectRepos, .projects = projectIDs}, Error::Ok};
     }
@@ -84,5 +84,14 @@ namespace service {
             }
         }
         co_return std::nullopt;
+    }
+
+    Task<Error> Users::refreshUserInfo(std::string username, std::string token) const {
+        const std::string hashed(computeSHA256Hash(token));
+        co_await github_.invalidateUserInstallations(username);
+        co_await cache_.erase(hashed);
+
+        const auto [info, error] = co_await getUserInfo(token);
+        co_return error;
     }
 }

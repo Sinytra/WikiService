@@ -83,7 +83,7 @@ namespace api::v1 {
         drogon::Task<bool> validateRepositoryAccess(const std::string &repo, const std::string &token,
                                                     std::function<void(const drogon::HttpResponsePtr &)> callback) const;
 
-        void reloadProject(const Project &project) const;
+        void reloadProject(const Project &project, bool invalidate = true) const;
 
         GitHub &github_;
         Platforms &platforms_;
