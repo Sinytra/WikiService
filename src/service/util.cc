@@ -1,6 +1,7 @@
 #include "util.h"
 #include <log/log.h>
 
+#include <fstream>
 #include <api/v1/error.h>
 #include <base64.hpp>
 #include <openssl/evp.h>
@@ -59,6 +60,19 @@ std::optional<Json::Value> parseJsonString(const std::string &str) {
         return std::nullopt;
     }
     return root;
+}
+
+std::optional<nlohmann::json> parseJsonFile(const std::filesystem::path &path) {
+    std::ifstream ifs(path);
+    try {
+        nlohmann::json jf = nlohmann::json::parse(ifs);
+        ifs.close();
+        return jf;
+    } catch (const nlohmann::json::parse_error &e) {
+        ifs.close();
+        logger.error("JSON parse error in (parseJsonFile): {}", e.what());
+        return std::nullopt;
+    }
 }
 
 std::string toCamelCase(std::string s) {

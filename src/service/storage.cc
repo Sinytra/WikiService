@@ -166,10 +166,19 @@ namespace service {
     }
 
     void RealtimeConnectionStorage::connect(const std::string &project, const WebSocketConnectionPtr &connection) {
+        std::unique_lock lock(mutex_);
+
         connections_[project].push_back(connection);
+        if (const auto messages = pending_.find(project); messages != pending_.end()) {
+            for (const auto &message: messages->second) {
+                connection->send(message);
+            }
+        }
     }
 
     void RealtimeConnectionStorage::disconnect(const WebSocketConnectionPtr &connection) {
+        std::unique_lock lock(mutex_);
+
         for (auto it = connections_.begin(); it != connections_.end();) {
             auto &vec = it->second;
 
@@ -183,20 +192,32 @@ namespace service {
         }
     }
 
-    void RealtimeConnectionStorage::broadcast(const std::string &project, const std::string &message) const {
-        if (const auto conns = connections_.find(project); conns != connections_.end()) {
-            for (const WebSocketConnectionPtr &conn: conns->second) {
-                conn->send(message);
+    void RealtimeConnectionStorage::broadcast(const std::string &project, const std::string &message) {
+        {
+            std::shared_lock lock(mutex_);
+
+            if (const auto conns = connections_.find(project); conns != connections_.end()) {
+                for (const WebSocketConnectionPtr &conn: conns->second) {
+                    conn->send(message);
+                }
+                return;
             }
         }
+
+        std::unique_lock lock(mutex_);
+        pending_[project].push_back(message);
     }
 
     void RealtimeConnectionStorage::shutdown(const std::string &project) {
+        std::unique_lock lock(mutex_);
+
         if (const auto it = connections_.find(project); it != connections_.end()) {
             for (const std::vector<WebSocketConnectionPtr> copy = it->second; const WebSocketConnectionPtr &conn: copy) {
                 conn->shutdown();
             }
         }
+        connections_.erase(project);
+        pending_.erase(project);
     }
 
     Storage::Storage(const std::string &p, MemoryCache &c, Documentation &d, RealtimeConnectionStorage &cn) :

@@ -16,6 +16,10 @@ namespace service {
         std::string updatedAt;
     };
 
+    struct ProjectMetadata {
+        Json::Value platforms;
+    };
+
     class ResolvedProject {
     public:
         explicit ResolvedProject(const Project &, const std::filesystem::path &, const std::filesystem::path &);
@@ -33,6 +37,8 @@ namespace service {
         std::tuple<nlohmann::ordered_json, Error> getDirectoryTree() const;
 
         std::optional<std::filesystem::path> getAsset(const ResourceLocation &location) const;
+
+        std::optional<nlohmann::json> readProjectMetadata() const;
 
         const Project &getProject() const;
 

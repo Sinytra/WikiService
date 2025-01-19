@@ -277,25 +277,21 @@ nlohmann::ordered_json getDirTreeJson(const Project &project, const fs::path &ro
     return root;
 }
 
-std::tuple<std::unordered_map<std::string, std::string>, Error> getAvailableDocsVersions(const Project &project, fs::path root) {
+std::tuple<std::unordered_map<std::string, std::string>, Error> getAvailableDocsVersions(const Project &project, const fs::path &root) {
     const auto defaultBranch = project.getValueOfSourceBranch();
     const auto metaFilePath = root / removeLeadingSlash(project.getValueOfSourcePath()) / DOCS_META_FILE;
 
     std::unordered_map<std::string, std::string> versions;
 
-    std::ifstream ifs(metaFilePath);
-    try {
-        if (nlohmann::json jf = nlohmann::json::parse(ifs); jf.contains("versions") && jf["versions"].is_object()) {
-            for (const auto &[key, val]: jf["versions"].items()) {
+    if (const auto jf = parseJsonFile(metaFilePath)) {
+        if (jf->contains("versions") && (*jf)["versions"].is_object()) {
+            for (const auto &[key, val]: (*jf)["versions"].items()) {
                 if (val.is_string() && val.get<std::string>() != defaultBranch) {
                     versions[key] = val;
                 }
             }
         }
-        ifs.close();
-    } catch (const nlohmann::json::parse_error &e) {
-        ifs.close();
-        logger.error("JSON parse error (getAvailableVersions): {}", e.what());
+    } else {
         return {versions, Error::ErrBadRequest};
     }
 
@@ -378,6 +374,11 @@ namespace service {
             ".assets/item/" + location.namespace_ + "/" + location.path_ + (location.path_.find('.') != std::string::npos ? "" : ".png");
         const auto filePath = docsDir_ / path;
         return exists(filePath) ? std::make_optional(filePath) : std::nullopt;
+    }
+
+    std::optional<nlohmann::json> ResolvedProject::readProjectMetadata() const {
+        const auto path = rootDir_ / DOCS_META_FILE;
+        return parseJsonFile(path);
     }
 
     const Project &ResolvedProject::getProject() const { return project_; }

@@ -27,10 +27,12 @@ namespace service {
 
         void disconnect(const drogon::WebSocketConnectionPtr &connection);
 
-        void broadcast(const std::string &project, const std::string &message) const;
+        void broadcast(const std::string &project, const std::string &message);
 
         void shutdown(const std::string &project);
     private:
+        mutable std::shared_mutex mutex_;
+        std::unordered_map<std::string, std::vector<std::string>> pending_;
         std::unordered_map<std::string, std::vector<drogon::WebSocketConnectionPtr>> connections_;
     };
 

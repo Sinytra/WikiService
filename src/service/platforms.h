@@ -4,9 +4,9 @@
 #define PLATFORM_CURSEFORGE "curseforge"
 
 #include <drogon/utils/coroutine.h>
-#include <json/value.h>
 #include <optional>
 #include <string>
+#include <map>
 
 namespace service {
     enum ProjectType {

@@ -17,8 +17,8 @@ using namespace drogon::orm;
 using namespace drogon_model::postgres;
 
 namespace api::v1 {
-    Task<bool> verifyProjectOwnership(const Platforms &pf, const std::string &platform, const PlatformProject &project, const std::string &repo,
-                                      const std::string &mrCode) {
+    Task<bool> verifyProjectOwnership(const Platforms &pf, const std::string &platform, const PlatformProject &project,
+                                      const std::string &repo, const std::string &mrCode) {
         if (const auto expected = "https://github.com/" + repo; !project.sourceUrl.empty() && project.sourceUrl.starts_with(expected)) {
             co_return true;
         }
@@ -34,7 +34,12 @@ namespace api::v1 {
         co_return false;
     }
 
-    nlohmann::json processPlatforms(const std::vector<std::string> &valid, const Json::Value &metadata) {
+    ProjectsController::ProjectsController(GitHub &gh, Platforms &pf, Database &db, Documentation &dc, Storage &s, CloudFlare &cf,
+                                           Users &us) :
+        github_(gh), platforms_(pf), database_(db), documentation_(dc), storage_(s), cloudflare_(cf), users_(us) {}
+
+    nlohmann::json ProjectsController::processPlatforms(const Json::Value &metadata) const {
+        const std::vector<std::string> &valid = platforms_.getAvailablePlatforms();
         nlohmann::json projects(nlohmann::json::value_t::object);
         if (metadata.isMember("platforms") && metadata["platforms"].isObject()) {
             const auto platforms = metadata["platforms"];
@@ -51,10 +56,6 @@ namespace api::v1 {
         }
         return projects;
     }
-
-    ProjectsController::ProjectsController(GitHub &gh, Platforms &pf, Database &db, Documentation &dc, Storage &s, CloudFlare &cf,
-                                           Users &us) :
-        github_(gh), platforms_(pf), database_(db), documentation_(dc), storage_(s), cloudflare_(cf), users_(us) {}
 
     Task<std::optional<PlatformProject>> ProjectsController::validatePlatform(const std::string &id, const std::string &repo,
                                                                               const std::string &mrCode, const std::string &platform,
@@ -175,7 +176,7 @@ namespace api::v1 {
         const auto jsonContent = *contents;
         const auto id = jsonContent["id"].asString();
 
-        const auto platforms = processPlatforms(platforms_.getAvailablePlatforms(), jsonContent);
+        const auto platforms = processPlatforms(jsonContent);
         if (platforms.empty()) {
             simpleError(Error::ErrBadRequest, "no_platforms", callback);
             co_return std::nullopt;

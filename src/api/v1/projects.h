@@ -68,6 +68,8 @@ namespace api::v1 {
                                   std::string token) const;
 
     private:
+        nlohmann::json processPlatforms(const Json::Value &metadata) const;
+
         drogon::Task<std::optional<PlatformProject>> validatePlatform(const std::string &id, const std::string &repo,
                                                                       const std::string &mrCode, const std::string &platform,
                                                                       const std::string &slug, bool checkExisting,

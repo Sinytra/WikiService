@@ -68,7 +68,7 @@ namespace service {
         json["repositories"] = parkourJson(projectRepos);
         json["projects"] = projectIDs;
 
-        co_await cache_.updateCache(hashed, json.dump(), 24h); // TODO unreliable cache time, handle OAuth on BE
+        co_await cache_.updateCache(hashed, json.dump(), 2h); // TODO unreliable cache time, handle OAuth on BE
 
         co_return {UserInfo{.profile = profile, .repositories = projectRepos, .projects = projectIDs}, Error::Ok};
     }

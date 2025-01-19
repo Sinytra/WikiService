@@ -32,6 +32,7 @@ void replace_all(std::string &s, std::string const &toReplace, std::string const
 std::string decodeBase64(std::string encoded);
 
 std::optional<Json::Value> parseJsonString(const std::string &str);
+std::optional<nlohmann::json> parseJsonFile(const std::filesystem::path &path);
 
 std::string serializeJsonString(const Json::Value &value);
 
