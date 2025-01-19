@@ -77,7 +77,7 @@ int main() {
         auto controller(make_shared<api::v1::DocsController>(github, database, documentation, storage));
         auto browseController(make_shared<api::v1::BrowseController>(database));
         auto projectsController(make_shared<api::v1::ProjectsController>(github, platforms, database, documentation, storage, cloudflare, users));
-        auto projectWSController(make_shared<api::v1::ProjectWebSocketController>(connections, users));
+        auto projectWSController(make_shared<api::v1::ProjectWebSocketController>(database, storage, connections, users));
 
         app().registerController(controller);
         app().registerController(browseController);

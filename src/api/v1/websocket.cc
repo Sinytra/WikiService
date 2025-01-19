@@ -16,10 +16,11 @@ using namespace drogon::orm;
 using namespace drogon_model::postgres;
 
 namespace api::v1 {
-    ProjectWebSocketController::ProjectWebSocketController(RealtimeConnectionStorage &c, Users &u) : connections_(c), users_(u) {}
+    ProjectWebSocketController::ProjectWebSocketController(Database &d, Storage &s, RealtimeConnectionStorage &c, Users &u) :
+        database_(d), storage_(s), connections_(c), users_(u) {}
 
     void ProjectWebSocketController::handleNewMessage(const WebSocketConnectionPtr &wsConnPtr, std::string &&message,
-                                          const WebSocketMessageType &type) {}
+                                                      const WebSocketMessageType &type) {}
 
     void ProjectWebSocketController::handleNewConnection(const HttpRequestPtr &req, const WebSocketConnectionPtr &wsConnPtr) {
         static std::string prefix = "/ws/api/v1/project/log/";
@@ -35,15 +36,33 @@ namespace api::v1 {
         const auto projectId = path.substr(prefix.size());
 
         app().getLoop()->queueInLoop(async_func([&, projectId, token]() -> Task<> {
-            if (const auto userInfo = co_await users_.getExistingUserInfo(token)) {
-                connections_.connect(projectId, wsConnPtr);
-            } else {
+            // Handle unauthenticated user
+            const auto userInfo = co_await users_.getExistingUserInfo(token);
+            if (!userInfo) {
                 wsConnPtr->shutdown(CloseCode::kViolation);
             }
+
+            // Handle inaccessible / unknown project
+            if (!userInfo->projects.contains(projectId)) {
+                wsConnPtr->shutdown(CloseCode::kViolation);
+            }
+
+            // Handle unknown project
+            const auto [project, err](co_await database_.getProjectSource(projectId));
+            if (!project) {
+                wsConnPtr->shutdown(CloseCode::kUnexpectedCondition);
+                co_return;
+            }
+
+            // Handle already loaded project
+            if (const auto status = co_await storage_.getProjectStatus(*project); status == LOADED || status == ERROR) {
+                wsConnPtr->shutdown();
+                co_return;
+            }
+
+            connections_.connect(projectId, wsConnPtr);
         }));
     }
 
-    void ProjectWebSocketController::handleConnectionClosed(const WebSocketConnectionPtr &wsConnPtr) {
-        connections_.disconnect(wsConnPtr);
-    }
+    void ProjectWebSocketController::handleConnectionClosed(const WebSocketConnectionPtr &wsConnPtr) { connections_.disconnect(wsConnPtr); }
 }
