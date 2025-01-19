@@ -255,16 +255,16 @@ namespace service {
 
         const auto callbackSink =
             std::make_shared<FormattedCallbackSink>([&, id](const std::string &msg) { connections_.broadcast(id, msg); });
-        callbackSink->set_pattern("[%^%L%$] [%H:%M:%S] [%n] %v");
+        callbackSink->set_pattern("[%^%L%$] [%Y-%m-%d %T] [%n] %v");
         sinks.push_back(callbackSink);
 
         const auto consoleSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-        consoleSink->set_pattern("[%^%L%$] [%H:%M:%S %z] [thread %t] [%n] %v");
+        consoleSink->set_pattern("[%^%L%$] [%T %z] [thread %t] [%n] %v");
         consoleSink->set_level(logger.level());
         sinks.push_back(consoleSink);
 
         const auto fileSink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(absolute(file).string());
-        fileSink->set_pattern("[%^%L%$] [%H:%M:%S] [%n] %v");
+        fileSink->set_pattern("[%^%L%$] [%Y-%m-%d %T] [%n] %v");
         sinks.push_back(fileSink);
 
         const auto projectLog = std::make_shared<spdlog::logger>(id, begin(sinks), end(sinks));
