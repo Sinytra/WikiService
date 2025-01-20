@@ -1,8 +1,10 @@
 #include "util.h"
 #include <log/log.h>
 
+#include <fstream>
 #include <api/v1/error.h>
 #include <base64.hpp>
+#include <openssl/evp.h>
 
 using namespace drogon;
 using namespace logging;
@@ -58,6 +60,19 @@ std::optional<Json::Value> parseJsonString(const std::string &str) {
         return std::nullopt;
     }
     return root;
+}
+
+std::optional<nlohmann::json> parseJsonFile(const std::filesystem::path &path) {
+    std::ifstream ifs(path);
+    try {
+        nlohmann::json jf = nlohmann::json::parse(ifs);
+        ifs.close();
+        return jf;
+    } catch (const nlohmann::json::parse_error &e) {
+        ifs.close();
+        logger.error("JSON parse error in (parseJsonFile): {}", e.what());
+        return std::nullopt;
+    }
 }
 
 std::string toCamelCase(std::string s) {
@@ -207,4 +222,52 @@ Json::Value projectToJson(const drogon_model::postgres::Project &project) {
     json["platforms"] = parseJsonString(project.getValueOfPlatforms()).value_or(Json::Value());
     json.removeMember("search_vector");
     return json;
+}
+
+struct OpenSSLFree {
+    void operator()(void* ptr) {
+        EVP_MD_CTX_free((EVP_MD_CTX*)ptr);
+    }
+};
+
+template <typename T>
+using OpenSSLPointer = std::unique_ptr<T, OpenSSLFree>;
+
+std::optional<std::string> computeHashInternal(const std::string& unhashed) {
+    const OpenSSLPointer<EVP_MD_CTX> context(EVP_MD_CTX_new());
+
+    if(!context.get()) {
+        return std::nullopt;
+    }
+
+    if(!EVP_DigestInit_ex(context.get(), EVP_sha256(), nullptr)) {
+        return std::nullopt;
+    }
+
+    if(!EVP_DigestUpdate(context.get(), unhashed.c_str(), unhashed.length())) {
+        return std::nullopt;
+    }
+
+    unsigned char hash[EVP_MAX_MD_SIZE];
+    unsigned int lengthOfHash = 0;
+
+    if(!EVP_DigestFinal_ex(context.get(), hash, &lengthOfHash)) {
+        return std::nullopt;
+    }
+
+    std::stringstream ss;
+    for(unsigned int i = 0; i < lengthOfHash; ++i)
+    {
+        ss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(hash[i]);
+    }
+
+    return ss.str();
+}
+
+std::string computeSHA256Hash(const std::string& unhashed) {
+    if (const auto result = computeHashInternal(unhashed)) {
+        return *result;
+    }
+    logger.critical("Failed to compute SHA256 hash");
+    throw std::runtime_error("Failed to compute SHA256 hash");
 }

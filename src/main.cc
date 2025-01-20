@@ -4,11 +4,15 @@
 
 #include "api/v1/browse.h"
 #include "api/v1/docs.h"
+#include "api/v1/websocket.h"
 #include "api/v1/projects.h"
+#include "git2.h"
 #include "log/log.h"
 #include "service/github.h"
 #include "service/platforms.h"
 #include "service/schemas.h"
+#include "service/storage.h"
+#include "service/users.h"
 #include "service/util.h"
 
 using namespace std;
@@ -42,6 +46,7 @@ int main() {
         const std::string &appClientId = githubAppConfig["client_id"].asString();
         const std::string &appPrivateKeyPath = githubAppConfig["private_key_path"].asString();
         const std::string &curseForgeKey = customConfig["curseforge_key"].asString();
+        const std::string &storageBasePath = customConfig["storage_path"].asString();
         const Json::Value &mrApp = customConfig["modrinth_app"];
         const std::string &mrAppClientId = mrApp["client_id"].asString();
         const std::string &mrAppClientSecret = mrApp["client_secret"].asString();
@@ -57,26 +62,34 @@ int main() {
 
         auto cache(MemoryCache{});
         auto github(GitHub{cache, appName, appClientId, appPrivateKeyPath});
-        auto database(Database{});
         auto documentation(Documentation{github, cache});
+        auto connections(RealtimeConnectionStorage{});
+        auto storage(Storage{storageBasePath, cache, documentation, connections});
+        auto database(Database{});
+        auto users(Users{database, github, cache});
+
         auto cloudflare(CloudFlare{cloudFlareToken, cloudFlareAccTag, cloudFlareSiteTag, cache});
 
         auto modrinth(ModrinthPlatform{mrAppClientId, mrAppClientSecret, mrAppRedirectUrl});
         auto curseForge(CurseForgePlatform{curseForgeKey});
         auto platforms(Platforms(curseForge, modrinth));
 
-        auto controller(make_shared<api::v1::DocsController>(github, database, documentation));
+        auto controller(make_shared<api::v1::DocsController>(github, database, documentation, storage));
         auto browseController(make_shared<api::v1::BrowseController>(database));
-        auto projectsController(make_shared<api::v1::ProjectsController>(github, platforms, database, documentation, cloudflare));
+        auto projectsController(make_shared<api::v1::ProjectsController>(github, platforms, database, documentation, storage, cloudflare, users));
+        auto projectWSController(make_shared<api::v1::ProjectWebSocketController>(database, storage, connections, users));
 
         app().registerController(controller);
         app().registerController(browseController);
         app().registerController(projectsController);
+        app().registerController(projectWSController);
 
         cacheAwaiterThreadPool.start();
+        git_libgit2_init();
 
         app().run();
 
+        git_libgit2_shutdown();
         cacheAwaiterThreadPool.getLoop(0)->quit();
         cacheAwaiterThreadPool.wait();
     } catch (const std::exception &e) {

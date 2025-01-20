@@ -3,8 +3,6 @@
 #define DOCS_META_FILE_PATH "/sinytra-wiki.json"
 
 #include "error.h"
-
-
 #include <drogon/HttpClient.h>
 #include <drogon/HttpTypes.h>
 #include <json/json.h>
@@ -34,6 +32,7 @@ void replace_all(std::string &s, std::string const &toReplace, std::string const
 std::string decodeBase64(std::string encoded);
 
 std::optional<Json::Value> parseJsonString(const std::string &str);
+std::optional<nlohmann::json> parseJsonFile(const std::filesystem::path &path);
 
 std::string serializeJsonString(const Json::Value &value);
 
@@ -85,3 +84,5 @@ drogon::HttpResponsePtr jsonResponse(const nlohmann::json &json);
 std::string join(const std::vector<std::string> &lst, const std::string &delim);
 
 Json::Value projectToJson(const drogon_model::postgres::Project &project);
+
+std::string computeSHA256Hash(const std::string& unhashed);

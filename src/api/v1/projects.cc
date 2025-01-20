@@ -17,13 +17,13 @@ using namespace drogon::orm;
 using namespace drogon_model::postgres;
 
 namespace api::v1 {
-    Task<bool> verifyProjectOwnership(const Platforms &pf, const PlatformProject &project, const std::string &repo,
-                                      const std::string &mrCode) {
+    Task<bool> verifyProjectOwnership(const Platforms &pf, const std::string &platform, const PlatformProject &project,
+                                      const std::string &repo, const std::string &mrCode) {
         if (const auto expected = "https://github.com/" + repo; !project.sourceUrl.empty() && project.sourceUrl.starts_with(expected)) {
             co_return true;
         }
 
-        if (!mrCode.empty()) {
+        if (platform == PLATFORM_MODRINTH && !mrCode.empty()) {
             if (const auto token = co_await pf.modrinth_.getOAuthToken(mrCode)) {
                 if (const auto mrUsername = co_await pf.modrinth_.getAuthenticatedUser(*token)) {
                     co_return co_await pf.modrinth_.isProjectMember(project.slug, *mrUsername);
@@ -34,7 +34,12 @@ namespace api::v1 {
         co_return false;
     }
 
-    nlohmann::json processPlatforms(const std::vector<std::string> &valid, const Json::Value &metadata) {
+    ProjectsController::ProjectsController(GitHub &gh, Platforms &pf, Database &db, Documentation &dc, Storage &s, CloudFlare &cf,
+                                           Users &us) :
+        github_(gh), platforms_(pf), database_(db), documentation_(dc), storage_(s), cloudflare_(cf), users_(us) {}
+
+    nlohmann::json ProjectsController::processPlatforms(const Json::Value &metadata) const {
+        const std::vector<std::string> &valid = platforms_.getAvailablePlatforms();
         nlohmann::json projects(nlohmann::json::value_t::object);
         if (metadata.isMember("platforms") && metadata["platforms"].isObject()) {
             const auto platforms = metadata["platforms"];
@@ -51,9 +56,6 @@ namespace api::v1 {
         }
         return projects;
     }
-
-    ProjectsController::ProjectsController(GitHub &gh, Platforms &pf, Database &db, Documentation &dc, CloudFlare &cf) :
-        github_(gh), platforms_(pf), database_(db), documentation_(dc), cloudflare(cf) {}
 
     Task<std::optional<PlatformProject>> ProjectsController::validatePlatform(const std::string &id, const std::string &repo,
                                                                               const std::string &mrCode, const std::string &platform,
@@ -88,7 +90,7 @@ namespace api::v1 {
             }
         }
         if (!skipCheck) {
-            if (const auto verified = co_await verifyProjectOwnership(platforms_, *platformProj, repo, mrCode); !verified) {
+            if (const auto verified = co_await verifyProjectOwnership(platforms_, platform, *platformProj, repo, mrCode); !verified) {
                 simpleError(Error::ErrBadRequest, "ownership", callback, [&](Json::Value &root) {
                     root["details"] = "Platform: " + platform;
                     root["can_verify_mr"] = platform == PLATFORM_MODRINTH && platforms_.modrinth_.isOAuthConfigured();
@@ -118,9 +120,9 @@ namespace api::v1 {
      * - ownership: Failed to verify platform project ownership (data: can_verify_mr)
      * - internal: Internal server error
      */
-    Task<std::optional<ValidatedProjectData>>
-    ProjectsController::validateProjectData(const Json::Value &json, const std::string &token,
-                                            std::function<void(const HttpResponsePtr &)> callback, const bool checkExisting) const {
+    Task<std::optional<ValidatedProjectData>> ProjectsController::validateProjectData(const Json::Value &json, const std::string &token,
+                                                                                      std::function<void(const HttpResponsePtr &)> callback,
+                                                                                      const bool checkExisting) const {
         const auto [username, usernameError](co_await github_.getUsername(token));
         if (!username) {
             simpleError(Error::ErrBadRequest, "user_github_auth", callback);
@@ -174,7 +176,7 @@ namespace api::v1 {
         const auto jsonContent = *contents;
         const auto id = jsonContent["id"].asString();
 
-        const auto platforms = processPlatforms(platforms_.getAvailablePlatforms(), jsonContent);
+        const auto platforms = processPlatforms(jsonContent);
         if (platforms.empty()) {
             simpleError(Error::ErrBadRequest, "no_platforms", callback);
             co_return std::nullopt;
@@ -203,6 +205,36 @@ namespace api::v1 {
         co_return ValidatedProjectData{*username, project, platforms};
     }
 
+    Task<bool> ProjectsController::validateRepositoryAccess(const std::string &repo, const std::string &token,
+                                                            std::function<void(const HttpResponsePtr &)> callback) const {
+        const auto [username, usernameError](co_await github_.getUsername(token));
+        if (!username) {
+            simpleError(usernameError, "user_github_auth", callback);
+            co_return false;
+        }
+
+        const auto [installationId, installationIdError](co_await github_.getRepositoryInstallation(repo));
+        if (!installationId) {
+            simpleError(installationIdError, "missing_installation", callback);
+            co_return false;
+        }
+
+        const auto [installationToken, tokenErr](co_await github_.getInstallationToken(installationId.value()));
+        if (!installationToken) {
+            simpleError(tokenErr, "internal", callback);
+            co_return false;
+        }
+
+        if (const auto [perms, permsError](co_await github_.getCollaboratorPermissionLevel(repo, *username, *installationToken));
+            !perms || perms != "admin" && perms != "write")
+        {
+            simpleError(Error::ErrBadRequest, "insufficient_repo_perms", callback);
+            co_return false;
+        }
+
+        co_return true;
+    }
+
     Task<std::optional<Project>> ProjectsController::validateProjectAccess(const std::string &id, const std::string &token,
                                                                            std::function<void(const HttpResponsePtr &)> callback) const {
         if (id.empty()) {
@@ -229,36 +261,6 @@ namespace api::v1 {
         co_return project;
     }
 
-    Task<bool> ProjectsController::validateRepositoryAccess(const std::string &repo, const std::string &token,
-                                                            std::function<void(const HttpResponsePtr &)> callback) const {
-        const auto [username, usernameError](co_await github_.getUsername(token));
-        if (!username) {
-            simpleError(Error::ErrBadRequest, "user_github_auth", callback);
-            co_return false;
-        }
-
-        const auto [installationId, installationIdError](co_await github_.getRepositoryInstallation(repo));
-        if (!installationId) {
-            simpleError(Error::ErrBadRequest, "missing_installation", callback);
-            co_return false;
-        }
-
-        const auto [installationToken, tokenErr](co_await github_.getInstallationToken(installationId.value()));
-        if (!installationToken) {
-            simpleError(Error::ErrInternal, "internal", callback);
-            co_return false;
-        }
-
-        if (const auto [perms, permsError](co_await github_.getCollaboratorPermissionLevel(repo, *username, *installationToken));
-            !perms || perms != "admin" && perms != "write")
-        {
-            simpleError(Error::ErrBadRequest, "insufficient_repo_perms", callback);
-            co_return false;
-        }
-
-        co_return true;
-    }
-
     Task<> ProjectsController::greet(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback) const {
         const auto resp = HttpResponse::newHttpResponse();
         resp->setStatusCode(k200OK);
@@ -282,59 +284,106 @@ namespace api::v1 {
 
     Task<> ProjectsController::listUserProjects(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback,
                                                 const std::string token) const {
-        if (token.empty()) {
-            co_return errorResponse(Error::ErrBadRequest, "Missing token parameter", callback);
+        const auto [userInfo, userInfoErr](co_await users_.getUserInfo(token));
+        if (userInfoErr != Error::Ok) {
+            errorResponse(Error::ErrUnauthorized, "Error getting user info", callback);
+            co_return;
         }
+        const auto [profile, repositories, projects] = *userInfo;
 
-        const auto [user, usernameErr] = co_await github_.getAuthenticatedUser(token);
-        if (!user) {
-            co_return errorResponse(usernameErr, "Couldn't fetch GitHub profile", callback);
-        }
-        const auto username = (*user)["login"].asString();
-
-        Json::Value projectRepos(Json::arrayValue);
-        std::vector<std::string> candidateRepos;
-
-        // TODO Multithread
-        for (const auto [installations, installationsErr] = co_await github_.getUserAccessibleInstallations(username, token);
-             const auto &id: installations)
-        {
-            if (installationsErr != Error::Ok) {
-                co_return errorResponse(installationsErr, "Error fetching installations", callback);
-            }
-
-            for (const auto [repos, reposErr] = co_await github_.getInstallationAccessibleRepos(id, token); const auto &repo: repos) {
-                projectRepos.append(repo);
-                candidateRepos.push_back(repo);
-            }
-        }
-
-        // TODO Include community projects
-        const auto projects = co_await database_.getProjectsForRepos(candidateRepos);
         Json::Value projectsJson(Json::arrayValue);
-        for (const auto &project: projects) {
-            projectsJson.append(projectToJson(project));
+        for (const auto &projectID: projects) {
+            const auto [project, err] = co_await database_.getProjectSource(projectID);
+            if (!project) {
+                continue;
+            }
+
+            Json::Value json = projectToJson(*project);
+            json["status"] = projectStatusToString(co_await storage_.getProjectStatus(*project));
+            projectsJson.append(json);
         }
 
         Json::Value root;
-        {
-            Json::Value profile;
-            profile["name"] = (*user)["name"].asString();
-            profile["bio"] = (*user)["bio"].asString();
-            profile["avatar_url"] = (*user)["avatar_url"].asString();
-            profile["login"] = (*user)["login"].asString();
-            profile["email"] = (*user)["email"].asString();
-            root["profile"] = profile;
-        }
-        root["repositories"] = projectRepos;
+        root["profile"] = profile;
+        root["repositories"] = repositories;
         root["projects"] = projectsJson;
+
         const auto resp = HttpResponse::newHttpJsonResponse(root);
         resp->setStatusCode(k200OK);
         callback(resp);
+        co_return;
+    }
+
+    Task<> ProjectsController::getProject(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string id,
+                                          std::string token) const {
+        const auto [userInfo, userInfoErr](co_await users_.getUserInfo(token));
+        if (userInfoErr != Error::Ok) {
+            errorResponse(Error::ErrUnauthorized, "Error getting user info", callback);
+            co_return;
+        }
+        if (!userInfo->projects.contains(id)) {
+            simpleError(Error::ErrBadRequest, "insufficient_repo_perms", callback);
+            co_return;
+        }
+
+        const auto [project, projectErr] = co_await database_.getProjectSource(id);
+        if (!project) {
+            simpleError(Error::ErrBadRequest, "not_found", callback);
+            co_return;
+        }
+
+        const auto isPublic(co_await documentation_.isPubliclyEditable(*project));
+
+        Json::Value root;
+        if (const auto resolved = co_await storage_.maybeGetProject(*project)) {
+            root = resolved->toJson(isPublic);
+        } else {
+            root = projectToJson(*project);
+            root["is_public"] = isPublic;
+        }
+        root["status"] = projectStatusToString(co_await storage_.getProjectStatus(*project));
+
+        const auto resp = HttpResponse::newHttpJsonResponse(root);
+        resp->setStatusCode(k200OK);
+        callback(resp);
+        co_return;
+    }
+
+    Task<> ProjectsController::getProjectLog(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string id,
+                                             std::string token) const {
+        const auto [userInfo, userInfoErr](co_await users_.getUserInfo(token));
+        if (userInfoErr != Error::Ok) {
+            errorResponse(Error::ErrUnauthorized, "Error getting user info", callback);
+            co_return;
+        }
+        if (!userInfo->projects.contains(id)) {
+            simpleError(Error::ErrBadRequest, "insufficient_repo_perms", callback);
+            co_return;
+        }
+
+        const auto [project, projectErr] = co_await database_.getProjectSource(id);
+        if (!project) {
+            simpleError(Error::ErrBadRequest, "not_found", callback);
+            co_return;
+        }
+
+        const auto log = storage_.getProjectLog(*project);
+        if (!log) {
+            simpleError(Error::ErrNotFound, "not_found", callback);
+            co_return;
+        }
+
+        Json::Value root;
+        root["content"] = *log;
+
+        const auto resp = HttpResponse::newHttpJsonResponse(root);
+        resp->setStatusCode(k200OK);
+        callback(resp);
+        co_return;
     }
 
     Task<> ProjectsController::listPopularProjects(HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
-        const std::vector<std::string> ids = co_await cloudflare.getMostVisitedProjectIDs();
+        const std::vector<std::string> ids = co_await cloudflare_.getMostVisitedProjectIDs();
         Json::Value root(Json::arrayValue);
         for (const auto &id: ids) {
             if (const auto [project, error] = co_await database_.getProjectSource(id); project) {
@@ -391,9 +440,12 @@ namespace api::v1 {
         }
 
         // Invalidate user installation cache to ensure project shows up on dev dashboard
-        co_await github_.invalidateUserInstallations(username);
+        co_await users_.refreshUserInfo(username, token);
+
+        reloadProject(project);
 
         Json::Value root;
+        root["project"] = projectToJson(project);
         root["message"] = "Project registered successfully";
         const auto resp = HttpResponse::newHttpJsonResponse(root);
         resp->setStatusCode(k200OK);
@@ -428,8 +480,7 @@ namespace api::v1 {
             co_return simpleError(Error::ErrInternal, "internal", callback);
         }
 
-        co_await github_.invalidateCache(project.getValueOfSourceRepo());
-        co_await documentation_.invalidateCache(project);
+        reloadProject(project);
 
         Json::Value root;
         root["message"] = "Project updated successfully";
@@ -455,6 +506,7 @@ namespace api::v1 {
 
         co_await github_.invalidateCache(project->getValueOfSourceRepo());
         co_await documentation_.invalidateCache(*project);
+        co_await storage_.invalidateProject(*project);
 
         Json::Value root;
         root["message"] = "Project deleted successfully";
@@ -511,13 +563,39 @@ namespace api::v1 {
             co_return;
         }
 
+        // Invalidate ahead of reloading
         co_await github_.invalidateCache(project->getValueOfSourceRepo());
         co_await documentation_.invalidateCache(*project);
+        co_await storage_.invalidateProject(*project);
+        // Prepare cache
+        co_await documentation_.isPubliclyEditable(*project);
+
+        reloadProject(*project, false);
 
         Json::Value root;
         root["message"] = "Project cache invalidated successfully";
         const auto resp = HttpResponse::newHttpJsonResponse(root);
         resp->setStatusCode(k200OK);
         callback(resp);
+    }
+
+    void ProjectsController::reloadProject(const Project &project, bool invalidate) const {
+        const auto currentLoop = trantor::EventLoop::getEventLoopOfCurrentThread();
+        currentLoop->queueInLoop(async_func([this, project, invalidate]() -> Task<> {
+            if (invalidate) {
+                logger.debug("Invalidating project '{}'", project.getValueOfId());
+                co_await github_.invalidateCache(project.getValueOfSourceRepo());
+                co_await documentation_.invalidateCache(project);
+                co_await storage_.invalidateProject(project);
+            }
+
+            logger.debug("Reloading project '{}'", project.getValueOfId());
+
+            if (const auto [resolved, resErr](co_await storage_.getProject(project, std::nullopt, std::nullopt)); resErr == Error::Ok) {
+                logger.debug("Project '{}' reloaded successfully", project.getValueOfId());
+            } else {
+                logger.error("Encountered error while reloading project '{}'", project.getValueOfId());
+            }
+        }));
     }
 }

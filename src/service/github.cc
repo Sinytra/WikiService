@@ -300,7 +300,7 @@ namespace service {
         co_return {std::nullopt, Error::ErrNotFound};
     }
 
-    Task<std::tuple<bool, Error>> GitHub::isPublicRepository(std::string repo, std::string installationToken) const {
+    Task<std::tuple<bool, Error>> GitHub::isPublicRepository(const std::string repo, const std::string installationToken) const {
         const auto client = createHttpClient(GITHUB_API_URL);
         if (const auto [repositoryContents, err] = co_await sendAuthenticatedRequest(client, Get, "/repos/" + repo, installationToken);
             repositoryContents)
@@ -308,32 +308,6 @@ namespace service {
             co_return {!(*repositoryContents)["private"].asBool(), Error::Ok};
         }
         co_return {false, Error::ErrNotFound};
-    }
-
-    Task<std::tuple<std::optional<std::string>, Error>> GitHub::getFileLastUpdateTime(std::string repo, std::string ref, std::string path,
-                                                                                      std::string installationToken) const {
-        const auto client = createHttpClient(GITHUB_API_URL);
-        std::map<std::string, std::string> params = {{"page", "1"}, {"per_page", "1"}};
-        params.try_emplace("path", path);
-        params.try_emplace("sha", ref);
-        if (auto [commits, err] = co_await sendAuthenticatedRequest(client, Get, std::format("/repos/{}/commits", repo), installationToken,
-                                                                    [&path, &ref](const HttpRequestPtr &req) {
-                                                                        req->setParameter("page", "1");
-                                                                        req->setParameter("per_page", "1");
-                                                                        req->setParameter("path", path);
-                                                                        req->setParameter("sha", ref);
-                                                                    });
-            commits && commits->isArray())
-        {
-            if (const auto entry = commits->front();
-                entry.isMember("commit") && entry["commit"].isMember("committer") && entry["commit"]["committer"].isMember("date"))
-            {
-                const auto date = entry["commit"]["committer"]["date"].asString();
-                co_return {date, Error::Ok};
-            }
-        }
-
-        co_return {std::nullopt, Error::ErrNotFound};
     }
 
     Task<> GitHub::invalidateCache(const std::string repo) const { co_await cache_.erase(createRepoInstallIdCacheKey(repo)); }

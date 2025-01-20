@@ -80,3 +80,12 @@ if (base64_ADDED)
     add_library(base64 INTERFACE)
     target_include_directories(base64 INTERFACE ${base64_SOURCE_DIR}/include)
 endif()
+
+CPMAddPackage(
+        NAME libgit2
+        GITHUB_REPOSITORY libgit2/libgit2
+        GIT_TAG v1.9.0
+        OPTIONS
+        "BUILD_TESTS OFF"
+        "BUILD_SHARED_LIBS OFF"
+)

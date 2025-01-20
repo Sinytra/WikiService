@@ -3,6 +3,7 @@ add_library(api STATIC
         docs.cc
         error.cc
         projects.cc
+        websocket.cc
 )
 
 target_link_libraries(api PRIVATE
@@ -10,4 +11,5 @@ target_link_libraries(api PRIVATE
         log
         Drogon::Drogon
         nlohmann_json_schema_validator
+        libgit2
 )

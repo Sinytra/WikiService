@@ -7,6 +7,9 @@ add_library(service STATIC
         platforms.cc
         schemas.cc
         cloudflare.cc
+        storage.cc
+        resolved.cc
+        users.cc
 )
 
 target_link_libraries(service PRIVATE
@@ -15,6 +18,9 @@ target_link_libraries(service PRIVATE
         jwt-cpp
         base64
         nlohmann_json_schema_validator
+        libgit2
+        libgit2package
+        OpenSSL::Crypto
 )
 
 target_include_directories(service PUBLIC

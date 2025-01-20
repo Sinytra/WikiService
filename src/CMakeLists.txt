@@ -31,6 +31,7 @@ add_executable(${PROJECT_NAME} main.cc)
 if (NOT USE_LOCAL_DEPS)
     find_package(Drogon CONFIG REQUIRED)
     find_package(spdlog CONFIG REQUIRED)
+    find_package(OpenSSL CONFIG REQUIRED)
 endif ()
 target_link_libraries(${PROJECT_NAME} PRIVATE
         api
@@ -39,6 +40,9 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
         jwt-cpp
         base64
         nlohmann_json_schema_validator
+        libgit2
+        libgit2package
+        OpenSSL::Crypto
 )
 
 # ##############################################################################

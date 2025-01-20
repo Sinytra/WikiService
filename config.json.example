@@ -52,6 +52,7 @@
         "account_tag": "",
         "site_tag": ""
     },
-    "curseforge_key": ""
+    "curseforge_key": "",
+    "storage_path": ""
   }
 }
