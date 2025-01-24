@@ -369,11 +369,23 @@ namespace service {
         return {tree, Error::Ok};
     }
 
+    std::string getAssetPath(const ResourceLocation &location) {
+        return ".assets/" + location.namespace_ + "/" + location.path_ + (location.path_.find('.') != std::string::npos ? "" : ".png");
+    }
+
     std::optional<std::filesystem::path> ResolvedProject::getAsset(const ResourceLocation &location) const {
-        const auto path =
-            ".assets/item/" + location.namespace_ + "/" + location.path_ + (location.path_.find('.') != std::string::npos ? "" : ".png");
-        const auto filePath = docsDir_ / path;
-        return exists(filePath) ? std::make_optional(filePath) : std::nullopt;
+        if (const auto filePath = docsDir_ / getAssetPath(location); exists(filePath)) {
+            return filePath;
+        }
+
+        // Legacy asset path fallback
+        if (const auto legacyFilePath = docsDir_ / getAssetPath({.namespace_ = "item", .path_ = location.namespace_ + '/' + location.path_});
+            exists(legacyFilePath))
+        {
+            return legacyFilePath;
+        }
+
+        return std::nullopt;
     }
 
     std::optional<nlohmann::json> ResolvedProject::readProjectMetadata() const {
