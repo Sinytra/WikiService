@@ -195,7 +195,7 @@ FolderMetadata getFolderMetadata(const Project &project, const fs::path &path) {
     try {
         nlohmann::ordered_json parsed = nlohmann::ordered_json::parse(ifs);
         if (const auto error = validateJson(schemas::folderMetadata, parsed)) {
-            logger.error("Invalid folder metadata: Repo: {} Path: {} Error: {}", project.getValueOfSourceRepo(), path.string(), error->msg);
+            logger.error("Invalid folder metadata: Project: {} Path: {} Error: {}", project.getValueOfId(), path.string(), error->msg);
         } else {
             for (auto &[key, val]: parsed.items()) {
                 metadata.keys.push_back(key);
@@ -210,6 +210,7 @@ FolderMetadata getFolderMetadata(const Project &project, const fs::path &path) {
         ifs.close();
     } catch (const nlohmann::json::parse_error &e) {
         ifs.close();
+        logger.error("Error parsing folder metadata: Project '{}', path {}", project.getValueOfId(), path.string());
         logger.error("JSON parse error (getFolderMetadata): {}", e.what());
     }
     return metadata;
