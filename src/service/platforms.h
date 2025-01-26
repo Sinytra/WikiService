@@ -4,9 +4,12 @@
 #define PLATFORM_CURSEFORGE "curseforge"
 
 #include <drogon/utils/coroutine.h>
+#include <map>
+#include <models/User.h>
 #include <optional>
 #include <string>
-#include <map>
+
+using namespace drogon_model::postgres;
 
 namespace service {
     enum ProjectType {
@@ -27,28 +30,26 @@ namespace service {
         std::string name;
         std::string sourceUrl;
         ProjectType type;
+        std::string platform;
     };
 
     class DistributionPlatform {
     public:
         virtual drogon::Task<std::optional<PlatformProject>> getProject(std::string slug) = 0;
+
+        virtual drogon::Task<bool> verifyProjectAccess(PlatformProject project, User user, std::string repo);
     };
 
     class ModrinthPlatform : public DistributionPlatform {
     public:
-        explicit ModrinthPlatform(const std::string &, const std::string &, const std::string &);
+        explicit ModrinthPlatform();
 
-        bool isOAuthConfigured() const;
+        drogon::Task<std::optional<std::string>> getAuthenticatedUserID(std::string token) const;
+        drogon::Task<bool> isProjectMember(std::string slug, std::string userId) const;
 
-        drogon::Task<std::optional<std::string>> getOAuthToken(std::string code) const;
-        drogon::Task<std::optional<std::string>> getAuthenticatedUser(std::string token) const;
-        drogon::Task<bool> isProjectMember(std::string slug, std::string username) const;
+        drogon::Task<std::optional<PlatformProject>> getProject(std::string slug) override;
 
-        virtual drogon::Task<std::optional<PlatformProject>> getProject(std::string slug) override;
-    private:
-        const std::string clientId_;
-        const std::string clientSecret_;
-        const std::string redirectUrl_;
+        drogon::Task<bool> verifyProjectAccess(PlatformProject project, User user, std::string repo) override;
     };
 
     class CurseForgePlatform : public DistributionPlatform {
@@ -57,7 +58,7 @@ namespace service {
 
         bool isAvailable() const;
 
-        virtual drogon::Task<std::optional<PlatformProject>> getProject(std::string slug) override;
+        drogon::Task<std::optional<PlatformProject>> getProject(std::string slug) override;
     private:
         const std::string apiKey_;
     };
@@ -69,6 +70,7 @@ namespace service {
         drogon::Task<std::optional<PlatformProject>> getProject(std::string platform, std::string slug);
 
         std::vector<std::string> getAvailablePlatforms();
+        DistributionPlatform& getPlatform(const std::string &platform);
 
         CurseForgePlatform& curseforge_;
         ModrinthPlatform& modrinth_;

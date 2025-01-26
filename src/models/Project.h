@@ -38,6 +38,8 @@ namespace drogon_model
 {
 namespace postgres
 {
+class User;
+class UserProject;
 
 class Project
 {
@@ -54,6 +56,7 @@ class Project
         static const std::string _platforms;
         static const std::string _search_vector;
         static const std::string _created_at;
+        static const std::string _is_public;
     };
 
     static const int primaryKeyNumber;
@@ -194,13 +197,25 @@ class Project
     ///Set the value of the column created_at
     void setCreatedAt(const ::trantor::Date &pCreatedAt) noexcept;
 
+    /**  For column is_public  */
+    ///Get the value of the column is_public, returns the default value if the column is null
+    const bool &getValueOfIsPublic() const noexcept;
+    ///Return a shared_ptr object pointing to the column const value, or an empty shared_ptr object if the column is null
+    const std::shared_ptr<bool> &getIsPublic() const noexcept;
+    ///Set the value of the column is_public
+    void setIsPublic(const bool &pIsPublic) noexcept;
 
-    static size_t getColumnNumber() noexcept {  return 10;  }
+
+    static size_t getColumnNumber() noexcept {  return 11;  }
     static const std::string &getColumnName(size_t index) noexcept(false);
 
     Json::Value toJson() const;
     Json::Value toMasqueradedJson(const std::vector<std::string> &pMasqueradingVector) const;
     /// Relationship interfaces
+    std::vector<std::pair<User,UserProject>> getUsers(const drogon::orm::DbClientPtr &clientPtr) const;
+    void getUsers(const drogon::orm::DbClientPtr &clientPtr,
+                  const std::function<void(std::vector<std::pair<User,UserProject>>)> &rcb,
+                  const drogon::orm::ExceptionCallback &ecb) const;
   private:
     friend drogon::orm::Mapper<Project>;
     friend drogon::orm::BaseBuilder<Project, true, true>;
@@ -226,6 +241,7 @@ class Project
     std::shared_ptr<std::string> platforms_;
     std::shared_ptr<std::string> searchVector_;
     std::shared_ptr<::trantor::Date> createdAt_;
+    std::shared_ptr<bool> isPublic_;
     struct MetaData
     {
         const std::string colName_;
@@ -237,7 +253,7 @@ class Project
         const bool notNull_;
     };
     static const std::vector<MetaData> metaData_;
-    bool dirtyFlag_[10]={ false };
+    bool dirtyFlag_[11]={ false };
   public:
     static const std::string &sqlForFindingByPrimaryKey()
     {
@@ -307,6 +323,12 @@ class Project
         {
             needSelection=true;
         }
+        sql += "is_public,";
+        ++parametersCount;
+        if(!dirtyFlag_[10])
+        {
+            needSelection=true;
+        }
         if(parametersCount > 0)
         {
             sql[sql.length()-1]=')';
@@ -368,6 +390,15 @@ class Project
             sql.append(placeholderStr, n);
         }
         if(dirtyFlag_[9])
+        {
+            n = snprintf(placeholderStr,sizeof(placeholderStr),"$%d,",placeholder++);
+            sql.append(placeholderStr, n);
+        }
+        else
+        {
+            sql +="default,";
+        }
+        if(dirtyFlag_[10])
         {
             n = snprintf(placeholderStr,sizeof(placeholderStr),"$%d,",placeholder++);
             sql.append(placeholderStr, n);

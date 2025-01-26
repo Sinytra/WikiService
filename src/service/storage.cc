@@ -220,8 +220,7 @@ namespace service {
         pending_.erase(project);
     }
 
-    Storage::Storage(const std::string &p, MemoryCache &c, Documentation &d, RealtimeConnectionStorage &cn) :
-        basePath_(p), cache_(c), documentation_(d), connections_(cn) {
+    Storage::Storage(const std::string &p, MemoryCache &c, RealtimeConnectionStorage &cn) : basePath_(p), cache_(c), connections_(cn) {
         // Verify base path
         getBaseDir();
     }
@@ -274,10 +273,9 @@ namespace service {
     }
 
     Task<std::tuple<git_repository *, Error>> gitCloneProject(const Project &project, const fs::path &projectPath,
-                                                              const std::string &branch, const std::string &installationToken,
-                                                              const std::shared_ptr<spdlog::logger> logger) {
+                                                              const std::string &branch, const std::shared_ptr<spdlog::logger> logger) {
         // TODO Support for non-github projects
-        const auto url = std::format("https://oauth2:{}@github.com/{}", installationToken, project.getValueOfSourceRepo());
+        const auto url = std::format("https://github.com/{}", project.getValueOfSourceRepo());
         const auto path = absolute(projectPath);
 
         logger->info("Cloning git repository");
@@ -312,7 +310,7 @@ namespace service {
         co_return {repo, Error::Ok};
     }
 
-    Task<Error> Storage::setupProject(const Project &project, std::string installationToken) const {
+    Task<Error> Storage::setupProject(const Project &project) const {
         const auto baseDir = getBaseDir();
         const auto clonePath = baseDir.path() / TEMP_DIR / project.getValueOfId();
         remove_all(clonePath);
@@ -324,8 +322,7 @@ namespace service {
 
         logger->info("Setting up project");
 
-        const auto [repo, cloneError] =
-            co_await gitCloneProject(project, clonePath, project.getValueOfSourceBranch(), installationToken, logger);
+        const auto [repo, cloneError] = co_await gitCloneProject(project, clonePath, project.getValueOfSourceBranch(), logger);
         if (!repo || cloneError != Error::Ok) {
             co_return cloneError;
         }
@@ -368,14 +365,14 @@ namespace service {
         co_return Error::Ok;
     }
 
-    Task<Error> Storage::setupProjectCached(const Project &project, const std::string installationToken) {
+    Task<Error> Storage::setupProjectCached(const Project &project) {
         const auto taskKey = createProjectSetupKey(project);
 
         if (const auto pending = co_await getOrStartTask<Error>(taskKey)) {
             co_return co_await patientlyAwaitTaskResult(*pending);
         }
 
-        auto result = co_await setupProject(project, installationToken);
+        auto result = co_await setupProject(project);
         if (result == Error::Ok) {
             connections_.broadcast(project.getValueOfId(), WS_SUCCESS);
         } else {
@@ -399,13 +396,7 @@ namespace service {
                 co_return {std::nullopt, Error::ErrNotFound};
             }
 
-            const auto [installationToken, err] = co_await documentation_.getIntallationToken(project);
-            if (err != Error::Ok) {
-                logger.error("Failed to get installation token for project '{}'", project.getValueOfId());
-                co_return {std::nullopt, err};
-            }
-
-            if (const auto res = co_await setupProjectCached(project, installationToken); res != Error::Ok) {
+            if (const auto res = co_await setupProjectCached(project); res != Error::Ok) {
                 logger.error("Failed to setup project '{}'", project.getValueOfId());
                 co_return {std::nullopt, res};
             }

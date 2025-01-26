@@ -396,12 +396,11 @@ namespace service {
 
     const Project &ResolvedProject::getProject() const { return project_; }
 
-    Json::Value ResolvedProject::toJson(const bool isPublic) const {
+    Json::Value ResolvedProject::toJson() const {
         const auto versions = getAvailableVersions();
         const auto locales = getLocales();
 
         Json::Value projectJson = projectToJson(project_);
-        projectJson["is_public"] = isPublic;
 
         if (!versions.empty()) {
             Json::Value versionsJson;

@@ -37,48 +37,35 @@ namespace service {
         throw std::runtime_error("Cannot stringify unknown project type");
     }
 
-    ModrinthPlatform::ModrinthPlatform(const std::string &clientId, const std::string &clientSecret, const std::string &redirectUrl) :
-        clientId_(clientId), clientSecret_(clientSecret), redirectUrl_(redirectUrl) {}
-
-    bool ModrinthPlatform::isOAuthConfigured() const { return !clientId_.empty() && !clientSecret_.empty() && !redirectUrl_.empty(); }
-
-    Task<std::optional<std::string>> ModrinthPlatform::getOAuthToken(std::string code) const {
-        const auto client = createHttpClient(MODRINTH_API_URL);
-        const auto httpReq = HttpRequest::newHttpFormPostRequest();
-        httpReq->setPath("/_internal/oauth/token");
-        httpReq->addHeader("Authorization", clientSecret_);
-        httpReq->setBody(std::format("grant_type=authorization_code&client_id={}&code={}&redirect_uri={}", clientId_, code, redirectUrl_));
-
-        if (const auto response = co_await client->sendRequestCoro(httpReq); response && isSuccess(response->getStatusCode())) {
-            if (const auto jsonResp = response->getJsonObject()) {
-                const auto accessToken = (*jsonResp)["access_token"].asString();
-                co_return accessToken;
-            }
+    Task<bool> DistributionPlatform::verifyProjectAccess(const PlatformProject project, const User user, const std::string repo) {
+        if (const auto expected = "https://github.com/" + repo; !project.sourceUrl.empty() && project.sourceUrl.starts_with(expected)) {
+            co_return true;
         }
-
-        co_return std::nullopt;
+        co_return false;
     }
 
-    Task<std::optional<std::string>> ModrinthPlatform::getAuthenticatedUser(std::string token) const {
+    ModrinthPlatform::ModrinthPlatform() {}
+
+    Task<std::optional<std::string>> ModrinthPlatform::getAuthenticatedUserID(std::string token) const {
         const auto client = createHttpClient(MODRINTH_API_URL);
         if (const auto [resp, err] = co_await sendApiRequest(
                 client, Get, "/v3/user", [&token](const HttpRequestPtr &req) { req->addHeader("Authorization", token); });
             resp && resp->isObject())
         {
-            const auto username = (*resp)["username"].asString();
+            const auto username = (*resp)["id"].asString();
             co_return username;
         }
         co_return std::nullopt;
     }
 
-    Task<bool> ModrinthPlatform::isProjectMember(std::string slug, std::string username) const {
+    Task<bool> ModrinthPlatform::isProjectMember(std::string slug, std::string userId) const {
         const auto client = createHttpClient(MODRINTH_API_URL);
         // Check direct project members
         if (const auto [resp, err] = co_await sendApiRequest(client, Get, std::format("/v3/project/{}/members", slug));
             resp && resp->isArray())
         {
             for (const auto &item: *resp) {
-                if (const auto memberUsername = item["user"]["username"].asString(); memberUsername == username) {
+                if (const auto memberUsername = item["user"]["id"].asString(); memberUsername == userId) {
                     co_return true;
                 }
             }
@@ -88,7 +75,7 @@ namespace service {
             resp && resp->isObject())
         {
             for (const auto members = (*resp)["members"]; const auto &item: members) {
-                if (const auto memberUsername = item["user"]["username"].asString(); memberUsername == username) {
+                if (const auto memberUsername = item["user"]["id"].asString(); memberUsername == userId) {
                     co_return true;
                 }
             }
@@ -106,9 +93,21 @@ namespace service {
                                        : "";
             const auto projectTypes = (*resp)["project_types"];
             const auto type = projectTypes.empty() ? _unknown : getProjectType(projectTypes.front().asString());
-            co_return PlatformProject{.slug = projectSlug, .name = name, .sourceUrl = sourceUrl, .type = type};
+            co_return PlatformProject{.slug = projectSlug, .name = name, .sourceUrl = sourceUrl, .type = type, .platform = PLATFORM_MODRINTH };
         }
         co_return std::nullopt;
+    }
+
+    Task<bool> ModrinthPlatform::verifyProjectAccess(const PlatformProject project, const User user, const std::string repo) override {
+        if (co_await DistributionPlatform::verifyProjectAccess(project, user, repo)) {
+            co_return true;
+        }
+
+        if (const auto id = user.getModrinthId()) {
+            co_return co_await isProjectMember(project.slug, *id);
+        }
+
+        co_return false;
     }
 
     CurseForgePlatform::CurseForgePlatform(std::string apiKey) : apiKey_(std::move(apiKey)) {}
@@ -135,7 +134,7 @@ namespace service {
                 const auto type = curseforgeProjectTypes.find(classId);
                 const auto actualType = type == curseforgeProjectTypes.end() ? _unknown : type->second;
 
-                co_return PlatformProject{.slug = projectSlug, .name = name, .sourceUrl = sourceUrl, .type = actualType};
+                co_return PlatformProject{.slug = projectSlug, .name = name, .sourceUrl = sourceUrl, .type = actualType, .platform = PLATFORM_CURSEFORGE};
             }
         }
         co_return std::nullopt;
@@ -144,7 +143,7 @@ namespace service {
     Platforms::Platforms(CurseForgePlatform &cf, ModrinthPlatform &mr) :
         curseforge_(cf), modrinth_(mr), platforms_({{PLATFORM_MODRINTH, modrinth_}, {PLATFORM_CURSEFORGE, curseforge_}}) {}
 
-    Task<std::optional<PlatformProject>> Platforms::getProject(std::string platform, std::string slug) {
+    Task<std::optional<PlatformProject>> Platforms::getProject(const std::string platform, const std::string slug) {
         const auto plat = platforms_.find(platform);
 
         if (plat == platforms_.end()) {
@@ -157,5 +156,15 @@ namespace service {
     std::vector<std::string> Platforms::getAvailablePlatforms() {
         auto kv = std::views::keys(platforms_);
         return { kv.begin(), kv.end() };
+    }
+
+    DistributionPlatform& Platforms::getPlatform(const std::string &platform) {
+        const auto plat = platforms_.find(platform);
+
+        if (plat == platforms_.end()) {
+            throw std::runtime_error(std::format("Platform '{}' not found", platform));
+        }
+
+        return plat->second;
     }
 }

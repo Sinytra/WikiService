@@ -1,7 +1,6 @@
 #pragma once
 
 #include "cache.h"
-#include "documentation.h"
 #include "error.h"
 #include "models/Project.h"
 #include "resolved.h"
@@ -38,7 +37,7 @@ namespace service {
 
     class Storage : public CacheableServiceBase {
     public:
-        explicit Storage(const std::string &, MemoryCache &, Documentation &, RealtimeConnectionStorage &);
+        explicit Storage(const std::string &, MemoryCache &, RealtimeConnectionStorage &);
 
         drogon::Task<std::tuple<std::optional<ResolvedProject>, Error>> getProject(const Project &project, const std::optional<std::string> &version, const std::optional<std::string> &locale);
 
@@ -52,8 +51,8 @@ namespace service {
 
         std::optional<std::string> getProjectLog(const Project &project) const;
     private:
-        drogon::Task<Error> setupProject(const Project &project, std::string installationToken) const;
-        drogon::Task<Error> setupProjectCached(const Project &project, std::string installationToken);
+        drogon::Task<Error> setupProject(const Project &project) const;
+        drogon::Task<Error> setupProjectCached(const Project &project);
         std::filesystem::directory_entry getBaseDir() const;
         std::filesystem::path getProjectLogPath(const Project &project) const;
         std::filesystem::path getProjectDirPath(const Project &project, const std::string &version) const;
@@ -62,7 +61,6 @@ namespace service {
 
         const std::string &basePath_;
         MemoryCache &cache_;
-        Documentation &documentation_;
         RealtimeConnectionStorage &connections_;
     };
 }

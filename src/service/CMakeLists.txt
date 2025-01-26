@@ -1,15 +1,14 @@
 add_library(service STATIC
-        github.cc
-        util.cc
+        auth.cc
         cache.cc
-        database.cc
-        documentation.cc
-        platforms.cc
-        schemas.cc
         cloudflare.cc
-        storage.cc
+        database.cc
+        github.cc
+        platforms.cc
         resolved.cc
-        users.cc
+        schemas.cc
+        storage.cc
+        util.cc
 )
 
 target_link_libraries(service PRIVATE

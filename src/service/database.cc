@@ -3,6 +3,8 @@
 #include "util.h"
 
 #include <drogon/drogon.h>
+#include <models/User.h>
+#include <models/UserProject.h>
 #include <ranges>
 
 using namespace logging;
@@ -12,7 +14,7 @@ using namespace drogon::orm;
 namespace service {
     Database::Database() = default;
 
-    Task<std::tuple<std::optional<Project>, Error>> Database::getProjectSource(std::string id) const {
+    Task<std::tuple<std::optional<Project>, Error>> Database::getProjectSource(const std::string id) const {
         try {
             const auto clientPtr = app().getFastDbClient();
             CoroMapper<Project> mapper(clientPtr);
@@ -27,22 +29,6 @@ namespace service {
             // Not found
             co_return {std::nullopt, Error::ErrNotFound};
         }
-    }
-
-    Task<std::vector<Project>> Database::getProjectsForRepos(const std::vector<std::string> repos) const {
-        try {
-            const auto clientPtr = app().getFastDbClient();
-            CoroMapper<Project> mapper(clientPtr);
-
-            co_return co_await mapper.findBy(
-                Criteria(CustomSql(Project::Cols::_source_repo + " ILIKE ANY (STRING_TO_ARRAY($?, ','))"), join(repos, ",")));
-        } catch (const Failure &e) {
-            // SQL Error
-            logger.error("Error querying database: {}", e.what());
-        } catch (const DrogonDbException &e) {
-            // Not found
-        }
-        co_return std::vector<Project>();
     }
 
     Task<std::vector<std::string>> Database::getProjectIDs() const {
@@ -234,9 +220,8 @@ namespace service {
 
             auto criteria = Criteria(Project::Cols::_id, CompareOperator::EQ, id);
             for (const auto &[key, val]: platforms.items()) {
-                criteria = criteria ||
-                           Criteria(CustomSql(Project::Cols::_platforms + " ILIKE '%\"' || $? || '\":\"' || $? || '\"%'"),
-                                    key, val.get<std::string>());
+                criteria = criteria || Criteria(CustomSql(Project::Cols::_platforms + " ILIKE '%\"' || $? || '\":\"' || $? || '\"%'"), key,
+                                                val.get<std::string>());
             }
 
             const auto results = co_await mapper.findBy(criteria);
@@ -249,6 +234,121 @@ namespace service {
         } catch (const DrogonDbException &e) {
             // Not found
             co_return false;
+        }
+    }
+
+    Task<Error> Database::createUserIfNotExists(std::string username) const {
+        try {
+            const auto clientPtr = app().getFastDbClient();
+            CoroMapper<User> mapper(clientPtr);
+
+            co_await mapper.findByPrimaryKey(username);
+            co_return Error::Ok;
+        } catch (const Failure &e) {
+            // SQL Error
+            logger.error("Error querying database: {}", e.what());
+            co_return Error::ErrInternal;
+        } catch (const DrogonDbException &e) {
+            // Not found
+        }
+
+        try {
+            const auto clientPtr = app().getFastDbClient();
+            CoroMapper<User> mapper(clientPtr);
+
+            User user;
+            user.setId(username);
+            const auto result = co_await mapper.insert(user);
+            co_return Error::Ok;
+        } catch (const Failure &e) {
+            // SQL Error
+            logger.error("Error querying database: {}", e.what());
+            co_return Error::ErrInternal;
+        }
+    }
+
+    Task<Error> Database::linkUserModrinthAccount(std::string username, std::string mrAccountId) const {
+        try {
+            const auto clientPtr = app().getFastDbClient();
+            CoroMapper<User> mapper(clientPtr);
+
+            co_await mapper.updateBy({User::Cols::_modrinth_id}, Criteria(User::Cols::_id, CompareOperator::EQ, username), mrAccountId);
+            co_return Error::Ok;
+        } catch (const Failure &e) {
+            // SQL Error
+            logger.error("Error querying database: {}", e.what());
+            co_return Error::ErrInternal;
+        } catch (const DrogonDbException &e) {
+            // Not found
+            co_return Error::ErrNotFound;
+        }
+    }
+
+    Task<std::optional<User>> Database::getUser(const std::string username) const {
+        try {
+            const auto clientPtr = app().getFastDbClient();
+            CoroMapper<User> mapper(clientPtr);
+
+            const auto result = co_await mapper.findByPrimaryKey(username);
+            co_return result;
+        } catch (const Failure &e) {
+            // SQL Error
+            logger.error("Error querying database: {}", e.what());
+            co_return std::nullopt;
+        } catch (const DrogonDbException &e) {
+            // Not found
+            co_return std::nullopt;
+        }
+    }
+
+    Task<std::vector<Project>> Database::getUserProjects(std::string username) const {
+        std::vector<Project> projects;
+        try {
+            const auto clientPtr = app().getFastDbClient();
+            CoroMapper<UserProject> mapper(clientPtr);
+            const auto results = co_await clientPtr->execSqlCoro(
+                "SELECT * FROM project "
+                "JOIN user_project ON project.id = user_project.project_id "
+                "WHERE user_id = $1;",
+                username
+            );
+            for (const auto &row: results) {
+                projects.emplace_back(row);
+            }
+        } catch (const Failure &e) {
+            // SQL Error
+            logger.error("Error querying database: {}", e.what());
+        } catch (const DrogonDbException &e) {
+            // Not found
+        }
+        co_return projects;
+    }
+
+    Task<std::optional<Project>> Database::getUserProject(std::string username, std::string id) const {
+        try {
+            const auto clientPtr = app().getFastDbClient();
+            CoroMapper<UserProject> mapper(clientPtr);
+            const auto results = co_await clientPtr->execSqlCoro(
+                "SELECT * FROM project "
+                "JOIN user_project ON project.id = user_project.project_id "
+                "WHERE user_id = $1 AND project_id = $2;",
+                username, id
+            );
+            if (results.empty()) {
+                co_return std::nullopt;
+            }
+            if (results.size() > 1) {
+                logger.critical("Duplicate user project found, bug? user {} <=> project {}", username, id);
+                co_return std::nullopt;
+            }
+            co_return Project(results.front());
+        } catch (const Failure &e) {
+            // SQL Error
+            logger.error("Error querying database: {}", e.what());
+            co_return std::nullopt;
+        } catch (const DrogonDbException &e) {
+            // Not found
+            co_return std::nullopt;
         }
     }
 }

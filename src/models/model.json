@@ -7,6 +7,28 @@
   "user": "postgres",
   "password": "postgres",
   "tables": [
-    "project"
-  ]
+    "project",
+    "user_",
+    "user_project"
+  ],
+  "relationships": {
+    "enabled": true,
+    "items": [
+      {
+        "type": "many to many",
+        "original_table_name": "user_",
+        "original_table_alias": "users",
+        "original_key": "id",
+        "pivot_table": {
+          "table_name": "user_project",
+          "original_key": "user_id",
+          "target_key": "project_id"
+        },
+        "target_table_name": "project",
+        "target_table_alias": "projects",
+        "target_key": "id",
+        "enable_reverse": true
+      }
+    ]
+  }
 }

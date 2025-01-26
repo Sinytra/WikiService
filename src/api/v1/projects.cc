@@ -2,6 +2,7 @@
 
 #include <log/log.h>
 #include <models/Project.h>
+#include <models/UserProject.h>
 #include <service/schemas.h>
 #include <service/util.h>
 
@@ -17,26 +18,8 @@ using namespace drogon::orm;
 using namespace drogon_model::postgres;
 
 namespace api::v1 {
-    Task<bool> verifyProjectOwnership(const Platforms &pf, const std::string &platform, const PlatformProject &project,
-                                      const std::string &repo, const std::string &mrCode) {
-        if (const auto expected = "https://github.com/" + repo; !project.sourceUrl.empty() && project.sourceUrl.starts_with(expected)) {
-            co_return true;
-        }
-
-        if (platform == PLATFORM_MODRINTH && !mrCode.empty()) {
-            if (const auto token = co_await pf.modrinth_.getOAuthToken(mrCode)) {
-                if (const auto mrUsername = co_await pf.modrinth_.getAuthenticatedUser(*token)) {
-                    co_return co_await pf.modrinth_.isProjectMember(project.slug, *mrUsername);
-                }
-            }
-        }
-
-        co_return false;
-    }
-
-    ProjectsController::ProjectsController(GitHub &gh, Platforms &pf, Database &db, Documentation &dc, Storage &s, CloudFlare &cf,
-                                           Users &us) :
-        github_(gh), platforms_(pf), database_(db), documentation_(dc), storage_(s), cloudflare_(cf), users_(us) {}
+    ProjectsController::ProjectsController(Auth &a, GitHub &gh, Platforms &pf, Database &db, Storage &s, CloudFlare &cf) :
+        auth_(a), github_(gh), platforms_(pf), database_(db), storage_(s), cloudflare_(cf) {}
 
     nlohmann::json ProjectsController::processPlatforms(const Json::Value &metadata) const {
         const std::vector<std::string> &valid = platforms_.getAvailablePlatforms();
@@ -58,15 +41,17 @@ namespace api::v1 {
     }
 
     Task<std::optional<PlatformProject>> ProjectsController::validatePlatform(const std::string &id, const std::string &repo,
-                                                                              const std::string &mrCode, const std::string &platform,
-                                                                              const std::string &slug, const bool checkExisting,
+                                                                              const std::string &platform, const std::string &slug,
+                                                                              const bool checkExisting, const User user,
                                                                               std::function<void(const HttpResponsePtr &)> callback) const {
         if (platform == PLATFORM_CURSEFORGE && !platforms_.curseforge_.isAvailable()) {
             simpleError(Error::ErrBadRequest, "cf_unavailable", callback);
             co_return std::nullopt;
         }
 
-        const auto platformProj = co_await platforms_.getProject(platform, slug);
+        auto &platInstance = platforms_.getPlatform(platform);
+
+        const auto platformProj = co_await platInstance.getProject(slug);
         if (!platformProj) {
             simpleError(Error::ErrBadRequest, "no_project", callback,
                         [&](Json::Value &root) { root["details"] = "Platform: " + platform; });
@@ -90,10 +75,10 @@ namespace api::v1 {
             }
         }
         if (!skipCheck) {
-            if (const auto verified = co_await verifyProjectOwnership(platforms_, platform, *platformProj, repo, mrCode); !verified) {
+            if (const auto verified = co_await platInstance.verifyProjectAccess(*platformProj, user, repo); !verified) {
                 simpleError(Error::ErrBadRequest, "ownership", callback, [&](Json::Value &root) {
                     root["details"] = "Platform: " + platform;
-                    root["can_verify_mr"] = platform == PLATFORM_MODRINTH && platforms_.modrinth_.isOAuthConfigured();
+                    root["can_verify_mr"] = true; // TODO
                 });
                 co_return std::nullopt;
             }
@@ -104,10 +89,7 @@ namespace api::v1 {
 
     /**
      * Possible errors:
-     * - user_github_auth: Invalid GitHub auth token
-     * - insufficient_wiki_perms: Insufficient admin perms (community projects)
      * - unsupported: Community project registration is not yet implemented
-     * - missing_installation: App not installed on repository (data: install_url)
      * - insufficient_repo_perms: User is not admin/maintainer
      * - no_branch: Wrong branch specifiec
      * - no_meta: No metadata file
@@ -123,9 +105,9 @@ namespace api::v1 {
     Task<std::optional<ValidatedProjectData>> ProjectsController::validateProjectData(const Json::Value &json, const std::string &token,
                                                                                       std::function<void(const HttpResponsePtr &)> callback,
                                                                                       const bool checkExisting) const {
-        const auto [username, usernameError](co_await github_.getUsername(token));
-        if (!username) {
-            simpleError(Error::ErrBadRequest, "user_github_auth", callback);
+        const auto session(co_await auth_.getSession(token));
+        if (!session) {
+            simpleError(Error::ErrUnauthorized, "unauthorized", callback);
             co_return std::nullopt;
         }
 
@@ -136,25 +118,7 @@ namespace api::v1 {
         // Optional
         const auto mrCode = json["mr_code"].asString();
 
-        const auto [installationId, installationIdError](co_await github_.getRepositoryInstallation(repo));
-        if (!installationId) {
-            simpleError(Error::ErrBadRequest, "missing_installation", callback,
-                        [&](Json::Value &root) { root["install_url"] = github_.getAppInstallUrl(); });
-            co_return std::nullopt;
-        }
-
-        const auto [installationToken, tokenErr](co_await github_.getInstallationToken(installationId.value()));
-        if (!installationToken) {
-            simpleError(Error::ErrInternal, "internal", callback);
-            co_return std::nullopt;
-        }
-
-        if (const auto [perms, permsError](co_await github_.getCollaboratorPermissionLevel(repo, *username, *installationToken));
-            !perms || perms != "admin" && perms != "write")
-        {
-            simpleError(Error::ErrBadRequest, "insufficient_repo_perms", callback);
-            co_return std::nullopt;
-        }
+        // TODO Rework this
 
         if (const auto [branches, branchesErr](co_await github_.getRepositoryBranches(repo, *installationToken));
             ranges::find(branches, branch) == branches.end())
@@ -184,7 +148,7 @@ namespace api::v1 {
 
         std::unordered_map<std::string, PlatformProject> platformProjects;
         for (const auto &[key, val]: platforms.items()) {
-            const auto platformProj = co_await validatePlatform(id, repo, mrCode, key, val, checkExisting, callback);
+            const auto platformProj = co_await validatePlatform(id, repo, key, val, checkExisting, session->user, callback);
             if (!platformProj) {
                 co_return std::nullopt;
             }
@@ -202,63 +166,7 @@ namespace api::v1 {
         project.setType(projectTypeToString(preferredProj.type));
         project.setPlatforms(platforms.dump());
 
-        co_return ValidatedProjectData{*username, project, platforms};
-    }
-
-    Task<bool> ProjectsController::validateRepositoryAccess(const std::string &repo, const std::string &token,
-                                                            std::function<void(const HttpResponsePtr &)> callback) const {
-        const auto [username, usernameError](co_await github_.getUsername(token));
-        if (!username) {
-            simpleError(usernameError, "user_github_auth", callback);
-            co_return false;
-        }
-
-        const auto [installationId, installationIdError](co_await github_.getRepositoryInstallation(repo));
-        if (!installationId) {
-            simpleError(installationIdError, "missing_installation", callback);
-            co_return false;
-        }
-
-        const auto [installationToken, tokenErr](co_await github_.getInstallationToken(installationId.value()));
-        if (!installationToken) {
-            simpleError(tokenErr, "internal", callback);
-            co_return false;
-        }
-
-        if (const auto [perms, permsError](co_await github_.getCollaboratorPermissionLevel(repo, *username, *installationToken));
-            !perms || perms != "admin" && perms != "write")
-        {
-            simpleError(Error::ErrBadRequest, "insufficient_repo_perms", callback);
-            co_return false;
-        }
-
-        co_return true;
-    }
-
-    Task<std::optional<Project>> ProjectsController::validateProjectAccess(const std::string &id, const std::string &token,
-                                                                           std::function<void(const HttpResponsePtr &)> callback) const {
-        if (id.empty()) {
-            errorResponse(Error::ErrBadRequest, "Missing id route parameter", callback);
-            co_return std::nullopt;
-        }
-
-        if (token.empty()) {
-            errorResponse(Error::ErrBadRequest, "Missing token parameter", callback);
-            co_return std::nullopt;
-        }
-
-        const auto [project, projectErr] = co_await database_.getProjectSource(id);
-        if (!project) {
-            simpleError(Error::ErrBadRequest, "not_found", callback);
-            co_return std::nullopt;
-        }
-        const auto repo = project->getValueOfSourceRepo();
-
-        if (const auto canAccess = co_await validateRepositoryAccess(repo, token, callback); !canAccess) {
-            co_return std::nullopt;
-        }
-
-        co_return project;
+        co_return ValidatedProjectData{.project = project, .platforms = platforms};
     }
 
     Task<> ProjectsController::greet(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback) const {
@@ -284,28 +192,22 @@ namespace api::v1 {
 
     Task<> ProjectsController::listUserProjects(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback,
                                                 const std::string token) const {
-        const auto [userInfo, userInfoErr](co_await users_.getUserInfo(token));
-        if (userInfoErr != Error::Ok) {
-            errorResponse(Error::ErrUnauthorized, "Error getting user info", callback);
+        const auto session(co_await auth_.getSession(token));
+        if (!session) {
+            simpleError(Error::ErrUnauthorized, "unauthorized", callback);
             co_return;
         }
-        const auto [profile, repositories, projects] = *userInfo;
 
+        const auto projects = co_await database_.getUserProjects(session->username);
         Json::Value projectsJson(Json::arrayValue);
-        for (const auto &projectID: projects) {
-            const auto [project, err] = co_await database_.getProjectSource(projectID);
-            if (!project) {
-                continue;
-            }
-
-            Json::Value json = projectToJson(*project);
-            json["status"] = projectStatusToString(co_await storage_.getProjectStatus(*project));
+        for (const auto &project: projects) {
+            Json::Value json = projectToJson(project);
+            json["status"] = projectStatusToString(co_await storage_.getProjectStatus(project));
             projectsJson.append(json);
         }
 
         Json::Value root;
-        root["profile"] = profile;
-        root["repositories"] = repositories;
+        root["profile"] = session->profile;
         root["projects"] = projectsJson;
 
         const auto resp = HttpResponse::newHttpJsonResponse(root);
@@ -316,30 +218,23 @@ namespace api::v1 {
 
     Task<> ProjectsController::getProject(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string id,
                                           std::string token) const {
-        const auto [userInfo, userInfoErr](co_await users_.getUserInfo(token));
-        if (userInfoErr != Error::Ok) {
-            errorResponse(Error::ErrUnauthorized, "Error getting user info", callback);
-            co_return;
-        }
-        if (!userInfo->projects.contains(id)) {
-            simpleError(Error::ErrBadRequest, "insufficient_repo_perms", callback);
+        const auto session(co_await auth_.getSession(token));
+        if (!session) {
+            simpleError(Error::ErrUnauthorized, "unauthorized", callback);
             co_return;
         }
 
-        const auto [project, projectErr] = co_await database_.getProjectSource(id);
+        const auto project = co_await database_.getUserProject(session->username, id);
         if (!project) {
             simpleError(Error::ErrBadRequest, "not_found", callback);
             co_return;
         }
 
-        const auto isPublic(co_await documentation_.isPubliclyEditable(*project));
-
         Json::Value root;
         if (const auto resolved = co_await storage_.maybeGetProject(*project)) {
-            root = resolved->toJson(isPublic);
+            root = resolved->toJson();
         } else {
             root = projectToJson(*project);
-            root["is_public"] = isPublic;
         }
         root["status"] = projectStatusToString(co_await storage_.getProjectStatus(*project));
 
@@ -351,17 +246,13 @@ namespace api::v1 {
 
     Task<> ProjectsController::getProjectLog(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string id,
                                              std::string token) const {
-        const auto [userInfo, userInfoErr](co_await users_.getUserInfo(token));
-        if (userInfoErr != Error::Ok) {
-            errorResponse(Error::ErrUnauthorized, "Error getting user info", callback);
-            co_return;
-        }
-        if (!userInfo->projects.contains(id)) {
-            simpleError(Error::ErrBadRequest, "insufficient_repo_perms", callback);
+        const auto session(co_await auth_.getSession(token));
+        if (!session) {
+            simpleError(Error::ErrUnauthorized, "unauthorized", callback);
             co_return;
         }
 
-        const auto [project, projectErr] = co_await database_.getProjectSource(id);
+        const auto project = co_await database_.getUserProject(session->username, id);
         if (!project) {
             simpleError(Error::ErrBadRequest, "not_found", callback);
             co_return;
@@ -427,7 +318,7 @@ namespace api::v1 {
         if (!validated) {
             co_return;
         }
-        auto [username, project, platforms] = *validated;
+        auto [project, platforms] = *validated;
         project.setIsCommunity(isCommunity);
 
         if (co_await database_.existsForData(project.getValueOfId(), platforms)) {
@@ -438,9 +329,6 @@ namespace api::v1 {
             logger.error("Failed to create project {} in database", project.getValueOfId());
             co_return simpleError(Error::ErrInternal, "internal", callback);
         }
-
-        // Invalidate user installation cache to ensure project shows up on dev dashboard
-        co_await users_.refreshUserInfo(username, token);
 
         reloadProject(project);
 
@@ -469,7 +357,7 @@ namespace api::v1 {
         if (!validated) {
             co_return;
         }
-        auto [username, project, platforms] = *validated;
+        auto [project, platforms] = *validated;
 
         if (const auto [proj, projErr] = co_await database_.getProjectSource(project.getValueOfId()); !proj) {
             co_return simpleError(Error::ErrBadRequest, "not_found", callback);
@@ -492,8 +380,15 @@ namespace api::v1 {
 
     Task<> ProjectsController::remove(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, const std::string id,
                                       const std::string token) const {
-        const auto project = co_await validateProjectAccess(id, token, callback);
+        const auto session(co_await auth_.getSession(token));
+        if (!session) {
+            simpleError(Error::ErrUnauthorized, "unauthorized", callback);
+            co_return;
+        }
+
+        const auto project = co_await database_.getUserProject(session->username, id);
         if (!project) {
+            simpleError(Error::ErrBadRequest, "not_found", callback);
             co_return;
         }
 
@@ -504,8 +399,6 @@ namespace api::v1 {
             co_return simpleError(Error::ErrInternal, "internal", callback);
         }
 
-        co_await github_.invalidateCache(project->getValueOfSourceRepo());
-        co_await documentation_.invalidateCache(*project);
         co_await storage_.invalidateProject(*project);
 
         Json::Value root;
@@ -517,58 +410,22 @@ namespace api::v1 {
         co_return;
     }
 
-    Task<> ProjectsController::migrate(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback,
-                                       const std::string token) const {
-        if (token.empty()) {
-            co_return errorResponse(Error::ErrBadRequest, "Missing token parameter", callback);
-        }
-
-        const auto json(req->getJsonObject());
-        if (!json) {
-            co_return errorResponse(Error::ErrBadRequest, req->getJsonError(), callback);
-        }
-        if (const auto error = validateJson(schemas::repositoryMigration, *json)) {
-            co_return simpleError(Error::ErrBadRequest, error->msg, callback);
-        }
-
-        const auto repo = (*json)["repo"].asString();
-
-        const auto newRepo = co_await github_.getNewRepositoryLocation(repo);
-        if (newRepo.empty()) {
-            co_return simpleError(Error::ErrBadRequest, "not_moved", callback);
-        }
-
-        if (const auto canAccess = co_await validateRepositoryAccess(newRepo, token, callback); !canAccess) {
+    Task<> ProjectsController::invalidate(HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+                                          const std::string id, const std::string token) const {
+        const auto session(co_await auth_.getSession(token));
+        if (!session) {
+            simpleError(Error::ErrUnauthorized, "unauthorized", callback);
             co_return;
         }
 
-        if (const auto error = co_await database_.updateRepository(repo, newRepo); error != Error::Ok) {
-            logger.error("Failed to update repositories for {} in database", repo);
-            co_return simpleError(Error::ErrInternal, "internal", callback);
-        }
-
-        co_await github_.invalidateCache(repo);
-
-        Json::Value root;
-        root["message"] = "Repository migrated successfully";
-        const auto resp = HttpResponse::newHttpJsonResponse(root);
-        resp->setStatusCode(k200OK);
-        callback(resp);
-    }
-
-    Task<> ProjectsController::invalidate(HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
-                                          const std::string id, const std::string token) const {
-        const auto project = co_await validateProjectAccess(id, token, callback);
+        const auto project = co_await database_.getUserProject(session->username, id);
         if (!project) {
+            simpleError(Error::ErrBadRequest, "not_found", callback);
             co_return;
         }
 
         // Invalidate ahead of reloading
-        co_await github_.invalidateCache(project->getValueOfSourceRepo());
-        co_await documentation_.invalidateCache(*project);
         co_await storage_.invalidateProject(*project);
-        // Prepare cache
-        co_await documentation_.isPubliclyEditable(*project);
 
         reloadProject(*project, false);
 
@@ -584,8 +441,6 @@ namespace api::v1 {
         currentLoop->queueInLoop(async_func([this, project, invalidate]() -> Task<> {
             if (invalidate) {
                 logger.debug("Invalidating project '{}'", project.getValueOfId());
-                co_await github_.invalidateCache(project.getValueOfSourceRepo());
-                co_await documentation_.invalidateCache(project);
                 co_await storage_.invalidateProject(project);
             }
 

@@ -2,9 +2,11 @@
 #include <log/log.h>
 
 #include <fstream>
+#include <ranges>
 #include <api/v1/error.h>
 #include <base64.hpp>
 #include <openssl/evp.h>
+#include <openssl/rand.h>
 
 using namespace drogon;
 using namespace logging;
@@ -270,4 +272,25 @@ std::string computeSHA256Hash(const std::string& unhashed) {
     }
     logger.critical("Failed to compute SHA256 hash");
     throw std::runtime_error("Failed to compute SHA256 hash");
+}
+
+std::string strToLower(std::string copy) {
+    std::ranges::transform(copy, copy.begin(), [](const unsigned char c) { return std::tolower(c); });
+    return copy;
+}
+
+std::string generateSecureRandomString(const size_t length) {
+    const size_t byteCount = (length + 1) / 2;
+    std::vector<unsigned char> buffer(byteCount);
+
+    if (RAND_bytes(buffer.data(), static_cast<int>(byteCount)) != 1) {
+        throw std::runtime_error("Error generating random bytes");
+    }
+
+    std::ostringstream oss;
+    for (const unsigned char byte: buffer) {
+        oss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(byte);
+    }
+
+    return oss.str();
 }

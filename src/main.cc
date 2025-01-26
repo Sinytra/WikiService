@@ -2,6 +2,7 @@
 #include <service/cloudflare.h>
 #include <stdexcept>
 
+#include "api/v1/auth.h"
 #include "api/v1/browse.h"
 #include "api/v1/docs.h"
 #include "api/v1/websocket.h"
@@ -12,7 +13,6 @@
 #include "service/platforms.h"
 #include "service/schemas.h"
 #include "service/storage.h"
-#include "service/users.h"
 #include "service/util.h"
 
 using namespace std;
@@ -41,16 +41,20 @@ int main() {
             throw std::runtime_error("Invalid configuration");
         }
 
+        const std::string appUrl = customConfig["app_url"].asString();
+        const std::string appFrontendUrl = customConfig["frontend_url"].asString();
+        const Json::Value &authConfig = customConfig["auth"];
+        const std::string authCallbackUrl = authConfig["callback_url"].asString();
         const Json::Value &githubAppConfig = customConfig["github_app"];
         const std::string &appName = githubAppConfig["name"].asString();
         const std::string &appClientId = githubAppConfig["client_id"].asString();
+        const std::string &appClientSecret = githubAppConfig["client_secret"].asString();
         const std::string &appPrivateKeyPath = githubAppConfig["private_key_path"].asString();
         const std::string &curseForgeKey = customConfig["curseforge_key"].asString();
         const std::string &storageBasePath = customConfig["storage_path"].asString();
         const Json::Value &mrApp = customConfig["modrinth_app"];
         const std::string &mrAppClientId = mrApp["client_id"].asString();
         const std::string &mrAppClientSecret = mrApp["client_secret"].asString();
-        const std::string &mrAppRedirectUrl = mrApp["redirect_url"].asString();
         const Json::Value &cloudFlareConfig = customConfig["cloudflare"];
         const std::string &cloudFlareToken = cloudFlareConfig["token"].asString();
         const std::string &cloudFlareAccTag = cloudFlareConfig["account_tag"].asString();
@@ -60,25 +64,27 @@ int main() {
             logger.warn("No API key configured, allowing public API access.");
         }
 
+        auto database(Database{});
         auto cache(MemoryCache{});
         auto github(GitHub{cache, appName, appClientId, appPrivateKeyPath});
-        auto documentation(Documentation{github, cache});
         auto connections(RealtimeConnectionStorage{});
-        auto storage(Storage{storageBasePath, cache, documentation, connections});
-        auto database(Database{});
-        auto users(Users{database, github, cache});
+        auto storage(Storage{storageBasePath, cache, connections});
 
         auto cloudflare(CloudFlare{cloudFlareToken, cloudFlareAccTag, cloudFlareSiteTag, cache});
 
-        auto modrinth(ModrinthPlatform{mrAppClientId, mrAppClientSecret, mrAppRedirectUrl});
+        auto modrinth(ModrinthPlatform{});
         auto curseForge(CurseForgePlatform{curseForgeKey});
         auto platforms(Platforms(curseForge, modrinth));
 
-        auto controller(make_shared<api::v1::DocsController>(github, database, documentation, storage));
-        auto browseController(make_shared<api::v1::BrowseController>(database));
-        auto projectsController(make_shared<api::v1::ProjectsController>(github, platforms, database, documentation, storage, cloudflare, users));
-        auto projectWSController(make_shared<api::v1::ProjectWebSocketController>(database, storage, connections, users));
+        auto auth(Auth{appUrl, { appClientId, appClientSecret }, {mrAppClientId, mrAppClientSecret}, database, cache, platforms});
 
+        auto authController(make_shared<api::v1::AuthController>(appFrontendUrl, authCallbackUrl, auth, github, cache, database));
+        auto controller(make_shared<api::v1::DocsController>(github, database, storage));
+        auto browseController(make_shared<api::v1::BrowseController>(database));
+        auto projectsController(make_shared<api::v1::ProjectsController>(auth, github, platforms, database, storage, cloudflare));
+        auto projectWSController(make_shared<api::v1::ProjectWebSocketController>(database, storage, connections, auth));
+
+        app().registerController(authController);
         app().registerController(controller);
         app().registerController(browseController);
         app().registerController(projectsController);

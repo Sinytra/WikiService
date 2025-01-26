@@ -34,12 +34,18 @@ namespace service {
         const auto resp = co_await client->execCommandCoro("SMEMBERS %s", key.data());
         std::set<std::string> members;
         if (!resp.isNil()) {
-            for (const auto &item : resp.asArray()) {
+            for (const auto &item: resp.asArray()) {
                 members.insert(item.asString());
             }
         }
         members.erase(INVALID_SET_MEMBER);
         co_return members;
+    }
+
+    Task<std::optional<std::string>> MemoryCache::getHashMember(std::string key, std::string value) const {
+        const auto client = app().getFastRedisClient();
+        const auto resp = co_await client->execCommandCoro("HGET %s %s", key.data(), value.data());
+        co_return resp.isNil() ? std::nullopt : std::optional{resp.asString()};
     }
 
     Task<> MemoryCache::updateCache(std::string key, std::string value, std::chrono::duration<long> expire) const {
@@ -48,7 +54,8 @@ namespace service {
         co_await client->execCommandCoro("SET %s %s EX %ld", key.data(), value.data(), expireSeconds);
     }
 
-    Task<> MemoryCache::updateCacheSet(std::string key, const std::vector<std::string> value, const std::chrono::duration<long> expire) const {
+    Task<> MemoryCache::updateCacheSet(std::string key, const std::vector<std::string> value,
+                                       const std::chrono::duration<long> expire) const {
         const auto client = app().getFastRedisClient();
         const auto expireSeconds = std::chrono::seconds(expire).count();
 
@@ -58,8 +65,21 @@ namespace service {
         }
 
         const auto trans = co_await client->newTransactionCoro();
-        for (const auto &item : valueCopy) {
+        for (const auto &item: valueCopy) {
             co_await trans->execCommandCoro("SADD %s %s", key.data(), item.data());
+        }
+        co_await trans->execCommandCoro("EXPIRE %s %ld", key.data(), expireSeconds);
+        co_await trans->executeCoro();
+    }
+
+    Task<> MemoryCache::updateCacheHash(std::string key, std::unordered_map<std::string, std::string> values,
+                                        std::chrono::duration<long> expire) const {
+        const auto client = app().getFastRedisClient();
+        const auto expireSeconds = std::chrono::seconds(expire).count();
+
+        const auto trans = co_await client->newTransactionCoro();
+        for (const auto& [field, value] : values) {
+            co_await trans->execCommandCoro("HSET %s %s %s", key.data(), field.data(), value.data());
         }
         co_await trans->execCommandCoro("EXPIRE %s %ld", key.data(), expireSeconds);
         co_await trans->executeCoro();
@@ -70,7 +90,7 @@ namespace service {
         co_await client->execCommandCoro("DEL %s", key.data());
     }
 
-    Task<> MemoryCache::erase(std::vector<std::string> keys) const {
+    Task<> MemoryCache::erase(const std::vector<std::string> keys) const {
         const auto client = app().getFastRedisClient();
         const auto toErase = join(keys, " ");
 
@@ -81,7 +101,9 @@ namespace service {
         const auto client = app().getFastRedisClient();
         std::string cursor = "0";
         while (true) {
-            if (const auto result = (co_await client->execCommandCoro("SCAN %s MATCH %s:*", cursor.data(), key.data())).asArray(); result.size() > 1) {
+            if (const auto result = (co_await client->execCommandCoro("SCAN %s MATCH %s:*", cursor.data(), key.data())).asArray();
+                result.size() > 1)
+            {
                 cursor = result[0].asString();
                 if (const auto keys = result[1].asArray(); !keys.empty()) {
                     std::string entries;

@@ -86,3 +86,7 @@ std::string join(const std::vector<std::string> &lst, const std::string &delim);
 Json::Value projectToJson(const drogon_model::postgres::Project &project);
 
 std::string computeSHA256Hash(const std::string& unhashed);
+
+std::string strToLower(std::string copy);
+
+std::string generateSecureRandomString(size_t length);

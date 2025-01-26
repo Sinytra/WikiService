@@ -42,7 +42,7 @@ namespace service {
 
         const Project &getProject() const;
 
-        Json::Value toJson(bool isPublic) const;
+        Json::Value toJson() const;
     private:
         Project project_;
 

@@ -1,27 +1,25 @@
 #pragma once
 
 #include <drogon/HttpController.h>
+#include <service/auth.h>
 
 #include <service/cloudflare.h>
 #include <service/database.h>
-#include <service/documentation.h>
 #include <service/github.h>
 #include <service/platforms.h>
 #include <service/storage.h>
-#include <service/users.h>
 
 using namespace service;
 
 namespace api::v1 {
     struct ValidatedProjectData {
-        std::string username;
         Project project;
         nlohmann::json platforms;
     };
 
     class ProjectsController final : public drogon::HttpController<ProjectsController, false> {
     public:
-        explicit ProjectsController(GitHub &, Platforms &, Database &, Documentation &, Storage &, CloudFlare &, Users &);
+        explicit ProjectsController(Auth &, GitHub &, Platforms &, Database &, Storage &, CloudFlare &);
 
         METHOD_LIST_BEGIN
         ADD_METHOD_TO(ProjectsController::greet, "/", drogon::Get);
@@ -33,7 +31,6 @@ namespace api::v1 {
         ADD_METHOD_TO(ProjectsController::create, "/api/v1/project/create?token={1:token}", drogon::Post, "AuthFilter");
         ADD_METHOD_TO(ProjectsController::remove, "/api/v1/project/{1:id}/remove?token={2:token}", drogon::Post, "AuthFilter");
         ADD_METHOD_TO(ProjectsController::update, "/api/v1/project/update?token={1:token}", drogon::Post, "AuthFilter");
-        ADD_METHOD_TO(ProjectsController::migrate, "/api/v1/project/migrate?token={1:token}", drogon::Post, "AuthFilter");
         ADD_METHOD_TO(ProjectsController::invalidate, "/api/v1/project/{1:id}/invalidate?token={2:token}", drogon::Post, "AuthFilter");
         METHOD_LIST_END
 
@@ -61,8 +58,7 @@ namespace api::v1 {
         drogon::Task<> remove(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback, std::string id,
                               std::string token) const;
 
-        drogon::Task<> migrate(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
-                               std::string token) const;
+        // TODO Remove repo migration on FE
 
         drogon::Task<> invalidate(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback, std::string id,
                                   std::string token) const;
@@ -71,28 +67,21 @@ namespace api::v1 {
         nlohmann::json processPlatforms(const Json::Value &metadata) const;
 
         drogon::Task<std::optional<PlatformProject>> validatePlatform(const std::string &id, const std::string &repo,
-                                                                      const std::string &mrCode, const std::string &platform,
-                                                                      const std::string &slug, bool checkExisting,
+                                                                      const std::string &platform, const std::string &slug,
+                                                                      bool checkExisting, User user,
                                                                       std::function<void(const drogon::HttpResponsePtr &)> callback) const;
 
         drogon::Task<std::optional<ValidatedProjectData>> validateProjectData(const Json::Value &json, const std::string &token,
                                                                               std::function<void(const drogon::HttpResponsePtr &)> callback,
                                                                               bool checkExisting) const;
 
-        drogon::Task<std::optional<Project>> validateProjectAccess(const std::string &id, const std::string &token,
-                                                                   std::function<void(const drogon::HttpResponsePtr &)> callback) const;
-
-        drogon::Task<bool> validateRepositoryAccess(const std::string &repo, const std::string &token,
-                                                    std::function<void(const drogon::HttpResponsePtr &)> callback) const;
-
         void reloadProject(const Project &project, bool invalidate = true) const;
 
+        Auth &auth_;
         GitHub &github_;
         Platforms &platforms_;
         Database &database_;
-        Documentation &documentation_;
         Storage &storage_;
         CloudFlare &cloudflare_;
-        Users &users_;
     };
 }

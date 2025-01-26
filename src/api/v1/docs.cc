@@ -17,12 +17,11 @@ using namespace drogon::orm;
 using namespace drogon_model::postgres;
 
 namespace api::v1 {
-    DocsController::DocsController(GitHub &g, Database &db, Documentation &d, Storage &s) :
-        github_(g), database_(db), documentation_(d), storage_(s) {}
+    DocsController::DocsController(GitHub &g, Database &db, Storage &s) : github_(g), database_(db), storage_(s) {}
 
     Task<std::optional<ResolvedProject>> DocsController::getProject(const std::string &project, const std::optional<std::string> &version,
-                                                                   const std::optional<std::string> &locale,
-                                                                   std::function<void(const HttpResponsePtr &)> callback) const {
+                                                                    const std::optional<std::string> &locale,
+                                                                    std::function<void(const HttpResponsePtr &)> callback) const {
         if (project.empty()) {
             errorResponse(Error::ErrBadRequest, "Missing project parameter", callback);
             co_return std::nullopt;
@@ -50,10 +49,8 @@ namespace api::v1 {
                 co_return;
             }
 
-            const auto isPublic(co_await documentation_.isPubliclyEditable(resolved->getProject()));
-
             Json::Value root;
-            root["project"] = resolved->toJson(isPublic);
+            root["project"] = resolved->toJson();
 
             const auto resp = HttpResponse::newHttpJsonResponse(root);
             resp->setStatusCode(k200OK);
@@ -77,7 +74,7 @@ namespace api::v1 {
             }
 
             const auto resolved = co_await getProject(project, req->getOptionalParameter<std::string>("version"),
-                                                  req->getOptionalParameter<std::string>("locale"), callback);
+                                                      req->getOptionalParameter<std::string>("locale"), callback);
             if (!resolved) {
                 co_return;
             }
@@ -90,14 +87,12 @@ namespace api::v1 {
                 co_return errorResponse(optional ? Error::Ok : pageError, "File not found", callback);
             }
 
-            const auto isPublic(co_await documentation_.isPubliclyEditable(resolved->getProject()));
-
             Json::Value root;
-            root["project"] = resolved->toJson(isPublic);
+            root["project"] = resolved->toJson();
             root["content"] = page.content;
-            if (isPublic) {
-                root["edit_url"] = page.editUrl;
-            }
+            // if (isPublic) { TODO
+            // root["edit_url"] = page.editUrl;
+            // }
             if (!page.updatedAt.empty()) {
                 root["updated_at"] = page.updatedAt;
             }
@@ -117,7 +112,7 @@ namespace api::v1 {
     Task<> DocsController::tree(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string project) const {
         try {
             const auto resolved = co_await getProject(project, req->getOptionalParameter<std::string>("version"),
-                                                  req->getOptionalParameter<std::string>("locale"), callback);
+                                                      req->getOptionalParameter<std::string>("locale"), callback);
             if (!resolved) {
                 co_return;
             }
@@ -126,10 +121,9 @@ namespace api::v1 {
             if (treeError != Error::Ok) {
                 co_return errorResponse(treeError, "Error getting directory tree", callback);
             }
-            const auto isPublic(co_await documentation_.isPubliclyEditable(resolved->getProject()));
 
             nlohmann::json root;
-            root["project"] = parkourJson(resolved->toJson(isPublic));
+            root["project"] = parkourJson(resolved->toJson());
             root["tree"] = tree;
 
             const auto resp = jsonResponse(root);

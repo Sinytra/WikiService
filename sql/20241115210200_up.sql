@@ -10,7 +10,8 @@ create table project
     type          varchar(255)                           not null,
     platforms     varchar(255)                           not null,
     search_vector tsvector,
-    created_at    timestamp(3) default CURRENT_TIMESTAMP not null
+    created_at    timestamp(3) default CURRENT_TIMESTAMP not null,
+    is_public     boolean      default false             not null
 );
 
 CREATE UNIQUE INDEX "project_source_repo_source_path_key"
