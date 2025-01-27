@@ -3,6 +3,9 @@
 #define PLATFORM_MODRINTH "modrinth"
 #define PLATFORM_CURSEFORGE "curseforge"
 
+#define WIKI_USER_AGENT "Sinytra/modded-wiki/1.0.0"
+#define MODRINTH_API_URL "https://api.modrinth.com/"
+
 #include <drogon/utils/coroutine.h>
 #include <map>
 #include <models/User.h>

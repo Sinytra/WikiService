@@ -58,8 +58,6 @@ namespace api::v1 {
         drogon::Task<> remove(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback, std::string id,
                               std::string token) const;
 
-        // TODO Remove repo migration on FE
-
         drogon::Task<> invalidate(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback, std::string id,
                                   std::string token) const;
 

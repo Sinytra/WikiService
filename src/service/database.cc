@@ -123,7 +123,7 @@ namespace service {
             else if (sort == "za")
                 sortQuery = "ORDER BY \"name\" desc";
             else if (sort == "popularity") {
-                // TODO
+                // TODO Sorting by popularity
             } else if (sort == "creation_date" || query.empty())
                 sortQuery = "ORDER BY \"created_at\" desc";
             else /*if (sort == "relevance")*/

@@ -8,7 +8,6 @@
 #include <set>
 #include <shared_mutex>
 #include <string>
-#include <vector>
 #include "log/log.h"
 
 namespace service {

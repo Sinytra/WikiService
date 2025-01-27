@@ -123,10 +123,9 @@ nlohmann::json schemas::systemConfig = R"(
             "type": "object",
             "properties": {
                 "name": { "type": "string" },
-                "client_id": { "type": "string" },
-                "private_key_path": { "type": "string"}
+                "client_id": { "type": "string" }
             },
-            "required": ["name", "client_id", "private_key_path"]
+            "required": ["name", "client_id"]
         },
         "modrinth_app": {
             "type": "object",

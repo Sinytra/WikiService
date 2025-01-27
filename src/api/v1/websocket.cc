@@ -26,7 +26,7 @@ namespace api::v1 {
         static std::string prefix = "/ws/api/v1/project/log/";
 
         const auto path = req->getPath();
-        const auto tokenParam = req->getOptionalParameter<std::string>("token"); // TODO tis broken
+        const auto tokenParam = req->getOptionalParameter<std::string>("token");
         if (!tokenParam) {
             wsConnPtr->shutdown(CloseCode::kViolation);
             return;

@@ -1,7 +1,5 @@
 #include "platforms.h"
 
-#define WIKI_USER_AGENT "Sinytra/modded-wiki/1.0.0"
-#define MODRINTH_API_URL "https://api.modrinth.com/"
 #define CURSEFORGE_API_URL "https://api.curseforge.com/"
 #define MC_GAME_ID 432
 
@@ -48,6 +46,7 @@ namespace service {
 
     Task<std::optional<std::string>> ModrinthPlatform::getAuthenticatedUserID(std::string token) const {
         const auto client = createHttpClient(MODRINTH_API_URL);
+        client->setUserAgent(WIKI_USER_AGENT);
         if (const auto [resp, err] = co_await sendApiRequest(
                 client, Get, "/v3/user", [&token](const HttpRequestPtr &req) { req->addHeader("Authorization", token); });
             resp && resp->isObject())
@@ -60,6 +59,7 @@ namespace service {
 
     Task<bool> ModrinthPlatform::isProjectMember(std::string slug, std::string userId) const {
         const auto client = createHttpClient(MODRINTH_API_URL);
+        client->setUserAgent(WIKI_USER_AGENT);
         // Check direct project members
         if (const auto [resp, err] = co_await sendApiRequest(client, Get, std::format("/v3/project/{}/members", slug));
             resp && resp->isArray())
@@ -85,6 +85,7 @@ namespace service {
 
     Task<std::optional<PlatformProject>> ModrinthPlatform::getProject(const std::string slug) {
         const auto client = createHttpClient(MODRINTH_API_URL);
+        client->setUserAgent(WIKI_USER_AGENT);
         if (const auto [resp, err] = co_await sendApiRequest(client, Get, "/v3/project/" + slug); resp && resp->isObject()) {
             const auto projectSlug = (*resp)["slug"].asString();
             const auto name = (*resp)["name"].asString();
@@ -93,7 +94,8 @@ namespace service {
                                        : "";
             const auto projectTypes = (*resp)["project_types"];
             const auto type = projectTypes.empty() ? _unknown : getProjectType(projectTypes.front().asString());
-            co_return PlatformProject{.slug = projectSlug, .name = name, .sourceUrl = sourceUrl, .type = type, .platform = PLATFORM_MODRINTH };
+            co_return PlatformProject{
+                .slug = projectSlug, .name = name, .sourceUrl = sourceUrl, .type = type, .platform = PLATFORM_MODRINTH};
         }
         co_return std::nullopt;
     }
@@ -134,7 +136,8 @@ namespace service {
                 const auto type = curseforgeProjectTypes.find(classId);
                 const auto actualType = type == curseforgeProjectTypes.end() ? _unknown : type->second;
 
-                co_return PlatformProject{.slug = projectSlug, .name = name, .sourceUrl = sourceUrl, .type = actualType, .platform = PLATFORM_CURSEFORGE};
+                co_return PlatformProject{
+                    .slug = projectSlug, .name = name, .sourceUrl = sourceUrl, .type = actualType, .platform = PLATFORM_CURSEFORGE};
             }
         }
         co_return std::nullopt;
@@ -155,10 +158,10 @@ namespace service {
 
     std::vector<std::string> Platforms::getAvailablePlatforms() {
         auto kv = std::views::keys(platforms_);
-        return { kv.begin(), kv.end() };
+        return {kv.begin(), kv.end()};
     }
 
-    DistributionPlatform& Platforms::getPlatform(const std::string &platform) {
+    DistributionPlatform &Platforms::getPlatform(const std::string &platform) {
         const auto plat = platforms_.find(platform);
 
         if (plat == platforms_.end()) {

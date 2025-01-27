@@ -23,7 +23,6 @@ namespace service {
     public:
         explicit Auth(const std::string &, const OAuthApp &, const OAuthApp &, Database &, MemoryCache &, Platforms &);
 
-        // TODO unify oauth logic
         std::string getGitHubOAuthInitURL() const;
         drogon::Task<std::string> createUserSession(std::string username, std::string profile) const;
         drogon::Task<std::optional<std::string>> requestUserAccessToken(std::string code) const;

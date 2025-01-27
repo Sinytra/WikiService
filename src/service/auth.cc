@@ -4,6 +4,7 @@
 #include "log/log.h"
 #include "util.h"
 
+#define GH_HOST "https://github.com"
 #define GH_OAUTH_SCOPE "read:user+read:org"
 #define GH_OAUTH_INIT_URL "https://github.com/login/oauth/authorize"
 #define GH_OAUTH_TOKEN_PATH "/login/oauth/access_token"
@@ -31,7 +32,7 @@ namespace service {
 
     Task<std::optional<std::string>> Auth::requestUserAccessToken(const std::string code) const {
         const auto callbackUrl = appUrl_ + "/api/v1/auth/callback/github";
-        const auto client = createHttpClient("https://github.com");
+        const auto client = createHttpClient(GH_HOST);
 
         const auto tokenReq = HttpRequest::newHttpRequest();
         tokenReq->setMethod(Post);
@@ -110,7 +111,8 @@ namespace service {
 
     Task<std::optional<std::string>> Auth::requestModrinthUserAccessToken(std::string code) const {
         const auto callbackUrl = appUrl_ + "/api/v1/auth/callback/modrinth";
-        const auto client = createHttpClient("https://api.modrinth.com");
+        const auto client = createHttpClient(MODRINTH_API_URL);
+        client->setUserAgent(WIKI_USER_AGENT);
 
         const auto tokenReq = HttpRequest::newHttpRequest();
         tokenReq->setPath(MR_OAUTH_TOKEN_PATH);

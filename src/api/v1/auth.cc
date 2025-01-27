@@ -43,13 +43,13 @@ namespace api::v1 {
             const auto username = (*profile)["login"].asString();
             const auto sessionId = co_await auth_.createUserSession(username, serializeJsonString(*profile));
 
-            const auto resp = HttpResponse::newRedirectionResponse("http://localhost:3000/en/dev");
+            const auto resp = HttpResponse::newRedirectionResponse(authCallbackUrl_);
             Cookie cookie;
             cookie.setKey("sessionid");
             cookie.setValue(sessionId);
             cookie.setSecure(true);
             cookie.setHttpOnly(true);
-            cookie.setSameSite(Cookie::SameSite::kStrict); // TODO This breaks live logs
+            cookie.setSameSite(Cookie::SameSite::kStrict);
             cookie.setPath("/");
             cookie.setMaxAge(std::chrono::duration_cast<std::chrono::seconds>(30 * 24h).count());
             resp->addCookie(cookie);
@@ -108,7 +108,6 @@ namespace api::v1 {
             co_return errorResponse(Error::ErrUnauthorized, "Unauthorized", callback);
         }
 
-        // TODO Use User-Agent
         if (const auto token = co_await auth_.requestModrinthUserAccessToken(code)) {
             if (const auto result = co_await auth_.linkModrinthAccount(session->username, *token); result != Error::Ok) {
                 co_return errorResponse(result, "Error linking Modrinth account", callback);
