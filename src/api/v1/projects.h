@@ -19,7 +19,7 @@ namespace api::v1 {
 
     class ProjectsController final : public drogon::HttpController<ProjectsController, false> {
     public:
-        explicit ProjectsController(Auth &, GitHub &, Platforms &, Database &, Storage &, CloudFlare &);
+        explicit ProjectsController(Auth &, Platforms &, Database &, Storage &, CloudFlare &);
 
         METHOD_LIST_BEGIN
         ADD_METHOD_TO(ProjectsController::greet, "/", drogon::Get);
@@ -64,21 +64,20 @@ namespace api::v1 {
                                   std::string token) const;
 
     private:
-        nlohmann::json processPlatforms(const Json::Value &metadata) const;
+        nlohmann::json processPlatforms(const nlohmann::json &metadata) const;
 
         drogon::Task<std::optional<PlatformProject>> validatePlatform(const std::string &id, const std::string &repo,
                                                                       const std::string &platform, const std::string &slug,
                                                                       bool checkExisting, User user,
                                                                       std::function<void(const drogon::HttpResponsePtr &)> callback) const;
 
-        drogon::Task<std::optional<ValidatedProjectData>> validateProjectData(const Json::Value &json, const std::string &token,
+        drogon::Task<std::optional<ValidatedProjectData>> validateProjectData(const Json::Value &json, User user,
                                                                               std::function<void(const drogon::HttpResponsePtr &)> callback,
                                                                               bool checkExisting) const;
 
         void reloadProject(const Project &project, bool invalidate = true) const;
 
         Auth &auth_;
-        GitHub &github_;
         Platforms &platforms_;
         Database &database_;
         Storage &storage_;

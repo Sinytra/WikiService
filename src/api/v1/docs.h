@@ -3,13 +3,12 @@
 #include <drogon/HttpController.h>
 
 #include "service/database.h"
-#include "service/github.h"
 #include "service/storage.h"
 
 namespace api::v1 {
     class DocsController final : public drogon::HttpController<DocsController, false> {
     public:
-        explicit DocsController(GitHub &, Database &, Storage &);
+        explicit DocsController(Database &, Storage &);
 
         METHOD_LIST_BEGIN
         ADD_METHOD_TO(DocsController::project, "/api/v1/project/{1:project}", drogon::Get, "AuthFilter");
@@ -31,7 +30,6 @@ namespace api::v1 {
                              std::string project) const;
 
     private:
-        GitHub &github_;
         Database &database_;
         Storage &storage_;
 

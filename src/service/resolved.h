@@ -20,6 +20,17 @@ namespace service {
         Json::Value platforms;
     };
 
+    enum class ProjectError {
+        OK,
+        REQUIRES_AUTH,
+        NO_REPOSITORY,
+        NO_BRANCH,
+        NO_PATH,
+        INVALID_META,
+        UNKNOWN
+    };
+    std::string projectErrorToString(ProjectError status);
+
     class ResolvedProject {
     public:
         explicit ResolvedProject(const Project &, const std::filesystem::path &, const std::filesystem::path &);
@@ -38,7 +49,7 @@ namespace service {
 
         std::optional<std::filesystem::path> getAsset(const ResourceLocation &location) const;
 
-        std::optional<nlohmann::json> readProjectMetadata() const;
+        std::tuple<std::optional<nlohmann::json>, ProjectError> validateProjectMetadata() const;
 
         const Project &getProject() const;
 

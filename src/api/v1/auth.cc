@@ -15,9 +15,9 @@ using namespace logging;
 
 namespace api::v1 {
     AuthController::AuthController(const std::string &fe, const std::string &cb, Auth &a, GitHub &gh, MemoryCache &c, Database &d) :
-        appFrontendUrl_(fe), authCallbackUrl_(cb), auth_(a), github_(gh), cache_(c), database_(d) {}
+        auth_(a), github_(gh), database_(d), cache_(c), appFrontendUrl_(fe), authCallbackUrl_(cb) {}
 
-    Task<> AuthController::initLogin(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback) const {
+    Task<> AuthController::initLogin(HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
         const auto url = auth_.getGitHubOAuthInitURL();
         const auto resp = HttpResponse::newRedirectionResponse(url);
         callback(resp);
@@ -65,7 +65,7 @@ namespace api::v1 {
         co_return;
     }
 
-    Task<> AuthController::logout(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback) const {
+    Task<> AuthController::logout(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
         const auto session = req->getCookie("sessionid");
 
         co_await auth_.expireSession(session);
@@ -83,7 +83,7 @@ namespace api::v1 {
     }
 
     Task<> AuthController::linkModrinth(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback,
-                                        std::string token) const {
+                                        const std::string token) const {
         if (token.empty()) {
             co_return errorResponse(Error::ErrBadRequest, "Missing token parameter", callback);
         }
@@ -126,7 +126,8 @@ namespace api::v1 {
         co_return;
     }
 
-    Task<> AuthController::userProfile(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string token) const {
+    Task<> AuthController::userProfile(HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+                                       const std::string token) const {
         if (token.empty()) {
             co_return errorResponse(Error::ErrUnauthorized, "Missing token parameter", callback);
         }

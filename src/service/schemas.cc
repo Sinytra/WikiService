@@ -9,8 +9,7 @@ nlohmann::json schemas::projectRegister = R"(
         "repo": { "type": "string" },
         "branch": { "type": "string" },
         "path": { "type": "string" },
-        "is_community": { "type": "boolean" },
-        "mr_code": { "type": "string" }
+        "is_community": { "type": "boolean" }
     },
     "required": ["repo", "branch", "path"]
 }
@@ -111,18 +110,6 @@ nlohmann::json schemas::folderMetadata = R"(
             }
         ]
     }
-}
-)"_json;
-
-nlohmann::json schemas::repositoryMigration = R"(
-{
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "title": "Repository migration",
-    "type": "object",
-    "properties": {
-        "repo": { "type": "string" }
-    },
-    "required": ["repo"]
 }
 )"_json;
 

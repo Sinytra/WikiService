@@ -14,8 +14,6 @@ add_library(service STATIC
 target_link_libraries(service PRIVATE
         log
         Drogon::Drogon
-        jwt-cpp
-        base64
         nlohmann_json_schema_validator
         libgit2
         libgit2package

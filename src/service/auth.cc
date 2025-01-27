@@ -17,6 +17,8 @@ using namespace drogon;
 using namespace drogon_model::postgres;
 using namespace std::chrono_literals;
 
+std::string createSessionCacheKey(const std::string &sessionId) { return "session:" + sessionId; }
+
 namespace service {
     Auth::Auth(const std::string &appUrl, const OAuthApp &ghApp, const OAuthApp &mrApp, Database &db, MemoryCache &ch, Platforms &pl) :
         database_(db), cache_(ch), platforms_(pl), appUrl_(appUrl), githubApp_(ghApp), modrinthApp_(mrApp) {}
@@ -60,13 +62,17 @@ namespace service {
         const auto sessionId = generateSecureRandomString(SESSION_ID_LEN);
 
         const std::unordered_map<std::string, std::string> values = {{"username", normalUserName}, {"profile", profile}};
-        co_await cache_.updateCacheHash("session:" + sessionId, values, 30 * 24h);
+        co_await cache_.updateCacheHash(createSessionCacheKey(sessionId), values, 30 * 24h);
 
         co_return sessionId;
     }
 
     Task<std::optional<UserSession>> Auth::getSession(const std::string id) const {
-        const auto sid = "session:" + id;
+        if (id.empty()) {
+            co_return std::nullopt;
+        }
+
+        const auto sid = createSessionCacheKey(id);
         const auto username = co_await cache_.getHashMember(sid, "username");
         if (!username) {
             co_return std::nullopt;
@@ -93,7 +99,7 @@ namespace service {
         co_return UserSession{.username = *username, .user = *user, .profile = root};
     }
 
-    Task<> Auth::expireSession(const std::string id) const { co_await cache_.erase("session:" + id); }
+    Task<> Auth::expireSession(const std::string id) const { co_await cache_.erase(createSessionCacheKey(id)); }
 
     std::string Auth::getModrinthOAuthInitURL(std::string state) const {
         const auto callbackUrl = appUrl_ + "/api/v1/auth/callback/modrinth";

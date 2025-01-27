@@ -18,24 +18,24 @@ using namespace drogon::orm;
 using namespace drogon_model::postgres;
 
 namespace api::v1 {
-    ProjectsController::ProjectsController(Auth &a, GitHub &gh, Platforms &pf, Database &db, Storage &s, CloudFlare &cf) :
-        auth_(a), github_(gh), platforms_(pf), database_(db), storage_(s), cloudflare_(cf) {}
+    ProjectsController::ProjectsController(Auth &a, Platforms &pf, Database &db, Storage &s, CloudFlare &cf) :
+        auth_(a), platforms_(pf), database_(db), storage_(s), cloudflare_(cf) {}
 
-    nlohmann::json ProjectsController::processPlatforms(const Json::Value &metadata) const {
+    nlohmann::json ProjectsController::processPlatforms(const nlohmann::json &metadata) const {
         const std::vector<std::string> &valid = platforms_.getAvailablePlatforms();
         nlohmann::json projects(nlohmann::json::value_t::object);
-        if (metadata.isMember("platforms") && metadata["platforms"].isObject()) {
+        if (metadata.contains("platforms") && metadata["platforms"].is_object()) {
             const auto platforms = metadata["platforms"];
             for (const auto &platform: valid) {
-                if (platforms.isMember(platform) && platforms[platform].isString()) {
-                    projects[platform] = platforms[platform].asString();
+                if (platforms.contains(platform) && platforms[platform].is_string()) {
+                    projects[platform] = platforms[platform];
                 }
             }
         }
-        if (metadata.isMember("platform") && metadata["platform"].isString() && !projects.contains(metadata["platform"].asString()) &&
-            metadata.isMember("slug") && metadata["slug"].isString())
+        if (metadata.contains("platform") && metadata["platform"].is_string() && !projects.contains(metadata["platform"]) &&
+            metadata.contains("slug") && metadata["slug"].is_string())
         {
-            projects[metadata["platform"].asString()] = metadata["slug"].asString();
+            projects[metadata["platform"]] = metadata["slug"];
         }
         return projects;
     }
@@ -78,7 +78,7 @@ namespace api::v1 {
             if (const auto verified = co_await platInstance.verifyProjectAccess(*platformProj, user, repo); !verified) {
                 simpleError(Error::ErrBadRequest, "ownership", callback, [&](Json::Value &root) {
                     root["details"] = "Platform: " + platform;
-                    root["can_verify_mr"] = true; // TODO
+                    root["can_verify_mr"] = platform == PLATFORM_MODRINTH;
                 });
                 co_return std::nullopt;
             }
@@ -88,59 +88,45 @@ namespace api::v1 {
     }
 
     /**
-     * Possible errors:
-     * - unsupported: Community project registration is not yet implemented
-     * - insufficient_repo_perms: User is not admin/maintainer
-     * - no_branch: Wrong branch specifiec
-     * - no_meta: No metadata file
-     * - invalid_meta: Metadata file format is invalid
-     * - exists: Duplicate project ID
+     * Resolution errors:
+     * - internal: Internal server error
+     * - unknown: Internal server error
+     * Platform errors:
      * - no_platforms: No defined platform projects
-     * - cf_unavailable: CF Project registration unavailable due to missing API key
      * - no_project: Platform project not found
      * - unsupported_type: Unsupported platform project type
      * - ownership: Failed to verify platform project ownership (data: can_verify_mr)
-     * - internal: Internal server error
+     * - cf_unavailable: CF Project registration unavailable due to missing API key
+     * Project errors:
+     * - requires_auth: Repository connection requires auth
+     * - no_repository: Repository not found
+     * - no_branch: Wrong branch specified
+     * - no_path: Invalid path / metadata not found at given path
+     * - invalid_meta: Metadata file format is invalid
      */
-    Task<std::optional<ValidatedProjectData>> ProjectsController::validateProjectData(const Json::Value &json, const std::string &token,
+    Task<std::optional<ValidatedProjectData>> ProjectsController::validateProjectData(const Json::Value &json, const User user,
                                                                                       std::function<void(const HttpResponsePtr &)> callback,
                                                                                       const bool checkExisting) const {
-        const auto session(co_await auth_.getSession(token));
-        if (!session) {
-            simpleError(Error::ErrUnauthorized, "unauthorized", callback);
-            co_return std::nullopt;
-        }
-
         // Required
         const auto branch = json["branch"].asString();
         const auto repo = json["repo"].asString();
         const auto path = json["path"].asString();
-        // Optional
-        const auto mrCode = json["mr_code"].asString();
 
-        // TODO Rework this
+        Project tempProject;
+        tempProject.setId("_temp-" + generateSecureRandomString(8));
+        tempProject.setSourceRepo(repo);
+        tempProject.setSourceBranch(branch);
+        tempProject.setSourcePath(path);
 
-        if (const auto [branches, branchesErr](co_await github_.getRepositoryBranches(repo, *installationToken));
-            ranges::find(branches, branch) == branches.end())
-        {
-            simpleError(Error::ErrBadRequest, "no_branch", callback);
+        // TODO Metadata validation error details
+        const auto [resolved, err] = co_await storage_.setupValidateTempProject(tempProject);
+        if (err != ProjectError::OK) {
+            simpleError(Error::ErrBadRequest, projectErrorToString(err), callback);
             co_return std::nullopt;
         }
 
-        const auto metaFilePath = path + DOCS_META_FILE_PATH;
-        const auto [contents, contentsError](co_await github_.getRepositoryJSONFile(repo, branch, metaFilePath, *installationToken));
-        if (!contents) {
-            simpleError(Error::ErrBadRequest, "no_meta", callback);
-            co_return std::nullopt;
-        }
-        if (const auto error = validateJson(schemas::projectMetadata, *contents)) {
-            simpleError(Error::ErrBadRequest, "invalid_meta", callback, [&error](Json::Value &root) { root["details"] = error->msg; });
-            co_return std::nullopt;
-        }
-        const auto jsonContent = *contents;
-        const auto id = jsonContent["id"].asString();
-
-        const auto platforms = processPlatforms(jsonContent);
+        const std::string id = (*resolved)["id"];
+        const auto platforms = processPlatforms(*resolved);
         if (platforms.empty()) {
             simpleError(Error::ErrBadRequest, "no_platforms", callback);
             co_return std::nullopt;
@@ -148,7 +134,7 @@ namespace api::v1 {
 
         std::unordered_map<std::string, PlatformProject> platformProjects;
         for (const auto &[key, val]: platforms.items()) {
-            const auto platformProj = co_await validatePlatform(id, repo, key, val, checkExisting, session->user, callback);
+            const auto platformProj = co_await validatePlatform(id, repo, key, val, checkExisting, user, callback);
             if (!platformProj) {
                 co_return std::nullopt;
             }
@@ -287,8 +273,9 @@ namespace api::v1 {
     }
 
     Task<> ProjectsController::create(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string token) const {
-        if (token.empty()) {
-            co_return errorResponse(Error::ErrBadRequest, "Missing token parameter", callback);
+        const auto session(co_await auth_.getSession(token));
+        if (!session) {
+            co_return simpleError(Error::ErrUnauthorized, "unauthorized", callback);
         }
 
         auto json(req->getJsonObject());
@@ -314,7 +301,7 @@ namespace api::v1 {
             co_return simpleError(Error::ErrBadRequest, "exists", callback);
         }
 
-        auto validated = co_await validateProjectData(*json, token, callback, false);
+        auto validated = co_await validateProjectData(*json, session->user, callback, false);
         if (!validated) {
             co_return;
         }
@@ -325,24 +312,32 @@ namespace api::v1 {
             co_return simpleError(Error::ErrBadRequest, "exists", callback);
         }
 
-        if (const auto [result, resultErr] = co_await database_.createProject(project); resultErr != Error::Ok) {
+        const auto [result, resultErr] = co_await database_.createProject(project);
+        if (resultErr != Error::Ok) {
             logger.error("Failed to create project {} in database", project.getValueOfId());
             co_return simpleError(Error::ErrInternal, "internal", callback);
         }
 
-        reloadProject(project);
+        if (const auto assignErr = co_await database_.assignUserProject(session->username, result->getValueOfId(), "member"); assignErr != Error::Ok) {
+            logger.error("Failed to assign project {} to user {}", result->getValueOfId(), session->username);
+            co_await database_.removeProject(result->getValueOfId());
+            co_return simpleError(Error::ErrInternal, "internal", callback);
+        }
 
         Json::Value root;
-        root["project"] = projectToJson(project);
+        root["project"] = projectToJson(*result);
         root["message"] = "Project registered successfully";
         const auto resp = HttpResponse::newHttpJsonResponse(root);
         resp->setStatusCode(k200OK);
         callback(resp);
+
+        reloadProject(*result);
     }
 
     Task<> ProjectsController::update(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string token) const {
-        if (token.empty()) {
-            co_return errorResponse(Error::ErrBadRequest, "Missing token parameter", callback);
+        const auto session(co_await auth_.getSession(token));
+        if (!session) {
+            co_return simpleError(Error::ErrUnauthorized, "unauthorized", callback);
         }
 
         const auto json(req->getJsonObject());
@@ -353,7 +348,7 @@ namespace api::v1 {
             co_return simpleError(Error::ErrBadRequest, error->msg, callback);
         }
 
-        auto validated = co_await validateProjectData(*json, token, callback, true);
+        auto validated = co_await validateProjectData(*json, session->user, callback, true);
         if (!validated) {
             co_return;
         }
@@ -368,14 +363,14 @@ namespace api::v1 {
             co_return simpleError(Error::ErrInternal, "internal", callback);
         }
 
-        reloadProject(project);
-
         Json::Value root;
         root["message"] = "Project updated successfully";
         root["project"] = projectToJson(project);
         const auto resp = HttpResponse::newHttpJsonResponse(root);
         resp->setStatusCode(k200OK);
         callback(resp);
+
+        reloadProject(project);
     }
 
     Task<> ProjectsController::remove(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, const std::string id,
@@ -392,9 +387,7 @@ namespace api::v1 {
             co_return;
         }
 
-        // Repo perms verified, proceed to deletion
-
-        if (const auto error = co_await database_.removeProject(id); error != Error::Ok) {
+        if (const auto error = co_await database_.removeProject(project->getValueOfId()); error != Error::Ok) {
             logger.error("Failed to delete project {} in database", id);
             co_return simpleError(Error::ErrInternal, "internal", callback);
         }

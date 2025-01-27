@@ -17,7 +17,6 @@ namespace service {
         LOADED,
         ERROR
     };
-
     std::string projectStatusToString(ProjectStatus status);
 
     class RealtimeConnectionStorage {
@@ -41,8 +40,6 @@ namespace service {
 
         drogon::Task<std::tuple<std::optional<ResolvedProject>, Error>> getProject(const Project &project, const std::optional<std::string> &version, const std::optional<std::string> &locale);
 
-        drogon::Task<std::tuple<std::vector<std::string>, Error>> getRepositoryBranches(const Project &project) const;
-
         drogon::Task<Error> invalidateProject(const Project &project);
 
         drogon::Task<std::optional<ResolvedProject>> maybeGetProject(const Project &project);
@@ -50,14 +47,16 @@ namespace service {
         drogon::Task<ProjectStatus> getProjectStatus(const Project &project);
 
         std::optional<std::string> getProjectLog(const Project &project) const;
+
+        drogon::Task<std::tuple<std::optional<nlohmann::json>, ProjectError>> setupValidateTempProject(const Project &project) const;
     private:
-        drogon::Task<Error> setupProject(const Project &project) const;
-        drogon::Task<Error> setupProjectCached(const Project &project);
+        drogon::Task<ProjectError> setupProject(const Project &project) const;
+        drogon::Task<ProjectError> setupProjectCached(const Project &project);
         std::filesystem::directory_entry getBaseDir() const;
         std::filesystem::path getProjectLogPath(const Project &project) const;
         std::filesystem::path getProjectDirPath(const Project &project, const std::string &version) const;
         drogon::Task<std::tuple<std::optional<ResolvedProject>, Error>> findProject(const Project &project, const std::optional<std::string> &version, const std::optional<std::string> &locale, bool setup);
-        std::shared_ptr<spdlog::logger> getProjectLogger(const Project &project) const;
+        std::shared_ptr<spdlog::logger> getProjectLogger(const Project &project, bool file = true) const;
 
         const std::string &basePath_;
         MemoryCache &cache_;

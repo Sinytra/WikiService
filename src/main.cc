@@ -46,10 +46,8 @@ int main() {
         const Json::Value &authConfig = customConfig["auth"];
         const std::string authCallbackUrl = authConfig["callback_url"].asString();
         const Json::Value &githubAppConfig = customConfig["github_app"];
-        const std::string &appName = githubAppConfig["name"].asString();
         const std::string &appClientId = githubAppConfig["client_id"].asString();
         const std::string &appClientSecret = githubAppConfig["client_secret"].asString();
-        const std::string &appPrivateKeyPath = githubAppConfig["private_key_path"].asString();
         const std::string &curseForgeKey = customConfig["curseforge_key"].asString();
         const std::string &storageBasePath = customConfig["storage_path"].asString();
         const Json::Value &mrApp = customConfig["modrinth_app"];
@@ -66,7 +64,7 @@ int main() {
 
         auto database(Database{});
         auto cache(MemoryCache{});
-        auto github(GitHub{cache, appName, appClientId, appPrivateKeyPath});
+        auto github(GitHub{});
         auto connections(RealtimeConnectionStorage{});
         auto storage(Storage{storageBasePath, cache, connections});
 
@@ -79,9 +77,9 @@ int main() {
         auto auth(Auth{appUrl, { appClientId, appClientSecret }, {mrAppClientId, mrAppClientSecret}, database, cache, platforms});
 
         auto authController(make_shared<api::v1::AuthController>(appFrontendUrl, authCallbackUrl, auth, github, cache, database));
-        auto controller(make_shared<api::v1::DocsController>(github, database, storage));
+        auto controller(make_shared<api::v1::DocsController>(database, storage));
         auto browseController(make_shared<api::v1::BrowseController>(database));
-        auto projectsController(make_shared<api::v1::ProjectsController>(auth, github, platforms, database, storage, cloudflare));
+        auto projectsController(make_shared<api::v1::ProjectsController>(auth, platforms, database, storage, cloudflare));
         auto projectWSController(make_shared<api::v1::ProjectWebSocketController>(database, storage, connections, auth));
 
         app().registerController(authController);

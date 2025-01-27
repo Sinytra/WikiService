@@ -17,7 +17,7 @@ using namespace drogon::orm;
 using namespace drogon_model::postgres;
 
 namespace api::v1 {
-    DocsController::DocsController(GitHub &g, Database &db, Storage &s) : github_(g), database_(db), storage_(s) {}
+    DocsController::DocsController(Database &db, Storage &s) : database_(db), storage_(s) {}
 
     Task<std::optional<ResolvedProject>> DocsController::getProject(const std::string &project, const std::optional<std::string> &version,
                                                                     const std::optional<std::string> &locale,
@@ -126,7 +126,7 @@ namespace api::v1 {
             root["project"] = parkourJson(resolved->toJson());
             root["tree"] = tree;
 
-            const auto resp = jsonResponse(root);
+            const auto resp = HttpResponse::newHttpJsonResponse(*parseJsonString(root.dump()));
             resp->setStatusCode(k200OK);
             callback(resp);
         } catch (const HttpException &err) {

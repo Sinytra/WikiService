@@ -101,26 +101,6 @@ namespace service {
         }
     }
 
-    Task<Error> Database::updateRepository(const std::string &repo, const std::string &newRepo) const {
-        try {
-            const auto clientPtr = app().getFastDbClient();
-            CoroMapper<Project> mapper(clientPtr);
-
-            const auto count =
-                co_await mapper.updateBy({Project::Cols::_source_repo}, Criteria(Project::Cols::_source_repo, repo), newRepo);
-            logger.info("Updated {} rows", count);
-
-            co_return Error::Ok;
-        } catch (const Failure &e) {
-            // SQL Error
-            logger.error("Error querying database: {}", e.what());
-            co_return Error::ErrInternal;
-        } catch (const DrogonDbException &e) {
-            // Not found
-            co_return Error::ErrNotFound;
-        }
-    }
-
     std::string buildSearchVectorQuery(std::string query) {
         auto result = query | std::views::split(' ') |
                       std::views::filter([](auto const &str) { return !std::all_of(str.begin(), str.end(), isspace); }) |
@@ -349,6 +329,28 @@ namespace service {
         } catch (const DrogonDbException &e) {
             // Not found
             co_return std::nullopt;
+        }
+    }
+
+    Task<Error> Database::assignUserProject(const std::string username, const std::string id, const std::string role) const {
+        try {
+            const auto clientPtr = app().getFastDbClient();
+            CoroMapper<UserProject> mapper(clientPtr);
+
+            UserProject userProject;
+            userProject.setUserId(username);
+            userProject.setProjectId(id);
+            userProject.setRole(role);
+
+            co_await mapper.insert(userProject);
+            co_return Error::Ok;
+        } catch (const Failure &e) {
+            // SQL Error
+            logger.error("Error querying database: {}", e.what());
+            co_return Error::ErrInternal;
+        } catch (const DrogonDbException &e) {
+            // Not found
+            co_return Error::ErrNotFound;
         }
     }
 }

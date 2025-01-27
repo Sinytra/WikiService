@@ -98,7 +98,7 @@ namespace service {
         co_return std::nullopt;
     }
 
-    Task<bool> ModrinthPlatform::verifyProjectAccess(const PlatformProject project, const User user, const std::string repo) override {
+    Task<bool> ModrinthPlatform::verifyProjectAccess(const PlatformProject project, const User user, const std::string repo) {
         if (co_await DistributionPlatform::verifyProjectAccess(project, user, repo)) {
             co_return true;
         }

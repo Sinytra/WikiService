@@ -300,6 +300,25 @@ std::tuple<std::unordered_map<std::string, std::string>, Error> getAvailableDocs
 }
 
 namespace service {
+    std::string projectErrorToString(const ProjectError status) {
+        switch (status) {
+            case ProjectError::OK:
+                return "ok";
+            case ProjectError::REQUIRES_AUTH:
+                return "requires_auth";
+            case ProjectError::NO_REPOSITORY:
+                return "no_repository";
+            case ProjectError::NO_BRANCH:
+                return "no_branch";
+            case ProjectError::NO_PATH:
+                return "no_path";
+            case ProjectError::INVALID_META:
+                return "invalid_meta";
+            default:
+                return "unknown";
+        }
+    }
+
     ResolvedProject::ResolvedProject(const Project &p, const std::filesystem::path &r, const std::filesystem::path &d) :
         project_(p), rootDir_(r), docsDir_(d) {}
 
@@ -389,11 +408,6 @@ namespace service {
         return std::nullopt;
     }
 
-    std::optional<nlohmann::json> ResolvedProject::readProjectMetadata() const {
-        const auto path = rootDir_ / DOCS_META_FILE;
-        return parseJsonFile(path);
-    }
-
     const Project &ResolvedProject::getProject() const { return project_; }
 
     Json::Value ResolvedProject::toJson() const {
@@ -419,5 +433,23 @@ namespace service {
         }
 
         return projectJson;
+    }
+
+    std::tuple<std::optional<nlohmann::json>, ProjectError> ResolvedProject::validateProjectMetadata() const {
+        const auto path = docsDir_ / DOCS_META_FILE;
+        if (!exists(path)) {
+            return {std::nullopt, ProjectError::NO_PATH};
+        }
+
+        const auto meta = parseJsonFile(path);
+        if (!meta) {
+            return {std::nullopt, ProjectError::INVALID_META};
+        }
+
+        if (const auto error = validateJson(schemas::projectMetadata, *meta)) {
+            return {std::nullopt, ProjectError::INVALID_META};
+        }
+
+        return {*meta, ProjectError::OK};
     }
 }
