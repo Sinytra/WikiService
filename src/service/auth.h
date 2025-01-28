@@ -2,6 +2,7 @@
 
 #include "cache.h"
 #include "database.h"
+#include "github.h"
 #include "platforms.h"
 
 #include <drogon/HttpRequest.h>
@@ -23,7 +24,7 @@ namespace service {
 
     class Auth : public CacheableServiceBase {
     public:
-        explicit Auth(const std::string &, const OAuthApp &, const OAuthApp &, Database &, MemoryCache &, Platforms &);
+        explicit Auth(const std::string &, const OAuthApp &, const OAuthApp &, Database &, MemoryCache &, Platforms &, GitHub &);
 
         std::string getGitHubOAuthInitURL() const;
         drogon::Task<std::string> createUserSession(std::string username, std::string profile) const;
@@ -36,10 +37,13 @@ namespace service {
         drogon::Task<std::optional<std::string>> requestModrinthUserAccessToken(std::string code) const;
         drogon::Task<Error> linkModrinthAccount(std::string username, std::string token) const;
         drogon::Task<Error> unlinkModrinthAccount(std::string username) const;
+
+        drogon::Task<std::optional<User>> getGitHubTokenUser(std::string token) const;
     private:
         Database &database_;
         MemoryCache &cache_;
         Platforms &platforms_;
+        GitHub &github_;
         const std::string appUrl_;
         const OAuthApp githubApp_;
         const OAuthApp modrinthApp_;

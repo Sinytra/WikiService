@@ -17,10 +17,10 @@ using namespace logging;
 #define SESSION_COOKIE "sessionid"
 
 namespace api::v1 {
-    AuthController::AuthController(const std::string &fe, const std::string &cb, const std::string &cbs, const std::string &tk, Auth &a,
-                                   GitHub &gh, MemoryCache &c, Database &d) :
+    AuthController::AuthController(const std::string &fe, const std::string &cb, const std::string &cbs, const std::string &cbe,
+                                   const std::string &tk, Auth &a, GitHub &gh, MemoryCache &c, Database &d) :
         auth_(a), github_(gh), database_(d), cache_(c), appFrontendUrl_(fe), authCallbackUrl_(cb), authSettingsCallbackUrl_(cbs),
-        tokenEncryptionKey_(tk) {}
+        authErrorCallbackUrl_(cbe), tokenEncryptionKey_(tk) {}
 
     Task<> AuthController::initLogin(HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
         const auto url = auth_.getGitHubOAuthInitURL();
@@ -36,8 +36,6 @@ namespace api::v1 {
         }
 
         if (const auto token = co_await auth_.requestUserAccessToken(code)) {
-            // TODO Handle errors
-
             const auto [profile, err] = co_await github_.getAuthenticatedUser(*token);
             if (!profile) {
                 const auto resp = HttpResponse::newHttpResponse();
@@ -63,9 +61,7 @@ namespace api::v1 {
             co_return;
         }
 
-        const auto resp = HttpResponse::newHttpResponse();
-        resp->setStatusCode(k400BadRequest);
-        callback(resp);
+        callback(HttpResponse::newRedirectionResponse(authErrorCallbackUrl_));
 
         co_return;
     }

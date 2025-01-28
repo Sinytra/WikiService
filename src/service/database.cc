@@ -171,7 +171,7 @@ namespace service {
 
     Task<Error> Database::createUserIfNotExists(const std::string username) const {
         const auto [res, err] = co_await handleDatabaseOperation<Error>([username](const DbClientPtr &client) -> Task<Error> {
-            CoroMapper<Project> mapper(client);
+            CoroMapper<User> mapper(client);
             co_await mapper.findByPrimaryKey(username);
             co_return Error::Ok;
         });

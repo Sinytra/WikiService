@@ -5,7 +5,6 @@
 
 #include <service/cloudflare.h>
 #include <service/database.h>
-#include <service/github.h>
 #include <service/platforms.h>
 #include <service/storage.h>
 
@@ -31,7 +30,7 @@ namespace api::v1 {
         ADD_METHOD_TO(ProjectsController::create, "/api/v1/project/create", drogon::Post, "AuthFilter");
         ADD_METHOD_TO(ProjectsController::remove, "/api/v1/project/{1:id}/remove", drogon::Post, "AuthFilter");
         ADD_METHOD_TO(ProjectsController::update, "/api/v1/project/update", drogon::Post, "AuthFilter");
-        ADD_METHOD_TO(ProjectsController::invalidate, "/api/v1/project/{1:id}/invalidate", drogon::Post, "AuthFilter"); // TODO Accept GH tokens
+        ADD_METHOD_TO(ProjectsController::invalidate, "/api/v1/project/{1:id}/invalidate", drogon::Post, "AuthFilter");
         METHOD_LIST_END
 
         drogon::Task<> greet(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback) const;

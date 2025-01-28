@@ -9,8 +9,8 @@
 namespace api::v1 {
     class AuthController final : public drogon::HttpController<AuthController, false> {
     public:
-        explicit AuthController(const std::string &, const std::string &, const std::string &, const std::string &, service::Auth &,
-                                service::GitHub &, service::MemoryCache &, service::Database &);
+        explicit AuthController(const std::string &, const std::string &, const std::string &, const std::string &, const std::string &,
+                                service::Auth &, service::GitHub &, service::MemoryCache &, service::Database &);
 
         METHOD_LIST_BEGIN
         ADD_METHOD_TO(AuthController::initLogin, "/api/v1/auth/login", drogon::Get);
@@ -39,6 +39,7 @@ namespace api::v1 {
         drogon::Task<> userProfile(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback) const;
 
         drogon::Task<> deleteAccount(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback) const;
+
     private:
         service::Auth &auth_;
         service::GitHub &github_;
@@ -47,6 +48,7 @@ namespace api::v1 {
         const std::string appFrontendUrl_;
         const std::string authCallbackUrl_;
         const std::string authSettingsCallbackUrl_;
+        const std::string authErrorCallbackUrl_;
         const std::string tokenEncryptionKey_;
     };
 }

@@ -23,8 +23,8 @@ using namespace std::chrono_literals;
 std::string createSessionCacheKey(const std::string &sessionId) { return "session:" + sessionId; }
 
 namespace service {
-    Auth::Auth(const std::string &appUrl, const OAuthApp &ghApp, const OAuthApp &mrApp, Database &db, MemoryCache &ch, Platforms &pl) :
-        database_(db), cache_(ch), platforms_(pl), appUrl_(appUrl), githubApp_(ghApp), modrinthApp_(mrApp) {}
+    Auth::Auth(const std::string &appUrl, const OAuthApp &ghApp, const OAuthApp &mrApp, Database &db, MemoryCache &ch, Platforms &pl, GitHub &gh) :
+        database_(db), cache_(ch), platforms_(pl), github_(gh), appUrl_(appUrl), githubApp_(ghApp), modrinthApp_(mrApp) {}
 
     std::string Auth::getGitHubOAuthInitURL() const {
         const auto callbackUrl = appUrl_ + "/api/v1/auth/callback/github";
@@ -48,9 +48,14 @@ namespace service {
         const auto response = co_await client->sendRequestCoro(tokenReq);
         if (const auto status = response->getStatusCode(); isSuccess(status)) {
             if (const auto jsonResp = response->getJsonObject()) {
-                const auto token = (*jsonResp)["access_token"].asString();
-
-                co_return token;
+                if (jsonResp->isMember("access_token")) {
+                    const auto token = (*jsonResp)["access_token"].asString();
+                    co_return token;
+                }
+                if (jsonResp->isMember("error")) {
+                    const auto error = (*jsonResp)["error"].asString();
+                    logger.error("Error requesting OAuth token: {}", error);
+                }
             }
         }
 
@@ -152,5 +157,16 @@ namespace service {
 
     Task<Error> Auth::unlinkModrinthAccount(const std::string username) const {
         co_return co_await database_.unlinkUserModrinthAccount(username);
+    }
+
+    Task<std::optional<User>> Auth::getGitHubTokenUser(const std::string token) const {
+        if (token.starts_with("ghp_")) {
+            if (const auto [ghProfile, ghErr](co_await github_.getAuthenticatedUser(token)); ghProfile) {
+                const auto username = (*ghProfile)["login"].asString();
+                const auto user = co_await database_.getUser(strToLower(username));
+                co_return user;
+            }
+        }
+        co_return std::nullopt;
     }
 }

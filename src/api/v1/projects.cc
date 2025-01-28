@@ -400,14 +400,24 @@ namespace api::v1 {
         co_return;
     }
 
-    Task<> ProjectsController::invalidate(HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback, const std::string id) const {
-        const auto session(co_await auth_.getSession(req));
-        if (!session) {
-            simpleError(Error::ErrUnauthorized, "unauthorized", callback);
-            co_return;
+    Task<> ProjectsController::invalidate(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback, const std::string id) const {
+        std::string username = "";
+
+        const auto token = req->getParameter("token");
+        if (const auto user = co_await auth_.getGitHubTokenUser(token)) {
+            username = user->getValueOfId();
         }
 
-        const auto project = co_await database_.getUserProject(session->username, id);
+        if (username.empty()) {
+            const auto session(co_await auth_.getSession(req));
+            if (!session) {
+                simpleError(Error::ErrUnauthorized, "unauthorized", callback);
+                co_return;
+            }
+            username = session->username;
+        }
+
+        const auto project = co_await database_.getUserProject(username, id);
         if (!project) {
             simpleError(Error::ErrBadRequest, "not_found", callback);
             co_return;
@@ -419,7 +429,7 @@ namespace api::v1 {
         reloadProject(*project, false);
 
         Json::Value root;
-        root["message"] = "Project cache invalidated successfully";
+        root["message"] = "Project reload started successfully";
         const auto resp = HttpResponse::newHttpJsonResponse(root);
         resp->setStatusCode(k200OK);
         callback(resp);
