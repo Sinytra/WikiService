@@ -22,6 +22,21 @@ namespace api::v1 {
     ProjectsController::ProjectsController(Auth &a, Platforms &pf, Database &db, Storage &s, CloudFlare &cf) :
         auth_(a), platforms_(pf), database_(db), storage_(s), cloudflare_(cf) {}
 
+    Task<bool> isProjectPubliclyBrowseable(const std::string &repo) {
+        try {
+            const auto client = createHttpClient("https://github.com");
+            const auto httpReq = HttpRequest::newHttpRequest();
+            httpReq->setMethod(Get);
+            httpReq->setPath("/" + repo);
+            const auto response = co_await client->sendRequestCoro(httpReq);
+            const auto status = response->getStatusCode();
+            co_return status == k200OK;
+        } catch (const std::exception &e) {
+            logger.error("Error checking public status: {}", e.what());
+            co_return false;
+        }
+    }
+
     nlohmann::json ProjectsController::processPlatforms(const nlohmann::json &metadata) const {
         const std::vector<std::string> &valid = platforms_.getAvailablePlatforms();
         nlohmann::json projects(nlohmann::json::value_t::object);
@@ -119,10 +134,10 @@ namespace api::v1 {
         tempProject.setSourceBranch(branch);
         tempProject.setSourcePath(path);
 
-        // TODO Metadata validation error details
-        const auto [resolved, err] = co_await storage_.setupValidateTempProject(tempProject);
+        const auto [resolved, err, details] = co_await storage_.setupValidateTempProject(tempProject);
         if (err != ProjectError::OK) {
-            simpleError(Error::ErrBadRequest, projectErrorToString(err), callback);
+            simpleError(Error::ErrBadRequest, projectErrorToString(err), callback,
+                        [&details](Json::Value &root) { root["details"] = details; });
             co_return std::nullopt;
         }
 
@@ -144,6 +159,8 @@ namespace api::v1 {
         const auto &preferredProj =
             platforms.contains(PLATFORM_MODRINTH) ? platformProjects[PLATFORM_MODRINTH] : platformProjects.begin()->second;
 
+        const auto isPublic = co_await isProjectPubliclyBrowseable(repo);
+
         Project project;
         project.setId(id);
         project.setName(preferredProj.name);
@@ -152,6 +169,7 @@ namespace api::v1 {
         project.setSourcePath(path);
         project.setType(projectTypeToString(preferredProj.type));
         project.setPlatforms(platforms.dump());
+        project.setIsPublic(isPublic);
 
         co_return ValidatedProjectData{.project = project, .platforms = platforms};
     }
@@ -229,7 +247,8 @@ namespace api::v1 {
         co_return;
     }
 
-    Task<> ProjectsController::getProjectLog(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string id) const {
+    Task<> ProjectsController::getProjectLog(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback,
+                                             std::string id) const {
         const auto session(co_await auth_.getSession(req));
         if (!session) {
             simpleError(Error::ErrUnauthorized, "unauthorized", callback);
@@ -316,7 +335,9 @@ namespace api::v1 {
             co_return simpleError(Error::ErrInternal, "internal", callback);
         }
 
-        if (const auto assignErr = co_await database_.assignUserProject(session->username, result->getValueOfId(), "member"); assignErr != Error::Ok) {
+        if (const auto assignErr = co_await database_.assignUserProject(session->username, result->getValueOfId(), "member");
+            assignErr != Error::Ok)
+        {
             logger.error("Failed to assign project {} to user {}", result->getValueOfId(), session->username);
             co_await database_.removeProject(result->getValueOfId());
             co_return simpleError(Error::ErrInternal, "internal", callback);
@@ -371,7 +392,8 @@ namespace api::v1 {
         reloadProject(project);
     }
 
-    Task<> ProjectsController::remove(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, const std::string id) const {
+    Task<> ProjectsController::remove(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback,
+                                      const std::string id) const {
         const auto session(co_await auth_.getSession(req));
         if (!session) {
             simpleError(Error::ErrUnauthorized, "unauthorized", callback);
@@ -400,7 +422,8 @@ namespace api::v1 {
         co_return;
     }
 
-    Task<> ProjectsController::invalidate(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback, const std::string id) const {
+    Task<> ProjectsController::invalidate(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+                                          const std::string id) const {
         std::string username = "";
 
         const auto token = req->getParameter("token");

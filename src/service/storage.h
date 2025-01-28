@@ -48,7 +48,7 @@ namespace service {
 
         std::optional<std::string> getProjectLog(const Project &project) const;
 
-        drogon::Task<std::tuple<std::optional<nlohmann::json>, ProjectError>> setupValidateTempProject(const Project &project) const;
+        drogon::Task<std::tuple<std::optional<nlohmann::json>, ProjectError, std::string>> setupValidateTempProject(const Project &project) const;
     private:
         drogon::Task<ProjectError> setupProject(const Project &project) const;
         drogon::Task<ProjectError> setupProjectCached(const Project &project);

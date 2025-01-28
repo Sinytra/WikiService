@@ -407,7 +407,7 @@ namespace service {
 
             if (const auto res = co_await setupProjectCached(project); res != ProjectError::OK) {
                 logger.error("Failed to setup project '{}'", project.getValueOfId());
-                co_return {std::nullopt, Error::ErrInternal}; // TODO propagate ProjectError
+                co_return {std::nullopt, Error::ErrInternal};
             }
         }
 
@@ -489,7 +489,7 @@ namespace service {
         return buffer.str();
     }
 
-    Task<std::tuple<std::optional<nlohmann::json>, ProjectError>> Storage::setupValidateTempProject(const Project &project) const {
+    Task<std::tuple<std::optional<nlohmann::json>, ProjectError, std::string>> Storage::setupValidateTempProject(const Project &project) const {
         const auto baseDir = getBaseDir();
         const auto clonePath = baseDir.path() / TEMP_DIR / project.getValueOfId();
         remove_all(clonePath);
@@ -501,26 +501,26 @@ namespace service {
             !repo || cloneError != ProjectError::OK)
         {
             remove_all(clonePath);
-            co_return {std::nullopt, cloneError};
+            co_return {std::nullopt, cloneError, ""};
         }
 
         // Validate path
         const auto docsPath = clonePath / removeLeadingSlash(project.getValueOfSourcePath());
         if (!exists(docsPath)) {
             remove_all(clonePath);
-            co_return {std::nullopt, ProjectError::NO_PATH};
+            co_return {std::nullopt, ProjectError::NO_PATH, ""};
         }
 
         const ResolvedProject resolved{project, clonePath, docsPath};
 
         // Validate metadata
-        const auto [json, error] = resolved.validateProjectMetadata();
+        const auto [json, error, details] = resolved.validateProjectMetadata();
         if (error != ProjectError::OK) {
             remove_all(clonePath);
-            co_return {std::nullopt, error};
+            co_return {std::nullopt, error, details};
         }
 
         remove_all(clonePath);
-        co_return {*json, ProjectError::OK};
+        co_return {*json, ProjectError::OK, ""};
     }
 }

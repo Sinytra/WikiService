@@ -51,7 +51,7 @@ namespace service {
 
         std::optional<std::filesystem::path> getAsset(const ResourceLocation &location) const;
 
-        std::tuple<std::optional<nlohmann::json>, ProjectError> validateProjectMetadata() const;
+        std::tuple<std::optional<nlohmann::json>, ProjectError, std::string> validateProjectMetadata() const;
 
         const Project &getProject() const;
 

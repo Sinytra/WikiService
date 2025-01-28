@@ -70,7 +70,7 @@ std::optional<nlohmann::json> parseJsonFile(const std::filesystem::path &path) {
 std::string toCamelCase(std::string s) {
     char previous = ' ';
     auto f = [&](const char current) {
-        char result = (std::isblank(previous) && std::isalpha(current)) ? std::toupper(current) : std::tolower(current);
+        const char result = (std::isblank(previous) && std::isalpha(current)) ? std::toupper(current) : std::tolower(current);
         previous = current;
         return result;
     };

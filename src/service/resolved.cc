@@ -435,21 +435,21 @@ namespace service {
         return projectJson;
     }
 
-    std::tuple<std::optional<nlohmann::json>, ProjectError> ResolvedProject::validateProjectMetadata() const {
+    std::tuple<std::optional<nlohmann::json>, ProjectError, std::string> ResolvedProject::validateProjectMetadata() const {
         const auto path = docsDir_ / DOCS_META_FILE;
         if (!exists(path)) {
-            return {std::nullopt, ProjectError::NO_PATH};
+            return {std::nullopt, ProjectError::NO_PATH, ""};
         }
 
         const auto meta = parseJsonFile(path);
         if (!meta) {
-            return {std::nullopt, ProjectError::INVALID_META};
+            return {std::nullopt, ProjectError::INVALID_META, ""};
         }
 
         if (const auto error = validateJson(schemas::projectMetadata, *meta)) {
-            return {std::nullopt, ProjectError::INVALID_META};
+            return {std::nullopt, ProjectError::INVALID_META, error->msg};
         }
 
-        return {*meta, ProjectError::OK};
+        return {*meta, ProjectError::OK, ""};
     }
 }
