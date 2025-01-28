@@ -1,11 +1,9 @@
 #include "util.h"
 #include <log/log.h>
+#include <api/v1/error.h>
 
 #include <fstream>
 #include <ranges>
-#include <api/v1/error.h>
-#include <openssl/evp.h>
-#include <openssl/rand.h>
 
 using namespace drogon;
 using namespace logging;
@@ -187,63 +185,7 @@ Json::Value projectToJson(const drogon_model::postgres::Project &project) {
     return json;
 }
 
-struct OpenSSLFree {
-    void operator()(void* ptr) {
-        EVP_MD_CTX_free((EVP_MD_CTX*)ptr);
-    }
-};
-
-template <typename T>
-using OpenSSLPointer = std::unique_ptr<T, OpenSSLFree>;
-
-std::optional<std::string> computeHashInternal(const std::string& unhashed) {
-    const OpenSSLPointer<EVP_MD_CTX> context(EVP_MD_CTX_new());
-
-    if(!context.get()) {
-        return std::nullopt;
-    }
-
-    if(!EVP_DigestInit_ex(context.get(), EVP_sha256(), nullptr)) {
-        return std::nullopt;
-    }
-
-    if(!EVP_DigestUpdate(context.get(), unhashed.c_str(), unhashed.length())) {
-        return std::nullopt;
-    }
-
-    unsigned char hash[EVP_MAX_MD_SIZE];
-    unsigned int lengthOfHash = 0;
-
-    if(!EVP_DigestFinal_ex(context.get(), hash, &lengthOfHash)) {
-        return std::nullopt;
-    }
-
-    std::stringstream ss;
-    for(unsigned int i = 0; i < lengthOfHash; ++i)
-    {
-        ss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(hash[i]);
-    }
-
-    return ss.str();
-}
-
 std::string strToLower(std::string copy) {
     std::ranges::transform(copy, copy.begin(), [](const unsigned char c) { return std::tolower(c); });
     return copy;
-}
-
-std::string generateSecureRandomString(const size_t length) {
-    const size_t byteCount = (length + 1) / 2;
-    std::vector<unsigned char> buffer(byteCount);
-
-    if (RAND_bytes(buffer.data(), static_cast<int>(byteCount)) != 1) {
-        throw std::runtime_error("Error generating random bytes");
-    }
-
-    std::ostringstream oss;
-    for (const unsigned char byte: buffer) {
-        oss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(byte);
-    }
-
-    return oss.str();
 }

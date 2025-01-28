@@ -1,6 +1,8 @@
 #include "auth.h"
 
 #include <models/User.h>
+
+#include "crypto.h"
 #include "log/log.h"
 #include "util.h"
 
@@ -60,12 +62,17 @@ namespace service {
 
         co_await database_.createUserIfNotExists(normalUserName);
 
-        const auto sessionId = generateSecureRandomString(SESSION_ID_LEN);
+        const auto sessionId = crypto::generateSecureRandomString(SESSION_ID_LEN);
 
         const std::unordered_map<std::string, std::string> values = {{"username", normalUserName}, {"profile", profile}};
         co_await cache_.updateCacheHash(createSessionCacheKey(sessionId), values, 30 * 24h);
 
         co_return sessionId;
+    }
+
+    Task<std::optional<UserSession>> Auth::getSession(const HttpRequestPtr req) const {
+        const auto token = req->getParameter("token");
+        co_return co_await getSession(token);
     }
 
     Task<std::optional<UserSession>> Auth::getSession(const std::string id) const {
@@ -97,7 +104,7 @@ namespace service {
         root["avatar_url"] = (*profileJson)["avatar_url"].asString();
         root["modrinth_id"] = user->getModrinthId() ? user->getValueOfModrinthId() : Json::Value::null;
 
-        co_return UserSession{.username = *username, .user = *user, .profile = root};
+        co_return UserSession{ .sessionId = id, .username = *username, .user = *user, .profile = root};
     }
 
     Task<> Auth::expireSession(const std::string id) const { co_await cache_.erase(createSessionCacheKey(id)); }
@@ -141,5 +148,9 @@ namespace service {
         }
 
         co_return co_await database_.linkUserModrinthAccount(username, *modrinthId);
+    }
+
+    Task<Error> Auth::unlinkModrinthAccount(const std::string username) const {
+        co_return co_await database_.unlinkUserModrinthAccount(username);
     }
 }

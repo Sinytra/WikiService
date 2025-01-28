@@ -424,10 +424,11 @@ namespace service {
         const auto [defaultProject, error] = co_await findProject(project, std::nullopt, locale, true);
 
         if (defaultProject && version) {
-            const auto [vProject, vError] = co_await findProject(project, version, locale, false);
+            auto [vProject, vError] = co_await findProject(project, version, locale, false);
             if (!vProject && defaultProject->getAvailableVersions().contains(*version)) {
                 logger.error("Failed to find existing version '{}' for '{}'", *version, project.getValueOfId());
             }
+            vProject->setDefaultVersion(*defaultProject);
             co_return {vProject, vError};
         }
 

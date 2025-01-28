@@ -5,8 +5,8 @@
 #include "api/v1/auth.h"
 #include "api/v1/browse.h"
 #include "api/v1/docs.h"
-#include "api/v1/websocket.h"
 #include "api/v1/projects.h"
+#include "api/v1/websocket.h"
 #include "git2.h"
 #include "log/log.h"
 #include "service/github.h"
@@ -41,10 +41,12 @@ int main() {
             throw std::runtime_error("Invalid configuration");
         }
 
-        const std::string appUrl = customConfig["app_url"].asString();
-        const std::string appFrontendUrl = customConfig["frontend_url"].asString();
+        const std::string &appUrl = customConfig["app_url"].asString();
+        const std::string &appFrontendUrl = customConfig["frontend_url"].asString();
         const Json::Value &authConfig = customConfig["auth"];
-        const std::string authCallbackUrl = authConfig["callback_url"].asString();
+        const std::string &authCallbackUrl = authConfig["callback_url"].asString();
+        const std::string &authSettingsCallbackUrl = authConfig["settings_callback_url"].asString();
+        const std::string &authTokenSecret = authConfig["token_secret"].asString();
         const Json::Value &githubAppConfig = customConfig["github_app"];
         const std::string &appClientId = githubAppConfig["client_id"].asString();
         const std::string &appClientSecret = githubAppConfig["client_secret"].asString();
@@ -74,9 +76,10 @@ int main() {
         auto curseForge(CurseForgePlatform{curseForgeKey});
         auto platforms(Platforms(curseForge, modrinth));
 
-        auto auth(Auth{appUrl, { appClientId, appClientSecret }, {mrAppClientId, mrAppClientSecret}, database, cache, platforms});
+        auto auth(Auth{appUrl, {appClientId, appClientSecret}, {mrAppClientId, mrAppClientSecret}, database, cache, platforms});
 
-        auto authController(make_shared<api::v1::AuthController>(appFrontendUrl, authCallbackUrl, auth, github, cache, database));
+        auto authController(make_shared<api::v1::AuthController>(appFrontendUrl, authCallbackUrl, authSettingsCallbackUrl, authTokenSecret,
+                                                                 auth, github, cache, database));
         auto controller(make_shared<api::v1::DocsController>(database, storage));
         auto browseController(make_shared<api::v1::BrowseController>(database));
         auto projectsController(make_shared<api::v1::ProjectsController>(auth, platforms, database, storage, cloudflare));

@@ -3,6 +3,7 @@
 #include <log/log.h>
 #include <models/Project.h>
 #include <models/UserProject.h>
+#include <service/crypto.h>
 #include <service/schemas.h>
 #include <service/util.h>
 
@@ -78,7 +79,7 @@ namespace api::v1 {
             if (const auto verified = co_await platInstance.verifyProjectAccess(*platformProj, user, repo); !verified) {
                 simpleError(Error::ErrBadRequest, "ownership", callback, [&](Json::Value &root) {
                     root["details"] = "Platform: " + platform;
-                    root["can_verify_mr"] = platform == PLATFORM_MODRINTH;
+                    root["can_verify_mr"] = platform == PLATFORM_MODRINTH && !user.getModrinthId();
                 });
                 co_return std::nullopt;
             }
@@ -113,7 +114,7 @@ namespace api::v1 {
         const auto path = json["path"].asString();
 
         Project tempProject;
-        tempProject.setId("_temp-" + generateSecureRandomString(8));
+        tempProject.setId("_temp-" + crypto::generateSecureRandomString(8));
         tempProject.setSourceRepo(repo);
         tempProject.setSourceBranch(branch);
         tempProject.setSourcePath(path);
@@ -176,9 +177,8 @@ namespace api::v1 {
         callback(resp);
     }
 
-    Task<> ProjectsController::listUserProjects(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback,
-                                                const std::string token) const {
-        const auto session(co_await auth_.getSession(token));
+    Task<> ProjectsController::listUserProjects(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback) const {
+        const auto session(co_await auth_.getSession(req));
         if (!session) {
             simpleError(Error::ErrUnauthorized, "unauthorized", callback);
             co_return;
@@ -202,9 +202,8 @@ namespace api::v1 {
         co_return;
     }
 
-    Task<> ProjectsController::getProject(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string id,
-                                          std::string token) const {
-        const auto session(co_await auth_.getSession(token));
+    Task<> ProjectsController::getProject(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string id) const {
+        const auto session(co_await auth_.getSession(req));
         if (!session) {
             simpleError(Error::ErrUnauthorized, "unauthorized", callback);
             co_return;
@@ -230,9 +229,8 @@ namespace api::v1 {
         co_return;
     }
 
-    Task<> ProjectsController::getProjectLog(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string id,
-                                             std::string token) const {
-        const auto session(co_await auth_.getSession(token));
+    Task<> ProjectsController::getProjectLog(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string id) const {
+        const auto session(co_await auth_.getSession(req));
         if (!session) {
             simpleError(Error::ErrUnauthorized, "unauthorized", callback);
             co_return;
@@ -272,8 +270,8 @@ namespace api::v1 {
         callback(resp);
     }
 
-    Task<> ProjectsController::create(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string token) const {
-        const auto session(co_await auth_.getSession(token));
+    Task<> ProjectsController::create(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback) const {
+        const auto session(co_await auth_.getSession(req));
         if (!session) {
             co_return simpleError(Error::ErrUnauthorized, "unauthorized", callback);
         }
@@ -334,8 +332,8 @@ namespace api::v1 {
         reloadProject(*result);
     }
 
-    Task<> ProjectsController::update(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string token) const {
-        const auto session(co_await auth_.getSession(token));
+    Task<> ProjectsController::update(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback) const {
+        const auto session(co_await auth_.getSession(req));
         if (!session) {
             co_return simpleError(Error::ErrUnauthorized, "unauthorized", callback);
         }
@@ -373,9 +371,8 @@ namespace api::v1 {
         reloadProject(project);
     }
 
-    Task<> ProjectsController::remove(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, const std::string id,
-                                      const std::string token) const {
-        const auto session(co_await auth_.getSession(token));
+    Task<> ProjectsController::remove(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, const std::string id) const {
+        const auto session(co_await auth_.getSession(req));
         if (!session) {
             simpleError(Error::ErrUnauthorized, "unauthorized", callback);
             co_return;
@@ -403,9 +400,8 @@ namespace api::v1 {
         co_return;
     }
 
-    Task<> ProjectsController::invalidate(HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
-                                          const std::string id, const std::string token) const {
-        const auto session(co_await auth_.getSession(token));
+    Task<> ProjectsController::invalidate(HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback, const std::string id) const {
+        const auto session(co_await auth_.getSession(req));
         if (!session) {
             simpleError(Error::ErrUnauthorized, "unauthorized", callback);
             co_return;

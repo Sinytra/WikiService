@@ -21,7 +21,7 @@ namespace api::v1 {
 
     Task<std::optional<ResolvedProject>> DocsController::getProject(const std::string &project, const std::optional<std::string> &version,
                                                                     const std::optional<std::string> &locale,
-                                                                    std::function<void(const HttpResponsePtr &)> callback) const {
+                                                                    const std::function<void(const HttpResponsePtr &)> callback) const {
         if (project.empty()) {
             errorResponse(Error::ErrBadRequest, "Missing project parameter", callback);
             co_return std::nullopt;
@@ -109,7 +109,8 @@ namespace api::v1 {
         co_return;
     }
 
-    Task<> DocsController::tree(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string project) const {
+    Task<> DocsController::tree(HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+                                const std::string project) const {
         try {
             const auto resolved = co_await getProject(project, req->getOptionalParameter<std::string>("version"),
                                                       req->getOptionalParameter<std::string>("locale"), callback);

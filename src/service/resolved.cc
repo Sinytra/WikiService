@@ -278,27 +278,6 @@ nlohmann::ordered_json getDirTreeJson(const Project &project, const fs::path &ro
     return root;
 }
 
-std::tuple<std::unordered_map<std::string, std::string>, Error> getAvailableDocsVersions(const Project &project, const fs::path &root) {
-    const auto defaultBranch = project.getValueOfSourceBranch();
-    const auto metaFilePath = root / removeLeadingSlash(project.getValueOfSourcePath()) / DOCS_META_FILE;
-
-    std::unordered_map<std::string, std::string> versions;
-
-    if (const auto jf = parseJsonFile(metaFilePath)) {
-        if (jf->contains("versions") && (*jf)["versions"].is_object()) {
-            for (const auto &[key, val]: (*jf)["versions"].items()) {
-                if (val.is_string() && val.get<std::string>() != defaultBranch) {
-                    versions[key] = val;
-                }
-            }
-        }
-    } else {
-        return {versions, Error::ErrBadRequest};
-    }
-
-    return {versions, Error::Ok};
-}
-
 namespace service {
     std::string projectErrorToString(const ProjectError status) {
         switch (status) {
@@ -320,7 +299,11 @@ namespace service {
     }
 
     ResolvedProject::ResolvedProject(const Project &p, const std::filesystem::path &r, const std::filesystem::path &d) :
-        project_(p), rootDir_(r), docsDir_(d) {}
+        project_(p), defaultVersion_(nullptr), rootDir_(r), docsDir_(d) {}
+
+    void ResolvedProject::setDefaultVersion(const ResolvedProject &defaultVersion) {
+        defaultVersion_ = std::make_shared<ResolvedProject>(defaultVersion);
+    }
 
     bool ResolvedProject::setLocale(const std::optional<std::string> &locale) {
         if (!locale || hasLocale(*locale)) {
@@ -356,7 +339,24 @@ namespace service {
     }
 
     std::unordered_map<std::string, std::string> ResolvedProject::getAvailableVersions() const {
-        const auto [versions, error] = getAvailableDocsVersions(project_, rootDir_);
+        if (defaultVersion_) {
+            return defaultVersion_->getAvailableVersions();
+        }
+
+        const auto defaultBranch = project_.getValueOfSourceBranch();
+        const auto metaFilePath = rootDir_ / removeLeadingSlash(project_.getValueOfSourcePath()) / DOCS_META_FILE;
+
+        std::unordered_map<std::string, std::string> versions;
+
+        if (const auto jf = parseJsonFile(metaFilePath)) {
+            if (jf->contains("versions") && (*jf)["versions"].is_object()) {
+                for (const auto &[key, val]: (*jf)["versions"].items()) {
+                    if (val.is_string() && val.get<std::string>() != defaultBranch) {
+                        versions[key] = val;
+                    }
+                }
+            }
+        }
 
         return versions;
     }

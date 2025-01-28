@@ -36,7 +36,11 @@ namespace service {
         drogon::Task<bool> existsForData(std::string id, nlohmann::json platforms) const;
 
         drogon::Task<Error> createUserIfNotExists(std::string username) const;
+        drogon::Task<Error> deleteUserProjects(std::string username) const;
+        drogon::Task<Error> deleteUser(std::string username) const;
+
         drogon::Task<Error> linkUserModrinthAccount(std::string username, std::string mrAccountId) const;
+        drogon::Task<Error> unlinkUserModrinthAccount(std::string username) const;
         drogon::Task<std::optional<User>> getUser(std::string username) const;
         drogon::Task<std::vector<Project>> getUserProjects(std::string username) const;
         drogon::Task<std::optional<Project>> getUserProject(std::string username, std::string id) const;

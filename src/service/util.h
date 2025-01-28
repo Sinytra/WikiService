@@ -72,5 +72,3 @@ std::optional<JsonValidationError> validateJson(const nlohmann::json &schema, co
 Json::Value projectToJson(const drogon_model::postgres::Project &project);
 
 std::string strToLower(std::string copy);
-
-std::string generateSecureRandomString(size_t length);

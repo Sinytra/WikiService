@@ -4,7 +4,7 @@
 
 using namespace drogon;
 
-class AuthFilter : public HttpFilter<AuthFilter> {
+class AuthFilter final : public HttpFilter<AuthFilter> {
 public:
     AuthFilter() = default;
 

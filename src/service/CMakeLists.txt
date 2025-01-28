@@ -2,6 +2,7 @@ add_library(service STATIC
         auth.cc
         cache.cc
         cloudflare.cc
+        crypto.cc
         database.cc
         github.cc
         platforms.cc

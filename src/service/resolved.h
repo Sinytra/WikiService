@@ -35,6 +35,8 @@ namespace service {
     public:
         explicit ResolvedProject(const Project &, const std::filesystem::path &, const std::filesystem::path &);
 
+        void setDefaultVersion(const ResolvedProject &defaultVersion);
+
         bool setLocale(const std::optional<std::string> &locale);
 
         bool hasLocale(const std::string &locale) const;
@@ -56,6 +58,7 @@ namespace service {
         Json::Value toJson() const;
     private:
         Project project_;
+        std::shared_ptr<ResolvedProject> defaultVersion_;
 
         std::filesystem::path rootDir_;
         std::filesystem::path docsDir_;
