@@ -32,27 +32,39 @@
       "log_path": "./logs",
       "log_size_limit": 100000000,
       "max_files": 10,
-      "log_level": "DEBUG"
+      "log_level": "DEBUG",
       "display_local_time": false
     }
   },
   "custom_config": {
+    "app_url": "",
+    "frontend_url": "",
+    "auth": {
+      "callback_url": "",
+      "settings_callback_url": "",
+      "error_callback_url": "",
+      "token_secret": ""
+    },
     "github_app": {
       "name": "",
       "client_id": "",
-      "private_key_path": ""
+      "client_secret": ""
+    },
+    "github_app_old": {
+      "name": "",
+      "client_id": ""
     },
     "modrinth_app": {
       "client_id": "",
-      "client_secret": "",
-      "redirect_url": ""
+      "client_secret": ""
     },
     "cloudflare": {
-        "token": "",
-        "account_tag": "",
-        "site_tag": ""
+      "token": "",
+      "account_tag": "",
+      "site_tag": ""
     },
     "curseforge_key": "",
-    "storage_path": ""
+    "storage_path": "",
+    "api_key": ""
   }
 }

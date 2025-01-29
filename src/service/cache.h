@@ -8,7 +8,6 @@
 #include <set>
 #include <shared_mutex>
 #include <string>
-#include <vector>
 #include "log/log.h"
 
 namespace service {
@@ -30,15 +29,14 @@ namespace service {
     public:
         MemoryCache();
 
-        drogon::Task<bool> exists(std::string key) const;
         drogon::Task<std::optional<std::string>> getFromCache(std::string key) const;
-        drogon::Task<bool> isSetMember(std::string key, std::string value) const;
-        drogon::Task<std::set<std::string>> getSetMembers(std::string key) const;
+
+        drogon::Task<std::optional<std::string>> getHashMember(std::string key, std::string value) const;
+
         drogon::Task<> updateCache(std::string key, std::string value, std::chrono::duration<long> expire) const;
-        drogon::Task<> updateCacheSet(std::string key, std::vector<std::string> value, std::chrono::duration<long> expire) const;
+        drogon::Task<> updateCacheHash(std::string key, std::unordered_map<std::string, std::string> values, std::chrono::duration<long> expire) const;
+
         drogon::Task<> erase(std::string key) const;
-        drogon::Task<> erase(std::vector<std::string> keys) const;
-        drogon::Task<> eraseNamespace(std::string key) const;
     };
 
     class CacheableServiceBase {

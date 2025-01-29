@@ -37,8 +37,6 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
         api
         Drogon::Drogon
         spdlog::spdlog
-        jwt-cpp
-        base64
         nlohmann_json_schema_validator
         libgit2
         libgit2package

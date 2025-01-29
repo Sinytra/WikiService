@@ -220,8 +220,7 @@ namespace service {
         pending_.erase(project);
     }
 
-    Storage::Storage(const std::string &p, MemoryCache &c, Documentation &d, RealtimeConnectionStorage &cn) :
-        basePath_(p), cache_(c), documentation_(d), connections_(cn) {
+    Storage::Storage(const std::string &p, MemoryCache &c, RealtimeConnectionStorage &cn) : basePath_(p), cache_(c), connections_(cn) {
         // Verify base path
         getBaseDir();
     }
@@ -247,9 +246,8 @@ namespace service {
         return targetPath;
     }
 
-    std::shared_ptr<spdlog::logger> Storage::getProjectLogger(const Project &project) const {
+    std::shared_ptr<spdlog::logger> Storage::getProjectLogger(const Project &project, bool file) const {
         const auto id = project.getValueOfId();
-        const auto file = getProjectLogPath(project);
 
         std::vector<spdlog::sink_ptr> sinks;
 
@@ -263,9 +261,13 @@ namespace service {
         consoleSink->set_level(logger.level());
         sinks.push_back(consoleSink);
 
-        const auto fileSink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(absolute(file).string());
-        fileSink->set_pattern("[%^%L%$] [%Y-%m-%d %T] [%n] %v");
-        sinks.push_back(fileSink);
+        if (file) {
+            const auto filePath = getProjectLogPath(project);
+
+            const auto fileSink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(absolute(filePath).string());
+            fileSink->set_pattern("[%^%L%$] [%Y-%m-%d %T] [%n] %v");
+            sinks.push_back(fileSink);
+        }
 
         const auto projectLog = std::make_shared<spdlog::logger>(id, begin(sinks), end(sinks));
         projectLog->set_level(spdlog::level::trace);
@@ -273,11 +275,10 @@ namespace service {
         return projectLog;
     }
 
-    Task<std::tuple<git_repository *, Error>> gitCloneProject(const Project &project, const fs::path &projectPath,
-                                                              const std::string &branch, const std::string &installationToken,
-                                                              const std::shared_ptr<spdlog::logger> logger) {
+    Task<std::tuple<git_repository *, ProjectError>> gitCloneProject(const Project &project, const fs::path &projectPath,
+                                                              const std::string &branch, const std::shared_ptr<spdlog::logger> logger) {
         // TODO Support for non-github projects
-        const auto url = std::format("https://oauth2:{}@github.com/{}", installationToken, project.getValueOfSourceRepo());
+        const auto url = std::format("https://github.com/{}", project.getValueOfSourceRepo());
         const auto path = absolute(projectPath);
 
         logger->info("Cloning git repository");
@@ -299,20 +300,26 @@ namespace service {
             const git_error *e = git_error_last();
             logger->error("Git clone error: {}/{}: {}", error, e->klass, e->message);
 
-            if (error == GIT_ERROR_REFERENCE) {
+            git_repository_free(repo);
+
+            if (error == GIT_EAUTH) {
+                logger->error("Authentication required but none was provided", project.getValueOfSourceBranch());
+                co_return {nullptr, ProjectError::NO_REPOSITORY};
+            }
+            if (e->klass == GIT_ERROR_REFERENCE) {
                 logger->error("Docs branch '{}' does not exist!", project.getValueOfSourceBranch());
+                co_return {nullptr, ProjectError::NO_BRANCH};
             }
 
-            git_repository_free(repo);
-            co_return {nullptr, Error::ErrInternal};
+            co_return {nullptr, ProjectError::UNKNOWN};
         }
 
         logger->info("Git clone successful");
 
-        co_return {repo, Error::Ok};
+        co_return {repo, ProjectError::OK};
     }
 
-    Task<Error> Storage::setupProject(const Project &project, std::string installationToken) const {
+    Task<ProjectError> Storage::setupProject(const Project &project) const {
         const auto baseDir = getBaseDir();
         const auto clonePath = baseDir.path() / TEMP_DIR / project.getValueOfId();
         remove_all(clonePath);
@@ -324,9 +331,8 @@ namespace service {
 
         logger->info("Setting up project");
 
-        const auto [repo, cloneError] =
-            co_await gitCloneProject(project, clonePath, project.getValueOfSourceBranch(), installationToken, logger);
-        if (!repo || cloneError != Error::Ok) {
+        const auto [repo, cloneError] = co_await gitCloneProject(project, clonePath, project.getValueOfSourceBranch(), logger);
+        if (!repo || cloneError != ProjectError::OK) {
             co_return cloneError;
         }
 
@@ -365,18 +371,18 @@ namespace service {
 
         logger->info("Project setup complete");
 
-        co_return Error::Ok;
+        co_return ProjectError::OK;
     }
 
-    Task<Error> Storage::setupProjectCached(const Project &project, const std::string installationToken) {
+    Task<ProjectError> Storage::setupProjectCached(const Project &project) {
         const auto taskKey = createProjectSetupKey(project);
 
-        if (const auto pending = co_await getOrStartTask<Error>(taskKey)) {
+        if (const auto pending = co_await getOrStartTask<ProjectError>(taskKey)) {
             co_return co_await patientlyAwaitTaskResult(*pending);
         }
 
-        auto result = co_await setupProject(project, installationToken);
-        if (result == Error::Ok) {
+        auto result = co_await setupProject(project);
+        if (result == ProjectError::OK) {
             connections_.broadcast(project.getValueOfId(), WS_SUCCESS);
         } else {
             connections_.broadcast(project.getValueOfId(), WS_ERROR);
@@ -384,7 +390,7 @@ namespace service {
 
         connections_.shutdown(project.getValueOfId());
 
-        co_return co_await completeTask<Error>(taskKey, std::move(result));
+        co_return co_await completeTask<ProjectError>(taskKey, std::move(result));
     }
 
     Task<std::tuple<std::optional<ResolvedProject>, Error>> Storage::findProject(const Project &project,
@@ -399,15 +405,9 @@ namespace service {
                 co_return {std::nullopt, Error::ErrNotFound};
             }
 
-            const auto [installationToken, err] = co_await documentation_.getIntallationToken(project);
-            if (err != Error::Ok) {
-                logger.error("Failed to get installation token for project '{}'", project.getValueOfId());
-                co_return {std::nullopt, err};
-            }
-
-            if (const auto res = co_await setupProjectCached(project, installationToken); res != Error::Ok) {
+            if (const auto res = co_await setupProjectCached(project); res != ProjectError::OK) {
                 logger.error("Failed to setup project '{}'", project.getValueOfId());
-                co_return {std::nullopt, res};
+                co_return {std::nullopt, Error::ErrInternal};
             }
         }
 
@@ -424,33 +424,15 @@ namespace service {
         const auto [defaultProject, error] = co_await findProject(project, std::nullopt, locale, true);
 
         if (defaultProject && version) {
-            const auto [vProject, vError] = co_await findProject(project, version, locale, false);
+            auto [vProject, vError] = co_await findProject(project, version, locale, false);
             if (!vProject && defaultProject->getAvailableVersions().contains(*version)) {
                 logger.error("Failed to find existing version '{}' for '{}'", *version, project.getValueOfId());
             }
+            vProject->setDefaultVersion(*defaultProject);
             co_return {vProject, vError};
         }
 
         co_return {defaultProject, error};
-    }
-
-    Task<std::tuple<std::vector<std::string>, Error>> Storage::getRepositoryBranches(const Project &project) const {
-        const auto repoPath = getProjectDirPath(project);
-        std::vector<std::string> repoBranches;
-
-        git_repository *repo = nullptr;
-        if (git_repository_open(&repo, repoPath.c_str()) != 0) {
-            logger.error("Failed to open repository: {}", repoPath.string());
-            co_return {repoBranches, Error::ErrInternal};
-        }
-
-        for (const auto branches = listRepoBranches(repo); const auto &key: branches | std::views::keys) {
-            repoBranches.emplace_back(key);
-        }
-
-        git_repository_free(repo);
-
-        co_return {repoBranches, Error::Ok};
     }
 
     Task<Error> Storage::invalidateProject(const Project &project) {
@@ -475,7 +457,7 @@ namespace service {
     Task<ProjectStatus> Storage::getProjectStatus(const Project &project) {
         const auto taskKey = createProjectSetupKey(project);
 
-        if (const auto pending = getPendingTask<Error>(taskKey)) {
+        if (const auto pending = getPendingTask<ProjectError>(taskKey)) {
             co_return LOADING;
         }
 
@@ -505,5 +487,40 @@ namespace service {
         file.close();
 
         return buffer.str();
+    }
+
+    Task<std::tuple<std::optional<nlohmann::json>, ProjectError, std::string>> Storage::setupValidateTempProject(const Project &project) const {
+        const auto baseDir = getBaseDir();
+        const auto clonePath = baseDir.path() / TEMP_DIR / project.getValueOfId();
+        remove_all(clonePath);
+
+        const auto logger = getProjectLogger(project, false);
+
+        // Clone project - validates repo and branch
+        if (const auto [repo, cloneError] = co_await gitCloneProject(project, clonePath, project.getValueOfSourceBranch(), logger);
+            !repo || cloneError != ProjectError::OK)
+        {
+            remove_all(clonePath);
+            co_return {std::nullopt, cloneError, ""};
+        }
+
+        // Validate path
+        const auto docsPath = clonePath / removeLeadingSlash(project.getValueOfSourcePath());
+        if (!exists(docsPath)) {
+            remove_all(clonePath);
+            co_return {std::nullopt, ProjectError::NO_PATH, ""};
+        }
+
+        const ResolvedProject resolved{project, clonePath, docsPath};
+
+        // Validate metadata
+        const auto [json, error, details] = resolved.validateProjectMetadata();
+        if (error != ProjectError::OK) {
+            remove_all(clonePath);
+            co_return {std::nullopt, error, details};
+        }
+
+        remove_all(clonePath);
+        co_return {*json, ProjectError::OK, ""};
     }
 }

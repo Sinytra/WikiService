@@ -1,22 +1,20 @@
 add_library(service STATIC
-        github.cc
-        util.cc
+        auth.cc
         cache.cc
-        database.cc
-        documentation.cc
-        platforms.cc
-        schemas.cc
         cloudflare.cc
-        storage.cc
+        crypto.cc
+        database.cc
+        github.cc
+        platforms.cc
         resolved.cc
-        users.cc
+        schemas.cc
+        storage.cc
+        util.cc
 )
 
 target_link_libraries(service PRIVATE
         log
         Drogon::Drogon
-        jwt-cpp
-        base64
         nlohmann_json_schema_validator
         libgit2
         libgit2package

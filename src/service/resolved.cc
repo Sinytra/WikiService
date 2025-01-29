@@ -195,7 +195,7 @@ FolderMetadata getFolderMetadata(const Project &project, const fs::path &path) {
     try {
         nlohmann::ordered_json parsed = nlohmann::ordered_json::parse(ifs);
         if (const auto error = validateJson(schemas::folderMetadata, parsed)) {
-            logger.error("Invalid folder metadata: Repo: {} Path: {} Error: {}", project.getValueOfSourceRepo(), path.string(), error->msg);
+            logger.error("Invalid folder metadata: Project: {} Path: {} Error: {}", project.getValueOfId(), path.string(), error->msg);
         } else {
             for (auto &[key, val]: parsed.items()) {
                 metadata.keys.push_back(key);
@@ -210,6 +210,7 @@ FolderMetadata getFolderMetadata(const Project &project, const fs::path &path) {
         ifs.close();
     } catch (const nlohmann::json::parse_error &e) {
         ifs.close();
+        logger.error("Error parsing folder metadata: Project '{}', path {}", project.getValueOfId(), path.string());
         logger.error("JSON parse error (getFolderMetadata): {}", e.what());
     }
     return metadata;
@@ -277,30 +278,32 @@ nlohmann::ordered_json getDirTreeJson(const Project &project, const fs::path &ro
     return root;
 }
 
-std::tuple<std::unordered_map<std::string, std::string>, Error> getAvailableDocsVersions(const Project &project, const fs::path &root) {
-    const auto defaultBranch = project.getValueOfSourceBranch();
-    const auto metaFilePath = root / removeLeadingSlash(project.getValueOfSourcePath()) / DOCS_META_FILE;
-
-    std::unordered_map<std::string, std::string> versions;
-
-    if (const auto jf = parseJsonFile(metaFilePath)) {
-        if (jf->contains("versions") && (*jf)["versions"].is_object()) {
-            for (const auto &[key, val]: (*jf)["versions"].items()) {
-                if (val.is_string() && val.get<std::string>() != defaultBranch) {
-                    versions[key] = val;
-                }
-            }
+namespace service {
+    std::string projectErrorToString(const ProjectError status) {
+        switch (status) {
+            case ProjectError::OK:
+                return "ok";
+            case ProjectError::REQUIRES_AUTH:
+                return "requires_auth";
+            case ProjectError::NO_REPOSITORY:
+                return "no_repository";
+            case ProjectError::NO_BRANCH:
+                return "no_branch";
+            case ProjectError::NO_PATH:
+                return "no_path";
+            case ProjectError::INVALID_META:
+                return "invalid_meta";
+            default:
+                return "unknown";
         }
-    } else {
-        return {versions, Error::ErrBadRequest};
     }
 
-    return {versions, Error::Ok};
-}
-
-namespace service {
     ResolvedProject::ResolvedProject(const Project &p, const std::filesystem::path &r, const std::filesystem::path &d) :
-        project_(p), rootDir_(r), docsDir_(d) {}
+        project_(p), defaultVersion_(nullptr), rootDir_(r), docsDir_(d) {}
+
+    void ResolvedProject::setDefaultVersion(const ResolvedProject &defaultVersion) {
+        defaultVersion_ = std::make_shared<ResolvedProject>(defaultVersion);
+    }
 
     bool ResolvedProject::setLocale(const std::optional<std::string> &locale) {
         if (!locale || hasLocale(*locale)) {
@@ -336,7 +339,24 @@ namespace service {
     }
 
     std::unordered_map<std::string, std::string> ResolvedProject::getAvailableVersions() const {
-        const auto [versions, error] = getAvailableDocsVersions(project_, rootDir_);
+        if (defaultVersion_) {
+            return defaultVersion_->getAvailableVersions();
+        }
+
+        const auto defaultBranch = project_.getValueOfSourceBranch();
+        const auto metaFilePath = rootDir_ / removeLeadingSlash(project_.getValueOfSourcePath()) / DOCS_META_FILE;
+
+        std::unordered_map<std::string, std::string> versions;
+
+        if (const auto jf = parseJsonFile(metaFilePath)) {
+            if (jf->contains("versions") && (*jf)["versions"].is_object()) {
+                for (const auto &[key, val]: (*jf)["versions"].items()) {
+                    if (val.is_string() && val.get<std::string>() != defaultBranch) {
+                        versions[key] = val;
+                    }
+                }
+            }
+        }
 
         return versions;
     }
@@ -369,26 +389,32 @@ namespace service {
         return {tree, Error::Ok};
     }
 
-    std::optional<std::filesystem::path> ResolvedProject::getAsset(const ResourceLocation &location) const {
-        const auto path =
-            ".assets/item/" + location.namespace_ + "/" + location.path_ + (location.path_.find('.') != std::string::npos ? "" : ".png");
-        const auto filePath = docsDir_ / path;
-        return exists(filePath) ? std::make_optional(filePath) : std::nullopt;
+    std::string getAssetPath(const ResourceLocation &location) {
+        return ".assets/" + location.namespace_ + "/" + location.path_ + (location.path_.find('.') != std::string::npos ? "" : ".png");
     }
 
-    std::optional<nlohmann::json> ResolvedProject::readProjectMetadata() const {
-        const auto path = rootDir_ / DOCS_META_FILE;
-        return parseJsonFile(path);
+    std::optional<std::filesystem::path> ResolvedProject::getAsset(const ResourceLocation &location) const {
+        if (const auto filePath = docsDir_ / getAssetPath(location); exists(filePath)) {
+            return filePath;
+        }
+
+        // Legacy asset path fallback
+        if (const auto legacyFilePath = docsDir_ / getAssetPath({.namespace_ = "item", .path_ = location.namespace_ + '/' + location.path_});
+            exists(legacyFilePath))
+        {
+            return legacyFilePath;
+        }
+
+        return std::nullopt;
     }
 
     const Project &ResolvedProject::getProject() const { return project_; }
 
-    Json::Value ResolvedProject::toJson(const bool isPublic) const {
+    Json::Value ResolvedProject::toJson() const {
         const auto versions = getAvailableVersions();
         const auto locales = getLocales();
 
         Json::Value projectJson = projectToJson(project_);
-        projectJson["is_public"] = isPublic;
 
         if (!versions.empty()) {
             Json::Value versionsJson;
@@ -407,5 +433,23 @@ namespace service {
         }
 
         return projectJson;
+    }
+
+    std::tuple<std::optional<nlohmann::json>, ProjectError, std::string> ResolvedProject::validateProjectMetadata() const {
+        const auto path = docsDir_ / DOCS_META_FILE;
+        if (!exists(path)) {
+            return {std::nullopt, ProjectError::NO_PATH, ""};
+        }
+
+        const auto meta = parseJsonFile(path);
+        if (!meta) {
+            return {std::nullopt, ProjectError::INVALID_META, ""};
+        }
+
+        if (const auto error = validateJson(schemas::projectMetadata, *meta)) {
+            return {std::nullopt, ProjectError::INVALID_META, error->msg};
+        }
+
+        return {*meta, ProjectError::OK, ""};
     }
 }

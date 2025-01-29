@@ -9,8 +9,7 @@ nlohmann::json schemas::projectRegister = R"(
         "repo": { "type": "string" },
         "branch": { "type": "string" },
         "path": { "type": "string" },
-        "is_community": { "type": "boolean" },
-        "mr_code": { "type": "string" }
+        "is_community": { "type": "boolean" }
     },
     "required": ["repo", "branch", "path"]
 }
@@ -114,18 +113,6 @@ nlohmann::json schemas::folderMetadata = R"(
 }
 )"_json;
 
-nlohmann::json schemas::repositoryMigration = R"(
-{
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "title": "Repository migration",
-    "type": "object",
-    "properties": {
-        "repo": { "type": "string" }
-    },
-    "required": ["repo"]
-}
-)"_json;
-
 nlohmann::json schemas::systemConfig = R"(
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -136,10 +123,9 @@ nlohmann::json schemas::systemConfig = R"(
             "type": "object",
             "properties": {
                 "name": { "type": "string" },
-                "client_id": { "type": "string" },
-                "private_key_path": { "type": "string"}
+                "client_id": { "type": "string" }
             },
-            "required": ["name", "client_id", "private_key_path"]
+            "required": ["name", "client_id"]
         },
         "modrinth_app": {
             "type": "object",

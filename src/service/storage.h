@@ -1,7 +1,6 @@
 #pragma once
 
 #include "cache.h"
-#include "documentation.h"
 #include "error.h"
 #include "models/Project.h"
 #include "resolved.h"
@@ -18,7 +17,6 @@ namespace service {
         LOADED,
         ERROR
     };
-
     std::string projectStatusToString(ProjectStatus status);
 
     class RealtimeConnectionStorage {
@@ -38,11 +36,9 @@ namespace service {
 
     class Storage : public CacheableServiceBase {
     public:
-        explicit Storage(const std::string &, MemoryCache &, Documentation &, RealtimeConnectionStorage &);
+        explicit Storage(const std::string &, MemoryCache &, RealtimeConnectionStorage &);
 
         drogon::Task<std::tuple<std::optional<ResolvedProject>, Error>> getProject(const Project &project, const std::optional<std::string> &version, const std::optional<std::string> &locale);
-
-        drogon::Task<std::tuple<std::vector<std::string>, Error>> getRepositoryBranches(const Project &project) const;
 
         drogon::Task<Error> invalidateProject(const Project &project);
 
@@ -51,18 +47,19 @@ namespace service {
         drogon::Task<ProjectStatus> getProjectStatus(const Project &project);
 
         std::optional<std::string> getProjectLog(const Project &project) const;
+
+        drogon::Task<std::tuple<std::optional<nlohmann::json>, ProjectError, std::string>> setupValidateTempProject(const Project &project) const;
     private:
-        drogon::Task<Error> setupProject(const Project &project, std::string installationToken) const;
-        drogon::Task<Error> setupProjectCached(const Project &project, std::string installationToken);
+        drogon::Task<ProjectError> setupProject(const Project &project) const;
+        drogon::Task<ProjectError> setupProjectCached(const Project &project);
         std::filesystem::directory_entry getBaseDir() const;
         std::filesystem::path getProjectLogPath(const Project &project) const;
         std::filesystem::path getProjectDirPath(const Project &project, const std::string &version) const;
         drogon::Task<std::tuple<std::optional<ResolvedProject>, Error>> findProject(const Project &project, const std::optional<std::string> &version, const std::optional<std::string> &locale, bool setup);
-        std::shared_ptr<spdlog::logger> getProjectLogger(const Project &project) const;
+        std::shared_ptr<spdlog::logger> getProjectLogger(const Project &project, bool file = true) const;
 
         const std::string &basePath_;
         MemoryCache &cache_;
-        Documentation &documentation_;
         RealtimeConnectionStorage &connections_;
     };
 }

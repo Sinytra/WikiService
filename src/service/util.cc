@@ -1,15 +1,12 @@
 #include "util.h"
 #include <log/log.h>
+#include <api/v1/error.h>
 
 #include <fstream>
-#include <api/v1/error.h>
-#include <base64.hpp>
-#include <openssl/evp.h>
+#include <ranges>
 
 using namespace drogon;
 using namespace logging;
-
-std::string removeTrailingSlash(const std::string &s) { return s.ends_with('/') ? s.substr(0, s.size() - 1) : s; }
 
 std::string removeLeadingSlash(const std::string &s) { return s.starts_with('/') ? s.substr(1) : s; }
 
@@ -23,7 +20,7 @@ std::optional<ResourceLocation> ResourceLocation::parse(const std::string &str) 
     return ResourceLocation{namespace_, path_};
 }
 
-void replace_all(std::string &s, std::string const &toReplace, std::string const &replaceWith) {
+void replaceAll(std::string &s, std::string const &toReplace, std::string const &replaceWith) {
     std::string buf;
     std::size_t pos = 0;
     std::size_t prevPos;
@@ -43,11 +40,6 @@ void replace_all(std::string &s, std::string const &toReplace, std::string const
 
     buf.append(s, prevPos, s.size() - prevPos);
     s.swap(buf);
-}
-
-std::string decodeBase64(std::string encoded) {
-    replace_all(encoded, "\n", "");
-    return base64::from_base64(encoded);
 }
 
 std::optional<Json::Value> parseJsonString(const std::string &str) {
@@ -78,7 +70,7 @@ std::optional<nlohmann::json> parseJsonFile(const std::filesystem::path &path) {
 std::string toCamelCase(std::string s) {
     char previous = ' ';
     auto f = [&](const char current) {
-        char result = (std::isblank(previous) && std::isalpha(current)) ? std::toupper(current) : std::tolower(current);
+        const char result = (std::isblank(previous) && std::isalpha(current)) ? std::toupper(current) : std::tolower(current);
         previous = current;
         return result;
     };
@@ -103,15 +95,6 @@ Task<std::tuple<std::optional<Json::Value>, Error>> sendAuthenticatedRequest(con
                                                                              const std::string path, const std::string token,
                                                                              const std::function<void(HttpRequestPtr &)> callback) {
     co_return co_await sendApiRequest(client, method, path, [&](HttpRequestPtr &req) {
-        req->addHeader("Authorization", "Bearer " + token);
-        callback(req);
-    });
-}
-
-Task<std::tuple<std::optional<std::pair<HttpResponsePtr, Json::Value>>, Error>>
-sendRawAuthenticatedRequest(const HttpClientPtr client, const HttpMethod method, const std::string path, const std::string token,
-                            const std::function<void(HttpRequestPtr &)> callback) {
-    co_return co_await sendRawApiRequest(client, method, path, [&](HttpRequestPtr &req) {
         req->addHeader("Authorization", "Bearer " + token);
         callback(req);
     });
@@ -156,11 +139,6 @@ sendRawApiRequest(const HttpClientPtr client, const HttpMethod method, std::stri
     }
 }
 
-bool hasMorePages(const HttpResponsePtr response) {
-    const auto link = response->getHeader("link");
-    return !link.empty() && link.find("rel=\"next\"") != std::string::npos;
-}
-
 nlohmann::json parkourJson(const Json::Value &json) {
     // Jump from one json library to the other. Parkour!
     const auto ser = serializeJsonString(json);
@@ -200,23 +178,6 @@ std::optional<JsonValidationError> validateJson(const nlohmann::json &schema, co
     }
 }
 
-HttpResponsePtr jsonResponse(const nlohmann::json &json) {
-    const auto resp = HttpResponse::newHttpResponse();
-    resp->setContentTypeCode(CT_APPLICATION_JSON);
-    resp->setBody(json.dump());
-    return resp;
-}
-
-std::string join(const std::vector<std::string> &lst, const std::string &delim) {
-    std::string ret;
-    for (const auto &s: lst) {
-        if (!ret.empty())
-            ret += delim;
-        ret += s;
-    }
-    return ret;
-}
-
 Json::Value projectToJson(const drogon_model::postgres::Project &project) {
     Json::Value json = project.toJson();
     json["platforms"] = parseJsonString(project.getValueOfPlatforms()).value_or(Json::Value());
@@ -224,50 +185,7 @@ Json::Value projectToJson(const drogon_model::postgres::Project &project) {
     return json;
 }
 
-struct OpenSSLFree {
-    void operator()(void* ptr) {
-        EVP_MD_CTX_free((EVP_MD_CTX*)ptr);
-    }
-};
-
-template <typename T>
-using OpenSSLPointer = std::unique_ptr<T, OpenSSLFree>;
-
-std::optional<std::string> computeHashInternal(const std::string& unhashed) {
-    const OpenSSLPointer<EVP_MD_CTX> context(EVP_MD_CTX_new());
-
-    if(!context.get()) {
-        return std::nullopt;
-    }
-
-    if(!EVP_DigestInit_ex(context.get(), EVP_sha256(), nullptr)) {
-        return std::nullopt;
-    }
-
-    if(!EVP_DigestUpdate(context.get(), unhashed.c_str(), unhashed.length())) {
-        return std::nullopt;
-    }
-
-    unsigned char hash[EVP_MAX_MD_SIZE];
-    unsigned int lengthOfHash = 0;
-
-    if(!EVP_DigestFinal_ex(context.get(), hash, &lengthOfHash)) {
-        return std::nullopt;
-    }
-
-    std::stringstream ss;
-    for(unsigned int i = 0; i < lengthOfHash; ++i)
-    {
-        ss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(hash[i]);
-    }
-
-    return ss.str();
-}
-
-std::string computeSHA256Hash(const std::string& unhashed) {
-    if (const auto result = computeHashInternal(unhashed)) {
-        return *result;
-    }
-    logger.critical("Failed to compute SHA256 hash");
-    throw std::runtime_error("Failed to compute SHA256 hash");
+std::string strToLower(std::string copy) {
+    std::ranges::transform(copy, copy.begin(), [](const unsigned char c) { return std::tolower(c); });
+    return copy;
 }

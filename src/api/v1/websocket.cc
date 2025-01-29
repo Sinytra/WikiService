@@ -16,8 +16,8 @@ using namespace drogon::orm;
 using namespace drogon_model::postgres;
 
 namespace api::v1 {
-    ProjectWebSocketController::ProjectWebSocketController(Database &d, Storage &s, RealtimeConnectionStorage &c, Users &u) :
-        database_(d), storage_(s), connections_(c), users_(u) {}
+    ProjectWebSocketController::ProjectWebSocketController(Database &d, Storage &s, RealtimeConnectionStorage &c, Auth &a) :
+        database_(d), storage_(s), connections_(c), auth_(a) {}
 
     void ProjectWebSocketController::handleNewMessage(const WebSocketConnectionPtr &wsConnPtr, std::string &&message,
                                                       const WebSocketMessageType &type) {}
@@ -37,20 +37,14 @@ namespace api::v1 {
 
         app().getLoop()->queueInLoop(async_func([&, projectId, token]() -> Task<> {
             // Handle unauthenticated user
-            const auto userInfo = co_await users_.getExistingUserInfo(token);
-            if (!userInfo) {
+            const auto session = co_await auth_.getSession(token);
+            if (!session) {
                 wsConnPtr->shutdown(CloseCode::kViolation);
             }
 
-            // Handle inaccessible / unknown project
-            if (!userInfo->projects.contains(projectId)) {
-                wsConnPtr->shutdown(CloseCode::kViolation);
-            }
-
-            // Handle unknown project
-            const auto [project, err](co_await database_.getProjectSource(projectId));
+            const auto project = co_await database_.getUserProject(session->username, projectId);
             if (!project) {
-                wsConnPtr->shutdown(CloseCode::kUnexpectedCondition);
+                wsConnPtr->shutdown(CloseCode::kViolation);
                 co_return;
             }
 

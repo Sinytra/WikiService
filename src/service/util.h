@@ -1,8 +1,7 @@
 #pragma once
 
-#define DOCS_META_FILE_PATH "/sinytra-wiki.json"
-
 #include "error.h"
+
 #include <drogon/HttpClient.h>
 #include <drogon/HttpTypes.h>
 #include <json/json.h>
@@ -27,9 +26,7 @@ struct JsonValidationError {
     const std::string msg;
 };
 
-void replace_all(std::string &s, std::string const &toReplace, std::string const &replaceWith);
-
-std::string decodeBase64(std::string encoded);
+void replaceAll(std::string &s, std::string const &toReplace, std::string const &replaceWith);
 
 std::optional<Json::Value> parseJsonString(const std::string &str);
 std::optional<nlohmann::json> parseJsonFile(const std::filesystem::path &path);
@@ -39,7 +36,6 @@ std::string serializeJsonString(const Json::Value &value);
 std::string toCamelCase(std::string s);
 
 std::string removeLeadingSlash(const std::string &s);
-std::string removeTrailingSlash(const std::string &s);
 
 bool isSuccess(const drogon::HttpStatusCode &code);
 
@@ -53,15 +49,9 @@ drogon::Task<std::tuple<std::optional<Json::Value>, Error>> sendApiRequest(
     drogon::HttpClientPtr client, drogon::HttpMethod method, std::string path,
     std::function<void(drogon::HttpRequestPtr &)> callback = [](drogon::HttpRequestPtr &) {});
 
-drogon::Task<std::tuple<std::optional<std::pair<drogon::HttpResponsePtr, Json::Value>>, Error>> sendRawAuthenticatedRequest(
-    drogon::HttpClientPtr client, drogon::HttpMethod method, std::string path, std::string token,
-    std::function<void(drogon::HttpRequestPtr &)> callback = [](drogon::HttpRequestPtr &) {});
-
 drogon::Task<std::tuple<std::optional<std::pair<drogon::HttpResponsePtr, Json::Value>>, Error>> sendRawApiRequest(
     drogon::HttpClientPtr client, drogon::HttpMethod method, std::string path,
     std::function<void(drogon::HttpRequestPtr &)> callback = [](drogon::HttpRequestPtr &) {});
-
-bool hasMorePages(drogon::HttpResponsePtr response);
 
 template <class T = nlohmann::json>
 std::optional<T> tryParseJson(const std::string_view json) {
@@ -79,10 +69,6 @@ std::optional<JsonValidationError> validateJson(const nlohmann::json &schema, co
 
 std::optional<JsonValidationError> validateJson(const nlohmann::json &schema, const nlohmann::json &json);
 
-drogon::HttpResponsePtr jsonResponse(const nlohmann::json &json);
-
-std::string join(const std::vector<std::string> &lst, const std::string &delim);
-
 Json::Value projectToJson(const drogon_model::postgres::Project &project);
 
-std::string computeSHA256Hash(const std::string& unhashed);
+std::string strToLower(std::string copy);

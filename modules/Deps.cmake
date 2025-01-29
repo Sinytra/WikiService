@@ -53,14 +53,6 @@ IF (WIN32 AND USE_LOCAL_DEPS)
 ENDIF()
 
 CPMAddPackage(
-        NAME jwt-cpp
-        GITHUB_REPOSITORY Thalhammer/jwt-cpp
-        GIT_TAG v0.7.0
-        OPTIONS
-        "JWT_BUILD_EXAMPLES OFF"
-)
-
-CPMAddPackage(
         NAME nlohmann_json_schema_validator
         GITHUB_REPOSITORY pboettch/json-schema-validator
         GIT_TAG 2.3.0
@@ -70,16 +62,6 @@ CPMAddPackage(
         "JSON_VALIDATOR_BUILD_TESTS OFF"
         "JSON_VALIDATOR_SHARED_LIBS OFF"
 )
-
-CPMAddPackage(
-        NAME base64
-        GITHUB_REPOSITORY tobiaslocker/base64
-        GIT_TAG "387b32f337b83d358ac1ffe574e596ba99c41d31"
-)
-if (base64_ADDED)
-    add_library(base64 INTERFACE)
-    target_include_directories(base64 INTERFACE ${base64_SOURCE_DIR}/include)
-endif()
 
 CPMAddPackage(
         NAME libgit2

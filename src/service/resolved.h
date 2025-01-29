@@ -20,9 +20,22 @@ namespace service {
         Json::Value platforms;
     };
 
+    enum class ProjectError {
+        OK,
+        REQUIRES_AUTH,
+        NO_REPOSITORY,
+        NO_BRANCH,
+        NO_PATH,
+        INVALID_META,
+        UNKNOWN
+    };
+    std::string projectErrorToString(ProjectError status);
+
     class ResolvedProject {
     public:
         explicit ResolvedProject(const Project &, const std::filesystem::path &, const std::filesystem::path &);
+
+        void setDefaultVersion(const ResolvedProject &defaultVersion);
 
         bool setLocale(const std::optional<std::string> &locale);
 
@@ -38,13 +51,14 @@ namespace service {
 
         std::optional<std::filesystem::path> getAsset(const ResourceLocation &location) const;
 
-        std::optional<nlohmann::json> readProjectMetadata() const;
+        std::tuple<std::optional<nlohmann::json>, ProjectError, std::string> validateProjectMetadata() const;
 
         const Project &getProject() const;
 
-        Json::Value toJson(bool isPublic) const;
+        Json::Value toJson() const;
     private:
         Project project_;
+        std::shared_ptr<ResolvedProject> defaultVersion_;
 
         std::filesystem::path rootDir_;
         std::filesystem::path docsDir_;

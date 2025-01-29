@@ -2,12 +2,12 @@
 
 #include <drogon/WebSocketController.h>
 #include <service/storage.h>
-#include <service/users.h>
+#include <service/auth.h>
 
 namespace api::v1 {
     class ProjectWebSocketController final : public drogon::WebSocketController<ProjectWebSocketController, false> {
     public:
-        explicit ProjectWebSocketController(Database &, Storage &, RealtimeConnectionStorage &, Users &);
+        explicit ProjectWebSocketController(Database &, Storage &, RealtimeConnectionStorage &, Auth &);
 
         void handleNewMessage(const drogon::WebSocketConnectionPtr&, std::string &&, const drogon::WebSocketMessageType &) override;
         void handleNewConnection(const drogon::HttpRequestPtr &, const drogon::WebSocketConnectionPtr&) override;
@@ -20,6 +20,6 @@ namespace api::v1 {
         Database &database_;
         Storage &storage_;
         RealtimeConnectionStorage &connections_;
-        Users &users_;
+        Auth &auth_;
     };
 }

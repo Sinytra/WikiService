@@ -9,5 +9,4 @@ namespace schemas {
     extern nlohmann::json projectUpdate;
     extern nlohmann::json projectMetadata;
     extern nlohmann::json folderMetadata;
-    extern nlohmann::json repositoryMigration;
 }
