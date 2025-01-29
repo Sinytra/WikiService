@@ -77,6 +77,7 @@ namespace api::v1 {
         cookie.setValue("");
         cookie.setPath("/");
         cookie.setMaxAge(0);
+        cookie.setDomain(appDomain_);
         resp->addCookie(cookie);
 
         callback(resp);
@@ -180,6 +181,7 @@ namespace api::v1 {
         cookie.setValue("");
         cookie.setPath("/");
         cookie.setMaxAge(0);
+        cookie.setDomain(appDomain_);
 
         const auto resp = HttpResponse::newHttpResponse();
         resp->setStatusCode(k200OK);
