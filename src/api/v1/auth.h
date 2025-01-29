@@ -50,5 +50,6 @@ namespace api::v1 {
         const std::string authSettingsCallbackUrl_;
         const std::string authErrorCallbackUrl_;
         const std::string tokenEncryptionKey_;
+        const std::string appDomain_;
     };
 }

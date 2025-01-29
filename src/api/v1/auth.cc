@@ -2,12 +2,11 @@
 
 #include <service/util.h>
 #include "log/log.h"
+#include "error.h"
+#include "include/uri.h"
 
-#include <fstream>
 #include <service/crypto.h>
 #include <string>
-
-#include "error.h"
 
 using namespace std;
 using namespace drogon;
@@ -20,7 +19,7 @@ namespace api::v1 {
     AuthController::AuthController(const std::string &fe, const std::string &cb, const std::string &cbs, const std::string &cbe,
                                    const std::string &tk, Auth &a, GitHub &gh, MemoryCache &c, Database &d) :
         auth_(a), github_(gh), database_(d), cache_(c), appFrontendUrl_(fe), authCallbackUrl_(cb), authSettingsCallbackUrl_(cbs),
-        authErrorCallbackUrl_(cbe), tokenEncryptionKey_(tk) {}
+        authErrorCallbackUrl_(cbe), tokenEncryptionKey_(tk), appDomain_(uri{appFrontendUrl_}.get_host()) {}
 
     Task<> AuthController::initLogin(HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
         const auto url = auth_.getGitHubOAuthInitURL();
@@ -55,6 +54,7 @@ namespace api::v1 {
             cookie.setSameSite(Cookie::SameSite::kStrict);
             cookie.setPath("/");
             cookie.setMaxAge(std::chrono::duration_cast<std::chrono::seconds>(30 * 24h).count());
+            cookie.setDomain(appDomain_);
             resp->addCookie(cookie);
 
             callback(resp);
@@ -77,6 +77,7 @@ namespace api::v1 {
         cookie.setValue("");
         cookie.setPath("/");
         cookie.setMaxAge(0);
+        cookie.setDomain(appDomain_);
         resp->addCookie(cookie);
 
         callback(resp);
@@ -180,6 +181,7 @@ namespace api::v1 {
         cookie.setValue("");
         cookie.setPath("/");
         cookie.setMaxAge(0);
+        cookie.setDomain(appDomain_);
 
         const auto resp = HttpResponse::newHttpResponse();
         resp->setStatusCode(k200OK);
