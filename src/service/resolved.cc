@@ -4,8 +4,11 @@
 
 #include <filesystem>
 #include <fstream>
+#include <unordered_map>
 
+#include <fmt/args.h>
 #include <git2.h>
+#include <include/uri.h>
 
 #define DOCS_META_FILE "sinytra-wiki.json"
 #define FOLDER_META_FILE "_meta.json"
@@ -16,6 +19,10 @@
 using namespace logging;
 using namespace drogon;
 namespace fs = std::filesystem;
+
+std::unordered_map<std::string, std::string> GIT_PROVIDERS = {
+    { "github.com", "blob/{branch}/{base}/{path}" }
+};
 
 std::string formatISOTime(git_time_t time, const int offset) {
     // time += offset * 60;
@@ -298,6 +305,24 @@ namespace service {
         }
     }
 
+    std::string formatEditUrl(const Project &project, const std::string &filePath) {
+        const uri parsed{project.getValueOfSourceRepo()};
+        const auto domain = parsed.get_host();
+
+        const auto provider = GIT_PROVIDERS.find(domain);
+        if (provider == GIT_PROVIDERS.end()) {
+            return "";
+        }
+
+        fmt::dynamic_format_arg_store<fmt::format_context> store;
+        store.push_back(fmt::arg("branch", project.getValueOfSourceBranch()));
+        store.push_back(fmt::arg("base", removeLeadingSlash(project.getValueOfSourcePath())));
+        store.push_back(fmt::arg("path", removeTrailingSlash(filePath)));
+        const std::string result = fmt::vformat(provider->second, store);
+
+        return removeTrailingSlash(project.getValueOfSourceRepo()) + "/" + result;
+    }
+
     ResolvedProject::ResolvedProject(const Project &p, const std::filesystem::path &r, const std::filesystem::path &d) :
         project_(p), defaultVersion_(nullptr), rootDir_(r), docsDir_(d) {}
 
@@ -376,10 +401,7 @@ namespace service {
         file.close();
 
         const auto updatedAt = getLastCommitDate(rootDir_, removeLeadingSlash(project_.getValueOfSourcePath()) + '/' + path).value_or("");
-
-        const auto editUrl =
-            std::format("https://github.com/{}/blob/{}/{}/{}", project_.getValueOfSourceRepo(), project_.getValueOfSourceBranch(),
-                        removeLeadingSlash(project_.getValueOfSourcePath()), removeLeadingSlash(path));
+        const auto editUrl = formatEditUrl(project_, path);
 
         return {{buffer.str(), editUrl, updatedAt}, Error::Ok};
     }

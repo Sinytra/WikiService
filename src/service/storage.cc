@@ -279,8 +279,7 @@ namespace service {
                                                                      const std::string &branch,
                                                                      const std::shared_ptr<spdlog::logger> logger,
                                                                      const bool shallowClone) {
-        // TODO Support for non-github projects
-        const auto url = std::format("https://github.com/{}", project.getValueOfSourceRepo());
+        const auto url = project.getValueOfSourceRepo();
         const auto path = absolute(projectPath);
 
         logger->info("Cloning git repository");

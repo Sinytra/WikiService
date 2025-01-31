@@ -1,5 +1,6 @@
 #include "projects.h"
 
+#include <include/uri.h>
 #include <log/log.h>
 #include <models/Project.h>
 #include <models/UserProject.h>
@@ -24,7 +25,7 @@ namespace api::v1 {
 
     Task<bool> isProjectPubliclyBrowseable(const std::string &repo) {
         try {
-            const auto client = createHttpClient("https://github.com");
+            const auto client = createHttpClient(repo);
             const auto httpReq = HttpRequest::newHttpRequest();
             httpReq->setMethod(Get);
             httpReq->setPath("/" + repo);

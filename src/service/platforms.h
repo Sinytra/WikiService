@@ -40,7 +40,7 @@ namespace service {
     public:
         virtual drogon::Task<std::optional<PlatformProject>> getProject(std::string slug) = 0;
 
-        virtual drogon::Task<bool> verifyProjectAccess(PlatformProject project, User user, std::string repo);
+        virtual drogon::Task<bool> verifyProjectAccess(PlatformProject project, User user, std::string repoUrl);
     };
 
     class ModrinthPlatform : public DistributionPlatform {

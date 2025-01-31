@@ -35,8 +35,8 @@ namespace service {
         throw std::runtime_error("Cannot stringify unknown project type");
     }
 
-    Task<bool> DistributionPlatform::verifyProjectAccess(const PlatformProject project, const User user, const std::string repo) {
-        if (const auto expected = "https://github.com/" + repo; !project.sourceUrl.empty() && project.sourceUrl.starts_with(expected)) {
+    Task<bool> DistributionPlatform::verifyProjectAccess(const PlatformProject project, const User user, const std::string repoUrl) {
+        if (!project.sourceUrl.empty() && project.sourceUrl.starts_with(repoUrl)) {
             co_return true;
         }
         co_return false;

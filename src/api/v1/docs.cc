@@ -90,7 +90,7 @@ namespace api::v1 {
             Json::Value root;
             root["project"] = resolved->toJson();
             root["content"] = page.content;
-            if (resolved->getProject().getValueOfIsPublic()) {
+            if (resolved->getProject().getValueOfIsPublic() && !page.editUrl.empty()) {
                 root["edit_url"] = page.editUrl;
             }
             if (!page.updatedAt.empty()) {

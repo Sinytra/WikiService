@@ -37,6 +37,8 @@ std::string toCamelCase(std::string s);
 
 std::string removeLeadingSlash(const std::string &s);
 
+std::string removeTrailingSlash(const std::string &s);
+
 bool isSuccess(const drogon::HttpStatusCode &code);
 
 drogon::HttpClientPtr createHttpClient(const std::string &url);
