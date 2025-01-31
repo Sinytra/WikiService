@@ -25,10 +25,11 @@ namespace api::v1 {
 
     Task<bool> isProjectPubliclyBrowseable(const std::string &repo) {
         try {
+            const uri repoUri(repo);
             const auto client = createHttpClient(repo);
             const auto httpReq = HttpRequest::newHttpRequest();
             httpReq->setMethod(Get);
-            httpReq->setPath("/" + repo);
+            httpReq->setPath("/" + repoUri.get_path());
             const auto response = co_await client->sendRequestCoro(httpReq);
             const auto status = response->getStatusCode();
             co_return status == k200OK;
@@ -128,6 +129,14 @@ namespace api::v1 {
         const auto branch = json["branch"].asString();
         const auto repo = json["repo"].asString();
         const auto path = json["path"].asString();
+
+        try {
+            const uri repoUri(repo);
+        } catch (const std::exception &e) {
+            logger.error("Invalid repository URL provided: {} Error: {}", repo, e.what());
+            simpleError(Error::ErrBadRequest, "no_repository", callback);
+            co_return std::nullopt;
+        }
 
         Project tempProject;
         tempProject.setId("_temp-" + crypto::generateSecureRandomString(8));
