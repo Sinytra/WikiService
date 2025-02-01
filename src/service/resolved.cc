@@ -445,6 +445,8 @@ namespace service {
 
     const Project &ResolvedProject::getProject() const { return project_; }
 
+    const std::filesystem::path &ResolvedProject::getDocsDirectoryPath() const { return docsDir_; }
+
     Json::Value ResolvedProject::toJson() const {
         const auto versions = getAvailableVersions();
         const auto locales = getLocales();

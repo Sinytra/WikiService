@@ -15,6 +15,8 @@ using namespace logging;
 using namespace service;
 
 struct ResourceLocation {
+    static constexpr std::string DEFAULT_NAMESPACE = "minecraft";
+
     const std::string namespace_;
     const std::string path_;
 

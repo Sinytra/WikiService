@@ -9,7 +9,12 @@
   "tables": [
     "project",
     "user_",
-    "user_project"
+    "user_project",
+    "item_id",
+    "item",
+    "recipe",
+    "recipe_ingredient_item",
+    "recipe_ingredient_tag"
   ],
   "relationships": {
     "enabled": true,

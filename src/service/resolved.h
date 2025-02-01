@@ -56,6 +56,8 @@ namespace service {
 
         const Project &getProject() const;
 
+        const std::filesystem::path &getDocsDirectoryPath() const;
+
         Json::Value toJson() const;
     private:
         Project project_;

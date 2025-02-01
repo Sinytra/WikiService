@@ -237,7 +237,8 @@ namespace service {
         pending_.erase(project);
     }
 
-    Storage::Storage(const std::string &p, MemoryCache &c, RealtimeConnectionStorage &cn) : basePath_(p), cache_(c), connections_(cn) {
+    Storage::Storage(const std::string &p, MemoryCache &c, RealtimeConnectionStorage &cn, content::Ingestor &in) :
+        basePath_(p), cache_(c), connections_(cn), ingestor_(in) {
         // Verify base path
         getBaseDir();
     }
@@ -275,7 +276,7 @@ namespace service {
 
         const auto consoleSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
         consoleSink->set_pattern("[%^%L%$] [%T %z] [thread %t] [%n] %v");
-        consoleSink->set_level(logger.level());
+        consoleSink->set_level(spdlog::level::trace);
         sinks.push_back(consoleSink);
 
         if (file) {
@@ -393,6 +394,10 @@ namespace service {
         git_repository_free(repo);
 
         logger->info("Project setup complete");
+
+        // TODO
+        ResolvedProject finalResolved{project, dest, dest / removeLeadingSlash(project.getValueOfSourcePath())};
+        co_await ingestor_.ingestGameContentData(finalResolved);
 
         co_return ProjectError::OK;
     }

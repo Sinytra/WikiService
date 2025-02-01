@@ -14,8 +14,11 @@ std::string removeTrailingSlash(const std::string &s) { return s.ends_with('/') 
 
 std::optional<ResourceLocation> ResourceLocation::parse(const std::string &str) {
     const auto delimeter = str.find(':');
-    if (delimeter == std::string::npos || delimeter == str.size() - 1) {
+    if (delimeter == str.size() - 1) {
         return std::nullopt;
+    }
+    if (delimeter == std::string::npos) {
+        return ResourceLocation{DEFAULT_NAMESPACE, str};
     }
     const auto namespace_ = str.substr(0, delimeter);
     const auto path_ = str.substr(delimeter + 1);

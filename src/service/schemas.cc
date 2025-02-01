@@ -35,3 +35,5 @@ nlohmann::json schemas::projectMetadata = R"(@PROJECT_META_SCHEMA@)"_json;
 nlohmann::json schemas::folderMetadata = R"(@FOLDER_META_SCHEMA@)"_json;
 
 nlohmann::json schemas::systemConfig = R"(@SYSTEM_CONFIG_SCHEMA@)"_json;
+
+nlohmann::json schemas::gameRecipe = R"(@GAME_RECIPE_SCHEMA@)"_json;
