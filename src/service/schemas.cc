@@ -1,6 +1,7 @@
+//ReSharper disable CppUseAuto
 #include "schemas.h"
 
-auto schemas::projectRegister = R"(
+nlohmann::json schemas::projectRegister = R"(
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "title": "Project registration",
@@ -15,7 +16,7 @@ auto schemas::projectRegister = R"(
 }
 )"_json;
 
-auto schemas::projectUpdate = R"(
+nlohmann::json schemas::projectUpdate = R"(
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "title": "Project update",
@@ -29,8 +30,8 @@ auto schemas::projectUpdate = R"(
 }
 )"_json;
 
-auto schemas::projectMetadata = R"(@PROJECT_META_SCHEMA@)"_json;
+nlohmann::json schemas::projectMetadata = R"(@PROJECT_META_SCHEMA@)"_json;
 
-auto schemas::folderMetadata = R"(@FOLDER_META_SCHEMA@)"_json;
+nlohmann::json schemas::folderMetadata = R"(@FOLDER_META_SCHEMA@)"_json;
 
-auto schemas::systemConfig = R"(@SYSTEM_CONFIG_SCHEMA@)"_json;
+nlohmann::json schemas::systemConfig = R"(@SYSTEM_CONFIG_SCHEMA@)"_json;
