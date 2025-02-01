@@ -447,7 +447,12 @@ namespace service {
         }
 
         if (const auto error = validateJson(schemas::projectMetadata, *meta)) {
-            return {std::nullopt, ProjectError::INVALID_META, error->msg};
+            auto field = error->pointer.to_string();
+            if (field.starts_with('/')) {
+                field = field.substr(1);
+            }
+            const auto detail = field + ": " + error->msg;
+            return {std::nullopt, ProjectError::INVALID_META, detail};
         }
 
         return {*meta, ProjectError::OK, ""};

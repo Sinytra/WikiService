@@ -276,7 +276,9 @@ namespace service {
     }
 
     Task<std::tuple<git_repository *, ProjectError>> gitCloneProject(const Project &project, const fs::path &projectPath,
-                                                              const std::string &branch, const std::shared_ptr<spdlog::logger> logger) {
+                                                                     const std::string &branch,
+                                                                     const std::shared_ptr<spdlog::logger> logger,
+                                                                     const bool shallowClone) {
         // TODO Support for non-github projects
         const auto url = std::format("https://github.com/{}", project.getValueOfSourceRepo());
         const auto path = absolute(projectPath);
@@ -291,7 +293,9 @@ namespace service {
         clone_opts.fetch_opts.callbacks.transfer_progress = fetch_progress;
         clone_opts.fetch_opts.callbacks.payload = &d;
         clone_opts.checkout_branch = branch.c_str();
-        // clone_opts.fetch_opts.depth = 1;
+        if (shallowClone) {
+            clone_opts.fetch_opts.depth = 1;
+        }
 
         git_repository *repo = nullptr;
         const int error = git_clone(&repo, url.c_str(), path.c_str(), &clone_opts);
@@ -331,7 +335,7 @@ namespace service {
 
         logger->info("Setting up project");
 
-        const auto [repo, cloneError] = co_await gitCloneProject(project, clonePath, project.getValueOfSourceBranch(), logger);
+        const auto [repo, cloneError] = co_await gitCloneProject(project, clonePath, project.getValueOfSourceBranch(), logger, false);
         if (!repo || cloneError != ProjectError::OK) {
             co_return cloneError;
         }
@@ -489,7 +493,8 @@ namespace service {
         return buffer.str();
     }
 
-    Task<std::tuple<std::optional<nlohmann::json>, ProjectError, std::string>> Storage::setupValidateTempProject(const Project &project) const {
+    Task<std::tuple<std::optional<nlohmann::json>, ProjectError, std::string>>
+    Storage::setupValidateTempProject(const Project &project) const {
         const auto baseDir = getBaseDir();
         const auto clonePath = baseDir.path() / TEMP_DIR / project.getValueOfId();
         remove_all(clonePath);
@@ -497,7 +502,7 @@ namespace service {
         const auto logger = getProjectLogger(project, false);
 
         // Clone project - validates repo and branch
-        if (const auto [repo, cloneError] = co_await gitCloneProject(project, clonePath, project.getValueOfSourceBranch(), logger);
+        if (const auto [repo, cloneError] = co_await gitCloneProject(project, clonePath, project.getValueOfSourceBranch(), logger, true);
             !repo || cloneError != ProjectError::OK)
         {
             remove_all(clonePath);
