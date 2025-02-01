@@ -14,6 +14,7 @@
 #include "service/schemas.h"
 #include "service/storage.h"
 #include "service/util.h"
+#include "service/content/game_content.h"
 
 using namespace std;
 using namespace drogon;
@@ -70,14 +71,12 @@ int main() {
         auto cache(MemoryCache{});
         auto github(GitHub{});
         auto connections(RealtimeConnectionStorage{});
-        auto storage(Storage{storageBasePath, cache, connections});
-
+        auto ingestor(content::Ingestor{database});
+        auto storage(Storage{storageBasePath, cache, connections, ingestor});
         auto cloudflare(CloudFlare{cloudFlareToken, cloudFlareAccTag, cloudFlareSiteTag, cache});
-
         auto modrinth(ModrinthPlatform{});
         auto curseForge(CurseForgePlatform{curseForgeKey});
         auto platforms(Platforms(curseForge, modrinth));
-
         auto auth(Auth{appUrl, {appClientId, appClientSecret}, {mrAppClientId, mrAppClientSecret}, database, cache, platforms, github});
 
         auto authController(make_shared<api::v1::AuthController>(appFrontendUrl, authCallbackUrl, authSettingsCallbackUrl,
