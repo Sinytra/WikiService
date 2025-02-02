@@ -294,6 +294,8 @@ namespace service {
                 return "requires_auth";
             case ProjectError::NO_REPOSITORY:
                 return "no_repository";
+            case ProjectError::REPO_TOO_LARGE:
+                return "repo_too_large";
             case ProjectError::NO_BRANCH:
                 return "no_branch";
             case ProjectError::NO_PATH:
