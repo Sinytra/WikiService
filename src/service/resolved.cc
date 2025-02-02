@@ -4,8 +4,11 @@
 
 #include <filesystem>
 #include <fstream>
+#include <unordered_map>
 
+#include <fmt/args.h>
 #include <git2.h>
+#include <include/uri.h>
 
 #define DOCS_META_FILE "sinytra-wiki.json"
 #define FOLDER_META_FILE "_meta.json"
@@ -16,6 +19,10 @@
 using namespace logging;
 using namespace drogon;
 namespace fs = std::filesystem;
+
+std::unordered_map<std::string, std::string> GIT_PROVIDERS = {
+    { "github.com", "blob/{branch}/{base}/{path}" }
+};
 
 std::string formatISOTime(git_time_t time, const int offset) {
     // time += offset * 60;
@@ -174,9 +181,9 @@ std::string getDocsTreeEntryName(std::string s) {
 std::string getDocsTreeEntryPath(const std::string &s) { return s.ends_with(DOCS_FILE_EXT) ? s.substr(0, s.size() - 4) : s; }
 
 fs::path getFolderMetaFilePath(const fs::path &rootDir, const fs::path &dir, const std::string &locale) {
-    const auto relativePath = relative(dir, rootDir);
-
     if (!locale.empty()) {
+        const auto relativePath = relative(dir, rootDir);
+
         if (const auto localeFile = rootDir / I18N_DIR_PATH / locale / relativePath / FOLDER_META_FILE; exists(localeFile)) {
             return localeFile;
         }
@@ -287,6 +294,8 @@ namespace service {
                 return "requires_auth";
             case ProjectError::NO_REPOSITORY:
                 return "no_repository";
+            case ProjectError::REPO_TOO_LARGE:
+                return "repo_too_large";
             case ProjectError::NO_BRANCH:
                 return "no_branch";
             case ProjectError::NO_PATH:
@@ -296,6 +305,24 @@ namespace service {
             default:
                 return "unknown";
         }
+    }
+
+    std::string formatEditUrl(const Project &project, const std::string &filePath) {
+        const uri parsed{project.getValueOfSourceRepo()};
+        const auto domain = parsed.get_host();
+
+        const auto provider = GIT_PROVIDERS.find(domain);
+        if (provider == GIT_PROVIDERS.end()) {
+            return "";
+        }
+
+        fmt::dynamic_format_arg_store<fmt::format_context> store;
+        store.push_back(fmt::arg("branch", project.getValueOfSourceBranch()));
+        store.push_back(fmt::arg("base", removeLeadingSlash(project.getValueOfSourcePath())));
+        store.push_back(fmt::arg("path", removeTrailingSlash(filePath)));
+        const std::string result = fmt::vformat(provider->second, store);
+
+        return removeTrailingSlash(project.getValueOfSourceRepo()) + "/" + result;
     }
 
     ResolvedProject::ResolvedProject(const Project &p, const std::filesystem::path &r, const std::filesystem::path &d) :
@@ -361,8 +388,19 @@ namespace service {
         return versions;
     }
 
+    fs::path getFilePath(const fs::path &rootDir, const std::string &path, const std::string &locale) {
+        if (!locale.empty()) {
+            const auto relativePath = relative(path, rootDir);
+
+            if (const auto localeFile = rootDir / I18N_DIR_PATH / locale / removeLeadingSlash(path); exists(localeFile)) {
+                return localeFile;
+            }
+        }
+        return rootDir / removeLeadingSlash(path);
+    }
+
     std::tuple<ProjectPage, Error> ResolvedProject::readFile(std::string path) const {
-        const auto filePath = docsDir_ / removeLeadingSlash(path);
+        const auto filePath = getFilePath(docsDir_, removeLeadingSlash(path), locale_);
 
         std::ifstream file(filePath);
 
@@ -376,10 +414,7 @@ namespace service {
         file.close();
 
         const auto updatedAt = getLastCommitDate(rootDir_, removeLeadingSlash(project_.getValueOfSourcePath()) + '/' + path).value_or("");
-
-        const auto editUrl =
-            std::format("https://github.com/{}/blob/{}/{}/{}", project_.getValueOfSourceRepo(), project_.getValueOfSourceBranch(),
-                        removeLeadingSlash(project_.getValueOfSourcePath()), removeLeadingSlash(path));
+        const auto editUrl = formatEditUrl(project_, path);
 
         return {{buffer.str(), editUrl, updatedAt}, Error::Ok};
     }

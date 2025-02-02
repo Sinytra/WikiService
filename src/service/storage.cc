@@ -11,6 +11,7 @@
 
 #define TEMP_DIR ".temp"
 #define LATEST_VERSION "latest"
+#define BYTE_RECEIVE_LIMIT 2.5e+8
 
 #define WS_SUCCESS "<<success"
 #define WS_ERROR "<<error"
@@ -23,18 +24,33 @@ const std::set<std::string> allowedFileExtensions = {".mdx", ".json", ".png", ".
 
 struct progress_data {
     size_t tick;
+    std::string error;
     std::shared_ptr<spdlog::logger> logger;
 };
 
 int fetch_progress(const git_indexer_progress *stats, void *payload) {
     const auto pd = static_cast<progress_data *>(payload);
-    if (const auto done = stats->received_objects == stats->total_objects; pd->tick != -1 && (done || pd->tick++ % 1000 == 0)) {
+
+    if (stats->received_bytes > BYTE_RECEIVE_LIMIT) {
+        if (pd->tick != -1) {
+            pd->tick = -1;
+            pd->error = "size";
+            pd->logger->error("Terminating fetch as it exceeded maximum size limit of 250MB");
+        }
+        return 1;
+    }
+
+    const auto progress = stats->received_objects / static_cast<double>(stats->total_objects) * 100;
+    const auto done = stats->received_objects == stats->total_objects;
+
+    if (const auto mark = static_cast<long>(progress); pd->tick != -1 && (done || mark % 5 == 0 && mark > pd->tick)) {
         if (done) {
             pd->tick = -1;
+        } else {
+            pd->tick = mark;
         }
 
-        const auto progress = stats->received_objects / static_cast<double>(stats->total_objects);
-        pd->logger->trace("Fetch progress: {0:.2f}%", progress * 100);
+        pd->logger->trace("Fetch progress: {0:.2f}%", progress);
     }
     return 0;
 }
@@ -94,6 +110,7 @@ Error copyProjectFiles(const Project &project, const fs::path &src, const fs::pa
 
             if (const auto extension = entry.path().extension().string(); !isGitSubdir && !allowedFileExtensions.contains(extension)) {
                 logger->warn("Ignoring file {}", relative_path.string());
+                continue;
             }
 
             if (fs::path destination_path = dest / relative_path.parent_path(); !exists(destination_path)) {
@@ -279,13 +296,12 @@ namespace service {
                                                                      const std::string &branch,
                                                                      const std::shared_ptr<spdlog::logger> logger,
                                                                      const bool shallowClone) {
-        // TODO Support for non-github projects
-        const auto url = std::format("https://github.com/{}", project.getValueOfSourceRepo());
+        const auto url = project.getValueOfSourceRepo();
         const auto path = absolute(projectPath);
 
-        logger->info("Cloning git repository");
+        logger->info("Cloning git repository at {}", url);
 
-        progress_data d = {.tick = 0, .logger = logger};
+        progress_data d = {.tick = 0, .error = "", .logger = logger};
         git_clone_options clone_opts = GIT_CLONE_OPTIONS_INIT;
         clone_opts.checkout_opts.checkout_strategy = GIT_CHECKOUT_SAFE;
         clone_opts.checkout_opts.progress_cb = checkout_progress;
@@ -313,6 +329,9 @@ namespace service {
             if (e->klass == GIT_ERROR_REFERENCE) {
                 logger->error("Docs branch '{}' does not exist!", project.getValueOfSourceBranch());
                 co_return {nullptr, ProjectError::NO_BRANCH};
+            }
+            if (d.error == "size") {
+                co_return {nullptr, ProjectError::REPO_TOO_LARGE};
             }
 
             co_return {nullptr, ProjectError::UNKNOWN};

@@ -24,6 +24,7 @@ namespace service {
         OK,
         REQUIRES_AUTH,
         NO_REPOSITORY,
+        REPO_TOO_LARGE,
         NO_BRANCH,
         NO_PATH,
         INVALID_META,

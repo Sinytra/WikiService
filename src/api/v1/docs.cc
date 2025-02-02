@@ -49,10 +49,7 @@ namespace api::v1 {
                 co_return;
             }
 
-            Json::Value root;
-            root["project"] = resolved->toJson();
-
-            const auto resp = HttpResponse::newHttpJsonResponse(root);
+            const auto resp = HttpResponse::newHttpJsonResponse(resolved->toJson());
             resp->setStatusCode(k200OK);
             callback(resp);
         } catch (const HttpException &err) {
@@ -66,7 +63,7 @@ namespace api::v1 {
 
     Task<> DocsController::page(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string project) const {
         try {
-            std::string prefix = std::format("/api/v1/project/{}/page/", project);
+            std::string prefix = std::format("/api/v1/docs/{}/page/", project);
             std::string path = req->getPath().substr(prefix.size());
 
             if (path.empty()) {
@@ -90,7 +87,7 @@ namespace api::v1 {
             Json::Value root;
             root["project"] = resolved->toJson();
             root["content"] = page.content;
-            if (resolved->getProject().getValueOfIsPublic()) {
+            if (resolved->getProject().getValueOfIsPublic() && !page.editUrl.empty()) {
                 root["edit_url"] = page.editUrl;
             }
             if (!page.updatedAt.empty()) {
@@ -147,7 +144,7 @@ namespace api::v1 {
                 co_return;
             }
 
-            std::string prefix = std::format("/api/v1/project/{}/asset/", project);
+            std::string prefix = std::format("/api/v1/docs/{}/asset", project);
             std::string location = req->getPath().substr(prefix.size());
 
             if (location.empty()) {

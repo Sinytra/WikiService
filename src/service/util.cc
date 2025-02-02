@@ -10,6 +10,8 @@ using namespace logging;
 
 std::string removeLeadingSlash(const std::string &s) { return s.starts_with('/') ? s.substr(1) : s; }
 
+std::string removeTrailingSlash(const std::string &s) { return s.ends_with('/') ? s.substr(0, s.size() - 1) : s; }
+
 std::optional<ResourceLocation> ResourceLocation::parse(const std::string &str) {
     const auto delimeter = str.find(':');
     if (delimeter == std::string::npos || delimeter == str.size() - 1) {

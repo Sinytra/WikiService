@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Modded MC Wiki System Configuration",
+  "type": "object",
+  "properties": {
+    "github_app": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "client_id": { "type": "string" }
+      },
+      "required": ["name", "client_id"]
+    },
+    "modrinth_app": {
+      "type": "object",
+      "properties": {
+        "client_id": { "type": "string" },
+        "client_secret": { "type": "string" },
+        "redirect_url": { "type": "string" }
+      }
+    },
+    "cloudflare": {
+      "type": "object",
+      "properties": {
+        "token": { "type": "string" },
+        "account_tag": { "type": "string" },
+        "site_tag": { "type": "string"}
+      },
+      "required": ["token", "account_tag", "site_tag"]
+    },
+    "curseforge_key": { "type": "string" },
+    "api_key": { "type": "string" }
+  },
+  "required": ["github_app"]
+}

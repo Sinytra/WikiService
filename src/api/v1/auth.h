@@ -12,19 +12,20 @@ namespace api::v1 {
         explicit AuthController(const std::string &, const std::string &, const std::string &, const std::string &, const std::string &,
                                 service::Auth &, service::GitHub &, service::MemoryCache &, service::Database &);
 
+        // clang-format off
         METHOD_LIST_BEGIN
-        ADD_METHOD_TO(AuthController::initLogin, "/api/v1/auth/login", drogon::Get);
-        ADD_METHOD_TO(AuthController::callbackGithub, "/api/v1/auth/callback/github?code={1:code}", drogon::Get);
-        ADD_METHOD_TO(AuthController::logout, "/api/v1/auth/logout", drogon::Get);
+        ADD_METHOD_TO(AuthController::initLogin,        "/api/v1/auth/login",                           drogon::Get);
+        ADD_METHOD_TO(AuthController::callbackGithub,   "/api/v1/auth/callback/github?code={1:code}",   drogon::Get);
+        ADD_METHOD_TO(AuthController::logout,           "/api/v1/auth/logout",                          drogon::Get);
 
-        ADD_METHOD_TO(AuthController::linkModrinth, "/api/v1/auth/link/modrinth", drogon::Get, "AuthFilter");
+        ADD_METHOD_TO(AuthController::linkModrinth,     "/api/v1/auth/link/modrinth",                                   drogon::Get,    "AuthFilter");
         ADD_METHOD_TO(AuthController::callbackModrinth, "/api/v1/auth/callback/modrinth?code={1:code}&state={2:state}", drogon::Get);
-        ADD_METHOD_TO(AuthController::unlinkModrinth, "/api/v1/auth/unlink/modrinth", drogon::Post, "AuthFilter");
+        ADD_METHOD_TO(AuthController::unlinkModrinth,   "/api/v1/auth/unlink/modrinth",                                 drogon::Post,   "AuthFilter");
 
-        ADD_METHOD_TO(AuthController::userProfile, "/api/v1/auth/user", drogon::Get, "AuthFilter");
-
-        ADD_METHOD_TO(AuthController::deleteAccount, "/api/v1/auth/user", drogon::Delete, "AuthFilter");
+        ADD_METHOD_TO(AuthController::userProfile,      "/api/v1/auth/user",    drogon::Get,    "AuthFilter");
+        ADD_METHOD_TO(AuthController::deleteAccount,    "/api/v1/auth/user",    drogon::Delete, "AuthFilter");
         METHOD_LIST_END
+        // clang-format on
 
         drogon::Task<> initLogin(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback) const;
         drogon::Task<> callbackGithub(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
