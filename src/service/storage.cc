@@ -110,6 +110,7 @@ Error copyProjectFiles(const Project &project, const fs::path &src, const fs::pa
 
             if (const auto extension = entry.path().extension().string(); !isGitSubdir && !allowedFileExtensions.contains(extension)) {
                 logger->warn("Ignoring file {}", relative_path.string());
+                continue;
             }
 
             if (fs::path destination_path = dest / relative_path.parent_path(); !exists(destination_path)) {

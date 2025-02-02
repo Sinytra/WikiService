@@ -181,9 +181,9 @@ std::string getDocsTreeEntryName(std::string s) {
 std::string getDocsTreeEntryPath(const std::string &s) { return s.ends_with(DOCS_FILE_EXT) ? s.substr(0, s.size() - 4) : s; }
 
 fs::path getFolderMetaFilePath(const fs::path &rootDir, const fs::path &dir, const std::string &locale) {
-    const auto relativePath = relative(dir, rootDir);
-
     if (!locale.empty()) {
+        const auto relativePath = relative(dir, rootDir);
+
         if (const auto localeFile = rootDir / I18N_DIR_PATH / locale / relativePath / FOLDER_META_FILE; exists(localeFile)) {
             return localeFile;
         }
@@ -388,8 +388,19 @@ namespace service {
         return versions;
     }
 
+    fs::path getFilePath(const fs::path &rootDir, const std::string &path, const std::string &locale) {
+        if (!locale.empty()) {
+            const auto relativePath = relative(path, rootDir);
+
+            if (const auto localeFile = rootDir / I18N_DIR_PATH / locale / removeLeadingSlash(path); exists(localeFile)) {
+                return localeFile;
+            }
+        }
+        return rootDir / removeLeadingSlash(path);
+    }
+
     std::tuple<ProjectPage, Error> ResolvedProject::readFile(std::string path) const {
-        const auto filePath = docsDir_ / removeLeadingSlash(path);
+        const auto filePath = getFilePath(docsDir_, removeLeadingSlash(path), locale_);
 
         std::ifstream file(filePath);
 
