@@ -32,7 +32,7 @@ Json::Value configureFromEnvironment() {
         db["name"] = "default";
         db["rdbms"] = "postgresql";
         db["host"] = std::getenv("DB_HOST");
-        db["port"] = std::getenv("DB_PORT");
+        db["port"] = stoi(std::getenv("DB_PORT"));
         db["dbname"] = std::getenv("DB_DATABASE");
         db["user"] = std::getenv("DB_USER");
         db["passwd"] = std::getenv("DB_PASSWORD");
@@ -46,7 +46,7 @@ Json::Value configureFromEnvironment() {
         Json::Value redis;
         redis["name"] = "default";
         redis["host"] = std::getenv("REDIS_HOST");
-        redis["port"] = std::getenv("REDIS_PORT");
+        redis["port"] = stoi(std::getenv("REDIS_PORT"));
         redis["username"] = std::getenv("REDIS_USER");
         redis["passwd"] = std::getenv("REDIS_PASSWORD");
         redis["db"] = 0;
