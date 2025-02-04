@@ -38,6 +38,7 @@ Json::Value configureFromEnvironment() {
         db["passwd"] = std::getenv("DB_PASSWORD");
         db["is_fast"] = true;
         db["connection_number"] = 1;
+        db["timeout"] = 20;
 
         root["db_clients"] = Json::Value(Json::arrayValue);
         root["db_clients"].append(db);
@@ -52,6 +53,7 @@ Json::Value configureFromEnvironment() {
         redis["db"] = 0;
         redis["is_fast"] = true;
         redis["number_of_connections"] = 1;
+        redis["timeout"] = 20;
 
         root["redis_clients"] = Json::Value(Json::arrayValue);
         root["redis_clients"].append(redis);
