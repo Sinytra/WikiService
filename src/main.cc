@@ -87,7 +87,7 @@ Json::Value configureFromEnvironment() {
         github["name"] = std::getenv("GITHUB_APP_NAME");
         github["client_id"] = std::getenv("GITHUB_CLIENT_ID");
         github["client_secret"] = std::getenv("GITHUB_CLIENT_SECRET");
-        custom["github"] = github;
+        custom["github_app"] = github;
     }
     {
         Json::Value modrinth;
