@@ -239,6 +239,9 @@ namespace service {
 
     Storage::Storage(const std::string &p, MemoryCache &c, RealtimeConnectionStorage &cn, content::Ingestor &in) :
         basePath_(p), cache_(c), connections_(cn), ingestor_(in) {
+        if (!fs::exists(basePath_)) {
+            fs::create_directories(basePath_);
+        }
         // Verify base path
         getBaseDir();
     }
