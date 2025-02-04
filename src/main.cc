@@ -24,18 +24,108 @@ namespace service {
     trantor::EventLoopThreadPool cacheAwaiterThreadPool{1};
 }
 
+Json::Value configureFromEnvironment() {
+    logger.info("Loading configuration from environment");
+    Json::Value root;
+    {
+        Json::Value db;
+        db["name"] = "default";
+        db["rdbms"] = "postgresql";
+        db["host"] = std::getenv("DB_HOST");
+        db["port"] = std::getenv("DB_PORT");
+        db["dbname"] = std::getenv("DB_DATABASE");
+        db["user"] = std::getenv("DB_USER");
+        db["passwd"] = std::getenv("DB_PASSWORD");
+        db["is_fast"] = true;
+        db["connection_number"] = 1;
+
+        root["db_clients"] = Json::Value(Json::arrayValue);
+        root["db_clients"].append(db);
+    }
+    {
+        Json::Value redis;
+        redis["name"] = "default";
+        redis["host"] = std::getenv("REDIS_HOST");
+        redis["port"] = std::getenv("REDIS_PORT");
+        redis["username"] = std::getenv("REDIS_USER");
+        redis["passwd"] = std::getenv("REDIS_PASSWORD");
+        redis["db"] = 0;
+        redis["is_fast"] = true;
+        redis["number_of_connections"] = 1;
+
+        root["redis_clients"] = Json::Value(Json::arrayValue);
+        root["redis_clients"].append(redis);
+    }
+    {
+        Json::Value app;
+        Json::Value log;
+        log["use_spdlog"] = true;
+        log["log_path"] = std::getenv("LOG_PATH");
+        log["log_size_limit"] = 100000000;
+        log["max_files"] = 10;
+        log["log_level"] = std::getenv("LOG_LEVEL");
+        log["display_local_time"] = false;
+
+        app["log"] = log;
+        root["app"] = app;
+    }
+    app().loadConfigJson(root);
+
+    Json::Value custom;
+    custom["app_url"] = std::getenv("APP_URL");
+    custom["frontend_url"] = std::getenv("FRONTEND_URL");
+    {
+        Json::Value auth;
+        auth["callback_url"] = std::getenv("AUTH_CALLBACK_URL");
+        auth["settings_callback_url"] = std::getenv("AUTH_SETTINGS_CALLBACK_URL");
+        auth["error_callback_url"] = std::getenv("AUTH_ERROR_CALLBACK_URL");
+        auth["token_secret"] = std::getenv("AUTH_TOKEN_SECRET");
+        custom["auth"] = auth;
+    }
+    {
+        Json::Value github;
+        github["name"] = std::getenv("GITHUB_APP_NAME");
+        github["client_id"] = std::getenv("GITHUB_CLIENT_ID");
+        github["client_secret"] = std::getenv("GITHUB_CLIENT_SECRET");
+        custom["github"] = github;
+    }
+    {
+        Json::Value modrinth;
+        modrinth["client_id"] = std::getenv("MODRINTH_CLIENT_ID");
+        modrinth["client_secret"] = std::getenv("MODRINTH_CLIENT_SECRET");
+        custom["modrinth"] = modrinth;
+    }
+    {
+        Json::Value cloudflare;
+        cloudflare["token"] = std::getenv("CLOUDFLARE_TOKEN");
+        cloudflare["account_tag"] = std::getenv("CLOUDFLARE_ACCOUNT_TAG");
+        cloudflare["site_tag"] = std::getenv("CLOUDFLARE_SITE_TAG");
+        custom["cloudflare"] = cloudflare;
+    }
+    custom["curseforge_key"] = std::getenv("CURSEFORGE_KEY");
+    custom["storage_path"] = std::getenv("STORAGE_PATH");
+
+    return custom;
+}
+
+Json::Value readCustomConfig() {
+    if (const std::filesystem::path configPath("config.json"); !exists(configPath)) {
+        return configureFromEnvironment();
+    }
+    app().loadConfigFile("config.json");
+    return app().getCustomConfig();
+}
+
 int main() {
     constexpr auto port(8080);
     logger.info("Starting wiki service server on port {}", port);
 
     try {
-        app().loadConfigFile("config.json");
+        const Json::Value &customConfig = readCustomConfig();
 
         const auto level = trantor::Logger::logLevel();
         app().setLogLevel(level).addListener("0.0.0.0", port).setThreadNum(16);
         configureLoggingLevel();
-
-        const Json::Value &customConfig = app().getCustomConfig();
 
         if (const auto error = validateJson(schemas::systemConfig, customConfig)) {
             logger.error("App config validation failed at {}: {}", error->pointer.to_string(), error->msg);
