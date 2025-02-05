@@ -117,3 +117,32 @@ CREATE TABLE recipe_ingredient_item
 
     PRIMARY KEY (recipe_id, item_id, slot, input)
 );
+
+CREATE MATERIALIZED VIEW tag_item_flat AS
+SELECT *
+FROM (WITH RECURSIVE tag_hierarchy AS (SELECT tp.tag_id                                 AS parent,
+                                              tc.tag_id                                 AS child,
+                                              array [ tp.tag_id, tc.tag_id ]::varchar[] AS track
+                                       FROM tag_tag
+                                                JOIN tag tp ON tag_tag.parent = tp.id
+                                                JOIN tag tc ON tag_tag.child = tc.id
+                                       UNION ALL
+                                       SELECT tp.tag_id AS parent, tc.tag_id AS child, tag_hierarchy.track || tc.tag_id
+                                       FROM tag_tag n
+                                                JOIN tag tp ON n.parent = tp.id
+                                                JOIN tag tc ON n.child = tc.id
+                                                JOIN tag_hierarchy ON tp.tag_id = tag_hierarchy.child)
+      -- Combine tag relationships with direct tag-to-item mappings
+      SELECT th.parent AS parent, item.item_id AS child
+      FROM tag_hierarchy th
+               JOIN tag ON tag.tag_id = th.child
+               JOIN tag_item ti ON tag.id = ti.tag_id
+               JOIN item ON item.id = ti.item_id
+
+      UNION ALL
+
+      -- Include direct tag-to-item mappings
+      SELECT tag.tag_id AS parent, item.item_id AS child
+      FROM tag_item
+               JOIN tag on tag.id = tag_item.tag_id
+               JOIN item ON item.id = tag_item.item_id) as subq;

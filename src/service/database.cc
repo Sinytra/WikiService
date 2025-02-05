@@ -11,20 +11,6 @@ using namespace logging;
 using namespace drogon;
 using namespace drogon::orm;
 
-template<typename Ret>
-Task<std::tuple<std::optional<Ret>, Error>> handleDatabaseOperation(const std::function<Task<Ret>(const DbClientPtr &client)> &func) {
-    try {
-        const auto clientPtr = app().getFastDbClient();
-        const Ret result = co_await func(clientPtr);
-        co_return {result, Error::Ok};
-    } catch (const Failure &e) {
-        logger.error("Error querying database: {}", e.what());
-        co_return {std::nullopt, Error::ErrInternal};
-    } catch ([[maybe_unused]] const DrogonDbException &e) {
-        co_return {std::nullopt, Error::ErrNotFound};
-    }
-}
-
 std::string buildSearchVectorQuery(std::string query) {
     auto result = query | std::views::split(' ') |
                   std::views::filter([](auto const &str) { return !std::all_of(str.begin(), str.end(), isspace); }) |
@@ -284,5 +270,47 @@ namespace service {
             co_return Error::Ok;
         });
         co_return res.value_or(err);
+    }
+
+    Task<std::optional<Recipe>> Database::getProjectRecipe(std::string project, std::string recipe) const {
+        const auto [res, err] = co_await handleDatabaseOperation<Recipe>([project, recipe](const DbClientPtr &client) -> Task<Recipe> {
+            CoroMapper<Recipe> mapper(client);
+            const auto results = co_await mapper.findBy(Criteria(Recipe::Cols::_project_id, CompareOperator::EQ, project) &&
+                                                        Criteria(Recipe::Cols::_loc, CompareOperator::EQ, recipe));
+            if (results.size() != 1) {
+                throw DrogonDbException{};
+            }
+            co_return results.front();
+        });
+        co_return res;
+    }
+
+    Task<std::vector<Recipe>> Database::getItemUsageInRecipes(std::string item) const {
+        const auto [res, err] = co_await handleDatabaseOperation<std::vector<Recipe>>([item](const DbClientPtr &client) -> Task<std::vector<Recipe>> {
+            const auto results = co_await client->execSqlCoro("SELECT * FROM recipe "
+                "JOIN recipe_ingredient_item ri ON recipe.id = ri.recipe_id "
+                "WHERE ri.item_id = $1",
+                item);
+            std::vector<Recipe> recipes;
+            for (const auto &row: results) {
+                recipes.emplace_back(Recipe{row});
+            }
+            co_return recipes;
+        });
+        co_return res.value_or(std::vector<Recipe>{});
+    }
+
+    Task<std::vector<TagItem>> Database::getTagItemsFlat(std::string tag) const {
+        const auto [res, err] = co_await handleDatabaseOperation<std::vector<TagItem>>([tag](const DbClientPtr &client) -> Task<std::vector<TagItem>> {
+            const auto results = co_await client->execSqlCoro("SELECT child FROM tag_item_flat WHERE parent = $1",
+                tag);
+            std::vector<TagItem> tagItems;
+            for (const auto &row: results) {
+                const auto itemId = row[0].as<std::string>();
+                tagItems.emplace_back(itemId);
+            }
+            co_return tagItems;
+        });
+        co_return res.value_or(std::vector<TagItem>{});
     }
 }

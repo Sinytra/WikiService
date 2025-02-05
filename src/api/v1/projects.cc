@@ -152,6 +152,12 @@ namespace api::v1 {
         }
 
         const std::string id = (*resolved)["id"];
+        // TODO
+        if (id == "c" || id == "minecraft" || id.size() < 2) {
+            simpleError(Error::ErrBadRequest, "illegal_id", callback);
+            co_return std::nullopt;
+        }
+
         const auto platforms = processPlatforms(*resolved);
         if (platforms.empty()) {
             simpleError(Error::ErrBadRequest, "no_platforms", callback);
