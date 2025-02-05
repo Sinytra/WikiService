@@ -16,10 +16,8 @@ using namespace logging;
 #define SESSION_COOKIE "sessionid"
 
 namespace api::v1 {
-    AuthController::AuthController(const std::string &fe, const std::string &cb, const std::string &cbs, const std::string &cbe,
-                                   const std::string &tk, Auth &a, GitHub &gh, MemoryCache &c, Database &d) :
-        auth_(a), github_(gh), database_(d), cache_(c), appFrontendUrl_(fe), authCallbackUrl_(cb), authSettingsCallbackUrl_(cbs),
-        authErrorCallbackUrl_(cbe), tokenEncryptionKey_(tk), appDomain_(uri{appFrontendUrl_}.get_host()) {}
+    AuthController::AuthController(const config::AuthConfig &config, Auth &a, GitHub &gh, MemoryCache &c, Database &d) :
+        config_(config), auth_(a), github_(gh), database_(d), cache_(c), appDomain_(uri{config.frontendUrl}.get_host()) {}
 
     Task<> AuthController::initLogin(HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
         const auto url = auth_.getGitHubOAuthInitURL();
@@ -45,7 +43,7 @@ namespace api::v1 {
             const auto username = (*profile)["login"].asString();
             const auto sessionId = co_await auth_.createUserSession(username, serializeJsonString(*profile));
 
-            const auto resp = HttpResponse::newRedirectionResponse(authCallbackUrl_);
+            const auto resp = HttpResponse::newRedirectionResponse(config_.callbackUrl);
             Cookie cookie;
             cookie.setKey(SESSION_COOKIE);
             cookie.setValue(sessionId);
@@ -61,7 +59,7 @@ namespace api::v1 {
             co_return;
         }
 
-        callback(HttpResponse::newRedirectionResponse(authErrorCallbackUrl_));
+        callback(HttpResponse::newRedirectionResponse(config_.errorCallbackUrl));
 
         co_return;
     }
@@ -71,7 +69,7 @@ namespace api::v1 {
 
         co_await auth_.expireSession(session);
 
-        const auto resp = HttpResponse::newRedirectionResponse(appFrontendUrl_);
+        const auto resp = HttpResponse::newRedirectionResponse(config_.frontendUrl);
         Cookie cookie;
         cookie.setKey(SESSION_COOKIE);
         cookie.setValue("");
@@ -89,7 +87,7 @@ namespace api::v1 {
         if (token.empty()) {
             co_return errorResponse(Error::ErrBadRequest, "Missing token parameter", callback);
         }
-        const auto encryptToken = crypto::encryptString(token, tokenEncryptionKey_);
+        const auto encryptToken = crypto::encryptString(token, config_.tokenSecret);
 
         const auto url = auth_.getModrinthOAuthInitURL(encryptToken);
         const auto resp = HttpResponse::newRedirectionResponse(url);
@@ -106,7 +104,7 @@ namespace api::v1 {
             co_return errorResponse(Error::ErrBadRequest, "Missing state parameter", callback);
         }
 
-        const auto decryptedToken = crypto::decryptString(state, tokenEncryptionKey_);
+        const auto decryptedToken = crypto::decryptString(state, config_.tokenSecret);
 
         const auto session = co_await auth_.getSession(decryptedToken);
         if (!session) {
@@ -118,7 +116,7 @@ namespace api::v1 {
                 co_return errorResponse(result, "Error linking Modrinth account", callback);
             }
 
-            const auto resp = HttpResponse::newRedirectionResponse(authSettingsCallbackUrl_);
+            const auto resp = HttpResponse::newRedirectionResponse(config_.settingsCallbackUrl);
             callback(resp);
             co_return;
         }

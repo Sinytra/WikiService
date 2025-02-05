@@ -2,6 +2,7 @@
 
 #include <drogon/HttpController.h>
 
+#include "config.h"
 #include "service/github.h"
 
 #include <service/auth.h>
@@ -9,8 +10,7 @@
 namespace api::v1 {
     class AuthController final : public drogon::HttpController<AuthController, false> {
     public:
-        explicit AuthController(const std::string &, const std::string &, const std::string &, const std::string &, const std::string &,
-                                service::Auth &, service::GitHub &, service::MemoryCache &, service::Database &);
+        explicit AuthController(const config::AuthConfig &, service::Auth &, service::GitHub &, service::MemoryCache &, service::Database &);
 
         // clang-format off
         METHOD_LIST_BEGIN
@@ -42,15 +42,11 @@ namespace api::v1 {
         drogon::Task<> deleteAccount(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback) const;
 
     private:
+        const config::AuthConfig &config_;
         service::Auth &auth_;
         service::GitHub &github_;
         service::Database &database_;
         service::MemoryCache &cache_;
-        const std::string appFrontendUrl_;
-        const std::string authCallbackUrl_;
-        const std::string authSettingsCallbackUrl_;
-        const std::string authErrorCallbackUrl_;
-        const std::string tokenEncryptionKey_;
         const std::string appDomain_;
     };
 }

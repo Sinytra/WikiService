@@ -38,21 +38,16 @@
   },
   "custom_config": {
     "app_url": "",
-    "frontend_url": "",
     "auth": {
+      "frontend_url": "",
       "callback_url": "",
       "settings_callback_url": "",
       "error_callback_url": "",
       "token_secret": ""
     },
     "github_app": {
-      "name": "",
       "client_id": "",
       "client_secret": ""
-    },
-    "github_app_old": {
-      "name": "",
-      "client_id": ""
     },
     "modrinth_app": {
       "client_id": "",
