@@ -6,6 +6,7 @@
 #include "api/v1/auth.h"
 #include "api/v1/browse.h"
 #include "api/v1/docs.h"
+#include "api/v1/game.h"
 #include "api/v1/projects.h"
 #include "api/v1/websocket.h"
 #include "git2.h"
@@ -60,12 +61,14 @@ int main() {
         auto browseController(make_shared<api::v1::BrowseController>(database));
         auto projectsController(make_shared<api::v1::ProjectsController>(auth, platforms, database, storage, cloudflare));
         auto projectWSController(make_shared<api::v1::ProjectWebSocketController>(database, storage, connections, auth));
+        auto gameController(make_shared<api::v1::GameController>(database, storage));
 
         app().registerController(authController);
         app().registerController(controller);
         app().registerController(browseController);
         app().registerController(projectsController);
         app().registerController(projectWSController);
+        app().registerController(gameController);
 
         cacheAwaiterThreadPool.start();
         git_libgit2_init();

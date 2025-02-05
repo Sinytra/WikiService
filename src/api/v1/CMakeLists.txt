@@ -2,6 +2,7 @@ add_library(api STATIC
         auth.cc
         browse.cc
         docs.cc
+        game.cc
         error.cc
         projects.cc
         websocket.cc
