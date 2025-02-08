@@ -12,8 +12,10 @@ namespace content {
   public:
     explicit Ingestor(Database &);
 
-    drogon::Task<Error> ingestGameContentData(ResolvedProject project) const;
+    drogon::Task<Error> ingestGameContentData(ResolvedProject project, std::shared_ptr<spdlog::logger> projectLogPtr) const;
   private:
+    drogon::Task<Error> ingestContentPaths(drogon::orm::DbClientPtr clientPtr, ResolvedProject project, std::shared_ptr<spdlog::logger> projectLog) const;
+
     Database &database_;
   };
 }

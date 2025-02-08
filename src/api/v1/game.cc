@@ -2,6 +2,7 @@
 
 #include <models/RecipeIngredientItem.h>
 #include <models/RecipeIngredientTag.h>
+#include <content/builtin_recipe_type.h>
 #include <string>
 
 #include "error.h"
@@ -17,7 +18,6 @@ using namespace drogon_model::postgres;
 namespace api::v1 {
     GameController::GameController(Database &db, Storage &s) : database_(db), storage_(s) {}
 
-    // TODO Use universal field for displayed items
     template<typename T>
     Task<Json::Value> appendSources(const std::string col, const std::string item, const Database &db) {
         const auto items = co_await db.getRelated<T>(col, item);
@@ -30,13 +30,18 @@ namespace api::v1 {
         co_return root;
     }
 
-    Task<Json::Value> ingredientToJson(const int slot, const std::vector<RecipeIngredientItem> items, const Database &db) {
+    Task<Json::Value> ingredientToJson(const ResolvedProject &project, const int slot, const std::vector<RecipeIngredientItem> items, const Database &db) {
         Json::Value root;
         root["slot"] = slot;
         Json::Value itemsJson(Json::arrayValue);
         for (const auto &item: items) {
+            const auto name = co_await project.getItemName(item.getValueOfItemId());
+
             Json::Value itemJson;
-            itemJson["item"] = item.getValueOfItemId();
+            itemJson["id"] = item.getValueOfItemId();
+            if (name) {
+                itemJson["name"] = *name;
+            }
             itemJson["count"] = item.getValueOfCount();
             itemJson["sources"] = co_await appendSources<Item>(RecipeIngredientItem::Cols::_item_id, item.getValueOfItemId(), db);
             itemsJson.append(itemJson);
@@ -45,7 +50,7 @@ namespace api::v1 {
         co_return root;
     }
 
-    Task<Json::Value> ingredientToJson(const RecipeIngredientTag &tag, const Database &db) {
+    Task<Json::Value> ingredientToJson(const ResolvedProject &project, const RecipeIngredientTag &tag, const Database &db) {
         Json::Value root;
         {
             Json::Value tagJson;
@@ -53,8 +58,13 @@ namespace api::v1 {
             {
                 Json::Value itemsJson(Json::arrayValue);
                 for (const auto tagItems = co_await db.getTagItemsFlat(tag.getValueOfTagId()); const auto &[itemId]: tagItems) {
+                    const auto name = co_await project.getItemName(itemId);
+
                     Json::Value itemJson;
                     itemJson["id"] = itemId;
+                    if (name) {
+                        itemJson["name"] = *name;
+                    }
                     itemJson["sources"] = co_await appendSources<Item>(RecipeIngredientItem::Cols::_item_id, itemId, db);
                     itemsJson.append(itemJson);
                 }
@@ -87,9 +97,21 @@ namespace api::v1 {
             co_return;
         }
 
+        const auto [proj, projErr] = co_await database_.getProjectSource(project);
+        if (!proj) {
+            errorResponse(projErr, "Project not found", callback);
+            co_return;
+        }
+
+        const auto [resolved, resErr](co_await storage_.getProject(*proj, std::nullopt, std::nullopt));
+        if (!resolved) {
+            errorResponse(resErr, "Resolution failure", callback);
+            co_return;
+        }
+
         const auto result = co_await database_.getProjectRecipe(project, recipe);
         if (!result) {
-            errorResponse(Error::ErrNotFound, "Project or recipe not found", callback);
+            errorResponse(Error::ErrNotFound, "Recipe not found", callback);
             co_return;
         }
         const auto itemIngredients =
@@ -98,7 +120,8 @@ namespace api::v1 {
             co_await database_.getRelated<RecipeIngredientTag>(RecipeIngredientTag::Cols::_recipe_id, result->getValueOfId());
 
         Json::Value json;
-        json["type"] = result->getValueOfType();
+        json["type"] = *parseJsonString(recipe_type::builtin::shapedCrafting.dump());
+        json["type"]["id"] = result->getValueOfType();
         {
             Json::Value inputs;
             Json::Value outputs;
@@ -106,15 +129,15 @@ namespace api::v1 {
             std::map<int, std::vector<RecipeIngredientItem>> itemOutputSlots = groupIngredients(itemIngredients, false);
 
             for (const auto &[slot, items]: itemInputSlots) {
-                const auto itemJson = co_await ingredientToJson(slot, items, database_);
+                const auto itemJson = co_await ingredientToJson(*resolved, slot, items, database_);
                 inputs.append(itemJson);
             }
             for (const auto &tag : tagIngredients) {
-                const auto tagJson = co_await ingredientToJson(tag, database_);
+                const auto tagJson = co_await ingredientToJson(*resolved, tag, database_);
                 inputs.append(tagJson);
             }
             for (const auto &[slot, items]: itemOutputSlots) {
-                const auto itemJson = co_await ingredientToJson(slot, items, database_);
+                const auto itemJson = co_await ingredientToJson(*resolved, slot, items, database_);
                 outputs.append(itemJson);
             }
             json["inputs"] = inputs;

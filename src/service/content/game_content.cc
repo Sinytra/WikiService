@@ -93,9 +93,88 @@ namespace content {
         return recipe;
     }
 
-    Task<Error> Ingestor::ingestGameContentData(const ResolvedProject project) const {
+    // TODO Replace with ResolvedProject::readPageAttribute
+    std::string readContentId(fs::path path) {
+        std::ifstream ifs(path);
+        if (!ifs.is_open()) {
+            return "";
+        }
+
+        std::string line;
+        int frontMatterBorder = 0;
+        while (std::getline(ifs, line)) {
+            if (frontMatterBorder > 1) {
+                break;
+            }
+            if (line.starts_with("---")) {
+                frontMatterBorder++;
+            }
+            replaceAll(line, " ", "");
+            if (frontMatterBorder == 1 && line.starts_with("id:")) {
+                const auto pos = line.find(":");
+                if (pos != std::string::npos) {
+                    auto sub = line.substr(pos + 1);
+                    replaceAll(sub, " ", "");
+                    ifs.close();
+                    return sub;
+                }
+            }
+        }
+        ifs.close();
+        return "";
+    }
+
+    Task<> addProjectItem(const DbClientPtr clientPtr, std::string project, std::string item) {
+        co_await clientPtr->execSqlCoro("INSERT INTO item_id VALUES ($1) ON CONFLICT DO NOTHING", item);
+        co_await clientPtr->execSqlCoro("INSERT INTO item VALUES (DEFAULT, $1, $2) ON CONFLICT DO NOTHING", item, project);
+    }
+
+    Task<Error> Ingestor::ingestContentPaths(const DbClientPtr clientPtr, const ResolvedProject project,
+                                             const std::shared_ptr<spdlog::logger> projectLog) const {
+        const auto docsRoot = project.getDocsDirectoryPath();
         const auto projectId = project.getProject().getValueOfId();
-        logger.info("Ingesting game data for project {}", projectId);
+        std::set<std::string> items;
+
+        for (const auto &entry: fs::recursive_directory_iterator(docsRoot)) {
+            if (!entry.is_regular_file() || entry.path().filename().string().starts_with(".")) {
+                continue;
+            }
+            fs::path relative_path = relative(entry.path(), docsRoot);
+            const auto id = readContentId(entry.path());
+            if (!id.empty()) {
+                if (items.contains(id)) {
+                    projectLog->warn("Skipping duplicate item {} path {}", id, relative_path.string());
+                    continue;
+                }
+
+                projectLog->debug("Found entry '{}' at '{}'", id, relative_path.string());
+
+                items.insert(id);
+                co_await addProjectItem(clientPtr, projectId, id);
+                co_await clientPtr->execSqlCoro("INSERT INTO item_page (id, path) "
+                                                "SELECT id, $1 as path FROM item "
+                                                "WHERE item_id = $2 AND project_id = $3",
+                                                relative_path.string(), id, projectId);
+            }
+        }
+
+        projectLog->info("Added {} entries", items.size());
+
+        co_return Error::Ok;
+    }
+
+    Task<Error> Ingestor::ingestGameContentData(const ResolvedProject project, const std::shared_ptr<spdlog::logger> projectLogPtr) const {
+        auto projectLog = *projectLogPtr;
+
+        const auto projectId = project.getProject().getValueOfId();
+        projectLog.info("====================================");
+        projectLog.info("Ingesting game data for project {}", projectId);
+
+        const auto clientPtr = app().getFastDbClient();
+
+        co_await wipeExistingData(clientPtr, projectId);
+
+        co_await ingestContentPaths(clientPtr, project, projectLogPtr);
 
         const auto docsRoot = project.getDocsDirectoryPath();
         const auto modid = project.getProject().getValueOfModid();
@@ -105,20 +184,17 @@ namespace content {
             co_return Error::Ok;
         }
 
-        const auto clientPtr = app().getFastDbClient();
-        co_await wipeExistingData(clientPtr, projectId);
-
         std::vector<ModRecipe> recipes;
         // TODO Recursion
         for (const auto &entry: fs::directory_iterator(recipesRoot)) {
             if (const auto recipe = readRecipe(modid, entry.path())) {
                 recipes.push_back(*recipe);
             } else {
-                logger.warn("Skipping recipe file: {}", entry.path().filename().string());
+                projectLog.warn("Skipping recipe file: '{}'", entry.path().filename().string());
             }
         }
 
-        logger.info("Importing {} recipes from project {}", recipes.size(), projectId);
+        projectLog.info("Importing {} recipes from project {}", recipes.size(), projectId);
 
         try {
             // 1. Create items
@@ -132,7 +208,7 @@ namespace content {
                 }
             }
 
-            logger.info("Adding {} items", newItems.size());
+            projectLog.info("Adding {} items", newItems.size());
 
             for (auto &item: newItems) {
                 co_await clientPtr->execSqlCoro("INSERT INTO item_id VALUES ($1) ON CONFLICT DO NOTHING", item);
@@ -142,26 +218,30 @@ namespace content {
             // 2. Create recipes
             CoroMapper<Recipe> recipeMapper(clientPtr);
             for (auto &[id, type, ingredients]: recipes) {
-                const auto row = co_await clientPtr->execSqlCoro("INSERT INTO recipe VALUES (DEFAULT, $1, $2, $3) ON CONFLICT DO NOTHING RETURNING id", projectId, id, type);
+                const auto row = co_await clientPtr->execSqlCoro(
+                    "INSERT INTO recipe VALUES (DEFAULT, $1, $2, $3) ON CONFLICT DO NOTHING RETURNING id", projectId, id, type);
                 const auto recipeId = row.front().at("id").as<int64_t>();
 
                 for (auto &[ingredientId, slot, count, input, isTag]: ingredients) {
                     try {
                         if (isTag) {
-                            co_await clientPtr->execSqlCoro("INSERT INTO recipe_ingredient_tag VALUES ($1, $2, $3, $4, $5)", recipeId, ingredientId, slot, count, input);
+                            co_await clientPtr->execSqlCoro("INSERT INTO recipe_ingredient_tag VALUES ($1, $2, $3, $4, $5)", recipeId,
+                                                            ingredientId, slot, count, input);
                         } else {
-                            co_await clientPtr->execSqlCoro("INSERT INTO recipe_ingredient_item VALUES ($1, $2, $3, $4, $5)", recipeId, ingredientId, slot, count, input);
+                            co_await clientPtr->execSqlCoro("INSERT INTO recipe_ingredient_item VALUES ($1, $2, $3, $4, $5)", recipeId,
+                                                            ingredientId, slot, count, input);
                         }
                         continue;
                     } catch (const std::exception &e) {
-                        logger.info("Removing recipe {} due to missing ingredient", id);
+                        const auto ingredientName = isTag ? "#" + ingredientId : ingredientId;
+                        projectLog.warn("Removing recipe '{}' due to missing ingredient '{}'", id, ingredientName);
                     }
                     co_await recipeMapper.deleteByPrimaryKey(recipeId);
                     break;
                 }
             }
         } catch (const std::exception &e) {
-            logger.error("Failed to add items to transaction: {}", e.what());
+            projectLog.error("Failed to add items to transaction: {}", e.what());
         }
 
         co_return Error::Ok;

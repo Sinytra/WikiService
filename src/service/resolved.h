@@ -48,6 +48,10 @@ namespace service {
 
         std::tuple<ProjectPage, Error> readFile(std::string path) const;
 
+        std::optional<std::string> readPageAttribute(std::string path, std::string prop) const;
+
+        std::optional<std::string> readLangKey(const std::string &locale, const std::string &key) const;
+
         std::tuple<nlohmann::ordered_json, Error> getDirectoryTree() const;
 
         std::optional<std::filesystem::path> getAsset(const ResourceLocation &location) const;
@@ -59,6 +63,9 @@ namespace service {
         const std::filesystem::path &getDocsDirectoryPath() const;
 
         Json::Value toJson() const;
+
+        // Content
+        drogon::Task<std::optional<std::string>> getItemName(std::string id) const;
     private:
         Project project_;
         std::shared_ptr<ResolvedProject> defaultVersion_;

@@ -400,7 +400,7 @@ namespace service {
 
         // TODO
         ResolvedProject finalResolved{project, dest, dest / removeLeadingSlash(project.getValueOfSourcePath())};
-        co_await ingestor_.ingestGameContentData(finalResolved);
+        co_await ingestor_.ingestGameContentData(finalResolved, logger);
 
         co_return ProjectError::OK;
     }

@@ -9,6 +9,7 @@
 #include <fmt/args.h>
 #include <git2.h>
 #include <include/uri.h>
+#include <drogon/HttpAppFramework.h>
 
 #define DOCS_META_FILE "sinytra-wiki.json"
 #define FOLDER_META_FILE "_meta.json"
@@ -285,6 +286,18 @@ nlohmann::ordered_json getDirTreeJson(const Project &project, const fs::path &ro
     return root;
 }
 
+inline void ltrim(std::string &s) {
+    s.erase(s.begin(), std::ranges::find_if(s, [](const unsigned char ch) {
+        return !std::isspace(ch);
+    }));
+}
+
+inline void rtrim(std::string &s) {
+    s.erase(std::find_if(s.rbegin(), s.rend(), [](const unsigned char ch) {
+        return !std::isspace(ch);
+    }).base(), s.end());
+}
+
 namespace service {
     std::string projectErrorToString(const ProjectError status) {
         switch (status) {
@@ -419,6 +432,48 @@ namespace service {
         return {{buffer.str(), editUrl, updatedAt}, Error::Ok};
     }
 
+    std::optional<std::string> ResolvedProject::readPageAttribute(std::string path, std::string prop) const {
+        const auto filePath = getFilePath(docsDir_, removeLeadingSlash(path), locale_);
+
+        std::ifstream ifs(filePath);
+
+        if (!ifs) {
+            return std::nullopt;
+        }
+
+        std::string line;
+        int frontMatterBorder = 0;
+        while (std::getline(ifs, line)) {
+            if (frontMatterBorder > 1) {
+                break;
+            }
+            if (line.starts_with("---")) {
+                frontMatterBorder++;
+            }
+            if (frontMatterBorder == 1 && line.starts_with(prop + ":")) {
+                const auto pos = line.find(":");
+                if (pos != std::string::npos) {
+                    auto sub = line.substr(pos + 1);
+                    ifs.close();
+                    ltrim(sub);
+                    rtrim(sub);
+                    return sub;
+                }
+            }
+        }
+        ifs.close();
+        return "";
+    }
+
+    std::optional<std::string> ResolvedProject::readLangKey(const std::string &locale, const std::string &key) const {
+        const auto path = docsDir_ / ".assets" / project_.getValueOfId() / "lang" / (locale + ".json");
+        const auto json = parseJsonFile(path);
+        if (!json || !json->is_object() || !json->contains(key)) {
+            return std::nullopt;
+        }
+        return (*json)[key].get<std::string>();
+    }
+
     std::tuple<nlohmann::ordered_json, Error> ResolvedProject::getDirectoryTree() const {
         const auto tree = getDirTreeJson(project_, docsDir_, docsDir_, locale_);
         return {tree, Error::Ok};
@@ -493,5 +548,25 @@ namespace service {
         }
 
         return {*meta, ProjectError::OK, ""};
+    }
+
+    Task<std::optional<std::string>> ResolvedProject::getItemName(const std::string id) const {
+        // TODO Database
+        const auto clientPtr = app().getFastDbClient();
+        const auto projectId = project_.getValueOfId();
+        const auto rows = co_await clientPtr->execSqlCoro(
+            "SELECT path FROM item_page "
+            "JOIN item ON item_page.id = item.id "
+            "WHERE item.project_id = $1 AND item.item_id = $2",
+            projectId, id
+        );
+        if (rows.size() < 1) {
+            const auto parsed = ResourceLocation::parse(id);
+            // TODO Locale
+            const auto localized = readLangKey("en_en", "item." + projectId + "." + parsed->path_);
+            co_return localized;
+        }
+        const auto path = rows.front()["path"].as<std::string>();
+        co_return readPageAttribute(path, "title");
     }
 }
