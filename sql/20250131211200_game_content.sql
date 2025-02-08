@@ -17,6 +17,12 @@ CREATE UNIQUE INDEX unique_item_no_project
     ON item (item_id)
     WHERE project_id IS NULL;
 
+CREATE table item_page
+(
+    id bigint REFERENCES item (id) ON DELETE CASCADE,
+    path text NOT NULL
+);
+
 CREATE TABLE tag_id
 (
     id varchar(255) primary key

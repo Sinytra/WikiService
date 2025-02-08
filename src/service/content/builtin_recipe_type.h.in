@@ -1,0 +1,7 @@
+#pragma once
+
+#include <nlohmann/json.hpp>
+
+namespace recipe_type::builtin {
+    nlohmann::json shapedCrafting = R"(@SHAPED_CRAFTING@)"_json;
+}
