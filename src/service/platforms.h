@@ -63,6 +63,8 @@ namespace service {
 
         drogon::Task<std::optional<PlatformProject>> getProject(std::string slug) override;
     private:
+        drogon::Task<std::optional<Json::Value>> getProjectData(std::string slug) const;
+
         const std::string apiKey_;
     };
 
