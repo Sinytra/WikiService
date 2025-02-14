@@ -1,7 +1,9 @@
 #include "auth.h"
 
-#include <global.h>
 #include <models/User.h>
+#include <service/database.h>
+#include <service/github.h>
+#include <service/platforms.h>
 
 #include "crypto.h"
 #include "log/log.h"

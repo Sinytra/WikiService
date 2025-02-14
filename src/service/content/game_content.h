@@ -13,3 +13,7 @@ namespace content {
     drogon::Task<service::Error> ingestContentPaths(drogon::orm::DbClientPtr clientPtr, service::ResolvedProject project, std::shared_ptr<spdlog::logger> projectLog) const;
   };
 }
+
+namespace global {
+  extern std::shared_ptr<content::Ingestor> ingestor;
+}

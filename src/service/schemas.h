@@ -1,7 +1,6 @@
 #pragma once
 
-#include <nlohmann/json-schema.hpp>
-#include <nlohmann/json.hpp>
+#include <nlohmann/json_fwd.hpp>
 
 namespace schemas {
     extern nlohmann::json systemConfig;

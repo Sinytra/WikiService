@@ -1,3 +1,4 @@
+#include "database.h"
 #include "resolved.h"
 #include "schemas.h"
 #include "util.h"
@@ -10,8 +11,8 @@
 #include <drogon/HttpAppFramework.h>
 #include <fmt/args.h>
 #include <git2.h>
-#include <global.h>
 #include <include/uri.h>
+#include <models/Item.h>
 
 #define DOCS_META_FILE "sinytra-wiki.json"
 #define FOLDER_META_FILE "_meta.json"
@@ -595,6 +596,43 @@ namespace service {
         }
 
         return projectJson;
+    }
+
+    int countPagesRecursive(nlohmann::ordered_json json) {
+        int sum = 0;
+
+        for (auto &item : json) {
+            if (item["type"] == "dir") {
+                if (item.contains("children")) {
+                    sum += countPagesRecursive(item["children"]);
+                }
+            } else if (item["type"] == "file") {
+                sum++;
+            }
+        }
+
+        return sum;
+    }
+
+    Task<Json::Value> ResolvedProject::toJsonVerbose() const {
+        auto projectJson = toJson();
+        Json::Value infoJson;
+
+        if (const auto [meta, err, detail] = validateProjectMetadata(); meta && meta->contains("links")) {
+            const auto links = (*meta)["links"];
+            if (links.contains("website")) {
+                infoJson["website"] = links["website"].get<std::string>();
+            }
+        }
+
+        const auto count = co_await global::database->getProjectContentCount(project_.getValueOfId());
+        infoJson["contentCount"] = count;
+
+        const auto [tree, treeErr] = getDirectoryTree();
+        infoJson["pageCount"] = treeErr == Error::Ok ? countPagesRecursive(tree) : 0;
+
+        projectJson["info"] = infoJson;
+        co_return projectJson;
     }
 
     std::tuple<std::optional<nlohmann::json>, ProjectError, std::string> ResolvedProject::validateProjectMetadata() const {

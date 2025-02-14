@@ -17,12 +17,19 @@ using namespace drogon_model::postgres;
 namespace api::v1 {
     Task<> DocsController::project(HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                    const std::string project) const {
-        const auto resolved = co_await getProject(project, std::nullopt, std::nullopt, callback);
+        const auto version = req->getOptionalParameter<std::string>("version");
+        const auto resolved = co_await getProject(project, version, std::nullopt, callback);
         if (!resolved) {
             co_return;
         }
 
-        const auto resp = HttpResponse::newHttpJsonResponse(resolved->toJson());
+        if (version && !resolved->getAvailableVersions().contains(*version)) {
+            errorResponse(Error::ErrNotFound, "Version not found", callback);
+            co_return;
+        }
+
+        const auto json = co_await resolved->toJsonVerbose();
+        const auto resp = HttpResponse::newHttpJsonResponse(json);
         resp->setStatusCode(k200OK);
         callback(resp);
 
@@ -105,7 +112,7 @@ namespace api::v1 {
                 co_return;
             }
 
-            std::string prefix = std::format("/api/v1/docs/{}/asset", project);
+            std::string prefix = std::format("/api/v1/docs/{}/asset/", project);
             std::string location = req->getPath().substr(prefix.size());
 
             if (location.empty()) {
@@ -117,15 +124,15 @@ namespace api::v1 {
                 co_return errorResponse(Error::ErrBadRequest, "Invalid location specified", callback);
             }
 
-            const auto assset = resolved->getAsset(*resourceLocation);
-            if (!assset) {
+            const auto asset = resolved->getAsset(*resourceLocation);
+            if (!asset) {
                 const auto optionalParam = req->getOptionalParameter<std::string>("optional");
                 const auto optional = optionalParam.has_value() && optionalParam == "true";
 
                 co_return errorResponse(optional ? Error::Ok : Error::ErrNotFound, "Asset not found", callback);
             }
 
-            const auto response = HttpResponse::newFileResponse(absolute(*assset).string());
+            const auto response = HttpResponse::newFileResponse(absolute(*asset).string());
             response->setStatusCode(k200OK);
             callback(response);
         } catch (const HttpException &err) {

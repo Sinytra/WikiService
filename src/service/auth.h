@@ -1,12 +1,12 @@
 #pragma once
 
-#include "cache.h"
-#include "database.h"
-#include "github.h"
-#include "platforms.h"
-
-#include <drogon/utils/coroutine.h>
+#include <drogon/HttpRequest.h>
 #include <json/value.h>
+#include <models/User.h>
+#include "cache.h"
+#include "error.h"
+
+using namespace drogon_model::postgres;
 
 namespace service {
     struct UserSession {
@@ -38,9 +38,14 @@ namespace service {
         drogon::Task<Error> unlinkModrinthAccount(std::string username) const;
 
         drogon::Task<std::optional<User>> getGitHubTokenUser(std::string token) const;
+
     private:
         const std::string appUrl_;
         const OAuthApp githubApp_;
         const OAuthApp modrinthApp_;
     };
+}
+
+namespace global {
+    extern std::shared_ptr<service::Auth> auth;
 }

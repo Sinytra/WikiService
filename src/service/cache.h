@@ -98,3 +98,7 @@ namespace service {
         std::unordered_map<std::string, std::any> pendingTasks_;
     };
 }
+
+namespace global {
+    extern std::shared_ptr<service::MemoryCache> cache;
+}

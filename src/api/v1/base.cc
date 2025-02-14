@@ -1,8 +1,6 @@
 #include "base.h"
 #include "error.h"
 
-#include <global.h>
-
 using namespace drogon;
 using namespace service;
 

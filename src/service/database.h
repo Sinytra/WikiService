@@ -1,17 +1,13 @@
 #pragma once
 
-#include "error.h"
-#include "log/log.h"
-#include "models/Project.h"
-
-#include <drogon/drogon.h>
+#include <drogon/HttpAppFramework.h>
 #include <drogon/utils/coroutine.h>
-#include <models/Item.h>
+#include <log/log.h>
 #include <models/Recipe.h>
 #include <models/User.h>
-#include <nlohmann/adl_serializer.hpp>
+#include <nlohmann/json_fwd.hpp>
 #include <optional>
-#include <string>
+#include "error.h"
 
 using namespace drogon_model::postgres;
 
@@ -74,6 +70,7 @@ namespace service {
         drogon::Task<Error> assignUserProject(std::string username, std::string id, std::string role) const;
 
         drogon::Task<std::vector<ProjectContent>> getProjectContents(std::string project) const;
+        drogon::Task<int> getProjectContentCount(std::string project) const;
         drogon::Task<std::optional<std::string>> getProjectContentPath(std::string project, std::string id) const;
         drogon::Task<std::optional<Recipe>> getProjectRecipe(std::string project, std::string recipe) const;
         drogon::Task<std::vector<Recipe>> getItemUsageInRecipes(std::string item) const;
@@ -84,11 +81,14 @@ namespace service {
             const auto [res, err] = co_await handleDatabaseOperation<std::vector<T>>(
                 [col, id](const drogon::orm::DbClientPtr &client) -> drogon::Task<std::vector<T>> {
                     drogon::orm::CoroMapper<T> mapper(client);
-                    const auto results =
-                        co_await mapper.findBy(drogon::orm::Criteria(col, drogon::orm::CompareOperator::EQ, id));
+                    const auto results = co_await mapper.findBy(drogon::orm::Criteria(col, drogon::orm::CompareOperator::EQ, id));
                     co_return results;
                 });
             co_return res.value_or(std::vector<T>{});
         }
     };
+}
+
+namespace global {
+    extern std::shared_ptr<service::Database> database;
 }

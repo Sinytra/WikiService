@@ -83,3 +83,7 @@ namespace service {
         std::map<std::string, DistributionPlatform&> platforms_;
     };
 }
+
+namespace global {
+    extern std::shared_ptr<service::Platforms> platforms;
+}

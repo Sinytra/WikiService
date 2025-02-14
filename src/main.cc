@@ -6,7 +6,9 @@
 #include "api/v1/websocket.h"
 
 #include "config.h"
-#include "global.h"
+#include <service/database.h>
+#include <service/github.h>
+#include <service/cloudflare.h>
 
 #include <git2.h>
 #include <log/log.h>
