@@ -18,3 +18,7 @@ namespace service {
         const config::CloudFlare &config_;
     };
 }
+
+namespace global {
+    extern std::shared_ptr<service::CloudFlare> cloudFlare;
+}

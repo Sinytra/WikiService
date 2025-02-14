@@ -5,8 +5,6 @@
 #include <drogon/utils/coroutine.h>
 #include <json/value.h>
 #include <optional>
-#include <set>
-#include <tuple>
 
 namespace service {
     class GitHub {
@@ -15,4 +13,8 @@ namespace service {
 
         drogon::Task<std::tuple<std::optional<Json::Value>, Error>> getAuthenticatedUser(std::string token) const;
     };
+}
+
+namespace global {
+    extern std::shared_ptr<service::GitHub> github;
 }

@@ -289,6 +289,20 @@ namespace service {
         co_return res.value_or(std::vector<ProjectContent>{});
     }
 
+    Task<int> Database::getProjectContentCount(std::string project) const {
+        const auto [res, err] = co_await handleDatabaseOperation<int>([project](const DbClientPtr &client) -> Task<int> {
+            const auto results = co_await client->execSqlCoro("SELECT count(*) FROM item "
+                "JOIN item_page ON item.id = item_page.id "
+                "WHERE item.project_id = $1 AND starts_with(item_page.path, '.content/');",
+                project);
+            if (results.size() != 1) {
+                throw DrogonDbException{};
+            }
+            co_return results.front().at("count").as<int>();
+        });
+        co_return res.value_or(0);
+    }
+
     Task<std::optional<std::string>> Database::getProjectContentPath(std::string project, std::string id) const {
         const auto [res, err] = co_await handleDatabaseOperation<std::string>([project, id](const DbClientPtr &client) -> Task<std::string> {
             const auto results = co_await client->execSqlCoro("SELECT path FROM item "

@@ -7,7 +7,7 @@
 #include <models/RecipeIngredientTag.h>
 #include "util.h"
 
-#include <nlohmann/json.hpp>
+#include <nlohmann/json_fwd.hpp>
 
 using namespace drogon_model::postgres;
 
@@ -67,6 +67,7 @@ namespace service {
         const std::filesystem::path &getDocsDirectoryPath() const;
 
         Json::Value toJson() const;
+        drogon::Task<Json::Value> toJsonVerbose() const;
 
         // Content
         drogon::Task<std::optional<std::string>> getItemName(std::string id) const;

@@ -4,7 +4,6 @@
 #include "util.h"
 
 #include <chrono>
-#include <global.h>
 
 using namespace drogon;
 using namespace std::chrono_literals;

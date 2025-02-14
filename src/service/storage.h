@@ -7,7 +7,7 @@
 #include "resolved.h"
 
 #include <drogon/WebSocketConnection.h>
-#include <nlohmann/json.hpp>
+#include <nlohmann/json_fwd.hpp>
 
 using namespace drogon_model::postgres;
 
@@ -61,4 +61,9 @@ namespace service {
 
         const std::string &basePath_;
     };
+}
+
+namespace global {
+    extern std::shared_ptr<service::Storage> storage;
+    extern std::shared_ptr<service::RealtimeConnectionStorage> connections;
 }

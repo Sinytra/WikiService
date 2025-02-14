@@ -1,6 +1,5 @@
 #include "game.h"
 
-#include <global.h>
 #include <string>
 
 #include "error.h"

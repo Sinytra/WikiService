@@ -3,7 +3,6 @@
 
 #include <string>
 
-#include <global.h>
 #include <log/log.h>
 #include <models/Project.h>
 #include <service/util.h>

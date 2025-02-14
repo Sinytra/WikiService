@@ -1,10 +1,13 @@
 #include "projects.h"
 
-#include <global.h>
 #include <include/uri.h>
 #include <log/log.h>
 #include <models/UserProject.h>
+#include <service/auth.h>
+#include <service/cloudflare.h>
 #include <service/crypto.h>
+#include <service/database.h>
+#include <service/storage.h>
 #include <service/error.h>
 #include <service/schemas.h>
 #include <service/util.h>
@@ -208,7 +211,7 @@ namespace api::v1 {
         callback(resp);
     }
 
-    Task<> ProjectsController::listUserProjects(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback) const {
+    Task<> ProjectsController::listUserProjects(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
         const auto session(co_await global::auth->getSession(req));
         if (!session) {
             simpleError(Error::ErrUnauthorized, "unauthorized", callback);
@@ -233,7 +236,8 @@ namespace api::v1 {
         co_return;
     }
 
-    Task<> ProjectsController::getProject(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string id) const {
+    Task<> ProjectsController::getProject(const HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback,
+                                          const std::string id) const {
         const auto session(co_await global::auth->getSession(req));
         if (!session) {
             simpleError(Error::ErrUnauthorized, "unauthorized", callback);

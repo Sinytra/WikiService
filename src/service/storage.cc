@@ -5,7 +5,6 @@
 #include <fstream>
 
 #include <git2.h>
-#include <global.h>
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/callback_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>

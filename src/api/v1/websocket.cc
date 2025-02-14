@@ -1,7 +1,6 @@
 #include "websocket.h"
 #include "error.h"
 
-#include <global.h>
 #include <log/log.h>
 #include <models/Project.h>
 
