@@ -1,12 +1,10 @@
 #include "docs.h"
+#include "error.h"
 
 #include <drogon/HttpClient.h>
 #include <models/Project.h>
-
-#include <string>
-
 #include <service/util.h>
-#include "error.h"
+#include <string>
 
 using namespace std;
 using namespace drogon;
@@ -17,46 +15,16 @@ using namespace drogon::orm;
 using namespace drogon_model::postgres;
 
 namespace api::v1 {
-    DocsController::DocsController(Database &db, Storage &s) : database_(db), storage_(s) {}
-
-    Task<std::optional<ResolvedProject>> DocsController::getProject(const std::string &project, const std::optional<std::string> &version,
-                                                                    const std::optional<std::string> &locale,
-                                                                    const std::function<void(const HttpResponsePtr &)> callback) const {
-        if (project.empty()) {
-            errorResponse(Error::ErrBadRequest, "Missing project parameter", callback);
-            co_return std::nullopt;
-        }
-
-        const auto [proj, projErr] = co_await database_.getProjectSource(project);
-        if (!proj) {
-            errorResponse(projErr, "Project not found", callback);
-            co_return std::nullopt;
-        }
-
-        const auto [resolved, resErr](co_await storage_.getProject(*proj, version, locale));
+    Task<> DocsController::project(HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+                                   const std::string project) const {
+        const auto resolved = co_await getProject(project, std::nullopt, std::nullopt, callback);
         if (!resolved) {
-            errorResponse(resErr, "Resolution failure", callback);
-            co_return std::nullopt;
+            co_return;
         }
 
-        co_return *resolved;
-    }
-
-    Task<> DocsController::project(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string project) const {
-        try {
-            const auto resolved = co_await getProject(project, std::nullopt, std::nullopt, callback);
-            if (!resolved) {
-                co_return;
-            }
-
-            const auto resp = HttpResponse::newHttpJsonResponse(resolved->toJson());
-            resp->setStatusCode(k200OK);
-            callback(resp);
-        } catch (const HttpException &err) {
-            const auto resp = HttpResponse::newHttpResponse();
-            resp->setBody(err.what());
-            callback(resp);
-        }
+        const auto resp = HttpResponse::newHttpJsonResponse(resolved->toJson());
+        resp->setStatusCode(k200OK);
+        callback(resp);
 
         co_return;
     }
@@ -108,31 +76,24 @@ namespace api::v1 {
 
     Task<> DocsController::tree(HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                 const std::string project) const {
-        try {
-            const auto resolved = co_await getProject(project, req->getOptionalParameter<std::string>("version"),
-                                                      req->getOptionalParameter<std::string>("locale"), callback);
-            if (!resolved) {
-                co_return;
-            }
-
-            const auto [tree, treeError](resolved->getDirectoryTree());
-            if (treeError != Error::Ok) {
-                co_return errorResponse(treeError, "Error getting directory tree", callback);
-            }
-
-            nlohmann::json root;
-            root["project"] = parkourJson(resolved->toJson());
-            root["tree"] = tree;
-
-            const auto resp = HttpResponse::newHttpJsonResponse(*parseJsonString(root.dump()));
-            resp->setStatusCode(k200OK);
-            callback(resp);
-        } catch (const HttpException &err) {
-            const auto resp = HttpResponse::newHttpResponse();
-            resp->setBody(err.what());
-            resp->setStatusCode(k500InternalServerError);
-            callback(resp);
+        const auto resolved = co_await getProject(project, req->getOptionalParameter<std::string>("version"),
+                                                  req->getOptionalParameter<std::string>("locale"), callback);
+        if (!resolved) {
+            co_return;
         }
+
+        const auto [tree, treeError](resolved->getDirectoryTree());
+        if (treeError != Error::Ok) {
+            co_return errorResponse(treeError, "Error getting directory tree", callback);
+        }
+
+        nlohmann::json root;
+        root["project"] = parkourJson(resolved->toJson());
+        root["tree"] = tree;
+
+        const auto resp = HttpResponse::newHttpJsonResponse(unparkourJson(root));
+        resp->setStatusCode(k200OK);
+        callback(resp);
 
         co_return;
     }

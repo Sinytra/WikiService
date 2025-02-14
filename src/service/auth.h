@@ -5,7 +5,6 @@
 #include "github.h"
 #include "platforms.h"
 
-#include <drogon/HttpRequest.h>
 #include <drogon/utils/coroutine.h>
 #include <json/value.h>
 
@@ -24,7 +23,7 @@ namespace service {
 
     class Auth : public CacheableServiceBase {
     public:
-        explicit Auth(const std::string &, const OAuthApp &, const OAuthApp &, Database &, MemoryCache &, Platforms &, GitHub &);
+        explicit Auth(const std::string &, const OAuthApp &, const OAuthApp &);
 
         std::string getGitHubOAuthInitURL() const;
         drogon::Task<std::string> createUserSession(std::string username, std::string profile) const;
@@ -40,10 +39,6 @@ namespace service {
 
         drogon::Task<std::optional<User>> getGitHubTokenUser(std::string token) const;
     private:
-        Database &database_;
-        MemoryCache &cache_;
-        Platforms &platforms_;
-        GitHub &github_;
         const std::string appUrl_;
         const OAuthApp githubApp_;
         const OAuthApp modrinthApp_;

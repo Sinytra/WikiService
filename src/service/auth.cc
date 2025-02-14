@@ -1,5 +1,6 @@
 #include "auth.h"
 
+#include <global.h>
 #include <models/User.h>
 
 #include "crypto.h"
@@ -23,9 +24,8 @@ using namespace std::chrono_literals;
 std::string createSessionCacheKey(const std::string &sessionId) { return "session:" + sessionId; }
 
 namespace service {
-    Auth::Auth(const std::string &appUrl, const OAuthApp &ghApp, const OAuthApp &mrApp, Database &db, MemoryCache &ch, Platforms &pl,
-               GitHub &gh) :
-        database_(db), cache_(ch), platforms_(pl), github_(gh), appUrl_(appUrl), githubApp_(ghApp), modrinthApp_(mrApp) {}
+    Auth::Auth(const std::string &appUrl, const OAuthApp &ghApp, const OAuthApp &mrApp) :
+        appUrl_(appUrl), githubApp_(ghApp), modrinthApp_(mrApp) {}
 
     std::string Auth::getGitHubOAuthInitURL() const {
         const auto callbackUrl = appUrl_ + "/api/v1/auth/callback/github";
@@ -66,12 +66,12 @@ namespace service {
     Task<std::string> Auth::createUserSession(const std::string username, const std::string profile) const {
         const auto normalUserName = strToLower(username);
 
-        co_await database_.createUserIfNotExists(normalUserName);
+        co_await global::database->createUserIfNotExists(normalUserName);
 
         const auto sessionId = crypto::generateSecureRandomString(SESSION_ID_LEN);
 
         const std::unordered_map<std::string, std::string> values = {{"username", normalUserName}, {"profile", profile}};
-        co_await cache_.updateCacheHash(createSessionCacheKey(sessionId), values, 30 * 24h);
+        co_await global::cache->updateCacheHash(createSessionCacheKey(sessionId), values, 30 * 24h);
 
         co_return sessionId;
     }
@@ -87,11 +87,11 @@ namespace service {
         }
 
         const auto sid = createSessionCacheKey(id);
-        const auto username = co_await cache_.getHashMember(sid, "username");
+        const auto username = co_await global::cache->getHashMember(sid, "username");
         if (!username) {
             co_return std::nullopt;
         }
-        const auto profile = co_await cache_.getHashMember(sid, "profile");
+        const auto profile = co_await global::cache->getHashMember(sid, "profile");
         if (!profile) {
             co_return std::nullopt;
         }
@@ -100,7 +100,7 @@ namespace service {
             co_return std::nullopt;
         }
 
-        const auto user = co_await database_.getUser(*username);
+        const auto user = co_await global::database->getUser(*username);
         if (!user) {
             co_return std::nullopt;
         }
@@ -113,7 +113,7 @@ namespace service {
         co_return UserSession{.sessionId = id, .username = *username, .user = *user, .profile = root};
     }
 
-    Task<> Auth::expireSession(const std::string id) const { co_await cache_.erase(createSessionCacheKey(id)); }
+    Task<> Auth::expireSession(const std::string id) const { co_await global::cache->erase(createSessionCacheKey(id)); }
 
     std::string Auth::getModrinthOAuthInitURL(std::string state) const {
         const auto callbackUrl = appUrl_ + "/api/v1/auth/callback/modrinth";
@@ -148,23 +148,25 @@ namespace service {
     }
 
     Task<Error> Auth::linkModrinthAccount(const std::string username, const std::string token) const {
-        const auto modrinthId = co_await platforms_.modrinth_.getAuthenticatedUserID(token);
+        const auto modrinthId = co_await global::platforms->modrinth_.getAuthenticatedUserID(token);
         if (!modrinthId) {
             co_return Error::ErrBadRequest;
         }
 
-        co_return co_await database_.linkUserModrinthAccount(username, *modrinthId);
+        co_return co_await global::database->linkUserModrinthAccount(username, *modrinthId);
     }
 
     Task<Error> Auth::unlinkModrinthAccount(const std::string username) const {
-        co_return co_await database_.unlinkUserModrinthAccount(username);
+        co_return co_await global::database->unlinkUserModrinthAccount(username);
     }
 
     Task<std::optional<User>> Auth::getGitHubTokenUser(const std::string token) const {
-        if (const auto [ghProfile, ghErr](co_await github_.getAuthenticatedUser(token)); ghProfile) {
-            const auto username = (*ghProfile)["login"].asString();
-            const auto user = co_await database_.getUser(strToLower(username));
-            co_return user;
+        if (token.starts_with("ghp_")) {
+            if (const auto [ghProfile, ghErr](co_await global::github->getAuthenticatedUser(token)); ghProfile) {
+                const auto username = (*ghProfile)["login"].asString();
+                const auto user = co_await global::database->getUser(strToLower(username));
+                co_return user;
+            }
         }
         co_return std::nullopt;
     }

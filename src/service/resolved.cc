@@ -6,10 +6,12 @@
 #include <fstream>
 #include <unordered_map>
 
+#include <content/builtin_recipe_type.h>
+#include <drogon/HttpAppFramework.h>
 #include <fmt/args.h>
 #include <git2.h>
+#include <global.h>
 #include <include/uri.h>
-#include <drogon/HttpAppFramework.h>
 
 #define DOCS_META_FILE "sinytra-wiki.json"
 #define FOLDER_META_FILE "_meta.json"
@@ -19,11 +21,10 @@
 
 using namespace logging;
 using namespace drogon;
+using namespace drogon_model::postgres;
 namespace fs = std::filesystem;
 
-std::unordered_map<std::string, std::string> GIT_PROVIDERS = {
-    { "github.com", "blob/{branch}/{base}/{path}" }
-};
+std::unordered_map<std::string, std::string> GIT_PROVIDERS = {{"github.com", "blob/{branch}/{base}/{path}"}};
 
 std::string formatISOTime(git_time_t time, const int offset) {
     // time += offset * 60;
@@ -286,16 +287,50 @@ nlohmann::ordered_json getDirTreeJson(const Project &project, const fs::path &ro
     return root;
 }
 
-inline void ltrim(std::string &s) {
-    s.erase(s.begin(), std::ranges::find_if(s, [](const unsigned char ch) {
-        return !std::isspace(ch);
-    }));
+Task<> addPageIDs(const std::unordered_map<std::string, std::string> &ids, nlohmann::ordered_json &json) {
+    if (!json.is_array()) {
+        co_return;
+    }
+    for (auto it = json.begin(); it != json.end();) {
+        if (auto &item = *it; item.is_object()) {
+            if (item["type"].get<std::string>() == "dir") {
+                if (item.contains("children")) {
+                    co_await addPageIDs(ids, item["children"]);
+                }
+            } else if (item["type"].get<std::string>() == "file") {
+                const auto path = item["path"].get<std::string>();
+                if (const auto id = ids.find(path + ".mdx"); id != ids.end()) {
+                    item["id"] = id->second;
+                } else {
+                    it = json.erase(it);
+                    continue;
+                }
+            }
+        }
+        ++it;
+    }
 }
 
-inline void rtrim(std::string &s) {
-    s.erase(std::find_if(s.rbegin(), s.rend(), [](const unsigned char ch) {
-        return !std::isspace(ch);
-    }).base(), s.end());
+template<typename T>
+Task<Json::Value> appendSources(const std::string col, const std::string item) {
+    const auto items = co_await global::database->getRelated<T>(col, item);
+    Json::Value root(Json::arrayValue);
+    for (const auto &res: items) {
+        if (!res.getValueOfProjectId().empty()) {
+            root.append(res.getValueOfProjectId());
+        }
+    }
+    co_return root;
+}
+
+std::map<int, std::vector<RecipeIngredientItem>> groupIngredients(const std::vector<RecipeIngredientItem> &ingredients, const bool input) {
+    std::map<int, std::vector<RecipeIngredientItem>> slots;
+    for (auto &ingredient: ingredients) {
+        if (ingredient.getValueOfInput() == input) {
+            slots[ingredient.getValueOfSlot()].emplace_back(ingredient);
+        }
+    }
+    return slots;
 }
 
 namespace service {
@@ -432,6 +467,14 @@ namespace service {
         return {{buffer.str(), editUrl, updatedAt}, Error::Ok};
     }
 
+    Task<std::tuple<ProjectPage, Error>> ResolvedProject::readContentPage(const std::string id) const {
+        const auto contentPath = co_await global::database->getProjectContentPath(project_.getValueOfId(), id);
+        if (!contentPath) {
+            co_return {{"", "", ""}, Error::ErrInternal};
+        }
+        co_return readFile(*contentPath);
+    }
+
     std::optional<std::string> ResolvedProject::readPageAttribute(std::string path, std::string prop) const {
         const auto filePath = getFilePath(docsDir_, removeLeadingSlash(path), locale_);
 
@@ -462,7 +505,7 @@ namespace service {
             }
         }
         ifs.close();
-        return "";
+        return std::nullopt;
     }
 
     std::optional<std::string> ResolvedProject::readLangKey(const std::string &locale, const std::string &key) const {
@@ -479,6 +522,32 @@ namespace service {
         return {tree, Error::Ok};
     }
 
+    std::tuple<nlohmann::ordered_json, Error> ResolvedProject::getContentDirectoryTree() const {
+        const auto contentPath = docsDir_ / ".content";
+        if (!exists(contentPath)) {
+            return {nlohmann::ordered_json(), Error::ErrNotFound};
+        }
+        const auto tree = getDirTreeJson(project_, docsDir_, contentPath, locale_);
+        return {tree, Error::Ok};
+    }
+
+    Task<std::tuple<std::optional<nlohmann::ordered_json>, Error>> ResolvedProject::getProjectContents() const {
+        std::unordered_map<std::string, std::string> ids;
+        for (const auto contents = co_await global::database->getProjectContents(project_.getValueOfId()); const auto &[id, path]: contents)
+        {
+            ids.emplace(path, id);
+        }
+
+        auto [tree, treeErr] = getContentDirectoryTree();
+        if (treeErr != Error::Ok) {
+            co_return {std::nullopt, treeErr};
+        }
+
+        co_await addPageIDs(ids, tree);
+
+        co_return {tree, Error::Ok};
+    }
+
     std::string getAssetPath(const ResourceLocation &location) {
         return ".assets/" + location.namespace_ + "/" + location.path_ + (location.path_.find('.') != std::string::npos ? "" : ".png");
     }
@@ -489,7 +558,8 @@ namespace service {
         }
 
         // Legacy asset path fallback
-        if (const auto legacyFilePath = docsDir_ / getAssetPath({.namespace_ = "item", .path_ = location.namespace_ + '/' + location.path_});
+        if (const auto legacyFilePath =
+                docsDir_ / getAssetPath({.namespace_ = "item", .path_ = location.namespace_ + '/' + location.path_});
             exists(legacyFilePath))
         {
             return legacyFilePath;
@@ -554,12 +624,10 @@ namespace service {
         // TODO Database
         const auto clientPtr = app().getFastDbClient();
         const auto projectId = project_.getValueOfId();
-        const auto rows = co_await clientPtr->execSqlCoro(
-            "SELECT path FROM item_page "
-            "JOIN item ON item_page.id = item.id "
-            "WHERE item.project_id = $1 AND item.item_id = $2",
-            projectId, id
-        );
+        const auto rows = co_await clientPtr->execSqlCoro("SELECT path FROM item_page "
+                                                          "JOIN item ON item_page.id = item.id "
+                                                          "WHERE item.project_id = $1 AND item.item_id = $2",
+                                                          projectId, id);
         if (rows.size() < 1) {
             const auto parsed = ResourceLocation::parse(id);
             // TODO Locale
@@ -568,5 +636,93 @@ namespace service {
         }
         const auto path = rows.front()["path"].as<std::string>();
         co_return readPageAttribute(path, "title");
+    }
+
+    Task<Json::Value> ResolvedProject::ingredientToJson(const int slot, const std::vector<RecipeIngredientItem> items) const {
+        Json::Value root;
+        root["slot"] = slot;
+        Json::Value itemsJson(Json::arrayValue);
+        for (const auto &item: items) {
+            const auto name = co_await getItemName(item.getValueOfItemId());
+
+            Json::Value itemJson;
+            itemJson["id"] = item.getValueOfItemId();
+            if (name) {
+                itemJson["name"] = *name;
+            }
+            itemJson["count"] = item.getValueOfCount();
+            itemJson["sources"] = co_await appendSources<Item>(RecipeIngredientItem::Cols::_item_id, item.getValueOfItemId());
+            itemsJson.append(itemJson);
+        }
+        root["items"] = itemsJson;
+        co_return root;
+    }
+
+    Task<Json::Value> ResolvedProject::ingredientToJson(const RecipeIngredientTag &tag) const {
+        Json::Value root;
+        {
+            Json::Value tagJson;
+            tagJson["id"] = tag.getValueOfTagId();
+            {
+                Json::Value itemsJson(Json::arrayValue);
+                for (const auto tagItems = co_await global::database->getTagItemsFlat(tag.getValueOfTagId());
+                     const auto &[itemId]: tagItems)
+                {
+                    const auto name = co_await getItemName(itemId);
+
+                    Json::Value itemJson;
+                    itemJson["id"] = itemId;
+                    if (name) {
+                        itemJson["name"] = *name;
+                    }
+                    itemJson["sources"] = co_await appendSources<Item>(RecipeIngredientItem::Cols::_item_id, itemId);
+                    itemsJson.append(itemJson);
+                }
+                tagJson["items"] = itemsJson;
+            }
+            root["tag"] = tagJson;
+        }
+        root["count"] = tag.getValueOfCount();
+        root["slot"] = tag.getValueOfSlot();
+        co_return root;
+    }
+
+    Task<std::optional<Json::Value>> ResolvedProject::getRecipe(std::string id) const {
+        const auto result = co_await global::database->getProjectRecipe(project_.getValueOfId(), id);
+        if (!result) {
+            co_return std::nullopt;
+        }
+
+        const auto itemIngredients =
+            co_await global::database->getRelated<RecipeIngredientItem>(RecipeIngredientItem::Cols::_recipe_id, result->getValueOfId());
+        const auto tagIngredients =
+            co_await global::database->getRelated<RecipeIngredientTag>(RecipeIngredientTag::Cols::_recipe_id, result->getValueOfId());
+
+        Json::Value json;
+        json["type"] = unparkourJson(recipe_type::builtin::shapedCrafting);
+        json["type"]["id"] = result->getValueOfType();
+        {
+            Json::Value inputs;
+            Json::Value outputs;
+            std::map<int, std::vector<RecipeIngredientItem>> itemInputSlots = groupIngredients(itemIngredients, true);
+            std::map<int, std::vector<RecipeIngredientItem>> itemOutputSlots = groupIngredients(itemIngredients, false);
+
+            for (const auto &[slot, items]: itemInputSlots) {
+                const auto itemJson = co_await ingredientToJson(slot, items);
+                inputs.append(itemJson);
+            }
+            for (const auto &tag: tagIngredients) {
+                const auto tagJson = co_await ingredientToJson(tag);
+                inputs.append(tagJson);
+            }
+            for (const auto &[slot, items]: itemOutputSlots) {
+                const auto itemJson = co_await ingredientToJson(slot, items);
+                outputs.append(itemJson);
+            }
+            json["inputs"] = inputs;
+            json["outputs"] = outputs;
+        }
+
+        co_return json;
     }
 }

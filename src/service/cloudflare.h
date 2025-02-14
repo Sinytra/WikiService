@@ -9,13 +9,12 @@
 namespace service {
     class CloudFlare : public CacheableServiceBase {
     public:
-        explicit CloudFlare(const config::CloudFlare &, MemoryCache &);
+        explicit CloudFlare(const config::CloudFlare &);
 
         drogon::Task<std::vector<std::string>> getMostVisitedProjectIDs();
     private:
         drogon::Task<std::vector<std::string>> computeMostVisitedProjectIDs() const;
 
-        MemoryCache &cache_;
         const config::CloudFlare &config_;
     };
 }
