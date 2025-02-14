@@ -4,12 +4,13 @@
 #include "util.h"
 
 #include <chrono>
+#include <global.h>
 
 using namespace drogon;
 using namespace std::chrono_literals;
 
 namespace service {
-    CloudFlare::CloudFlare(const config::CloudFlare &config, MemoryCache &c) : cache_(c), config_(config) {}
+    CloudFlare::CloudFlare(const config::CloudFlare &config) : config_(config) {}
 
     Task<std::vector<std::string>> CloudFlare::computeMostVisitedProjectIDs() const {
         const auto client = createHttpClient(CLOUDFLARE_API_URL);
@@ -96,7 +97,7 @@ namespace service {
 
         static const auto cacheKey = "popular_projects";
 
-        if (const auto cached = co_await cache_.getFromCache(cacheKey)) {
+        if (const auto cached = co_await global::cache->getFromCache(cacheKey)) {
             if (const auto parsed = tryParseJson<nlohmann::ordered_json>(*cached)) {
                 co_return parsed->get<std::vector<std::string>>();
             }
@@ -109,7 +110,7 @@ namespace service {
         auto result = co_await computeMostVisitedProjectIDs();
         const auto serialized = nlohmann::json(result).dump();
 
-        co_await cache_.updateCache(cacheKey, serialized, 7 * 24h);
+        co_await global::cache->updateCache(cacheKey, serialized, 7 * 24h);
         co_return co_await completeTask<std::vector<std::string>>(cacheKey, std::move(result));
     }
 }

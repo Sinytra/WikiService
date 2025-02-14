@@ -1,8 +1,6 @@
 #include "game.h"
 
-#include <models/RecipeIngredientItem.h>
-#include <models/RecipeIngredientTag.h>
-#include <content/builtin_recipe_type.h>
+#include <global.h>
 #include <string>
 
 #include "error.h"
@@ -16,75 +14,56 @@ using namespace drogon::orm;
 using namespace drogon_model::postgres;
 
 namespace api::v1 {
-    GameController::GameController(Database &db, Storage &s) : database_(db), storage_(s) {}
-
-    template<typename T>
-    Task<Json::Value> appendSources(const std::string col, const std::string item, const Database &db) {
-        const auto items = co_await db.getRelated<T>(col, item);
-        Json::Value root(Json::arrayValue);
-        for (const auto &res: items) {
-            if (!res.getValueOfProjectId().empty()) {
-                root.append(res.getValueOfProjectId());
-            }
+    // TODO Version and lang
+    Task<> GameController::contents(HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+                                    const std::string project) const {
+        const auto resolved = co_await getProject(project, std::nullopt, std::nullopt, callback);
+        if (!resolved) {
+            co_return;
         }
-        co_return root;
+
+        const auto [contents, contentsErr] = co_await resolved->getProjectContents();
+        if (!contents) {
+            errorResponse(contentsErr, "Contents directory not found", callback);
+            co_return;
+        }
+
+        const auto response = HttpResponse::newHttpJsonResponse(unparkourJson(*contents));
+        callback(response);
+
+        co_return;
     }
 
-    Task<Json::Value> ingredientToJson(const ResolvedProject &project, const int slot, const std::vector<RecipeIngredientItem> items, const Database &db) {
+    Task<> GameController::contentItem(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, const std::string project,
+                                       const std::string id) const {
+        if (id.empty()) {
+            errorResponse(Error::ErrBadRequest, "Insufficient parameters", callback);
+            co_return;
+        }
+
+        const auto resolved = co_await getProject(project, std::nullopt, std::nullopt, callback);
+        if (!resolved) {
+            co_return;
+        }
+
+        const auto [page, pageErr] = co_await resolved->readContentPage(id);
+        if (pageErr != Error::Ok) {
+            errorResponse(Error::ErrBadRequest, "Content ID not found", callback);
+            co_return;
+        }
+
         Json::Value root;
-        root["slot"] = slot;
-        Json::Value itemsJson(Json::arrayValue);
-        for (const auto &item: items) {
-            const auto name = co_await project.getItemName(item.getValueOfItemId());
-
-            Json::Value itemJson;
-            itemJson["id"] = item.getValueOfItemId();
-            if (name) {
-                itemJson["name"] = *name;
-            }
-            itemJson["count"] = item.getValueOfCount();
-            itemJson["sources"] = co_await appendSources<Item>(RecipeIngredientItem::Cols::_item_id, item.getValueOfItemId(), db);
-            itemsJson.append(itemJson);
+        root["project"] = resolved->toJson();
+        root["content"] = page.content;
+        if (resolved->getProject().getValueOfIsPublic() && !page.editUrl.empty()) {
+            root["edit_url"] = page.editUrl;
         }
-        root["items"] = itemsJson;
-        co_return root;
-    }
-
-    Task<Json::Value> ingredientToJson(const ResolvedProject &project, const RecipeIngredientTag &tag, const Database &db) {
-        Json::Value root;
-        {
-            Json::Value tagJson;
-            tagJson["id"] = tag.getValueOfTagId();
-            {
-                Json::Value itemsJson(Json::arrayValue);
-                for (const auto tagItems = co_await db.getTagItemsFlat(tag.getValueOfTagId()); const auto &[itemId]: tagItems) {
-                    const auto name = co_await project.getItemName(itemId);
-
-                    Json::Value itemJson;
-                    itemJson["id"] = itemId;
-                    if (name) {
-                        itemJson["name"] = *name;
-                    }
-                    itemJson["sources"] = co_await appendSources<Item>(RecipeIngredientItem::Cols::_item_id, itemId, db);
-                    itemsJson.append(itemJson);
-                }
-                tagJson["items"] = itemsJson;
-            }
-            root["tag"] = tagJson;
+        if (!page.updatedAt.empty()) {
+            root["updated_at"] = page.updatedAt;
         }
-        root["count"] = tag.getValueOfCount();
-        root["slot"] = tag.getValueOfSlot();
-        co_return root;
-    }
 
-    std::map<int, std::vector<RecipeIngredientItem>> groupIngredients(const std::vector<RecipeIngredientItem> &ingredients, const bool input) {
-        std::map<int, std::vector<RecipeIngredientItem>> slots;
-        for (auto &ingredient: ingredients) {
-            if (ingredient.getValueOfInput() == input) {
-                slots[ingredient.getValueOfSlot()].emplace_back(ingredient);
-            }
-        }
-        return slots;
+        const auto resp = HttpResponse::newHttpJsonResponse(root);
+        callback(resp);
     }
 
     // TODO have projects include game version info (merge with versions?)
@@ -92,58 +71,23 @@ namespace api::v1 {
     // TODO How about nonexistent items, tags or so?
     Task<> GameController::recipe(HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                   const std::string project, const std::string recipe) const {
-        if (project.empty() || recipe.empty()) {
+        if (recipe.empty()) {
             errorResponse(Error::ErrBadRequest, "Insufficient parameters", callback);
             co_return;
         }
 
-        const auto [proj, projErr] = co_await database_.getProjectSource(project);
-        if (!proj) {
-            errorResponse(projErr, "Project not found", callback);
-            co_return;
-        }
-
-        const auto [resolved, resErr](co_await storage_.getProject(*proj, std::nullopt, std::nullopt));
+        const auto resolved = co_await getProject(project, std::nullopt, std::nullopt, callback);
         if (!resolved) {
-            errorResponse(resErr, "Resolution failure", callback);
             co_return;
         }
 
-        const auto result = co_await database_.getProjectRecipe(project, recipe);
-        if (!result) {
+        const auto projectRecipe = co_await resolved->getRecipe(recipe);
+        if (!projectRecipe) {
             errorResponse(Error::ErrNotFound, "Recipe not found", callback);
             co_return;
         }
-        const auto itemIngredients =
-            co_await database_.getRelated<RecipeIngredientItem>(RecipeIngredientItem::Cols::_recipe_id, result->getValueOfId());
-        const auto tagIngredients =
-            co_await database_.getRelated<RecipeIngredientTag>(RecipeIngredientTag::Cols::_recipe_id, result->getValueOfId());
 
-        Json::Value json;
-        json["type"] = *parseJsonString(recipe_type::builtin::shapedCrafting.dump());
-        json["type"]["id"] = result->getValueOfType();
-        {
-            Json::Value inputs;
-            Json::Value outputs;
-            std::map<int, std::vector<RecipeIngredientItem>> itemInputSlots = groupIngredients(itemIngredients, true);
-            std::map<int, std::vector<RecipeIngredientItem>> itemOutputSlots = groupIngredients(itemIngredients, false);
-
-            for (const auto &[slot, items]: itemInputSlots) {
-                const auto itemJson = co_await ingredientToJson(*resolved, slot, items, database_);
-                inputs.append(itemJson);
-            }
-            for (const auto &tag : tagIngredients) {
-                const auto tagJson = co_await ingredientToJson(*resolved, tag, database_);
-                inputs.append(tagJson);
-            }
-            for (const auto &[slot, items]: itemOutputSlots) {
-                const auto itemJson = co_await ingredientToJson(*resolved, slot, items, database_);
-                outputs.append(itemJson);
-            }
-            json["inputs"] = inputs;
-            json["outputs"] = outputs;
-        }
-        const auto response = HttpResponse::newHttpJsonResponse(json);
+        const auto response = HttpResponse::newHttpJsonResponse(*projectRecipe);
         callback(response);
 
         co_return;
@@ -156,7 +100,7 @@ namespace api::v1 {
             co_return;
         }
 
-        const auto recipes = co_await database_.getItemUsageInRecipes(item);
+        const auto recipes = co_await global::database->getItemUsageInRecipes(item);
         Json::Value root(Json::arrayValue);
         for (const auto &recipe: recipes) {
             Json::Value recipeJson;

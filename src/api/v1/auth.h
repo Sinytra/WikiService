@@ -3,14 +3,12 @@
 #include <drogon/HttpController.h>
 
 #include "config.h"
-#include "service/github.h"
-
 #include <service/auth.h>
 
 namespace api::v1 {
     class AuthController final : public drogon::HttpController<AuthController, false> {
     public:
-        explicit AuthController(const config::AuthConfig &, service::Auth &, service::GitHub &, service::MemoryCache &, service::Database &);
+        explicit AuthController(const config::AuthConfig &);
 
         // clang-format off
         METHOD_LIST_BEGIN
@@ -43,10 +41,6 @@ namespace api::v1 {
 
     private:
         const config::AuthConfig &config_;
-        service::Auth &auth_;
-        service::GitHub &github_;
-        service::Database &database_;
-        service::MemoryCache &cache_;
         const std::string appDomain_;
     };
 }

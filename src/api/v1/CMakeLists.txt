@@ -1,5 +1,6 @@
 add_library(api STATIC
         auth.cc
+        base.cc
         browse.cc
         docs.cc
         game.cc

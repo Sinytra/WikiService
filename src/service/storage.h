@@ -37,7 +37,7 @@ namespace service {
 
     class Storage : public CacheableServiceBase {
     public:
-        explicit Storage(const std::string &, MemoryCache &, RealtimeConnectionStorage &, content::Ingestor &);
+        explicit Storage(const std::string &);
 
         drogon::Task<std::tuple<std::optional<ResolvedProject>, Error>> getProject(const Project &project, const std::optional<std::string> &version, const std::optional<std::string> &locale);
 
@@ -60,8 +60,5 @@ namespace service {
         std::shared_ptr<spdlog::logger> getProjectLogger(const Project &project, bool file = true) const;
 
         const std::string &basePath_;
-        MemoryCache &cache_;
-        RealtimeConnectionStorage &connections_;
-        content::Ingestor ingestor_;
     };
 }

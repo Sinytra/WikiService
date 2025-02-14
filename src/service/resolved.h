@@ -2,7 +2,9 @@
 
 #include "cache.h"
 #include "error.h"
-#include "models/Project.h"
+#include <models/Project.h>
+#include <models/RecipeIngredientItem.h>
+#include <models/RecipeIngredientTag.h>
 #include "util.h"
 
 #include <nlohmann/json.hpp>
@@ -47,14 +49,16 @@ namespace service {
         std::unordered_map<std::string, std::string> getAvailableVersions() const;
 
         std::tuple<ProjectPage, Error> readFile(std::string path) const;
-
+        drogon::Task<std::tuple<ProjectPage, Error>> readContentPage(std::string id) const;
         std::optional<std::string> readPageAttribute(std::string path, std::string prop) const;
-
         std::optional<std::string> readLangKey(const std::string &locale, const std::string &key) const;
 
         std::tuple<nlohmann::ordered_json, Error> getDirectoryTree() const;
+        std::tuple<nlohmann::ordered_json, Error> getContentDirectoryTree() const;
+        drogon::Task<std::tuple<std::optional<nlohmann::ordered_json>, Error>> getProjectContents() const;
 
         std::optional<std::filesystem::path> getAsset(const ResourceLocation &location) const;
+        drogon::Task<std::optional<Json::Value>> getRecipe(std::string id) const;
 
         std::tuple<std::optional<nlohmann::json>, ProjectError, std::string> validateProjectMetadata() const;
 
@@ -67,6 +71,9 @@ namespace service {
         // Content
         drogon::Task<std::optional<std::string>> getItemName(std::string id) const;
     private:
+        drogon::Task<Json::Value> ingredientToJson(int slot, std::vector<RecipeIngredientItem> items) const;
+        drogon::Task<Json::Value> ingredientToJson(const RecipeIngredientTag &tag) const;
+
         Project project_;
         std::shared_ptr<ResolvedProject> defaultVersion_;
 

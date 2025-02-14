@@ -8,12 +8,11 @@
 using namespace drogon;
 using namespace drogon::orm;
 using namespace logging;
+using namespace service;
 namespace fs = std::filesystem;
 
 // TODO Reserved modids
 namespace content {
-    Ingestor::Ingestor(Database &db) : database_(db) {}
-
     struct RecipeIngredient {
         std::string itemId;
         int slot;
@@ -93,37 +92,6 @@ namespace content {
         return recipe;
     }
 
-    // TODO Replace with ResolvedProject::readPageAttribute
-    std::string readContentId(fs::path path) {
-        std::ifstream ifs(path);
-        if (!ifs.is_open()) {
-            return "";
-        }
-
-        std::string line;
-        int frontMatterBorder = 0;
-        while (std::getline(ifs, line)) {
-            if (frontMatterBorder > 1) {
-                break;
-            }
-            if (line.starts_with("---")) {
-                frontMatterBorder++;
-            }
-            replaceAll(line, " ", "");
-            if (frontMatterBorder == 1 && line.starts_with("id:")) {
-                const auto pos = line.find(":");
-                if (pos != std::string::npos) {
-                    auto sub = line.substr(pos + 1);
-                    replaceAll(sub, " ", "");
-                    ifs.close();
-                    return sub;
-                }
-            }
-        }
-        ifs.close();
-        return "";
-    }
-
     Task<> addProjectItem(const DbClientPtr clientPtr, std::string project, std::string item) {
         co_await clientPtr->execSqlCoro("INSERT INTO item_id VALUES ($1) ON CONFLICT DO NOTHING", item);
         co_await clientPtr->execSqlCoro("INSERT INTO item VALUES (DEFAULT, $1, $2) ON CONFLICT DO NOTHING", item, project);
@@ -136,25 +104,25 @@ namespace content {
         std::set<std::string> items;
 
         for (const auto &entry: fs::recursive_directory_iterator(docsRoot)) {
-            if (!entry.is_regular_file() || entry.path().filename().string().starts_with(".")) {
+            const auto fileName = entry.path().filename().string();
+            if (!entry.is_regular_file() || entry.path().extension() != ".mdx" || fileName.starts_with(".") && !fileName.starts_with(".content/")) {
                 continue;
             }
             fs::path relative_path = relative(entry.path(), docsRoot);
-            const auto id = readContentId(entry.path());
-            if (!id.empty()) {
-                if (items.contains(id)) {
-                    projectLog->warn("Skipping duplicate item {} path {}", id, relative_path.string());
+            if (const auto id = project.readPageAttribute(relative_path.string(), "id")) {
+                if (items.contains(*id)) {
+                    projectLog->warn("Skipping duplicate item {} path {}", *id, relative_path.string());
                     continue;
                 }
 
-                projectLog->debug("Found entry '{}' at '{}'", id, relative_path.string());
+                projectLog->debug("Found entry '{}' at '{}'", *id, relative_path.string());
 
-                items.insert(id);
-                co_await addProjectItem(clientPtr, projectId, id);
+                items.insert(*id);
+                co_await addProjectItem(clientPtr, projectId, *id);
                 co_await clientPtr->execSqlCoro("INSERT INTO item_page (id, path) "
                                                 "SELECT id, $1 as path FROM item "
                                                 "WHERE item_id = $2 AND project_id = $3",
-                                                relative_path.string(), id, projectId);
+                                                relative_path.string(), *id, projectId);
             }
         }
 

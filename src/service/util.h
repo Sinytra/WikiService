@@ -4,7 +4,6 @@
 
 #include <drogon/HttpClient.h>
 #include <drogon/HttpTypes.h>
-#include <json/json.h>
 #include <log/log.h>
 #include <models/Project.h>
 #include <nlohmann/json-schema.hpp>
@@ -12,7 +11,6 @@
 #include <string>
 
 using namespace logging;
-using namespace service;
 
 struct ResourceLocation {
     static constexpr std::string DEFAULT_NAMESPACE = "minecraft";
@@ -41,19 +39,23 @@ std::string removeLeadingSlash(const std::string &s);
 
 std::string removeTrailingSlash(const std::string &s);
 
+void ltrim(std::string &s);
+
+void rtrim(std::string &s);
+
 bool isSuccess(const drogon::HttpStatusCode &code);
 
 drogon::HttpClientPtr createHttpClient(const std::string &url);
 
-drogon::Task<std::tuple<std::optional<Json::Value>, Error>> sendAuthenticatedRequest(
+drogon::Task<std::tuple<std::optional<Json::Value>, service::Error>> sendAuthenticatedRequest(
     drogon::HttpClientPtr client, drogon::HttpMethod method, std::string path, std::string token,
     std::function<void(drogon::HttpRequestPtr &)> callback = [](drogon::HttpRequestPtr &) {});
 
-drogon::Task<std::tuple<std::optional<Json::Value>, Error>> sendApiRequest(
+drogon::Task<std::tuple<std::optional<Json::Value>, service::Error>> sendApiRequest(
     drogon::HttpClientPtr client, drogon::HttpMethod method, std::string path,
     std::function<void(drogon::HttpRequestPtr &)> callback = [](drogon::HttpRequestPtr &) {});
 
-drogon::Task<std::tuple<std::optional<std::pair<drogon::HttpResponsePtr, Json::Value>>, Error>> sendRawApiRequest(
+drogon::Task<std::tuple<std::optional<std::pair<drogon::HttpResponsePtr, Json::Value>>, service::Error>> sendRawApiRequest(
     drogon::HttpClientPtr client, drogon::HttpMethod method, std::string path,
     std::function<void(drogon::HttpRequestPtr &)> callback = [](drogon::HttpRequestPtr &) {});
 
@@ -68,6 +70,7 @@ std::optional<T> tryParseJson(const std::string_view json) {
 }
 
 nlohmann::json parkourJson(const Json::Value &json);
+Json::Value unparkourJson(const nlohmann::json &json);
 
 std::optional<JsonValidationError> validateJson(const nlohmann::json &schema, const Json::Value &json);
 

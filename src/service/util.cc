@@ -7,10 +7,19 @@
 
 using namespace drogon;
 using namespace logging;
+using namespace service;
 
 std::string removeLeadingSlash(const std::string &s) { return s.starts_with('/') ? s.substr(1) : s; }
 
 std::string removeTrailingSlash(const std::string &s) { return s.ends_with('/') ? s.substr(0, s.size() - 1) : s; }
+
+void ltrim(std::string &s) {
+    s.erase(s.begin(), std::ranges::find_if(s, [](const unsigned char ch) { return !std::isspace(ch); }));
+}
+
+void rtrim(std::string &s) {
+    s.erase(std::find_if(s.rbegin(), s.rend(), [](const unsigned char ch) { return !std::isspace(ch); }).base(), s.end());
+}
 
 std::optional<ResourceLocation> ResourceLocation::parse(const std::string &str) {
     const auto delimeter = str.find(':');
@@ -148,6 +157,14 @@ nlohmann::json parkourJson(const Json::Value &json) {
     // Jump from one json library to the other. Parkour!
     const auto ser = serializeJsonString(json);
     return nlohmann::json::parse(ser);
+}
+
+Json::Value unparkourJson(const nlohmann::json &json) {
+    const auto parsed = parseJsonString(json.dump());
+    if (!parsed) {
+        throw std::runtime_error("Failed to convert JSON: " + json.dump());
+    }
+    return *parsed;
 }
 
 std::optional<JsonValidationError> validateJson(const nlohmann::json &schema, const Json::Value &json) {

@@ -1,14 +1,11 @@
 #pragma once
 
 #include <drogon/HttpController.h>
-#include <service/auth.h>
-
-#include <service/cloudflare.h>
-#include <service/database.h>
+#include <models/Project.h>
+#include <nlohmann/json.hpp>
 #include <service/platforms.h>
-#include <service/storage.h>
 
-using namespace service;
+using namespace drogon_model::postgres;
 
 namespace api::v1 {
     struct ValidatedProjectData {
@@ -18,8 +15,6 @@ namespace api::v1 {
 
     class ProjectsController final : public drogon::HttpController<ProjectsController, false> {
     public:
-        explicit ProjectsController(Auth &, Platforms &, Database &, Storage &, CloudFlare &);
-
         // clang-format off
         METHOD_LIST_BEGIN
         // Public
@@ -65,21 +60,14 @@ namespace api::v1 {
     private:
         nlohmann::json processPlatforms(const nlohmann::json &metadata) const;
 
-        drogon::Task<std::optional<PlatformProject>> validatePlatform(const std::string &id, const std::string &repo,
-                                                                      const std::string &platform, const std::string &slug,
-                                                                      bool checkExisting, User user,
-                                                                      std::function<void(const drogon::HttpResponsePtr &)> callback) const;
+        drogon::Task<std::optional<service::PlatformProject>>
+        validatePlatform(const std::string &id, const std::string &repo, const std::string &platform, const std::string &slug,
+                         bool checkExisting, User user, std::function<void(const drogon::HttpResponsePtr &)> callback) const;
 
         drogon::Task<std::optional<ValidatedProjectData>> validateProjectData(const Json::Value &json, User user,
                                                                               std::function<void(const drogon::HttpResponsePtr &)> callback,
                                                                               bool checkExisting) const;
 
         void reloadProject(const Project &project, bool invalidate = true) const;
-
-        Auth &auth_;
-        Platforms &platforms_;
-        Database &database_;
-        Storage &storage_;
-        CloudFlare &cloudflare_;
     };
 }

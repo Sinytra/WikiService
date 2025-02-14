@@ -5,6 +5,7 @@
 #include <fstream>
 
 #include <git2.h>
+#include <global.h>
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/callback_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
@@ -18,6 +19,7 @@
 
 using namespace logging;
 using namespace drogon;
+using namespace service;
 namespace fs = std::filesystem;
 
 const std::set<std::string> allowedFileExtensions = {".mdx", ".json", ".png", ".jpg", ".jpeg", ".webp", ".gif"};
@@ -237,8 +239,7 @@ namespace service {
         pending_.erase(project);
     }
 
-    Storage::Storage(const std::string &p, MemoryCache &c, RealtimeConnectionStorage &cn, content::Ingestor &in) :
-        basePath_(p), cache_(c), connections_(cn), ingestor_(in) {
+    Storage::Storage(const std::string &basePath) : basePath_(basePath) {
         if (!fs::exists(basePath_)) {
             fs::create_directories(basePath_);
         }
@@ -273,7 +274,7 @@ namespace service {
         std::vector<spdlog::sink_ptr> sinks;
 
         const auto callbackSink =
-            std::make_shared<FormattedCallbackSink>([&, id](const std::string &msg) { connections_.broadcast(id, msg); });
+            std::make_shared<FormattedCallbackSink>([&, id](const std::string &msg) { global::connections->broadcast(id, msg); });
         callbackSink->set_pattern("[%^%L%$] [%Y-%m-%d %T] [%n] %v");
         sinks.push_back(callbackSink);
 
@@ -400,7 +401,7 @@ namespace service {
 
         // TODO
         ResolvedProject finalResolved{project, dest, dest / removeLeadingSlash(project.getValueOfSourcePath())};
-        co_await ingestor_.ingestGameContentData(finalResolved, logger);
+        co_await global::ingestor->ingestGameContentData(finalResolved, logger);
 
         co_return ProjectError::OK;
     }
@@ -414,12 +415,12 @@ namespace service {
 
         auto result = co_await setupProject(project);
         if (result == ProjectError::OK) {
-            connections_.broadcast(project.getValueOfId(), WS_SUCCESS);
+            global::connections->broadcast(project.getValueOfId(), WS_SUCCESS);
         } else {
-            connections_.broadcast(project.getValueOfId(), WS_ERROR);
+            global::connections->broadcast(project.getValueOfId(), WS_ERROR);
         }
 
-        connections_.shutdown(project.getValueOfId());
+        global::connections->shutdown(project.getValueOfId());
 
         co_return co_await completeTask<ProjectError>(taskKey, std::move(result));
     }

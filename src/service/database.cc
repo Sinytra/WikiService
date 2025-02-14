@@ -272,6 +272,39 @@ namespace service {
         co_return res.value_or(err);
     }
 
+    Task<std::vector<ProjectContent>> Database::getProjectContents(const std::string project) const {
+        const auto [res, err] = co_await handleDatabaseOperation<std::vector<ProjectContent>>([project](const DbClientPtr &client) -> Task<std::vector<ProjectContent>> {
+            const auto results = co_await client->execSqlCoro("SELECT item_id, path FROM item "
+                "JOIN item_page ON item.id = item_page.id "
+                "WHERE item.project_id = $1 AND starts_with(item_page.path, '.content/');",
+                project);
+            std::vector<ProjectContent> contents;
+            for (const auto &row: results) {
+                const auto id = row.at("item_id").as<std::string>();
+                const auto path = row.at("path").as<std::string>();
+                contents.emplace_back(id, path);
+            }
+            co_return contents;
+        });
+        co_return res.value_or(std::vector<ProjectContent>{});
+    }
+
+    Task<std::optional<std::string>> Database::getProjectContentPath(std::string project, std::string id) const {
+        const auto [res, err] = co_await handleDatabaseOperation<std::string>([project, id](const DbClientPtr &client) -> Task<std::string> {
+            const auto results = co_await client->execSqlCoro("SELECT path FROM item "
+                "JOIN item_page ON item.id = item_page.id "
+                "WHERE item.project_id = $1 AND item.item_id = $2;",
+                project, id);
+            if (results.size() != 1) {
+                throw DrogonDbException{};
+            }
+            const auto row = results.front();
+            const auto path = row.at("path").as<std::string>();
+            co_return path;
+        });
+        co_return res;
+    }
+
     Task<std::optional<Recipe>> Database::getProjectRecipe(std::string project, std::string recipe) const {
         const auto [res, err] = co_await handleDatabaseOperation<Recipe>([project, recipe](const DbClientPtr &client) -> Task<Recipe> {
             CoroMapper<Recipe> mapper(client);
