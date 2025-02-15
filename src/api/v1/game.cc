@@ -82,17 +82,18 @@ namespace api::v1 {
 
         const auto obtainable = co_await global::database->getObtainableItemsBy(item);
         Json::Value root(Json::arrayValue);
-        for (const auto &[id, project]: obtainable) {
+        for (const auto &[project, id, path]: obtainable) {
             // TODO
             const auto name = co_await resolved->getItemName(id);
 
-            Json::Value recipeJson;
-            recipeJson["project"] = project;
-            recipeJson["id"] = id;
+            Json::Value itemJson;
+            itemJson["project"] = project;
+            itemJson["id"] = id;
             if (name) {
-                recipeJson["name"] = *name;
+                itemJson["name"] = *name;
             }
-            root.append(recipeJson);
+            itemJson["has_page"] = !path.empty();
+            root.append(itemJson);
         }
         const auto response = HttpResponse::newHttpJsonResponse(root);
         callback(response);

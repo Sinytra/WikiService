@@ -25,8 +25,9 @@ namespace service {
         std::string path;
     };
     struct ContentUsage {
-        std::string id;
         std::string project;
+        std::string id;
+        std::string path;
     };
 
     class Database {
