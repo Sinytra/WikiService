@@ -355,9 +355,11 @@ namespace service {
         const auto [res, err] = co_await handleDatabaseOperation<std::vector<ContentUsage>>(
             [item](const DbClientPtr &client) -> Task<std::vector<ContentUsage>> {
                 const auto results =
-                    co_await client->execSqlCoro("SELECT r.project_id, ri.item_id "
+                    co_await client->execSqlCoro("SELECT item.project_id, ri.item_id, item_page.path "
                                                  "FROM recipe r "
                                                  "JOIN recipe_ingredient_item ri ON r.id = ri.recipe_id "
+                                                 "JOIN item ON ri.item_id = item.item_id "
+                                                 "LEFT JOIN item_page ON item.id = item_page.id "
                                                  "WHERE NOT ri.input "
                                                  "AND EXISTS (SELECT 1 FROM recipe_ingredient_item ri_sub "
                                                  "            WHERE ri_sub.recipe_id = r.id AND ri_sub.item_id = $1 AND ri_sub.input)",
@@ -366,7 +368,8 @@ namespace service {
                 for (const auto &row: results) {
                     const auto projectId = row[0].as<std::string>();
                     const auto loc = row[1].as<std::string>();
-                    usages.emplace_back(loc, projectId);
+                    const auto path = row[2].isNull() ? "" : row[2].as<std::string>();
+                    usages.emplace_back(projectId, loc, path);
                 }
                 co_return usages;
             });
