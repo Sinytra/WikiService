@@ -12,11 +12,12 @@ using namespace logging;
 using namespace drogon::orm;
 using namespace drogon_model::postgres;
 
+// TODO Have projects include game version info (merge with versions?)
 namespace api::v1 {
-    // TODO Version and lang
-    Task<> GameController::contents(HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+    // TODO DB content pages not tied to version
+    Task<> GameController::contents(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                     const std::string project) const {
-        const auto resolved = co_await getProject(project, std::nullopt, std::nullopt, callback);
+        const auto resolved = co_await getProjectWithParams(req, callback, project);
         if (!resolved) {
             co_return;
         }
@@ -33,14 +34,15 @@ namespace api::v1 {
         co_return;
     }
 
-    Task<> GameController::contentItem(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, const std::string project,
-                                       const std::string id) const {
+    // TODO DB content pages not tied to version
+    Task<> GameController::contentItem(const HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback,
+                                       const std::string project, const std::string id) const {
         if (id.empty()) {
             errorResponse(Error::ErrBadRequest, "Insufficient parameters", callback);
             co_return;
         }
 
-        const auto resolved = co_await getProject(project, std::nullopt, std::nullopt, callback);
+        const auto resolved = co_await getProjectWithParams(req, callback, project);
         if (!resolved) {
             co_return;
         }
@@ -65,17 +67,47 @@ namespace api::v1 {
         callback(resp);
     }
 
-    // TODO have projects include game version info (merge with versions?)
-    // TODO version param
-    // TODO How about nonexistent items, tags or so?
-    Task<> GameController::recipe(HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+    // TODO DB content pages not tied to version
+    Task<> GameController::contentItemUsage(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+                                            const std::string project, const std::string item) const {
+        if (item.empty()) {
+            errorResponse(Error::ErrBadRequest, "Insufficient parameters", callback);
+            co_return;
+        }
+
+        const auto resolved = co_await getProjectWithParams(req, callback, project);
+        if (!resolved) {
+            co_return;
+        }
+
+        const auto obtainable = co_await global::database->getObtainableItemsBy(item);
+        Json::Value root(Json::arrayValue);
+        for (const auto &[id, project]: obtainable) {
+            // TODO
+            const auto name = co_await resolved->getItemName(id);
+
+            Json::Value recipeJson;
+            recipeJson["project"] = project;
+            recipeJson["id"] = id;
+            if (name) {
+                recipeJson["name"] = *name;
+            }
+            root.append(recipeJson);
+        }
+        const auto response = HttpResponse::newHttpJsonResponse(root);
+        callback(response);
+
+        co_return;
+    }
+
+    Task<> GameController::recipe(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                   const std::string project, const std::string recipe) const {
         if (recipe.empty()) {
             errorResponse(Error::ErrBadRequest, "Insufficient parameters", callback);
             co_return;
         }
 
-        const auto resolved = co_await getProject(project, std::nullopt, std::nullopt, callback);
+        const auto resolved = co_await getVersionedProject(req, callback, project);
         if (!resolved) {
             co_return;
         }
@@ -87,27 +119,6 @@ namespace api::v1 {
         }
 
         const auto response = HttpResponse::newHttpJsonResponse(*projectRecipe);
-        callback(response);
-
-        co_return;
-    }
-
-    Task<> GameController::itemUsage(HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
-                                     const std::string project, const std::string item) const {
-        if (project.empty() || item.empty()) {
-            errorResponse(Error::ErrBadRequest, "Insufficient parameters", callback);
-            co_return;
-        }
-
-        const auto recipes = co_await global::database->getItemUsageInRecipes(item);
-        Json::Value root(Json::arrayValue);
-        for (const auto &recipe: recipes) {
-            Json::Value recipeJson;
-            recipeJson["project"] = recipe.getValueOfProjectId();
-            recipeJson["id"] = recipe.getValueOfLoc();
-            root.append(recipeJson);
-        }
-        const auto response = HttpResponse::newHttpJsonResponse(root);
         callback(response);
 
         co_return;

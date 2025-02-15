@@ -1,6 +1,6 @@
 CREATE TABLE item_id
 (
-    id varchar(255) primary key
+    id varchar(255) primary key not null check (id <> '')
 );
 
 CREATE TABLE item

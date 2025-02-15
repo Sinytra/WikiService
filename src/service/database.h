@@ -24,6 +24,10 @@ namespace service {
         std::string id;
         std::string path;
     };
+    struct ContentUsage {
+        std::string id;
+        std::string project;
+    };
 
     class Database {
         template<typename Ret>
@@ -74,6 +78,7 @@ namespace service {
         drogon::Task<std::optional<std::string>> getProjectContentPath(std::string project, std::string id) const;
         drogon::Task<std::optional<Recipe>> getProjectRecipe(std::string project, std::string recipe) const;
         drogon::Task<std::vector<Recipe>> getItemUsageInRecipes(std::string item) const;
+        drogon::Task<std::vector<ContentUsage>> getObtainableItemsBy(std::string item) const;
         drogon::Task<std::vector<TagItem>> getTagItemsFlat(std::string tag) const;
 
         template<typename T, typename U>

@@ -398,9 +398,13 @@ namespace service {
 
         logger->info("Project setup complete");
 
-        // TODO
         ResolvedProject finalResolved{project, dest, dest / removeLeadingSlash(project.getValueOfSourcePath())};
-        co_await global::ingestor->ingestGameContentData(finalResolved, logger);
+        content::Ingestor ingestor{finalResolved, logger};
+        co_await ingestor.ingestGameContentData();
+
+        logger->info("====================================");
+        logger->info("Project setup complete");
+        logger->info("====================================");
 
         co_return ProjectError::OK;
     }

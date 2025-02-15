@@ -1,19 +1,22 @@
 #pragma once
 
 #include <drogon/utils/coroutine.h>
-#include <service/database.h>
 #include <service/error.h>
 #include <service/resolved.h>
 
 namespace content {
+
+
   class Ingestor {
   public:
-    drogon::Task<service::Error> ingestGameContentData(service::ResolvedProject project, std::shared_ptr<spdlog::logger> projectLogPtr) const;
-  private:
-    drogon::Task<service::Error> ingestContentPaths(drogon::orm::DbClientPtr clientPtr, service::ResolvedProject project, std::shared_ptr<spdlog::logger> projectLog) const;
-  };
-}
+    explicit Ingestor(service::ResolvedProject &, const std::shared_ptr<spdlog::logger> &);
 
-namespace global {
-  extern std::shared_ptr<content::Ingestor> ingestor;
+    drogon::Task<service::Error> ingestGameContentData() const;
+  private:
+    drogon::Task<service::Error> ingestRecipes() const;
+    drogon::Task<service::Error> ingestContentPaths() const;
+
+    const service::ResolvedProject &project_;
+    const std::shared_ptr<spdlog::logger> &logger_;
+  };
 }

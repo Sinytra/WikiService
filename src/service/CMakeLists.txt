@@ -24,6 +24,7 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/content/builtin_recipe_type.h.in
 
 add_library(service STATIC
         content/game_content.cc
+        content/game_recipes.cc
         auth.cc
         cache.cc
         cloudflare.cc

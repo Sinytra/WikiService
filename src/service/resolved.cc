@@ -7,7 +7,7 @@
 #include <fstream>
 #include <unordered_map>
 
-#include <content/builtin_recipe_type.h>
+#include <content/game_recipes.h>
 #include <drogon/HttpAppFramework.h>
 #include <fmt/args.h>
 #include <git2.h>
@@ -730,6 +730,11 @@ namespace service {
         if (!result) {
             co_return std::nullopt;
         }
+        const auto type = result->getValueOfType();
+        const auto displaySchema = content::getRecipeType(type);
+        if (!displaySchema) {
+            co_return std::nullopt;
+        }
 
         const auto itemIngredients =
             co_await global::database->getRelated<RecipeIngredientItem>(RecipeIngredientItem::Cols::_recipe_id, result->getValueOfId());
@@ -737,8 +742,8 @@ namespace service {
             co_await global::database->getRelated<RecipeIngredientTag>(RecipeIngredientTag::Cols::_recipe_id, result->getValueOfId());
 
         Json::Value json;
-        json["type"] = unparkourJson(recipe_type::builtin::shapedCrafting);
-        json["type"]["id"] = result->getValueOfType();
+        json["type"] = *displaySchema;
+        json["type"]["id"] = type;
         {
             Json::Value inputs;
             Json::Value outputs;
