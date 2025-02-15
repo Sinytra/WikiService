@@ -14,6 +14,8 @@
 
 #include "error.h"
 
+#define MODID_MINECRAFT "minecraft"
+
 using namespace std;
 using namespace drogon;
 using namespace service;
@@ -152,8 +154,7 @@ namespace api::v1 {
         }
 
         const std::string id = (*resolved)["id"];
-        // TODO
-        if (id == "c" || id == "minecraft" || id.size() < 2) {
+        if (id == MODID_MINECRAFT || id.size() < 2) {
             simpleError(Error::ErrBadRequest, "illegal_id", callback);
             co_return std::nullopt;
         }

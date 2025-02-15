@@ -32,8 +32,6 @@ namespace global {
     std::shared_ptr<Auth> auth;
 
     std::shared_ptr<Platforms> platforms;
-
-    std::shared_ptr<content::Ingestor> ingestor;
 }
 
 int main() {
@@ -58,7 +56,6 @@ int main() {
         auto curseForge(CurseForgePlatform{curseForgeKey});
         auto modrinth(ModrinthPlatform{});
         global::platforms = std::make_shared<Platforms>(curseForge, modrinth);
-        global::ingestor = std::make_shared<content::Ingestor>();
 
         auto authController(make_shared<api::v1::AuthController>(authConfig));
         auto controller(make_shared<api::v1::DocsController>());

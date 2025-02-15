@@ -68,6 +68,54 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "minecraft:crafting_shapeless"
+          }
+        }
+      },
+      "then": {
+        "description": "Represents a shapeless crafting recipe in a crafting table.",
+        "anyOf": [
+          {
+            "$ref": "#/definitions/tagsCommonToAllRecipes"
+          },
+          {
+            "$ref": "#/definitions/commonRecipeCategory"
+          }
+        ],
+        "properties": {
+          "ingredients": {
+            "description": "A list of entries for this shapeless crafting recipe.",
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/definitions/ingredient",
+                  "title": "ingredient",
+                  "description": "An entry made of a single ingredient.",
+                  "type": "object"
+                },
+                {
+                  "description": "An entry made of a list of acceptable ingredients.",
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 9,
+                  "items": {
+                    "$ref": "#/definitions/ingredient"
+                  }
+                }
+              ]
+            }
+          },
+          "result": {
+            "$ref": "#/definitions/result"
+          }
+        }
+      }
     }
   ],
   "definitions": {
@@ -167,7 +215,8 @@
       "description": "The type of recipe.",
       "type": "string",
       "enum": [
-        "minecraft:crafting_shaped"
+        "minecraft:crafting_shaped",
+        "minecraft:crafting_shapeless"
       ]
     }
   }

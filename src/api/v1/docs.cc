@@ -15,7 +15,7 @@ using namespace drogon::orm;
 using namespace drogon_model::postgres;
 
 namespace api::v1 {
-    Task<> DocsController::project(HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+    Task<> DocsController::project(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                    const std::string project) const {
         const auto version = req->getOptionalParameter<std::string>("version");
         const auto resolved = co_await getProject(project, version, std::nullopt, callback);
