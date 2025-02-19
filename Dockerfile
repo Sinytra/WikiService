@@ -23,6 +23,7 @@ WORKDIR /build
 # Build app
 WORKDIR /build/src
 
+COPY $PWD/builtin /build/src/builtin
 COPY $PWD/modules /build/src/modules
 COPY $PWD/src /build/src/src
 COPY $PWD/CMakeLists.txt /build/src/
