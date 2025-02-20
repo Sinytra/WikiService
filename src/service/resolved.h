@@ -15,7 +15,6 @@ namespace service {
     struct ProjectPage {
         std::string content;
         std::string editUrl;
-        std::string updatedAt;
     };
 
     struct ProjectMetadata {

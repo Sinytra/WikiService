@@ -59,9 +59,6 @@ namespace api::v1 {
         if (resolved->getProject().getValueOfIsPublic() && !page.editUrl.empty()) {
             root["edit_url"] = page.editUrl;
         }
-        if (!page.updatedAt.empty()) {
-            root["updated_at"] = page.updatedAt;
-        }
 
         const auto resp = HttpResponse::newHttpJsonResponse(root);
         callback(resp);
