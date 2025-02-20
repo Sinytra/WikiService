@@ -298,8 +298,7 @@ namespace service {
 
     Task<std::tuple<git_repository *, ProjectError>> gitCloneProject(const Project &project, const fs::path &projectPath,
                                                                      const std::string &branch,
-                                                                     const std::shared_ptr<spdlog::logger> logger,
-                                                                     const bool shallowClone) {
+                                                                     const std::shared_ptr<spdlog::logger> logger) {
         const auto url = project.getValueOfSourceRepo();
         const auto path = absolute(projectPath);
 
@@ -313,9 +312,7 @@ namespace service {
         clone_opts.fetch_opts.callbacks.transfer_progress = fetch_progress;
         clone_opts.fetch_opts.callbacks.payload = &d;
         clone_opts.checkout_branch = branch.c_str();
-        if (shallowClone) {
-            clone_opts.fetch_opts.depth = 1;
-        }
+        clone_opts.fetch_opts.depth = 1;
 
         git_repository *repo = nullptr;
         const int error = git_clone(&repo, url.c_str(), path.c_str(), &clone_opts);
@@ -358,7 +355,7 @@ namespace service {
 
         logger->info("Setting up project");
 
-        const auto [repo, cloneError] = co_await gitCloneProject(project, clonePath, project.getValueOfSourceBranch(), logger, false);
+        const auto [repo, cloneError] = co_await gitCloneProject(project, clonePath, project.getValueOfSourceBranch(), logger);
         if (!repo || cloneError != ProjectError::OK) {
             co_return cloneError;
         }
@@ -533,7 +530,7 @@ namespace service {
         const auto logger = getProjectLogger(project, false);
 
         // Clone project - validates repo and branch
-        if (const auto [repo, cloneError] = co_await gitCloneProject(project, clonePath, project.getValueOfSourceBranch(), logger, true);
+        if (const auto [repo, cloneError] = co_await gitCloneProject(project, clonePath, project.getValueOfSourceBranch(), logger);
             !repo || cloneError != ProjectError::OK)
         {
             remove_all(clonePath);
