@@ -200,10 +200,17 @@ std::optional<JsonValidationError> validateJson(const nlohmann::json &schema, co
     }
 }
 
-Json::Value projectToJson(const drogon_model::postgres::Project &project) {
+Json::Value projectToJson(const drogon_model::postgres::Project &project, const bool verbose) {
     Json::Value json = project.toJson();
     json["platforms"] = parseJsonString(project.getValueOfPlatforms()).value_or(Json::Value());
     json.removeMember("search_vector");
+    if (!verbose) {
+        if (!project.getValueOfIsPublic()) {
+            json.removeMember("source_repo");
+        }
+        json.removeMember("source_path");
+        json.removeMember("source_branch");
+    }
     return json;
 }
 

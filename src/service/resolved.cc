@@ -445,11 +445,11 @@ namespace service {
 
     const std::filesystem::path &ResolvedProject::getDocsDirectoryPath() const { return docsDir_; }
 
-    Json::Value ResolvedProject::toJson() const {
+    Json::Value ResolvedProject::toJson(const bool full) const {
         const auto versions = getAvailableVersions();
         const auto locales = getLocales();
 
-        Json::Value projectJson = projectToJson(project_);
+        Json::Value projectJson = projectToJson(project_, full);
 
         if (!versions.empty()) {
             Json::Value versionsJson;
@@ -491,8 +491,7 @@ namespace service {
         Json::Value infoJson;
 
         if (const auto [meta, err, detail] = validateProjectMetadata(); meta && meta->contains("links")) {
-            const auto links = (*meta)["links"];
-            if (links.contains("website")) {
+            if (const auto links = (*meta)["links"]; links.contains("website")) {
                 infoJson["website"] = links["website"].get<std::string>();
             }
         }
