@@ -76,6 +76,6 @@ std::optional<JsonValidationError> validateJson(const nlohmann::json &schema, co
 
 std::optional<JsonValidationError> validateJson(const nlohmann::json &schema, const nlohmann::json &json);
 
-Json::Value projectToJson(const drogon_model::postgres::Project &project);
+Json::Value projectToJson(const drogon_model::postgres::Project &project, bool verbose = false);
 
 std::string strToLower(std::string copy);

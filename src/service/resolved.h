@@ -65,7 +65,7 @@ namespace service {
 
         const std::filesystem::path &getDocsDirectoryPath() const;
 
-        Json::Value toJson() const;
+        Json::Value toJson(bool full = false) const;
         drogon::Task<Json::Value> toJsonVerbose() const;
 
         // Content

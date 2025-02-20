@@ -222,7 +222,7 @@ namespace api::v1 {
         const auto projects = co_await global::database->getUserProjects(session->username);
         Json::Value projectsJson(Json::arrayValue);
         for (const auto &project: projects) {
-            Json::Value json = projectToJson(project);
+            Json::Value json = projectToJson(project, true);
             json["status"] = projectStatusToString(co_await global::storage->getProjectStatus(project));
             projectsJson.append(json);
         }
@@ -253,9 +253,9 @@ namespace api::v1 {
 
         Json::Value root;
         if (const auto resolved = co_await global::storage->maybeGetProject(*project)) {
-            root = resolved->toJson();
+            root = resolved->toJson(true);
         } else {
-            root = projectToJson(*project);
+            root = projectToJson(*project, true);
         }
         root["status"] = projectStatusToString(co_await global::storage->getProjectStatus(*project));
 
@@ -362,7 +362,7 @@ namespace api::v1 {
         }
 
         Json::Value root;
-        root["project"] = projectToJson(*result);
+        root["project"] = projectToJson(*result, true);
         root["message"] = "Project registered successfully";
         const auto resp = HttpResponse::newHttpJsonResponse(root);
         resp->setStatusCode(k200OK);
@@ -402,7 +402,7 @@ namespace api::v1 {
 
         Json::Value root;
         root["message"] = "Project updated successfully";
-        root["project"] = projectToJson(project);
+        root["project"] = projectToJson(project, true);
         const auto resp = HttpResponse::newHttpJsonResponse(root);
         resp->setStatusCode(k200OK);
         callback(resp);
