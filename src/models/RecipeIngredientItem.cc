@@ -24,7 +24,7 @@ const std::string RecipeIngredientItem::tableName = "\"recipe_ingredient_item\""
 
 const std::vector<typename RecipeIngredientItem::MetaData> RecipeIngredientItem::metaData_={
 {"recipe_id","int64_t","bigint",8,1,1,1},
-{"item_id","std::string","character varying",255,0,1,1},
+{"item_id","int64_t","bigint",8,0,1,1},
 {"slot","int32_t","integer",4,0,1,1},
 {"count","int32_t","integer",4,0,0,1},
 {"input","bool","boolean",1,0,1,1}
@@ -44,7 +44,7 @@ RecipeIngredientItem::RecipeIngredientItem(const Row &r, const ssize_t indexOffs
         }
         if(!r["item_id"].isNull())
         {
-            itemId_=std::make_shared<std::string>(r["item_id"].as<std::string>());
+            itemId_=std::make_shared<int64_t>(r["item_id"].as<int64_t>());
         }
         if(!r["slot"].isNull())
         {
@@ -76,7 +76,7 @@ RecipeIngredientItem::RecipeIngredientItem(const Row &r, const ssize_t indexOffs
         index = offset + 1;
         if(!r[index].isNull())
         {
-            itemId_=std::make_shared<std::string>(r[index].as<std::string>());
+            itemId_=std::make_shared<int64_t>(r[index].as<int64_t>());
         }
         index = offset + 2;
         if(!r[index].isNull())
@@ -117,7 +117,7 @@ RecipeIngredientItem::RecipeIngredientItem(const Json::Value &pJson, const std::
         dirtyFlag_[1] = true;
         if(!pJson[pMasqueradingVector[1]].isNull())
         {
-            itemId_=std::make_shared<std::string>(pJson[pMasqueradingVector[1]].asString());
+            itemId_=std::make_shared<int64_t>((int64_t)pJson[pMasqueradingVector[1]].asInt64());
         }
     }
     if(!pMasqueradingVector[2].empty() && pJson.isMember(pMasqueradingVector[2]))
@@ -161,7 +161,7 @@ RecipeIngredientItem::RecipeIngredientItem(const Json::Value &pJson) noexcept(fa
         dirtyFlag_[1]=true;
         if(!pJson["item_id"].isNull())
         {
-            itemId_=std::make_shared<std::string>(pJson["item_id"].asString());
+            itemId_=std::make_shared<int64_t>((int64_t)pJson["item_id"].asInt64());
         }
     }
     if(pJson.isMember("slot"))
@@ -209,7 +209,7 @@ void RecipeIngredientItem::updateByMasqueradedJson(const Json::Value &pJson,
     {
         if(!pJson[pMasqueradingVector[1]].isNull())
         {
-            itemId_=std::make_shared<std::string>(pJson[pMasqueradingVector[1]].asString());
+            itemId_=std::make_shared<int64_t>((int64_t)pJson[pMasqueradingVector[1]].asInt64());
         }
     }
     if(!pMasqueradingVector[2].empty() && pJson.isMember(pMasqueradingVector[2]))
@@ -249,7 +249,7 @@ void RecipeIngredientItem::updateByJson(const Json::Value &pJson) noexcept(false
     {
         if(!pJson["item_id"].isNull())
         {
-            itemId_=std::make_shared<std::string>(pJson["item_id"].asString());
+            itemId_=std::make_shared<int64_t>((int64_t)pJson["item_id"].asInt64());
         }
     }
     if(pJson.isMember("slot"))
@@ -293,25 +293,20 @@ void RecipeIngredientItem::setRecipeId(const int64_t &pRecipeId) noexcept
     dirtyFlag_[0] = true;
 }
 
-const std::string &RecipeIngredientItem::getValueOfItemId() const noexcept
+const int64_t &RecipeIngredientItem::getValueOfItemId() const noexcept
 {
-    static const std::string defaultValue = std::string();
+    static const int64_t defaultValue = int64_t();
     if(itemId_)
         return *itemId_;
     return defaultValue;
 }
-const std::shared_ptr<std::string> &RecipeIngredientItem::getItemId() const noexcept
+const std::shared_ptr<int64_t> &RecipeIngredientItem::getItemId() const noexcept
 {
     return itemId_;
 }
-void RecipeIngredientItem::setItemId(const std::string &pItemId) noexcept
+void RecipeIngredientItem::setItemId(const int64_t &pItemId) noexcept
 {
-    itemId_ = std::make_shared<std::string>(pItemId);
-    dirtyFlag_[1] = true;
-}
-void RecipeIngredientItem::setItemId(std::string &&pItemId) noexcept
-{
-    itemId_ = std::make_shared<std::string>(std::move(pItemId));
+    itemId_ = std::make_shared<int64_t>(pItemId);
     dirtyFlag_[1] = true;
 }
 
@@ -515,7 +510,7 @@ Json::Value RecipeIngredientItem::toJson() const
     }
     if(getItemId())
     {
-        ret["item_id"]=getValueOfItemId();
+        ret["item_id"]=(Json::Int64)getValueOfItemId();
     }
     else
     {
@@ -569,7 +564,7 @@ Json::Value RecipeIngredientItem::toMasqueradedJson(
         {
             if(getItemId())
             {
-                ret[pMasqueradingVector[1]]=getValueOfItemId();
+                ret[pMasqueradingVector[1]]=(Json::Int64)getValueOfItemId();
             }
             else
             {
@@ -622,7 +617,7 @@ Json::Value RecipeIngredientItem::toMasqueradedJson(
     }
     if(getItemId())
     {
-        ret["item_id"]=getValueOfItemId();
+        ret["item_id"]=(Json::Int64)getValueOfItemId();
     }
     else
     {
@@ -925,19 +920,11 @@ bool RecipeIngredientItem::validJsonOfField(size_t index,
                 err="The " + fieldName + " column cannot be null";
                 return false;
             }
-            if(!pJson.isString())
+            if(!pJson.isInt64())
             {
                 err="Type error in the "+fieldName+" field";
                 return false;
             }
-            if(pJson.isString() && std::strlen(pJson.asCString()) > 255)
-            {
-                err="String length exceeds limit for the " +
-                    fieldName +
-                    " field (the maximum value is 255)";
-                return false;
-            }
-
             break;
         case 2:
             if(pJson.isNull())

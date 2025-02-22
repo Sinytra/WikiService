@@ -8,6 +8,7 @@ read_and_escape_schema("schemas/sinytra-wiki.schema.json" PROJECT_META_SCHEMA)
 read_and_escape_schema("schemas/_meta.schema.json" FOLDER_META_SCHEMA)
 read_and_escape_schema("schemas/config.schema.json" SYSTEM_CONFIG_SCHEMA)
 read_and_escape_schema("schemas/game-recipe.schema.json" GAME_RECIPE_SCHEMA)
+read_and_escape_schema("schemas/game-tag.schema.json" GAME_TAG_SCHEMA)
 
 read_and_escape_schema("../../builtin/minecraft/recipe_type/crafting_shaped.json" SHAPED_CRAFTING)
 

@@ -45,8 +45,7 @@ class Tag
     struct Cols
     {
         static const std::string _id;
-        static const std::string _tag_id;
-        static const std::string _project_id;
+        static const std::string _loc;
     };
 
     static const int primaryKeyNumber;
@@ -106,28 +105,18 @@ class Tag
     ///Set the value of the column id
     void setId(const int64_t &pId) noexcept;
 
-    /**  For column tag_id  */
-    ///Get the value of the column tag_id, returns the default value if the column is null
-    const std::string &getValueOfTagId() const noexcept;
+    /**  For column loc  */
+    ///Get the value of the column loc, returns the default value if the column is null
+    const std::string &getValueOfLoc() const noexcept;
     ///Return a shared_ptr object pointing to the column const value, or an empty shared_ptr object if the column is null
-    const std::shared_ptr<std::string> &getTagId() const noexcept;
-    ///Set the value of the column tag_id
-    void setTagId(const std::string &pTagId) noexcept;
-    void setTagId(std::string &&pTagId) noexcept;
-    void setTagIdToNull() noexcept;
-
-    /**  For column project_id  */
-    ///Get the value of the column project_id, returns the default value if the column is null
-    const std::string &getValueOfProjectId() const noexcept;
-    ///Return a shared_ptr object pointing to the column const value, or an empty shared_ptr object if the column is null
-    const std::shared_ptr<std::string> &getProjectId() const noexcept;
-    ///Set the value of the column project_id
-    void setProjectId(const std::string &pProjectId) noexcept;
-    void setProjectId(std::string &&pProjectId) noexcept;
-    void setProjectIdToNull() noexcept;
+    const std::shared_ptr<std::string> &getLoc() const noexcept;
+    ///Set the value of the column loc
+    void setLoc(const std::string &pLoc) noexcept;
+    void setLoc(std::string &&pLoc) noexcept;
+    void setLocToNull() noexcept;
 
 
-    static size_t getColumnNumber() noexcept {  return 3;  }
+    static size_t getColumnNumber() noexcept {  return 2;  }
     static const std::string &getColumnName(size_t index) noexcept(false);
 
     Json::Value toJson() const;
@@ -149,8 +138,7 @@ class Tag
     ///For mysql or sqlite3
     void updateId(const uint64_t id);
     std::shared_ptr<int64_t> id_;
-    std::shared_ptr<std::string> tagId_;
-    std::shared_ptr<std::string> projectId_;
+    std::shared_ptr<std::string> loc_;
     struct MetaData
     {
         const std::string colName_;
@@ -162,7 +150,7 @@ class Tag
         const bool notNull_;
     };
     static const std::vector<MetaData> metaData_;
-    bool dirtyFlag_[3]={ false };
+    bool dirtyFlag_[2]={ false };
   public:
     static const std::string &sqlForFindingByPrimaryKey()
     {
@@ -184,12 +172,7 @@ class Tag
             ++parametersCount;
         if(dirtyFlag_[1])
         {
-            sql += "tag_id,";
-            ++parametersCount;
-        }
-        if(dirtyFlag_[2])
-        {
-            sql += "project_id,";
+            sql += "loc,";
             ++parametersCount;
         }
         needSelection=true;
@@ -206,11 +189,6 @@ class Tag
         size_t n=0;
         sql +="default,";
         if(dirtyFlag_[1])
-        {
-            n = snprintf(placeholderStr,sizeof(placeholderStr),"$%d,",placeholder++);
-            sql.append(placeholderStr, n);
-        }
-        if(dirtyFlag_[2])
         {
             n = snprintf(placeholderStr,sizeof(placeholderStr),"$%d,",placeholder++);
             sql.append(placeholderStr, n);

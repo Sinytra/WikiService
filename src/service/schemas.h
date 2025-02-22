@@ -10,4 +10,5 @@ namespace schemas {
     extern nlohmann::json folderMetadata;
 
     extern nlohmann::json gameRecipe;
+    extern nlohmann::json gameTag;
 }

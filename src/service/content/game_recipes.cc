@@ -1,5 +1,5 @@
-#include "game_content.h"
 #include "game_recipes.h"
+#include "game_content.h"
 
 #include <content/builtin_recipe_type.h>
 #include <drogon/HttpAppFramework.h>
@@ -107,8 +107,7 @@ std::optional<ModRecipe> readShapelessCraftingRecipe(const std::string &id, cons
 
 std::unordered_map<std::string, RecipeType> recipeTypes{
     {"minecraft:crafting_shaped", {recipe_type::builtin::shapedCrafting, readShapedCraftingRecipe}},
-    {"minecraft:crafting_shapeless", {recipe_type::builtin::shapedCrafting, readShapelessCraftingRecipe}}
-};
+    {"minecraft:crafting_shapeless", {recipe_type::builtin::shapedCrafting, readShapelessCraftingRecipe}}};
 
 namespace content {
     std::optional<Json::Value> getRecipeType(const std::string &type) {
@@ -185,13 +184,13 @@ namespace content {
             logger_->info("Adding {} items found in recipes", newItems.size());
 
             for (auto &item: newItems) {
-                co_await clientPtr->execSqlCoro("INSERT INTO item_id VALUES ($1) ON CONFLICT DO NOTHING", item);
-                co_await clientPtr->execSqlCoro("INSERT INTO item VALUES (DEFAULT, $1, $2) ON CONFLICT DO NOTHING", item, projectId);
+                co_await addProjectItem(clientPtr, projectId, item);
             }
 
             // 2. Create recipes
             CoroMapper<Recipe> recipeMapper(clientPtr);
             for (auto &[id, type, ingredients]: recipes) {
+                // language=postgresql
                 const auto row = co_await clientPtr->execSqlCoro(
                     "INSERT INTO recipe VALUES (DEFAULT, $1, $2, $3) ON CONFLICT DO NOTHING RETURNING id", projectId, id, type);
                 const auto recipeId = row.front().at("id").as<int64_t>();
@@ -199,11 +198,19 @@ namespace content {
                 for (auto &[ingredientId, slot, count, input, isTag]: ingredients) {
                     try {
                         if (isTag) {
-                            co_await clientPtr->execSqlCoro("INSERT INTO recipe_ingredient_tag VALUES ($1, $2, $3, $4, $5)", recipeId,
-                                                            ingredientId, slot, count, input);
+                            // language=postgresql
+                            co_await clientPtr->execSqlCoro("INSERT INTO recipe_ingredient_tag (recipe_id, tag_id, slot, count, input) \
+                                                             SELECT $1 as recipe_id, id, $3 as slot, $4 as count, $5 as input \
+                                                             FROM tag \
+                                                             WHERE tag.loc = $2;",
+                                                            recipeId, ingredientId, slot, count, input);
                         } else {
-                            co_await clientPtr->execSqlCoro("INSERT INTO recipe_ingredient_item VALUES ($1, $2, $3, $4, $5)", recipeId,
-                                                            ingredientId, slot, count, input);
+                            // language=postgresql
+                            co_await clientPtr->execSqlCoro("INSERT INTO recipe_ingredient_item (recipe_id, item_id, slot, count, input) \
+                                                             SELECT $1 as recipe_id, id, $3 as slot, $4 as count, $5 as input \
+                                                             FROM item \
+                                                             WHERE item.loc = $2;",
+                                                            recipeId, ingredientId, slot, count, input);
                         }
                         continue;
                     } catch (const std::exception &e) {

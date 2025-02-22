@@ -9,6 +9,9 @@
 #include <optional>
 #include "error.h"
 
+#include <models/Item.h>
+#include <models/Tag.h>
+
 using namespace drogon_model::postgres;
 
 namespace service {
@@ -17,16 +20,14 @@ namespace service {
         int total;
         std::vector<Project> data;
     };
-    struct TagItem {
-        std::string itemId;
-    };
     struct ProjectContent {
         std::string id;
         std::string path;
     };
     struct ContentUsage {
+        int64_t id;
+        std::string loc;
         std::string project;
-        std::string id;
         std::string path;
     };
 
@@ -47,8 +48,6 @@ namespace service {
         }
 
     public:
-        explicit Database();
-
         drogon::Task<std::vector<std::string>> getProjectIDs() const;
         drogon::Task<std::tuple<std::optional<Project>, Error>> createProject(const Project &project) const;
         drogon::Task<Error> updateProject(const Project &project) const;
@@ -74,13 +73,19 @@ namespace service {
         drogon::Task<std::optional<Project>> getUserProject(std::string username, std::string id) const;
         drogon::Task<Error> assignUserProject(std::string username, std::string id, std::string role) const;
 
+        drogon::Task<Item> getItem(int64_t id) const;
+        drogon::Task<Tag> getTag(int64_t id) const;
+        drogon::Task<std::vector<Item>> getTagItemsFlat(int64_t tag, std::string project) const;
+        drogon::Task<Error> addTagItemEntry(std::string project, std::string tag, std::string item) const;
+        drogon::Task<Error> addTagTagEntry(std::string project, std::string parentTag, std::string childTag) const;
+
         drogon::Task<std::vector<ProjectContent>> getProjectContents(std::string project) const;
         drogon::Task<int> getProjectContentCount(std::string project) const;
         drogon::Task<std::optional<std::string>> getProjectContentPath(std::string project, std::string id) const;
+
         drogon::Task<std::optional<Recipe>> getProjectRecipe(std::string project, std::string recipe) const;
         drogon::Task<std::vector<Recipe>> getItemUsageInRecipes(std::string item) const;
         drogon::Task<std::vector<ContentUsage>> getObtainableItemsBy(std::string item) const;
-        drogon::Task<std::vector<TagItem>> getTagItemsFlat(std::string tag) const;
 
         template<typename T, typename U>
         drogon::Task<std::vector<T>> getRelated(const std::string col, const U id) const {

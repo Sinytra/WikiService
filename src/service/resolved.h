@@ -3,6 +3,7 @@
 #include "cache.h"
 #include "error.h"
 #include <models/Project.h>
+#include <models/Item.h>
 #include <models/RecipeIngredientItem.h>
 #include <models/RecipeIngredientTag.h>
 #include "util.h"
@@ -69,9 +70,9 @@ namespace service {
         drogon::Task<Json::Value> toJsonVerbose() const;
 
         // Content
-        drogon::Task<std::optional<std::string>> getItemName(std::string id) const;
+        drogon::Task<std::optional<std::string>> getItemName(Item item) const;
     private:
-        drogon::Task<Json::Value> ingredientToJson(int slot, std::vector<RecipeIngredientItem> items) const;
+        drogon::Task<Json::Value> ingredientToJson(int slot, std::vector<RecipeIngredientItem> ingredients) const;
         drogon::Task<Json::Value> ingredientToJson(const RecipeIngredientTag &tag) const;
 
         Project project_;

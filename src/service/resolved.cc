@@ -13,6 +13,7 @@
 #include <git2.h>
 #include <include/uri.h>
 #include <models/Item.h>
+#include <models/ProjectItem.h>
 
 #define DOCS_META_FILE "sinytra-wiki.json"
 #define FOLDER_META_FILE "_meta.json"
@@ -186,7 +187,7 @@ Task<> addPageIDs(const std::unordered_map<std::string, std::string> &ids, nlohm
 }
 
 template<typename T>
-Task<Json::Value> appendSources(const std::string col, const std::string item) {
+Task<Json::Value> appendSources(const std::string col, const int64_t item) {
     const auto items = co_await global::database->getRelated<T>(col, item);
     Json::Value root(Json::arrayValue);
     for (const auto &res: items) {
@@ -529,16 +530,16 @@ namespace service {
         return {*meta, ProjectError::OK, ""};
     }
 
-    Task<std::optional<std::string>> ResolvedProject::getItemName(const std::string id) const {
+    Task<std::optional<std::string>> ResolvedProject::getItemName(const Item item) const {
         // TODO Database
         const auto clientPtr = app().getFastDbClient();
         const auto projectId = project_.getValueOfId();
-        const auto rows = co_await clientPtr->execSqlCoro("SELECT path FROM item_page "
-                                                          "JOIN item ON item_page.id = item.id "
-                                                          "WHERE item.project_id = $1 AND item.item_id = $2",
-                                                          projectId, id);
+        const auto rows = co_await clientPtr->execSqlCoro("SELECT path FROM project_item_page "
+                                                          "JOIN project_item pi ON project_item_page.item_id = pi.id "
+                                                          "WHERE pi.project_id = $1 AND pi.item_id = $2",
+                                                          projectId, item.getValueOfId());
         if (rows.size() < 1) {
-            const auto parsed = ResourceLocation::parse(id);
+            const auto parsed = ResourceLocation::parse(item.getValueOfLoc());
             // TODO Locale
             const auto localized = readLangKey("en_en", "item." + projectId + "." + parsed->path_);
             co_return localized;
@@ -547,20 +548,21 @@ namespace service {
         co_return readPageAttribute(path, "title");
     }
 
-    Task<Json::Value> ResolvedProject::ingredientToJson(const int slot, const std::vector<RecipeIngredientItem> items) const {
+    Task<Json::Value> ResolvedProject::ingredientToJson(const int slot, const std::vector<RecipeIngredientItem> ingredients) const {
         Json::Value root;
         root["slot"] = slot;
         Json::Value itemsJson(Json::arrayValue);
-        for (const auto &item: items) {
-            const auto name = co_await getItemName(item.getValueOfItemId());
+        for (const auto &ingredient: ingredients) {
+            const auto item = co_await global::database->getItem(ingredient.getValueOfItemId());
+            const auto name = co_await getItemName(item);
 
             Json::Value itemJson;
-            itemJson["id"] = item.getValueOfItemId();
+            itemJson["id"] = item.getValueOfLoc();
             if (name) {
                 itemJson["name"] = *name;
             }
-            itemJson["count"] = item.getValueOfCount();
-            itemJson["sources"] = co_await appendSources<Item>(RecipeIngredientItem::Cols::_item_id, item.getValueOfItemId());
+            itemJson["count"] = ingredient.getValueOfCount();
+            itemJson["sources"] = co_await appendSources<ProjectItem>(ProjectItem::Cols::_item_id, ingredient.getValueOfItemId());
             itemsJson.append(itemJson);
         }
         root["items"] = itemsJson;
@@ -568,23 +570,25 @@ namespace service {
     }
 
     Task<Json::Value> ResolvedProject::ingredientToJson(const RecipeIngredientTag &tag) const {
+        const auto dbTag = co_await global::database->getTag(tag.getValueOfTagId());
+
         Json::Value root;
         {
             Json::Value tagJson;
-            tagJson["id"] = tag.getValueOfTagId();
+            tagJson["id"] = dbTag.getValueOfLoc();
             {
                 Json::Value itemsJson(Json::arrayValue);
-                for (const auto tagItems = co_await global::database->getTagItemsFlat(tag.getValueOfTagId());
-                     const auto &[itemId]: tagItems)
+                for (const auto tagItems = co_await global::database->getTagItemsFlat(tag.getValueOfTagId(), project_.getValueOfId());
+                     const auto &item: tagItems)
                 {
-                    const auto name = co_await getItemName(itemId);
+                    const auto name = co_await getItemName(item);
 
                     Json::Value itemJson;
-                    itemJson["id"] = itemId;
+                    itemJson["id"] = item.getValueOfLoc();
                     if (name) {
                         itemJson["name"] = *name;
                     }
-                    itemJson["sources"] = co_await appendSources<Item>(RecipeIngredientItem::Cols::_item_id, itemId);
+                    itemJson["sources"] = co_await appendSources<ProjectItem>(ProjectItem::Cols::_item_id, item.getValueOfId());
                     itemsJson.append(itemJson);
                 }
                 tagJson["items"] = itemsJson;
