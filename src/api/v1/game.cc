@@ -79,13 +79,14 @@ namespace api::v1 {
 
         const auto obtainable = co_await global::database->getObtainableItemsBy(item);
         Json::Value root(Json::arrayValue);
-        for (const auto &[project, id, path]: obtainable) {
+        for (const auto &[id, loc, project, path]: obtainable) {
             // TODO
-            const auto name = co_await resolved->getItemName(id);
+            const auto dbItem = co_await global::database->getItem(id);
+            const auto name = co_await resolved->getItemName(dbItem);
 
             Json::Value itemJson;
             itemJson["project"] = project;
-            itemJson["id"] = id;
+            itemJson["id"] = loc;
             if (name) {
                 itemJson["name"] = *name;
             }

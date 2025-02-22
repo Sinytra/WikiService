@@ -55,7 +55,7 @@ class RecipeIngredientTag
     static const std::string tableName;
     static const bool hasPrimaryKey;
     static const std::vector<std::string> primaryKeyName;
-    using PrimaryKeyType = std::tuple<int64_t,std::string,int32_t,bool>;//recipe_id,tag_id,slot,input
+    using PrimaryKeyType = std::tuple<int64_t,int64_t,int32_t,bool>;//recipe_id,tag_id,slot,input
     PrimaryKeyType getPrimaryKey() const;
 
     /**
@@ -110,12 +110,11 @@ class RecipeIngredientTag
 
     /**  For column tag_id  */
     ///Get the value of the column tag_id, returns the default value if the column is null
-    const std::string &getValueOfTagId() const noexcept;
+    const int64_t &getValueOfTagId() const noexcept;
     ///Return a shared_ptr object pointing to the column const value, or an empty shared_ptr object if the column is null
-    const std::shared_ptr<std::string> &getTagId() const noexcept;
+    const std::shared_ptr<int64_t> &getTagId() const noexcept;
     ///Set the value of the column tag_id
-    void setTagId(const std::string &pTagId) noexcept;
-    void setTagId(std::string &&pTagId) noexcept;
+    void setTagId(const int64_t &pTagId) noexcept;
 
     /**  For column slot  */
     ///Get the value of the column slot, returns the default value if the column is null
@@ -164,7 +163,7 @@ class RecipeIngredientTag
     ///For mysql or sqlite3
     void updateId(const uint64_t id);
     std::shared_ptr<int64_t> recipeId_;
-    std::shared_ptr<std::string> tagId_;
+    std::shared_ptr<int64_t> tagId_;
     std::shared_ptr<int32_t> slot_;
     std::shared_ptr<int32_t> count_;
     std::shared_ptr<bool> input_;
