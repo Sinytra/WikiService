@@ -1,4 +1,7 @@
 #include "game_recipes.h"
+
+#include <database.h>
+
 #include "game_content.h"
 
 #include <content/builtin_recipe_type.h>
@@ -142,7 +145,46 @@ namespace content {
         return std::nullopt;
     }
 
-    // TODO How about nonexistent items, tags or so?
+    Task<Error> Ingestor::addRecipe(const ModRecipe recipe) const {
+        const auto clientPtr = app().getFastDbClient();
+        CoroMapper<Recipe> recipeMapper(clientPtr);
+        const auto [id, type, ingredients] = recipe;
+        const auto projectId = project_.getProject().getValueOfId();
+
+        // language=postgresql
+        const auto row =
+            co_await clientPtr->execSqlCoro("INSERT INTO recipe VALUES (DEFAULT, $1, $2, $3) RETURNING id", projectId, id, type);
+        const auto recipeId = row.front().at("id").as<int64_t>();
+
+        for (auto &[ingredientId, slot, count, input, isTag]: ingredients) {
+            try {
+                if (isTag) {
+                    // language=postgresql
+                    co_await clientPtr->execSqlCoro("INSERT INTO recipe_ingredient_tag (recipe_id, tag_id, slot, count, input) \
+                                                        SELECT $1 as recipe_id, id, $3 as slot, $4 as count, $5 as input \
+                                                        FROM tag \
+                                                        WHERE tag.loc = $2;",
+                                                    recipeId, ingredientId, slot, count, input);
+                } else {
+                    // language=postgresql
+                    co_await clientPtr->execSqlCoro("INSERT INTO recipe_ingredient_item (recipe_id, item_id, slot, count, input) \
+                                                        SELECT $1 as recipe_id, id, $3 as slot, $4 as count, $5 as input \
+                                                        FROM item \
+                                                        WHERE item.loc = $2;",
+                                                    recipeId, ingredientId, slot, count, input);
+                }
+                continue;
+            } catch (const std::exception &e) {
+                const auto ingredientName = isTag ? "#" + ingredientId : ingredientId;
+                logger_->warn("Skipping recipe '{}' due to missing ingredient '{}'", id, ingredientName);
+            }
+            co_await recipeMapper.deleteByPrimaryKey(recipeId);
+            co_return Error::ErrNotFound;
+        }
+
+        co_return Error::Ok;
+    }
+
     Task<Error> Ingestor::ingestRecipes() const {
         const auto clientPtr = app().getFastDbClient();
 
@@ -184,42 +226,13 @@ namespace content {
             logger_->info("Adding {} items found in recipes", newItems.size());
 
             for (auto &item: newItems) {
-                co_await addProjectItem(clientPtr, projectId, item);
+                co_await global::database->addProjectItem(projectId, item);
             }
 
             // 2. Create recipes
             CoroMapper<Recipe> recipeMapper(clientPtr);
-            for (auto &[id, type, ingredients]: recipes) {
-                // language=postgresql
-                const auto row = co_await clientPtr->execSqlCoro(
-                    "INSERT INTO recipe VALUES (DEFAULT, $1, $2, $3) ON CONFLICT DO NOTHING RETURNING id", projectId, id, type);
-                const auto recipeId = row.front().at("id").as<int64_t>();
-
-                for (auto &[ingredientId, slot, count, input, isTag]: ingredients) {
-                    try {
-                        if (isTag) {
-                            // language=postgresql
-                            co_await clientPtr->execSqlCoro("INSERT INTO recipe_ingredient_tag (recipe_id, tag_id, slot, count, input) \
-                                                             SELECT $1 as recipe_id, id, $3 as slot, $4 as count, $5 as input \
-                                                             FROM tag \
-                                                             WHERE tag.loc = $2;",
-                                                            recipeId, ingredientId, slot, count, input);
-                        } else {
-                            // language=postgresql
-                            co_await clientPtr->execSqlCoro("INSERT INTO recipe_ingredient_item (recipe_id, item_id, slot, count, input) \
-                                                             SELECT $1 as recipe_id, id, $3 as slot, $4 as count, $5 as input \
-                                                             FROM item \
-                                                             WHERE item.loc = $2;",
-                                                            recipeId, ingredientId, slot, count, input);
-                        }
-                        continue;
-                    } catch (const std::exception &e) {
-                        const auto ingredientName = isTag ? "#" + ingredientId : ingredientId;
-                        logger_->warn("Removing recipe '{}' due to missing ingredient '{}'", id, ingredientName);
-                    }
-                    co_await recipeMapper.deleteByPrimaryKey(recipeId);
-                    break;
-                }
+            for (auto &recipe: recipes) {
+                co_await addRecipe(recipe);
             }
         } catch (const std::exception &e) {
             logger_->error("Failed to add items to transaction: {}", e.what());

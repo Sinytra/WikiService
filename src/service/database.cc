@@ -270,26 +270,37 @@ namespace service {
         co_return res.value_or(err);
     }
 
-    Task<Item> Database::getItem(int64_t id) const {
-        const auto [res, err] = co_await handleDatabaseOperation<Item>([id](const DbClientPtr &client) -> Task<Item> {
-            CoroMapper<Item> mapper(client);
-            co_return co_await mapper.findByPrimaryKey(id);
+    Task<Error> Database::addProjectItem(const std::string project, const std::string item) const {
+        // language=postgresql
+        static constexpr auto query = "INSERT INTO project_item (item_id, project_id) \
+                                       SELECT id, $2 FROM item WHERE loc = $1 \
+                                       ON CONFLICT DO NOTHING";
+        const auto [res, err] = co_await handleDatabaseOperation<Error>([project, item](const DbClientPtr &client) -> Task<Error> {
+            // language=postgresql
+            co_await client->execSqlCoro("INSERT INTO item VALUES (DEFAULT, $1) ON CONFLICT DO NOTHING", item);
+            co_await client->execSqlCoro(query, item, project);
+            co_return Error::Ok;
         });
-        if (!res) {
-            throw std::runtime_error("Failed to get Item with id " + std::to_string(id));
-        }
-        co_return *res;
+        co_return res.value_or(err);
     }
 
-    Task<Tag> Database::getTag(int64_t id) const {
-        const auto [res, err] = co_await handleDatabaseOperation<Tag>([id](const DbClientPtr &client) -> Task<Tag> {
-            CoroMapper<Tag> mapper(client);
-            co_return co_await mapper.findByPrimaryKey(id);
+    Task<Error> Database::addTag(const std::string tag, const std::optional<std::string> project) const {
+        // language=postgresql
+        static constexpr auto query = "INSERT INTO project_tag (tag_id, project_id) \
+                                       SELECT id, $2 FROM tag WHERE loc = $1 \
+                                       ON CONFLICT DO NOTHING";
+
+        const auto [res, err] = co_await handleDatabaseOperation<Error>([tag, project](const DbClientPtr &client) -> Task<Error> {
+            // language=postgresql
+            co_await client->execSqlCoro("INSERT INTO tag VALUES (DEFAULT, $1) ON CONFLICT DO NOTHING", tag);
+            if (project) {
+                co_await client->execSqlCoro(query, tag, project);
+            } else {
+                co_await client->execSqlCoro(query, tag, nullptr);
+            }
+            co_return Error::Ok;
         });
-        if (!res) {
-            throw std::runtime_error("Failed to get Tag with id " + std::to_string(id));
-        }
-        co_return *res;
+        co_return res.value_or(err);
     }
 
     Task<std::vector<Item>> Database::getTagItemsFlat(const int64_t tag, const std::string project) const {
@@ -338,11 +349,22 @@ namespace service {
                                                AND (tc.project_id IS NULL OR tc.project_id = $1) \
                                                AND p.loc = $2 AND c.loc = $3 \
                                              ON CONFLICT DO NOTHING";
-        const auto [res, err] = co_await handleDatabaseOperation<Error>([project, parentTag, childTag](const DbClientPtr &client) -> Task<Error> {
-            co_await client->execSqlCoro(tagTagQuery, project, parentTag, childTag);
-            co_return Error::Ok;
-        });
-        co_return res.value_or(Error::ErrInternal);
+        const auto [res, err] =
+            co_await handleDatabaseOperation<Error>([project, parentTag, childTag](const DbClientPtr &client) -> Task<Error> {
+                co_await client->execSqlCoro(tagTagQuery, project, parentTag, childTag);
+                co_return Error::Ok;
+            });
+        co_return res.value_or(err);
+    }
+
+    Task<Error> Database::refreshFlatTagItemView() const {
+        const auto [res, err] =
+            co_await handleDatabaseOperation<Error>([](const DbClientPtr &client) -> Task<Error> {
+                // language=postgresql
+                co_await client->execSqlCoro("REFRESH MATERIALIZED VIEW tag_item_flat;");
+                co_return Error::Ok;
+            });
+        co_return res.value_or(err);
     }
 
     Task<std::vector<ProjectContent>> Database::getProjectContents(const std::string project) const {
@@ -400,6 +422,21 @@ namespace service {
                 co_return path;
             });
         co_return res;
+    }
+
+    Task<Error> Database::addProjectContentPage(const std::string project, const std::string id, const std::string path) const {
+        // language=postgresql
+        static constexpr auto pageQuery = "INSERT INTO project_item_page (item_id, path) \
+                                           SELECT pitem.id as item_id, $1 as path \
+                                           FROM project_item pitem \
+                                           JOIN item i ON pitem.item_id = i.id \
+                                           WHERE i.loc = $2 AND pitem.project_id = $3";
+        const auto [res, err] =
+            co_await handleDatabaseOperation<Error>([project, id, path](const DbClientPtr &client) -> Task<Error> {
+                co_await client->execSqlCoro(pageQuery, path, id, project);
+                co_return Error::Ok;
+            });
+        co_return res.value_or(err);
     }
 
     Task<std::optional<Recipe>> Database::getProjectRecipe(std::string project, std::string recipe) const {
