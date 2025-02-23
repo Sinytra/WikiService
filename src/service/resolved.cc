@@ -14,6 +14,7 @@
 #include <include/uri.h>
 #include <models/Item.h>
 #include <models/ProjectItem.h>
+#include <models/Tag.h>
 
 #define DOCS_META_FILE "sinytra-wiki.json"
 #define FOLDER_META_FILE "_meta.json"
@@ -553,7 +554,7 @@ namespace service {
         root["slot"] = slot;
         Json::Value itemsJson(Json::arrayValue);
         for (const auto &ingredient: ingredients) {
-            const auto item = co_await global::database->getItem(ingredient.getValueOfItemId());
+            const auto item = co_await global::database->getByPrimaryKey<Item>(ingredient.getValueOfItemId());
             const auto name = co_await getItemName(item);
 
             Json::Value itemJson;
@@ -570,7 +571,7 @@ namespace service {
     }
 
     Task<Json::Value> ResolvedProject::ingredientToJson(const RecipeIngredientTag &tag) const {
-        const auto dbTag = co_await global::database->getTag(tag.getValueOfTagId());
+        const auto dbTag = co_await global::database->getByPrimaryKey<Tag>(tag.getValueOfTagId());
 
         Json::Value root;
         {

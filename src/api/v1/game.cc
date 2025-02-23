@@ -81,7 +81,7 @@ namespace api::v1 {
         Json::Value root(Json::arrayValue);
         for (const auto &[id, loc, project, path]: obtainable) {
             // TODO
-            const auto dbItem = co_await global::database->getItem(id);
+            const auto dbItem = co_await global::database->getByPrimaryKey<Item>(id);
             const auto name = co_await resolved->getItemName(dbItem);
 
             Json::Value itemJson;

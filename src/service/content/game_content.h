@@ -4,6 +4,8 @@
 #include <service/error.h>
 #include <service/resolved.h>
 
+struct ModRecipe;
+
 namespace content {
   class Ingestor {
   public:
@@ -11,12 +13,11 @@ namespace content {
 
     drogon::Task<service::Error> ingestGameContentData() const;
   private:
-    drogon::Task<service::Error> ingestTags() const;
+    drogon::Task<int> ingestTags() const;
     drogon::Task<service::Error> ingestRecipes() const;
     drogon::Task<service::Error> ingestContentPaths() const;
 
-    drogon::Task<> addProjectItem(drogon::orm::DbClientPtr clientPtr, std::string project, std::string item) const;
-    drogon::Task<> addTag(drogon::orm::DbClientPtr clientPtr, std::string tag, std::optional<std::string> project) const;
+    drogon::Task<service::Error> addRecipe(ModRecipe recipe) const;
 
     const service::ResolvedProject &project_;
     const std::shared_ptr<spdlog::logger> &logger_;

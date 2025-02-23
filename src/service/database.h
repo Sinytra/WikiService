@@ -10,7 +10,6 @@
 #include "error.h"
 
 #include <models/Item.h>
-#include <models/Tag.h>
 
 using namespace drogon_model::postgres;
 
@@ -73,15 +72,18 @@ namespace service {
         drogon::Task<std::optional<Project>> getUserProject(std::string username, std::string id) const;
         drogon::Task<Error> assignUserProject(std::string username, std::string id, std::string role) const;
 
-        drogon::Task<Item> getItem(int64_t id) const;
-        drogon::Task<Tag> getTag(int64_t id) const;
+        // TODO Project-bound db object
+        drogon::Task<Error> addProjectItem(std::string project, std::string item) const;
+        drogon::Task<Error> addTag(std::string tag, std::optional<std::string> project) const;
         drogon::Task<std::vector<Item>> getTagItemsFlat(int64_t tag, std::string project) const;
         drogon::Task<Error> addTagItemEntry(std::string project, std::string tag, std::string item) const;
         drogon::Task<Error> addTagTagEntry(std::string project, std::string parentTag, std::string childTag) const;
+        drogon::Task<Error> refreshFlatTagItemView() const;
 
         drogon::Task<std::vector<ProjectContent>> getProjectContents(std::string project) const;
         drogon::Task<int> getProjectContentCount(std::string project) const;
         drogon::Task<std::optional<std::string>> getProjectContentPath(std::string project, std::string id) const;
+        drogon::Task<Error> addProjectContentPage(std::string project, std::string id, std::string path) const;
 
         drogon::Task<std::optional<Recipe>> getProjectRecipe(std::string project, std::string recipe) const;
         drogon::Task<std::vector<Recipe>> getItemUsageInRecipes(std::string item) const;
@@ -96,6 +98,19 @@ namespace service {
                     co_return results;
                 });
             co_return res.value_or(std::vector<T>{});
+        }
+
+        template<typename T>
+        drogon::Task<T> getByPrimaryKey(int64_t id) const {
+            const auto [res, err] = co_await handleDatabaseOperation<T>([id](const drogon::orm::DbClientPtr &client) -> drogon::Task<T> {
+                drogon::orm::CoroMapper<T> mapper(client);
+                co_return co_await mapper.findByPrimaryKey(id);
+            });
+            if (!res) {
+                const auto name = typeid(T).name();
+                throw std::runtime_error(std::format("Failed to get {} with id {}", name, std::to_string(id)));
+            }
+            co_return *res;
         }
     };
 }

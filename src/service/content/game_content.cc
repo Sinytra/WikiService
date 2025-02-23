@@ -30,30 +30,6 @@ namespace content {
         co_return Error::Ok;
     }
 
-    Task<> Ingestor::addProjectItem(const DbClientPtr clientPtr, const std::string project, const std::string item) const {
-        // language=postgresql
-        co_await clientPtr->execSqlCoro("INSERT INTO item VALUES (DEFAULT, $1) ON CONFLICT DO NOTHING", item);
-        // language=postgresql
-        static constexpr auto query = "INSERT INTO project_item (item_id, project_id) \
-                                       SELECT id, $2 FROM item WHERE loc = $1 \
-                                       ON CONFLICT DO NOTHING";
-        co_await clientPtr->execSqlCoro(query, item, project);
-    }
-
-    Task<> Ingestor::addTag(const DbClientPtr clientPtr, const std::string tag, const std::optional<std::string> project) const {
-        // language=postgresql
-        co_await clientPtr->execSqlCoro("INSERT INTO tag VALUES (DEFAULT, $1) ON CONFLICT DO NOTHING", tag);
-        // language=postgresql
-        static constexpr auto query = "INSERT INTO project_tag (tag_id, project_id) \
-                                       SELECT id, $2 FROM tag WHERE loc = $1 \
-                                       ON CONFLICT DO NOTHING";
-        if (project) {
-            co_await clientPtr->execSqlCoro(query, tag, project);
-        } else {
-            co_await clientPtr->execSqlCoro(query, tag, nullptr);
-        }
-    }
-
     Task<Error> Ingestor::ingestContentPaths() const {
         const auto clientPtr = app().getFastDbClient();
 
@@ -78,15 +54,8 @@ namespace content {
                 logger_->debug("Found entry '{}' at '{}'", *id, relative_path.string());
 
                 items.insert(*id);
-                co_await addProjectItem(clientPtr, projectId, *id);
-
-                // language=postgresql
-                static constexpr auto pageQuery = "INSERT INTO project_item_page (item_id, path) \
-                                                   SELECT pitem.id as item_id, $1 as path \
-                                                   FROM project_item pitem \
-                                                   JOIN item i ON pitem.item_id = i.id \
-                                                   WHERE i.loc = $2 AND pitem.project_id = $3";
-                co_await clientPtr->execSqlCoro(pageQuery, relative_path.string(), *id, projectId);
+                co_await global::database->addProjectItem(projectId, *id);
+                co_await global::database->addProjectContentPage(projectId, *id, relative_path.string());
             }
         }
 
@@ -95,16 +64,11 @@ namespace content {
         co_return Error::Ok;
     }
 
-    Task<Error> Ingestor::ingestTags() const {
+    Task<int> Ingestor::ingestTags() const {
         static const std::set<std::string> allowedTypes{"item"};
 
         const auto docsRoot = project_.getDocsDirectoryPath();
         const auto dataRoot = docsRoot / ".data";
-        if (!exists(dataRoot)) {
-            co_return Error::Ok;
-        }
-
-        const auto clientPtr = app().getFastDbClient();
         const auto projectId = project_.getProject().getValueOfId();
         const auto projectModid = project_.getProject().getValueOfModid();
         auto projectLog = *logger_;
@@ -187,7 +151,7 @@ namespace content {
 
             std::optional<std::string> project = resloc->namespace_ == projectModid ? std::make_optional(projectModid) : std::nullopt;
 
-            co_await addTag(clientPtr, tag, project);
+            co_await global::database->addTag(tag, project);
         }
 
         projectLog.debug("Adding tag entries");
@@ -207,7 +171,7 @@ namespace content {
                     co_await global::database->addTagTagEntry(projectId, key, entry);
                 } else {
                     if (resloc->namespace_ == projectModid) {
-                        co_await addProjectItem(clientPtr, projectId, entry);
+                        co_await global::database->addProjectItem(projectId, entry);
                     }
 
                     co_await global::database->addTagItemEntry(projectId, key, entry);
@@ -215,7 +179,7 @@ namespace content {
             }
         }
 
-        co_return Error::Ok;
+        co_return candidateTags.size();
     }
 
     Task<Error> Ingestor::ingestGameContentData() const {
@@ -229,13 +193,16 @@ namespace content {
 
         co_await wipeExistingData(clientPtr, projectId);
 
-        co_await ingestTags();
-
         co_await ingestContentPaths();
+
+        const int tags = co_await ingestTags();
 
         co_await ingestRecipes();
 
-        // TODO Refresh flat tag item view
+        if (tags > 0) {
+            logger.debug("Refreshing flat tag->item view after data ingestion");
+            co_await global::database->refreshFlatTagItemView();
+        }
 
         co_return Error::Ok;
     }
