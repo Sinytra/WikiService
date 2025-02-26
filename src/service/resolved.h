@@ -6,6 +6,7 @@
 #include <models/Item.h>
 #include <models/RecipeIngredientItem.h>
 #include <models/RecipeIngredientTag.h>
+#include <models/ProjectVersion.h>
 #include "util.h"
 
 #include <nlohmann/json_fwd.hpp>
@@ -34,9 +35,13 @@ namespace service {
     };
     std::string projectErrorToString(ProjectError status);
 
+    // See resolved_db.h
+    class ProjectDatabaseAccess;
+
     class ResolvedProject {
     public:
         explicit ResolvedProject(const Project &, const std::filesystem::path &, const std::filesystem::path &);
+        explicit ResolvedProject(const Project &, const std::filesystem::path &, const std::filesystem::path &, const ProjectVersion &);
 
         void setDefaultVersion(const ResolvedProject &defaultVersion);
 
@@ -45,8 +50,8 @@ namespace service {
         bool hasLocale(const std::string &locale) const;
         std::set<std::string> getLocales() const;
 
-        std::optional<std::unordered_map<std::string, std::string>> getAvailableVersionsFiltered() const;
-        std::unordered_map<std::string, std::string> getAvailableVersions() const;
+        drogon::Task<std::unordered_map<std::string, std::string>> getAvailableVersions() const;
+        drogon::Task<bool> hasVersion(std::string version) const;
 
         std::tuple<ProjectPage, Error> readFile(std::string path) const;
         drogon::Task<std::tuple<ProjectPage, Error>> readContentPage(std::string id) const;
@@ -64,9 +69,13 @@ namespace service {
 
         const Project &getProject() const;
 
+        const std::optional<ProjectVersion> &getProjectVersion() const;
+
         const std::filesystem::path &getDocsDirectoryPath() const;
 
-        Json::Value toJson(bool full = false) const;
+        const ProjectDatabaseAccess &getProjectDatabase() const;
+
+        drogon::Task<Json::Value> toJson(bool full = false) const;
         drogon::Task<Json::Value> toJsonVerbose() const;
 
         // Content
@@ -82,5 +91,8 @@ namespace service {
         std::filesystem::path docsDir_;
 
         std::string locale_;
+        std::optional<ProjectVersion> version_;
+
+        std::shared_ptr<ProjectDatabaseAccess> projectDb_;
     };
 }

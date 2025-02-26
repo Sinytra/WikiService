@@ -253,7 +253,7 @@ namespace api::v1 {
 
         Json::Value root;
         if (const auto resolved = co_await global::storage->maybeGetProject(*project)) {
-            root = resolved->toJson(true);
+            root = co_await resolved->toJson(true);
         } else {
             root = projectToJson(*project, true);
         }

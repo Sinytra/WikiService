@@ -1,6 +1,7 @@
 #include "game_recipes.h"
 
 #include <database.h>
+#include <resolved_db.h>
 
 #include "game_content.h"
 
@@ -226,7 +227,7 @@ namespace content {
             logger_->info("Adding {} items found in recipes", newItems.size());
 
             for (auto &item: newItems) {
-                co_await global::database->addProjectItem(projectId, item);
+                co_await project_.getProjectDatabase().addProjectItem(item);
             }
 
             // 2. Create recipes

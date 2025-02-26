@@ -1,10 +1,14 @@
 #include "storage.h"
+
+#include <database.h>
+
 #include "util.h"
 
 #include <filesystem>
 #include <fstream>
 
 #include <git2.h>
+#include <models/ProjectVersion.h>
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/callback_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
@@ -343,6 +347,49 @@ namespace service {
         co_return {repo, ProjectError::OK};
     }
 
+    std::unordered_map<std::string, std::string> readVersionsFromMetadata(const nlohmann::json &metadata, const std::string &defaultBranch) {
+        std::unordered_map<std::string, std::string> versions;
+
+        if (metadata.contains("versions") && metadata["versions"].is_object()) {
+            for (const auto &[key, val]: metadata["versions"].items()) {
+                if (val.is_string() && val.get<std::string>() != defaultBranch) {
+                    versions[key] = val;
+                }
+            }
+        }
+
+        return versions;
+    }
+
+    Task<std::vector<ProjectVersion>> setupProjectVersions(const ResolvedProject &resolved,
+                                                           const std::unordered_map<std::string, std::string> &branches,
+                                                           const std::shared_ptr<spdlog::logger> logger) {
+        const auto projectId = resolved.getProject().getValueOfId();
+        const auto [json, err, det] = resolved.validateProjectMetadata();
+        if (!json) {
+            co_return std::vector<ProjectVersion>{};
+        }
+        const auto defaultBranch = resolved.getProject().getValueOfSourceBranch();
+        const auto versions(readVersionsFromMetadata(*json, defaultBranch));
+
+        std::vector<ProjectVersion> resolvedVersions;
+        for (auto &[key, val]: versions) {
+            if (!branches.contains(val)) {
+                logger->warn("Ignoring version '{}' with unknown branch '{}'", key, val);
+                continue;
+            }
+
+            ProjectVersion version;
+            version.setProjectId(projectId);
+            version.setName(key);
+            version.setBranch(val);
+            if (const auto [result, err] = co_await global::database->createProjectVersion(version); result) {
+                resolvedVersions.push_back(version);
+            }
+        }
+        co_return resolvedVersions;
+    }
+
     Task<ProjectError> Storage::setupProject(const Project &project) const {
         const auto baseDir = getBaseDir();
         const auto clonePath = baseDir.path() / TEMP_DIR / project.getValueOfId();
@@ -362,30 +409,23 @@ namespace service {
 
         ResolvedProject resolved{project, clonePath, clonePath / removeLeadingSlash(project.getValueOfSourcePath())};
 
-        auto versions(resolved.getAvailableVersions());
         const auto branches = listRepoBranches(repo);
-
-        for (auto it = versions.begin(); it != versions.end();) {
-            if (!branches.contains(it->second)) {
-                logger->warn("Ignoring version '{}' with unknown branch '{}'", it->first, it->second);
-                it = versions.erase(it);
-            } else {
-                ++it;
-            }
-        }
+        const auto versions = co_await setupProjectVersions(resolved, branches, logger);
 
         const auto dest = getProjectDirPath(project);
         copyProjectFiles(project, clonePath, dest, logger);
 
-        for (const auto &[key, branch]: versions) {
-            logger->info("Setting up version '{}' on branch '{}'", key, branch);
+        for (const auto &version: versions) {
+            const auto name = version.getValueOfName();
+            const auto branch = version.getValueOfBranch();
+            logger->info("Setting up version '{}' on branch '{}'", name, branch);
 
             const auto branchRef = branches.at(branch);
             if (const auto err = checkoutGitBranch(repo, branchRef, logger); err != Error::Ok) {
                 continue;
             }
 
-            const auto versionDest = getProjectDirPath(project, key);
+            const auto versionDest = getProjectDirPath(project, name);
             copyProjectFiles(project, clonePath, versionDest, logger);
         }
 
@@ -445,9 +485,19 @@ namespace service {
 
         const auto docsDir = rootDir / removeLeadingSlash(project.getValueOfSourcePath());
 
+        if (version) {
+            const auto resolvedVersion = co_await global::database->getProjectVersion(project.getValueOfId(), *version);
+            if (!resolvedVersion) {
+                co_return {std::nullopt, Error::ErrNotFound};
+            }
+
+            ResolvedProject resolved{project, rootDir, docsDir, *resolvedVersion};
+            resolved.setLocale(locale);
+            co_return {resolved, Error::Ok};
+        }
+
         ResolvedProject resolved{project, rootDir, docsDir};
         resolved.setLocale(locale);
-
         co_return {resolved, Error::Ok};
     }
 
@@ -456,12 +506,13 @@ namespace service {
         const auto [defaultProject, error] = co_await findProject(project, std::nullopt, locale, true);
 
         if (defaultProject && version) {
-            auto [vProject, vError] = co_await findProject(project, version, locale, false);
-            if (!vProject && defaultProject->getAvailableVersions().contains(*version)) {
+            if (auto [vProject, vError] = co_await findProject(project, version, locale, false); vProject) {
+                vProject->setDefaultVersion(*defaultProject);
+                co_return {vProject, vError};
+            }
+            if (!co_await defaultProject->hasVersion(*version)) {
                 logger.error("Failed to find existing version '{}' for '{}'", *version, project.getValueOfId());
             }
-            vProject->setDefaultVersion(*defaultProject);
-            co_return {vProject, vError};
         }
 
         co_return {defaultProject, error};

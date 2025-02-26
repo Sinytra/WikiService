@@ -23,7 +23,7 @@ namespace api::v1 {
             co_return;
         }
 
-        if (version && !resolved->getAvailableVersions().contains(*version)) {
+        if (!co_await resolved->hasVersion(*version)) {
             errorResponse(Error::ErrNotFound, "Version not found", callback);
             co_return;
         }
@@ -60,7 +60,7 @@ namespace api::v1 {
             }
 
             Json::Value root;
-            root["project"] = resolved->toJson();
+            root["project"] = co_await resolved->toJson();
             root["content"] = page.content;
             if (resolved->getProject().getValueOfIsPublic() && !page.editUrl.empty()) {
                 root["edit_url"] = page.editUrl;
@@ -92,7 +92,7 @@ namespace api::v1 {
         }
 
         nlohmann::json root;
-        root["project"] = parkourJson(resolved->toJson());
+        root["project"] = parkourJson(co_await resolved->toJson());
         root["tree"] = tree;
 
         const auto resp = HttpResponse::newHttpJsonResponse(unparkourJson(root));

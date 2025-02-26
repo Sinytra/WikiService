@@ -8,6 +8,7 @@
   "password": "postgres",
   "tables": [
     "project",
+    "project_version",
     "user_",
     "user_project",
     "item",

@@ -14,7 +14,6 @@ using namespace drogon_model::postgres;
 
 // TODO Have projects include game version info (merge with versions?)
 namespace api::v1 {
-    // TODO DB content pages not tied to version
     Task<> GameController::contents(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                     const std::string project) const {
         const auto resolved = co_await getProjectWithParams(req, callback, project);
@@ -34,7 +33,6 @@ namespace api::v1 {
         co_return;
     }
 
-    // TODO DB content pages not tied to version
     Task<> GameController::contentItem(const HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback,
                                        const std::string project, const std::string id) const {
         if (id.empty()) {
@@ -54,7 +52,7 @@ namespace api::v1 {
         }
 
         Json::Value root;
-        root["project"] = resolved->toJson();
+        root["project"] = co_await resolved->toJson();
         root["content"] = page.content;
         if (resolved->getProject().getValueOfIsPublic() && !page.editUrl.empty()) {
             root["edit_url"] = page.editUrl;
