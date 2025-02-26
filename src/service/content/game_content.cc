@@ -1,6 +1,7 @@
 #include "game_content.h"
 
 #include <database.h>
+#include <resolved_db.h>
 #include <drogon/drogon.h>
 #include <fstream>
 #include <models/Recipe.h>
@@ -34,7 +35,6 @@ namespace content {
         const auto clientPtr = app().getFastDbClient();
 
         const auto docsRoot = project_.getDocsDirectoryPath();
-        const auto projectId = project_.getProject().getValueOfId();
         std::set<std::string> items;
 
         for (const auto &entry: fs::recursive_directory_iterator(docsRoot)) {
@@ -51,11 +51,11 @@ namespace content {
                     continue;
                 }
 
-                logger_->debug("Found entry '{}' at '{}'", *id, relative_path.string());
+                logger_->trace("Found entry '{}' at '{}'", *id, relative_path.string());
 
                 items.insert(*id);
-                co_await global::database->addProjectItem(projectId, *id);
-                co_await global::database->addProjectContentPage(projectId, *id, relative_path.string());
+                co_await project_.getProjectDatabase().addProjectItem(*id);
+                co_await project_.getProjectDatabase().addProjectContentPage(*id, relative_path.string());
             }
         }
 
@@ -69,7 +69,10 @@ namespace content {
 
         const auto docsRoot = project_.getDocsDirectoryPath();
         const auto dataRoot = docsRoot / ".data";
-        const auto projectId = project_.getProject().getValueOfId();
+        if (!exists(dataRoot)) {
+            co_return 0;
+        }
+
         const auto projectModid = project_.getProject().getValueOfModid();
         auto projectLog = *logger_;
 
@@ -151,7 +154,7 @@ namespace content {
 
             std::optional<std::string> project = resloc->namespace_ == projectModid ? std::make_optional(projectModid) : std::nullopt;
 
-            co_await global::database->addTag(tag, project);
+            co_await project_.getProjectDatabase().addTag(tag);
         }
 
         projectLog.debug("Adding tag entries");
@@ -168,13 +171,13 @@ namespace content {
 
                 if (isTag) {
                     const auto tagId = entry.substr(1);
-                    co_await global::database->addTagTagEntry(projectId, key, entry);
+                    co_await project_.getProjectDatabase().addTagTagEntry(key, entry);
                 } else {
                     if (resloc->namespace_ == projectModid) {
-                        co_await global::database->addProjectItem(projectId, entry);
+                        co_await project_.getProjectDatabase().addProjectItem(entry);
                     }
 
-                    co_await global::database->addTagItemEntry(projectId, key, entry);
+                    co_await project_.getProjectDatabase().addTagItemEntry(key, entry);
                 }
             }
         }

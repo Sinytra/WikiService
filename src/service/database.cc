@@ -69,6 +69,27 @@ namespace service {
         co_return res.value_or(err);
     }
 
+    Task<std::tuple<std::optional<ProjectVersion>, Error>> Database::createProjectVersion(ProjectVersion version) const {
+        co_return co_await handleDatabaseOperation<ProjectVersion>([version](const DbClientPtr &client) -> Task<ProjectVersion> {
+            CoroMapper<ProjectVersion> mapper(client);
+            co_return co_await mapper.insert(version);
+        });
+    }
+
+    Task<std::optional<ProjectVersion>> Database::getProjectVersion(const std::string project, const std::string name) const {
+        const auto [res, err] =
+            co_await handleDatabaseOperation<ProjectVersion>([project, name](const DbClientPtr &client) -> Task<ProjectVersion> {
+                // language=postgresql
+                const auto results =
+                    co_await client->execSqlCoro("SELECT * FROM project_version WHERE project_id = $1 AND name = $2", project, name);
+                if (results.size() != 1) {
+                    throw DrogonDbException{};
+                }
+                co_return ProjectVersion(results.front());
+            });
+        co_return res;
+    }
+
     Task<std::tuple<ProjectSearchResponse, Error>> Database::findProjects(const std::string query, const std::string types,
                                                                           const std::string sort, int page) const {
         const auto [res, err] = co_await handleDatabaseOperation<ProjectSearchResponse>(
@@ -239,7 +260,6 @@ namespace service {
 
     Task<std::optional<Project>> Database::getUserProject(std::string username, std::string id) const {
         const auto [res, err] = co_await handleDatabaseOperation<Project>([username, id](const DbClientPtr &client) -> Task<Project> {
-            CoroMapper<UserProject> mapper(client);
             const auto results = co_await client->execSqlCoro("SELECT * FROM project "
                                                               "JOIN user_project ON project.id = user_project.project_id "
                                                               "WHERE user_id = $1 AND project_id = $2;",
@@ -270,172 +290,27 @@ namespace service {
         co_return res.value_or(err);
     }
 
-    Task<Error> Database::addProjectItem(const std::string project, const std::string item) const {
-        // language=postgresql
-        static constexpr auto query = "INSERT INTO project_item (item_id, project_id) \
-                                       SELECT id, $2 FROM item WHERE loc = $1 \
-                                       ON CONFLICT DO NOTHING";
-        const auto [res, err] = co_await handleDatabaseOperation<Error>([project, item](const DbClientPtr &client) -> Task<Error> {
-            // language=postgresql
-            co_await client->execSqlCoro("INSERT INTO item VALUES (DEFAULT, $1) ON CONFLICT DO NOTHING", item);
-            co_await client->execSqlCoro(query, item, project);
-            co_return Error::Ok;
-        });
-        co_return res.value_or(err);
-    }
-
-    Task<Error> Database::addTag(const std::string tag, const std::optional<std::string> project) const {
+    Task<Error> Database::addTag(const std::string tag) const {
         // language=postgresql
         static constexpr auto query = "INSERT INTO project_tag (tag_id, project_id) \
-                                       SELECT id, $2 FROM tag WHERE loc = $1 \
+                                       SELECT id, NULL FROM tag WHERE loc = $1 \
                                        ON CONFLICT DO NOTHING";
 
-        const auto [res, err] = co_await handleDatabaseOperation<Error>([tag, project](const DbClientPtr &client) -> Task<Error> {
+        const auto [res, err] = co_await handleDatabaseOperation<Error>([tag](const DbClientPtr &client) -> Task<Error> {
             // language=postgresql
             co_await client->execSqlCoro("INSERT INTO tag VALUES (DEFAULT, $1) ON CONFLICT DO NOTHING", tag);
-            if (project) {
-                co_await client->execSqlCoro(query, tag, project);
-            } else {
-                co_await client->execSqlCoro(query, tag, nullptr);
-            }
+            co_await client->execSqlCoro(query, tag);
             co_return Error::Ok;
         });
-        co_return res.value_or(err);
-    }
-
-    Task<std::vector<Item>> Database::getTagItemsFlat(const int64_t tag, const std::string project) const {
-        // language=postgresql
-        static constexpr auto query = "SELECT item.* FROM tag_item_flat \
-                                       JOIN item ON item.id = child \
-                                       JOIN project_item pitem ON pitem.item_id = item.id \
-                                       WHERE parent = $1 AND (pitem.project_id IS NULL OR pitem.project_id = $2)";
-
-        const auto [res, err] =
-            co_await handleDatabaseOperation<std::vector<Item>>([tag, project](const DbClientPtr &client) -> Task<std::vector<Item>> {
-                const auto results = co_await client->execSqlCoro(query, tag, project);
-                std::vector<Item> tagItems;
-                for (const auto &row: results) {
-                    tagItems.emplace_back(row);
-                }
-                co_return tagItems;
-            });
-        co_return res.value_or(std::vector<Item>{});
-    }
-
-    Task<Error> Database::addTagItemEntry(const std::string project, const std::string tag, const std::string item) const {
-        // language=postgresql
-        static constexpr auto tagItemQuery = "INSERT INTO tag_item (tag_id, item_id) \
-                                              SELECT pt.id, pip.id FROM project_tag pt CROSS JOIN project_item pip \
-                                              JOIN tag ON tag.id = pt.tag_id \
-                                              JOIN item ON item.id = pip.item_id \
-                                              WHERE (pt.project_id IS NULL OR pt.project_id = $1) \
-                                                AND (pip.project_id IS NULL OR pip.project_id = $1) \
-                                                AND tag.loc = $2 AND item.loc = $3 \
-                                              ON CONFLICT DO NOTHING";
-        const auto [res, err] = co_await handleDatabaseOperation<Error>([project, tag, item](const DbClientPtr &client) -> Task<Error> {
-            co_await client->execSqlCoro(tagItemQuery, project, tag, item);
-            co_return Error::Ok;
-        });
-        co_return res.value_or(Error::ErrInternal);
-    }
-
-    Task<Error> Database::addTagTagEntry(const std::string project, const std::string parentTag, const std::string childTag) const {
-        // language=postgresql
-        static constexpr auto tagTagQuery = "INSERT INTO tag_tag (parent, child) \
-                                             SELECT tp.id, tc.id FROM project_tag tp CROSS JOIN project_tag tc \
-                                             JOIN tag p ON p.id = tp.tag_id \
-                                             JOIN tag c ON c.id = tc.tag_id \
-                                             WHERE (tp.project_id IS NULL OR tp.project_id = $1) \
-                                               AND (tc.project_id IS NULL OR tc.project_id = $1) \
-                                               AND p.loc = $2 AND c.loc = $3 \
-                                             ON CONFLICT DO NOTHING";
-        const auto [res, err] =
-            co_await handleDatabaseOperation<Error>([project, parentTag, childTag](const DbClientPtr &client) -> Task<Error> {
-                co_await client->execSqlCoro(tagTagQuery, project, parentTag, childTag);
-                co_return Error::Ok;
-            });
         co_return res.value_or(err);
     }
 
     Task<Error> Database::refreshFlatTagItemView() const {
-        const auto [res, err] =
-            co_await handleDatabaseOperation<Error>([](const DbClientPtr &client) -> Task<Error> {
-                // language=postgresql
-                co_await client->execSqlCoro("REFRESH MATERIALIZED VIEW tag_item_flat;");
-                co_return Error::Ok;
-            });
-        co_return res.value_or(err);
-    }
-
-    Task<std::vector<ProjectContent>> Database::getProjectContents(const std::string project) const {
-        // language=postgresql
-        static constexpr auto query = "SELECT item.loc, path FROM project_item pitem \
-                                       JOIN project_item_page pip ON pitem.id = pip.item_id \
-                                       JOIN item ON item.id = pitem.item_id \
-                                       WHERE pitem.project_id = $1 AND starts_with(pip.path, '.content/');";
-
-        const auto [res, err] = co_await handleDatabaseOperation<std::vector<ProjectContent>>(
-            [project](const DbClientPtr &client) -> Task<std::vector<ProjectContent>> {
-                const auto results = co_await client->execSqlCoro(query, project);
-                std::vector<ProjectContent> contents;
-                for (const auto &row: results) {
-                    const auto id = row[0].as<std::string>();
-                    const auto path = row[1].as<std::string>();
-                    contents.emplace_back(id, path);
-                }
-                co_return contents;
-            });
-        co_return res.value_or(std::vector<ProjectContent>{});
-    }
-
-    Task<int> Database::getProjectContentCount(std::string project) const {
-        // language=postgresql
-        static constexpr auto query = "SELECT count(*) FROM project_item pitem \
-                                       JOIN project_item_page pip ON pitem.id = pip.item_id \
-                                       WHERE pitem.project_id = $1 AND starts_with(pip.path, '.content/')";
-
-        const auto [res, err] = co_await handleDatabaseOperation<int>([project](const DbClientPtr &client) -> Task<int> {
-            const auto results = co_await client->execSqlCoro(query, project);
-            if (results.size() != 1) {
-                throw DrogonDbException{};
-            }
-            co_return results.front().at("count").as<int>();
+        const auto [res, err] = co_await handleDatabaseOperation<Error>([](const DbClientPtr &client) -> Task<Error> {
+            // language=postgresql
+            co_await client->execSqlCoro("REFRESH MATERIALIZED VIEW tag_item_flat;");
+            co_return Error::Ok;
         });
-        co_return res.value_or(0);
-    }
-
-    Task<std::optional<std::string>> Database::getProjectContentPath(std::string project, std::string id) const {
-        // language=postgresql
-        static constexpr auto query = "SELECT path FROM project_item pitem \
-                                       JOIN project_item_page pip ON pitem.id = pip.item_id \
-                                       JOIN item i ON pip.item_id = i.id \
-                                       WHERE pitem.project_id = $1 AND i.loc = $2;";
-
-        const auto [res, err] =
-            co_await handleDatabaseOperation<std::string>([project, id](const DbClientPtr &client) -> Task<std::string> {
-                const auto results = co_await client->execSqlCoro(query, project, id);
-                if (results.size() != 1) {
-                    throw DrogonDbException{};
-                }
-                const auto row = results.front();
-                const auto path = row.at("path").as<std::string>();
-                co_return path;
-            });
-        co_return res;
-    }
-
-    Task<Error> Database::addProjectContentPage(const std::string project, const std::string id, const std::string path) const {
-        // language=postgresql
-        static constexpr auto pageQuery = "INSERT INTO project_item_page (item_id, path) \
-                                           SELECT pitem.id as item_id, $1 as path \
-                                           FROM project_item pitem \
-                                           JOIN item i ON pitem.item_id = i.id \
-                                           WHERE i.loc = $2 AND pitem.project_id = $3";
-        const auto [res, err] =
-            co_await handleDatabaseOperation<Error>([project, id, path](const DbClientPtr &client) -> Task<Error> {
-                co_await client->execSqlCoro(pageQuery, path, id, project);
-                co_return Error::Ok;
-            });
         co_return res.value_or(err);
     }
 

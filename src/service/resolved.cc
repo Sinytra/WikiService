@@ -1,5 +1,6 @@
-#include "database.h"
 #include "resolved.h"
+#include "database.h"
+#include "resolved_db.h"
 #include "schemas.h"
 #include "util.h"
 
@@ -250,7 +251,13 @@ namespace service {
     }
 
     ResolvedProject::ResolvedProject(const Project &p, const std::filesystem::path &r, const std::filesystem::path &d) :
-        project_(p), defaultVersion_(nullptr), rootDir_(r), docsDir_(d) {}
+        project_(p), defaultVersion_(nullptr), rootDir_(r), docsDir_(d), version_(std::nullopt),
+        projectDb_(std::make_shared<ProjectDatabaseAccess>(*this)) {}
+
+    ResolvedProject::ResolvedProject(const Project &p, const std::filesystem::path &r, const std::filesystem::path &d,
+                                     const ProjectVersion &v) :
+        project_(p), defaultVersion_(nullptr), rootDir_(r), docsDir_(d), version_(v),
+        projectDb_(std::make_shared<ProjectDatabaseAccess>(*this)) {}
 
     void ResolvedProject::setDefaultVersion(const ResolvedProject &defaultVersion) {
         defaultVersion_ = std::make_shared<ResolvedProject>(defaultVersion);
@@ -283,33 +290,19 @@ namespace service {
         return locales;
     }
 
-    std::optional<std::unordered_map<std::string, std::string>> ResolvedProject::getAvailableVersionsFiltered() const {
-        const auto versions = getAvailableVersions();
-
-        return versions.empty() ? std::nullopt : std::make_optional(versions);
-    }
-
-    std::unordered_map<std::string, std::string> ResolvedProject::getAvailableVersions() const {
-        if (defaultVersion_) {
-            return defaultVersion_->getAvailableVersions();
-        }
-
-        const auto defaultBranch = project_.getValueOfSourceBranch();
-        const auto metaFilePath = rootDir_ / removeLeadingSlash(project_.getValueOfSourcePath()) / DOCS_META_FILE;
-
+    Task<std::unordered_map<std::string, std::string>> ResolvedProject::getAvailableVersions() const {
         std::unordered_map<std::string, std::string> versions;
 
-        if (const auto jf = parseJsonFile(metaFilePath)) {
-            if (jf->contains("versions") && (*jf)["versions"].is_object()) {
-                for (const auto &[key, val]: (*jf)["versions"].items()) {
-                    if (val.is_string() && val.get<std::string>() != defaultBranch) {
-                        versions[key] = val;
-                    }
-                }
-            }
+        for (const auto dbVersions = co_await projectDb_->getVersions(); const auto &version: dbVersions) {
+            versions.emplace(version.getValueOfName(), version.getValueOfBranch());
         }
 
-        return versions;
+        co_return versions;
+    }
+
+    Task<bool> ResolvedProject::hasVersion(const std::string version) const {
+        const auto versions = co_await getAvailableVersions();
+        co_return versions.contains(version);
     }
 
     fs::path getFilePath(const fs::path &rootDir, const std::string &path, const std::string &locale) {
@@ -343,7 +336,7 @@ namespace service {
     }
 
     Task<std::tuple<ProjectPage, Error>> ResolvedProject::readContentPage(const std::string id) const {
-        const auto contentPath = co_await global::database->getProjectContentPath(project_.getValueOfId(), id);
+        const auto contentPath = co_await projectDb_->getProjectContentPath(id);
         if (!contentPath) {
             co_return {{"", ""}, Error::ErrInternal};
         }
@@ -408,7 +401,8 @@ namespace service {
 
     Task<std::tuple<std::optional<nlohmann::ordered_json>, Error>> ResolvedProject::getProjectContents() const {
         std::unordered_map<std::string, std::string> ids;
-        for (const auto contents = co_await global::database->getProjectContents(project_.getValueOfId()); const auto &[id, path]: contents)
+        for (const auto contents = co_await projectDb_->getProjectContents();
+             const auto &[id, path]: contents)
         {
             ids.emplace(path, id);
         }
@@ -445,10 +439,16 @@ namespace service {
 
     const Project &ResolvedProject::getProject() const { return project_; }
 
+    const std::optional<ProjectVersion> &ResolvedProject::getProjectVersion() const { return version_; }
+
     const std::filesystem::path &ResolvedProject::getDocsDirectoryPath() const { return docsDir_; }
 
-    Json::Value ResolvedProject::toJson(const bool full) const {
-        const auto versions = getAvailableVersions();
+    const ProjectDatabaseAccess &ResolvedProject::getProjectDatabase() const {
+        return *projectDb_;
+    }
+
+    Task<Json::Value> ResolvedProject::toJson(const bool full) const {
+        const auto versions = co_await getAvailableVersions();
         const auto locales = getLocales();
 
         Json::Value projectJson = projectToJson(project_, full);
@@ -469,13 +469,13 @@ namespace service {
             projectJson["locales"] = localesJson;
         }
 
-        return projectJson;
+        co_return projectJson;
     }
 
     int countPagesRecursive(nlohmann::ordered_json json) {
         int sum = 0;
 
-        for (auto &item : json) {
+        for (auto &item: json) {
             if (item["type"] == "dir") {
                 if (item.contains("children")) {
                     sum += countPagesRecursive(item["children"]);
@@ -489,7 +489,7 @@ namespace service {
     }
 
     Task<Json::Value> ResolvedProject::toJsonVerbose() const {
-        auto projectJson = toJson();
+        auto projectJson = co_await toJson();
         Json::Value infoJson;
 
         if (const auto [meta, err, detail] = validateProjectMetadata(); meta && meta->contains("links")) {
@@ -498,7 +498,7 @@ namespace service {
             }
         }
 
-        const auto count = co_await global::database->getProjectContentCount(project_.getValueOfId());
+        const auto count = co_await projectDb_->getProjectContentCount();
         infoJson["contentCount"] = count;
 
         const auto [tree, treeErr] = getDirectoryTree();
@@ -532,21 +532,15 @@ namespace service {
     }
 
     Task<std::optional<std::string>> ResolvedProject::getItemName(const Item item) const {
-        // TODO Database
-        const auto clientPtr = app().getFastDbClient();
-        const auto projectId = project_.getValueOfId();
-        const auto rows = co_await clientPtr->execSqlCoro("SELECT path FROM project_item_page "
-                                                          "JOIN project_item pi ON project_item_page.item_id = pi.id "
-                                                          "WHERE pi.project_id = $1 AND pi.item_id = $2",
-                                                          projectId, item.getValueOfId());
-        if (rows.size() < 1) {
-            const auto parsed = ResourceLocation::parse(item.getValueOfLoc());
-            // TODO Locale
-            const auto localized = readLangKey("en_en", "item." + projectId + "." + parsed->path_);
-            co_return localized;
+        if (const auto path = co_await projectDb_->getProjectContentPath(item.getValueOfLoc())) {
+            co_return readPageAttribute(*path, "title");
         }
-        const auto path = rows.front()["path"].as<std::string>();
-        co_return readPageAttribute(path, "title");
+
+        const auto projectId = project_.getValueOfId();
+        const auto parsed = ResourceLocation::parse(item.getValueOfLoc());
+        // TODO Locale
+        const auto localized = readLangKey("en_en", "item." + projectId + "." + parsed->path_);
+        co_return localized;
     }
 
     Task<Json::Value> ResolvedProject::ingredientToJson(const int slot, const std::vector<RecipeIngredientItem> ingredients) const {
@@ -579,7 +573,7 @@ namespace service {
             tagJson["id"] = dbTag.getValueOfLoc();
             {
                 Json::Value itemsJson(Json::arrayValue);
-                for (const auto tagItems = co_await global::database->getTagItemsFlat(tag.getValueOfTagId(), project_.getValueOfId());
+                for (const auto tagItems = co_await projectDb_->getTagItemsFlat(tag.getValueOfTagId());
                      const auto &item: tagItems)
                 {
                     const auto name = co_await getItemName(item);

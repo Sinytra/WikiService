@@ -34,6 +34,7 @@ add_library(service STATIC
         github.cc
         platforms.cc
         resolved.cc
+        resolved_db.cc
         schemas.cc
         storage.cc
         util.cc

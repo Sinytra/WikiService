@@ -1,3 +1,14 @@
+CREATE TABLE project_version
+(
+    id bigserial PRIMARY KEY,
+    project_id text NOT NULL REFERENCES project (id) ON DELETE CASCADE,
+    name varchar(255) NOT NULL,
+    branch varchar(255) NOT NULL,
+--    game_version varchar(255) NOT NULL
+
+    UNIQUE (project_id, name, branch)
+);
+
 CREATE TABLE item
 (
     id  bigserial PRIMARY KEY,
@@ -22,7 +33,8 @@ CREATE UNIQUE INDEX unique_item_no_project
 CREATE TABLE project_item_page
 (
     item_id   bigint NOT NULL REFERENCES project_item (id) ON DELETE CASCADE,
-    path text NOT NULL
+    path text NOT NULL,
+    version_id bigint REFERENCES project_version (id) ON DELETE CASCADE
 );
 
 CREATE TABLE tag
