@@ -23,7 +23,7 @@ namespace api::v1 {
             co_return;
         }
 
-        if (!co_await resolved->hasVersion(*version)) {
+        if (version && !co_await resolved->hasVersion(*version)) {
             errorResponse(Error::ErrNotFound, "Version not found", callback);
             co_return;
         }

@@ -454,9 +454,9 @@ namespace service {
         Json::Value projectJson = projectToJson(project_, full);
 
         if (!versions.empty()) {
-            Json::Value versionsJson;
-            for (const auto &[key, val]: versions) {
-                versionsJson[key] = val;
+            Json::Value versionsJson(Json::arrayValue);
+            for (const auto &key: versions | std::views::keys) {
+                versionsJson.append(key);
             }
             projectJson["versions"] = versionsJson;
         }
