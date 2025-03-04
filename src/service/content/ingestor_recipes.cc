@@ -1,13 +1,9 @@
-#include "game_recipes.h"
-
-#include <database.h>
-#include <resolved_db.h>
-
+#include "ingestor_recipes.h"
 #include "game_content.h"
-
+#include <database.h>
+#include <drogon/drogon.h>
+#include <resolved_db.h>
 #include <content/builtin_recipe_type.h>
-#include <drogon/HttpAppFramework.h>
-#include <models/Recipe.h>
 #include <schemas.h>
 
 using namespace drogon;
@@ -15,20 +11,6 @@ using namespace drogon::orm;
 using namespace logging;
 using namespace service;
 namespace fs = std::filesystem;
-
-struct RecipeIngredient {
-    std::string itemId;
-    int slot;
-    int count;
-    bool input;
-    bool isTag;
-};
-
-struct ModRecipe {
-    std::string id;
-    std::string type;
-    std::vector<RecipeIngredient> ingredients;
-};
 
 using RecipeProcessor = std::function<std::optional<ModRecipe>(const std::string &id, const std::string &type, const nlohmann::json &json)>;
 
@@ -113,6 +95,7 @@ std::unordered_map<std::string, RecipeType> recipeTypes{
     {"minecraft:crafting_shaped", {recipe_type::builtin::shapedCrafting, readShapedCraftingRecipe}},
     {"minecraft:crafting_shapeless", {recipe_type::builtin::shapedCrafting, readShapelessCraftingRecipe}}};
 
+
 namespace content {
     std::optional<Json::Value> getRecipeType(const std::string &type) {
         if (const auto knownType = recipeTypes.find(type); knownType != recipeTypes.end()) {
@@ -146,9 +129,43 @@ namespace content {
         return std::nullopt;
     }
 
-    Task<Error> Ingestor::addRecipe(const ModRecipe recipe) const {
+    RecipesSubIngestor::RecipesSubIngestor(const ResolvedProject &proj, const std::shared_ptr<spdlog::logger> &log) :
+        SubIngestor(proj, log) {}
+
+    Task<PreparationResult> RecipesSubIngestor::prepare() {
+        PreparationResult result;
+
+        const auto docsRoot = project_.getDocsDirectoryPath();
+        const auto modid = project_.getProject().getValueOfModid();
+        const auto recipesRoot = docsRoot / ".data" / modid / "recipe";
+
+        if (!exists(recipesRoot)) {
+            co_return result;
+        }
+
+        for (const auto &entry: fs::recursive_directory_iterator(recipesRoot)) {
+            if (!entry.is_regular_file()) {
+                continue;
+            }
+
+            if (const auto recipe = readRecipe(modid, recipesRoot, entry.path())) {
+                recipes_.push_back(*recipe);
+
+                for (const auto &item: recipe->ingredients) {
+                    result.items.insert(item.itemId);
+                }
+            } else {
+                logger_->warn("Skipping recipe file: '{}'", entry.path().filename().string());
+            }
+        }
+
+        co_return result;
+    }
+
+    Task<Error> RecipesSubIngestor::addRecipe(const ModRecipe recipe) const {
         const auto clientPtr = app().getFastDbClient();
         CoroMapper<Recipe> recipeMapper(clientPtr);
+
         const auto [id, type, ingredients] = recipe;
         const auto projectId = project_.getProject().getValueOfId();
 
@@ -175,7 +192,7 @@ namespace content {
                                                     recipeId, ingredientId, slot, count, input);
                 }
                 continue;
-            } catch (const std::exception &e) {
+            } catch ([[maybe_unused]] const std::exception &e) {
                 const auto ingredientName = isTag ? "#" + ingredientId : ingredientId;
                 logger_->warn("Skipping recipe '{}' due to missing ingredient '{}'", id, ingredientName);
             }
@@ -186,59 +203,14 @@ namespace content {
         co_return Error::Ok;
     }
 
-    Task<Error> Ingestor::ingestRecipes() const {
-        const auto clientPtr = app().getFastDbClient();
+    Task<Error> RecipesSubIngestor::execute() {
+        logger_->info("Importing {} recipes", recipes_.size());
 
-        const auto projectId = project_.getProject().getValueOfId();
-        const auto docsRoot = project_.getDocsDirectoryPath();
-        const auto modid = project_.getProject().getValueOfModid();
-        const auto recipesRoot = docsRoot / ".data" / modid / "recipe";
-
-        if (!exists(recipesRoot)) {
-            co_return Error::Ok;
-        }
-
-        std::vector<ModRecipe> recipes;
-        for (const auto &entry: fs::recursive_directory_iterator(recipesRoot)) {
-            if (!entry.is_regular_file()) {
-                continue;
-            }
-
-            if (const auto recipe = readRecipe(modid, recipesRoot, entry.path())) {
-                recipes.push_back(*recipe);
-            } else {
-                logger_->warn("Skipping recipe file: '{}'", entry.path().filename().string());
-            }
-        }
-
-        logger_->info("Importing {} recipes from project {}", recipes.size(), projectId);
-
-        try {
-            // 1. Create items
-            std::set<std::string> newItems;
-            for (auto &recipe: recipes) {
-                for (const auto &item: recipe.ingredients) {
-                    if (const auto parsedId = ResourceLocation::parse(item.itemId); parsedId && parsedId->namespace_ == modid) {
-                        newItems.insert(item.itemId);
-                    }
-                }
-            }
-
-            logger_->info("Adding {} items found in recipes", newItems.size());
-
-            for (auto &item: newItems) {
-                co_await project_.getProjectDatabase().addProjectItem(item);
-            }
-
-            // 2. Create recipes
-            CoroMapper<Recipe> recipeMapper(clientPtr);
-            for (auto &recipe: recipes) {
-                co_await addRecipe(recipe);
-            }
-        } catch (const std::exception &e) {
-            logger_->error("Failed to add items to transaction: {}", e.what());
+        for (const auto &recipe: recipes_) {
+            co_await addRecipe(recipe);
         }
 
         co_return Error::Ok;
     }
+
 }
