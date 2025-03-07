@@ -47,7 +47,7 @@ namespace api::v1 {
 
         const auto [page, pageErr] = co_await resolved->readContentPage(id);
         if (pageErr != Error::Ok) {
-            errorResponse(Error::ErrBadRequest, "Content ID not found", callback);
+            errorResponse(Error::ErrNotFound, "Content ID not found", callback);
             co_return;
         }
 
