@@ -104,7 +104,7 @@ namespace service {
                                        JOIN project_item_page pip ON pitem.id = pip.item_id \
                                        JOIN item ON item.id = pitem.item_id \
                                        WHERE pitem.project_id = $1 AND starts_with(pip.path, '.content/') \
-                                       AND pip.version_id = $2";
+                                       AND (pip.version_id = $2 OR $2 IS NULL)";
 
         const auto [res, err] = co_await handleDatabaseOperation<std::vector<ProjectContent>>(
             [&](const DbClientPtr &client) -> Task<std::vector<ProjectContent>> {
@@ -127,7 +127,7 @@ namespace service {
         static constexpr auto query = "SELECT count(*) FROM project_item pitem \
                                        JOIN project_item_page pip ON pitem.id = pip.item_id \
                                        WHERE pitem.project_id = $1 AND starts_with(pip.path, '.content/') \
-                                       AND pip.version_id = $2";
+                                       AND (pip.version_id = $2 OR $2 IS NULL)";
 
         const auto [res, err] = co_await handleDatabaseOperation<int>([&](const DbClientPtr &client) -> Task<int> {
             const auto version = project_.getProjectVersion();
@@ -145,9 +145,9 @@ namespace service {
         // language=postgresql
         static constexpr auto query = "SELECT path FROM project_item pitem \
                                        JOIN project_item_page pip ON pitem.id = pip.item_id \
-                                       JOIN item i ON pip.item_id = i.id \
+                                       JOIN item i ON pitem.item_id = i.id \
                                        WHERE pitem.project_id = $1 AND i.loc = $2 \
-                                       AND pip.version_id = $2";
+                                       AND (pip.version_id = $3 OR $3 IS NULL)";
 
         const auto [res, err] = co_await handleDatabaseOperation<std::string>([&, id](const DbClientPtr &client) -> Task<std::string> {
             const auto version = project_.getProjectVersion();
