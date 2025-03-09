@@ -1,10 +1,10 @@
 #include "ingestor_recipes.h"
-#include "game_content.h"
+#include <content/builtin_recipe_type.h>
 #include <database.h>
 #include <drogon/drogon.h>
 #include <resolved_db.h>
-#include <content/builtin_recipe_type.h>
 #include <schemas.h>
+#include "game_content.h"
 
 using namespace drogon;
 using namespace drogon::orm;
@@ -12,7 +12,8 @@ using namespace logging;
 using namespace service;
 namespace fs = std::filesystem;
 
-using RecipeProcessor = std::function<std::optional<ModRecipe>(const std::string &id, const std::string &type, const nlohmann::json &json)>;
+using RecipeProcessor = std::function<std::optional<ModRecipe>(const std::string &id, const std::string &type, const nlohmann::json &json,
+                                                               spdlog::logger &logger)>;
 
 struct RecipeType {
     nlohmann::json displaySchema;
@@ -33,7 +34,7 @@ std::optional<RecipeIngredient> readRecipeIngredient(const nlohmann::json &json,
 }
 
 // TODO Support 1.21.4+ recipe ingredients
-std::optional<ModRecipe> readShapedCraftingRecipe(const std::string &id, const std::string &type, const nlohmann::json &json) {
+std::optional<ModRecipe> readShapedCraftingRecipe(const std::string &id, const std::string &type, const nlohmann::json &json, spdlog::logger &logger) {
     const auto keys = json.at("key");
     const auto pattern = json.at("pattern");
     std::string concat = "";
@@ -55,7 +56,7 @@ std::optional<ModRecipe> readShapedCraftingRecipe(const std::string &id, const s
         } else {
             const auto ingredient = readRecipeIngredient(keyValue, i + 1);
             if (!ingredient) {
-                logger.info("Invalid ingredient, skipping recipe"); // TODO Project logger
+                logger.info("Invalid ingredient, skipping recipe");
                 return std::nullopt;
             }
             recipe.ingredients.push_back(*ingredient);
@@ -70,14 +71,14 @@ std::optional<ModRecipe> readShapedCraftingRecipe(const std::string &id, const s
     return recipe;
 }
 
-std::optional<ModRecipe> readShapelessCraftingRecipe(const std::string &id, const std::string &type, const nlohmann::json &json) {
+std::optional<ModRecipe> readShapelessCraftingRecipe(const std::string &id, const std::string &type, const nlohmann::json &json, spdlog::logger &logger) {
     ModRecipe recipe{.id = id, .type = type};
 
     const auto ingredients = json["ingredients"];
     for (int i = 0; i < ingredients.size(); ++i) {
         const auto ingredient = readRecipeIngredient(ingredients[i], i + 1);
         if (!ingredient) {
-            logger.info("Invalid ingredient, skipping recipe"); // TODO Project logger
+            logger.info("Invalid ingredient, skipping recipe");
             return std::nullopt;
         }
         recipe.ingredients.push_back(*ingredient);
@@ -104,7 +105,7 @@ namespace content {
         return std::nullopt;
     }
 
-    std::optional<ModRecipe> readRecipe(const std::string &namespace_, const fs::path &root, const fs::path &path) {
+    std::optional<ModRecipe> readRecipe(const std::string &namespace_, const fs::path &root, const fs::path &path, spdlog::logger &projectLogger) {
         fs::path relativePath = relative(path, root);
         const auto fileName = relativePath.string();
         const auto id = namespace_ + ":" + fileName.substr(0, fileName.find_last_of('.'));
@@ -123,7 +124,7 @@ namespace content {
         // Ingest recipe
         const auto type = json->at("type").get<std::string>();
         if (const auto knownType = recipeTypes.find(type); knownType != recipeTypes.end()) {
-            return knownType->second.processor(id, type, *json);
+            return knownType->second.processor(id, type, *json, projectLogger);
         }
 
         return std::nullopt;
@@ -148,7 +149,7 @@ namespace content {
                 continue;
             }
 
-            if (const auto recipe = readRecipe(modid, recipesRoot, entry.path())) {
+            if (const auto recipe = readRecipe(modid, recipesRoot, entry.path(), *logger_)) {
                 recipes_.push_back(*recipe);
 
                 for (const auto &item: recipe->ingredients) {

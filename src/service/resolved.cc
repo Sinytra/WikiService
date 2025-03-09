@@ -22,6 +22,7 @@
 #define DOCS_FILE_EXT ".mdx"
 #define I18N_DIR_PATH ".translated"
 #define NO_ICON "_none"
+#define DEFAULT_LOCALE "en_en"
 
 using namespace logging;
 using namespace drogon;
@@ -531,16 +532,18 @@ namespace service {
         return {*meta, ProjectError::OK, ""};
     }
 
-    Task<std::optional<std::string>> ResolvedProject::getItemName(const Item item) const {
+    Task<ItemData> ResolvedProject::getItemName(const Item item) const {
         if (const auto path = co_await projectDb_->getProjectContentPath(item.getValueOfLoc())) {
-            co_return readPageAttribute(*path, "title");
+            const auto title = readPageAttribute(*path, "title");
+            co_return ItemData{ .name = title.value_or(""), .path = *path };
         }
 
         const auto projectId = project_.getValueOfId();
         const auto parsed = ResourceLocation::parse(item.getValueOfLoc());
-        // TODO Locale
-        const auto localized = readLangKey("en_en", "item." + projectId + "." + parsed->path_);
-        co_return localized;
+        const auto localeKey = locale_.empty() ? DEFAULT_LOCALE : locale_;
+        const auto localized = readLangKey(localeKey, "item." + projectId + "." + parsed->path_);
+
+        co_return ItemData{ .name = localized.value_or(""), .path = "" };
     }
 
     Task<Json::Value> ResolvedProject::ingredientToJson(const int slot, const std::vector<RecipeIngredientItem> ingredients) const {
@@ -549,13 +552,14 @@ namespace service {
         Json::Value itemsJson(Json::arrayValue);
         for (const auto &ingredient: ingredients) {
             const auto item = co_await global::database->getByPrimaryKey<Item>(ingredient.getValueOfItemId());
-            const auto name = co_await getItemName(item);
+            const auto [name, path] = co_await getItemName(item);
 
             Json::Value itemJson;
             itemJson["id"] = item.getValueOfLoc();
-            if (name) {
-                itemJson["name"] = *name;
+            if (!name.empty()) {
+                itemJson["name"] = name;
             }
+            itemJson["has_page"] = !path.empty();
             itemJson["count"] = ingredient.getValueOfCount();
             itemJson["sources"] = co_await appendSources<ProjectItem>(ProjectItem::Cols::_item_id, ingredient.getValueOfItemId());
             itemsJson.append(itemJson);
@@ -576,13 +580,14 @@ namespace service {
                 for (const auto tagItems = co_await projectDb_->getTagItemsFlat(tag.getValueOfTagId());
                      const auto &item: tagItems)
                 {
-                    const auto name = co_await getItemName(item);
+                    const auto [name, path] = co_await getItemName(item);
 
                     Json::Value itemJson;
                     itemJson["id"] = item.getValueOfLoc();
-                    if (name) {
-                        itemJson["name"] = *name;
+                    if (!name.empty()) {
+                        itemJson["name"] = name;
                     }
+                    itemJson["has_page"] = !path.empty();
                     itemJson["sources"] = co_await appendSources<ProjectItem>(ProjectItem::Cols::_item_id, item.getValueOfId());
                     itemsJson.append(itemJson);
                 }

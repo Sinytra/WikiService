@@ -433,11 +433,17 @@ namespace service {
 
         git_repository_free(repo);
 
-        logger->info("Project setup complete");
+        logger->info("Project import complete");
 
+        // TODO Does not work on first import
         ResolvedProject finalResolved{project, dest, dest / removeLeadingSlash(project.getValueOfSourcePath())};
         content::Ingestor ingestor{finalResolved, logger};
-        co_await ingestor.ingestGameContentData();
+        try {
+            co_await ingestor.ingestGameContentData();
+        } catch (std::exception e) {
+            logger->error("Error ingesting project data");
+            logging::logger.error("Error ingesting project data: {}", e.what());
+        }
 
         logger->info("====================================");
         logger->info("Project setup complete");
