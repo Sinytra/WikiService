@@ -80,13 +80,13 @@ namespace api::v1 {
         for (const auto &[id, loc, project, path]: obtainable) {
             // TODO
             const auto dbItem = co_await global::database->getByPrimaryKey<Item>(id);
-            const auto name = co_await resolved->getItemName(dbItem);
+            const auto [name, _] = co_await resolved->getItemName(dbItem);
 
             Json::Value itemJson;
             itemJson["project"] = project;
             itemJson["id"] = loc;
-            if (name) {
-                itemJson["name"] = *name;
+            if (!name.empty()) {
+                itemJson["name"] = name;
             }
             itemJson["has_page"] = !path.empty();
             root.append(itemJson);

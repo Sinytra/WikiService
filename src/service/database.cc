@@ -331,7 +331,8 @@ namespace service {
         // language=postgresql
         static constexpr auto query = "SELECT * FROM recipe \
                                        JOIN recipe_ingredient_item ri ON recipe.id = ri.recipe_id \
-                                       WHERE ri.item_id = $1"; // FIXME
+                                       JOIN item i ON ri.item_id = i.id \
+                                       WHERE i.loc = $1";
 
         const auto [res, err] =
             co_await handleDatabaseOperation<std::vector<Recipe>>([item](const DbClientPtr &client) -> Task<std::vector<Recipe>> {

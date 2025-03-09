@@ -35,6 +35,11 @@ namespace service {
     };
     std::string projectErrorToString(ProjectError status);
 
+    struct ItemData {
+        std::string name;
+        std::string path;
+    };
+
     // See resolved_db.h
     class ProjectDatabaseAccess;
 
@@ -79,7 +84,7 @@ namespace service {
         drogon::Task<Json::Value> toJsonVerbose() const;
 
         // Content
-        drogon::Task<std::optional<std::string>> getItemName(Item item) const;
+        drogon::Task<ItemData> getItemName(Item item) const;
     private:
         drogon::Task<Json::Value> ingredientToJson(int slot, std::vector<RecipeIngredientItem> ingredients) const;
         drogon::Task<Json::Value> ingredientToJson(const RecipeIngredientTag &tag) const;

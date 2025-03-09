@@ -39,7 +39,8 @@ namespace content {
         auto projectLog = *logger_;
 
         if (!project_.getProject().getModid()) {
-            co_return Error::Ok; // TODO
+            projectLog.debug("No content data to ingest.");
+            co_return Error::Ok;
         }
 
         const auto projectId = project_.getProject().getValueOfId();
