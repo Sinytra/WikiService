@@ -24,7 +24,7 @@ CREATE OR REPLACE FUNCTION update_search_vector()
     RETURNS TRIGGER AS
 $$
 BEGIN
-    NEW.search_vector := to_tsvector('english', NEW.id || ' ' || NEW.name);
+    NEW.search_vector := to_tsvector('simple', NEW.id || ' ' || NEW.name);
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
