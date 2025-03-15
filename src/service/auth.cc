@@ -163,12 +163,10 @@ namespace service {
     }
 
     Task<std::optional<User>> Auth::getGitHubTokenUser(const std::string token) const {
-        if (token.starts_with("ghp_")) {
-            if (const auto [ghProfile, ghErr](co_await global::github->getAuthenticatedUser(token)); ghProfile) {
-                const auto username = (*ghProfile)["login"].asString();
-                const auto user = co_await global::database->getUser(strToLower(username));
-                co_return user;
-            }
+        if (const auto [ghProfile, ghErr](co_await global::github->getAuthenticatedUser(token)); ghProfile) {
+            const auto username = (*ghProfile)["login"].asString();
+            const auto user = co_await global::database->getUser(strToLower(username));
+            co_return user;
         }
         co_return std::nullopt;
     }
