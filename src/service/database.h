@@ -15,6 +15,13 @@
 using namespace drogon_model::postgres;
 
 namespace service {
+    template<class T>
+    struct PaginatedData {
+        int pages;
+        int total;
+        int size;
+        std::vector<T> data;
+    };
     struct ProjectSearchResponse {
         int pages;
         int total;

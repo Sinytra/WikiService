@@ -16,7 +16,7 @@ using namespace drogon_model::postgres;
 namespace api::v1 {
     Task<> GameController::contents(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                     const std::string project) const {
-        const auto resolved = co_await getProjectWithParams(req, callback, project);
+        const auto resolved = co_await BaseProjectController::getProjectWithParams(req, callback, project);
         if (!resolved) {
             co_return;
         }
@@ -40,7 +40,7 @@ namespace api::v1 {
             co_return;
         }
 
-        const auto resolved = co_await getProjectWithParams(req, callback, project);
+        const auto resolved = co_await BaseProjectController::getProjectWithParams(req, callback, project);
         if (!resolved) {
             co_return;
         }
@@ -70,7 +70,7 @@ namespace api::v1 {
             co_return;
         }
 
-        const auto resolved = co_await getProjectWithParams(req, callback, project);
+        const auto resolved = co_await BaseProjectController::getProjectWithParams(req, callback, project);
         if (!resolved) {
             co_return;
         }
@@ -104,7 +104,7 @@ namespace api::v1 {
             co_return;
         }
 
-        const auto resolved = co_await getVersionedProject(req, callback, project);
+        const auto resolved = co_await BaseProjectController::getVersionedProject(req, callback, project);
         if (!resolved) {
             co_return;
         }

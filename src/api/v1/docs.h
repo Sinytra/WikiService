@@ -5,7 +5,7 @@
 #include "base.h"
 
 namespace api::v1 {
-    class DocsController final : public drogon::HttpController<DocsController, false>, public BaseProjectController {
+    class DocsController final : public drogon::HttpController<DocsController, false> {
     public:
         METHOD_LIST_BEGIN
         ADD_METHOD_TO(DocsController::project,  "/api/v1/docs/{1:project}",           drogon::Get, "AuthFilter");

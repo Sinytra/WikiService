@@ -7,17 +7,17 @@
 
 namespace api::v1 {
     class BaseProjectController {
-    protected:
-        drogon::Task<std::optional<service::ResolvedProject>>
+    public:
+        static drogon::Task<std::optional<service::ResolvedProject>>
         getProjectWithParams(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
-                             std::string project) const;
+                             std::string project);
 
-        drogon::Task<std::optional<service::ResolvedProject>>
+        static drogon::Task<std::optional<service::ResolvedProject>>
         getVersionedProject(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
-                            std::string project) const;
+                            std::string project);
 
-        drogon::Task<std::optional<service::ResolvedProject>>
+        static drogon::Task<std::optional<service::ResolvedProject>>
         getProject(const std::string &project, const std::optional<std::string> &version, const std::optional<std::string> &locale,
-                   std::function<void(const drogon::HttpResponsePtr &)> callback) const;
+                   std::function<void(const drogon::HttpResponsePtr &)> callback);
     };
 }

@@ -8,8 +8,8 @@ namespace service {
     ProjectDatabaseAccess::ProjectDatabaseAccess(const ResolvedProject &p) : project_(p), projectId_(p.getProject().getValueOfId()) {}
 
     Task<std::vector<ProjectVersion>> ProjectDatabaseAccess::getVersions() const {
-        const auto [res, err] =
-            co_await handleDatabaseOperation<std::vector<ProjectVersion>>([&](const DbClientPtr &client) -> Task<std::vector<ProjectVersion>> {
+        const auto [res, err] = co_await handleDatabaseOperation<std::vector<ProjectVersion>>(
+            [&](const DbClientPtr &client) -> Task<std::vector<ProjectVersion>> {
                 CoroMapper<ProjectVersion> mapper(client);
                 co_return co_await mapper.findBy(Criteria(ProjectVersion::Cols::_project_id, CompareOperator::EQ, projectId_));
             });
@@ -98,7 +98,56 @@ namespace service {
         co_return res.value_or(err);
     }
 
-    Task<std::vector<ProjectContent>> ProjectDatabaseAccess::getProjectContents() const {
+    std::string paginatedQuery(const std::string &dataQuery, const int pageSize, const int page) {
+        return std::format("WITH search_data AS ({}), "
+                           "    total_count AS (SELECT COUNT(*) AS total_rows FROM search_data) "
+                           "SELECT search_data.*, "
+                           "    total_count.total_rows, "
+                           "    CEIL(total_count.total_rows::DECIMAL / {}) AS total_pages "
+                           "FROM search_data, total_count "
+                           "LIMIT 20 OFFSET ({} - 1) * {};",
+                           dataQuery, pageSize, page, pageSize);
+    }
+
+    Task<PaginatedData<ProjectContent>> ProjectDatabaseAccess::getProjectItemsDev(const std::string searchQuery, const int page) const {
+        // language=postgresql
+        static constexpr auto query = "SELECT item.loc, path FROM project_item pitem \
+                                       LEFT JOIN project_item_page pip ON pitem.id = pip.item_id \
+                                       JOIN item ON item.id = pitem.item_id \
+                                       WHERE pitem.project_id = $1 AND (pip IS NULL OR starts_with(pip.path, '.content/')) \
+                                       AND (pip.version_id = $2 OR $2 IS NULL) \
+                                       AND item.loc ILIKE '%' || $3 || '%' \
+                                       ORDER BY item.loc";
+
+        const auto [res, err] = co_await handleDatabaseOperation<PaginatedData<ProjectContent>>(
+            [&](const DbClientPtr &client) -> Task<PaginatedData<ProjectContent>> {
+                constexpr int size = 20;
+                const auto actualQuery = paginatedQuery(query, size, page);
+
+                const auto version = project_.getProjectVersion();
+                const auto results = version ? co_await client->execSqlCoro(actualQuery, projectId_, version->getValueOfId(), searchQuery)
+                                             : co_await client->execSqlCoro(actualQuery, projectId_, nullptr, searchQuery);
+
+                if (results.empty()) {
+                    throw DrogonDbException{};
+                }
+
+                const int totalRows = results[0]["total_rows"].as<int>();
+                const int totalPages = results[0]["total_pages"].as<int>();
+
+                std::vector<ProjectContent> contents;
+                for (const auto &row: results) {
+                    const auto id = row[0].as<std::string>();
+                    const auto path = row[1].isNull() ? "" : row[1].as<std::string>();
+                    contents.emplace_back(id, path);
+                }
+
+                co_return PaginatedData{.total = totalRows, .pages = totalPages, .size = size, .data = contents};
+            });
+        co_return res.value_or(PaginatedData<ProjectContent>{});
+    }
+
+    Task<std::vector<ProjectContent>> ProjectDatabaseAccess::getProjectItemPages() const {
         // language=postgresql
         static constexpr auto query = "SELECT item.loc, path FROM project_item pitem \
                                        JOIN project_item_page pip ON pitem.id = pip.item_id \

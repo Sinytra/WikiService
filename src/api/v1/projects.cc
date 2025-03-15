@@ -7,9 +7,9 @@
 #include <service/cloudflare.h>
 #include <service/crypto.h>
 #include <service/database.h>
-#include <service/storage.h>
 #include <service/error.h>
 #include <service/schemas.h>
+#include <service/storage.h>
 #include <service/util.h>
 
 #include "error.h"
@@ -212,7 +212,8 @@ namespace api::v1 {
         callback(resp);
     }
 
-    Task<> ProjectsController::listUserProjects(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
+    Task<> ProjectsController::listUserProjects(const HttpRequestPtr req,
+                                                const std::function<void(const HttpResponsePtr &)> callback) const {
         const auto session(co_await global::auth->getSession(req));
         if (!session) {
             simpleError(Error::ErrUnauthorized, "unauthorized", callback);
@@ -486,11 +487,56 @@ namespace api::v1 {
 
             logger.debug("Reloading project '{}'", project.getValueOfId());
 
-            if (const auto [resolved, resErr](co_await global::storage->getProject(project, std::nullopt, std::nullopt)); resErr == Error::Ok) {
+            if (const auto [resolved, resErr](co_await global::storage->getProject(project, std::nullopt, std::nullopt));
+                resErr == Error::Ok)
+            {
                 logger.debug("Project '{}' reloaded successfully", project.getValueOfId());
             } else {
                 logger.error("Encountered error while reloading project '{}'", project.getValueOfId());
             }
         }));
+    }
+
+    Task<> ProjectsController::getContentPages(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+                                               const std::string id) const {
+        const auto session(co_await global::auth->getSession(req));
+        if (!session) {
+            simpleError(Error::ErrUnauthorized, "unauthorized", callback);
+            co_return;
+        }
+
+        const auto project = co_await global::database->getUserProject(session->username, id);
+        if (!project) {
+            simpleError(Error::ErrBadRequest, "not_found", callback);
+            co_return;
+        }
+
+        const auto [resolved, err] = co_await global::storage->getProject(*project, std::nullopt, std::nullopt);
+        if (!resolved) {
+            simpleError(Error::ErrBadRequest, "not_found", callback);
+            co_return;
+        }
+
+        const auto query = req->getOptionalParameter<std::string>("query").value_or("");
+        const auto page = req->getOptionalParameter<int>("page").value_or(1);
+
+        const auto items = co_await resolved->getItems(query, page);
+        Json::Value root;
+        Json::Value data(Json::arrayValue);
+        for (const auto &[id, name, path] : items.data) {
+            Json::Value entry;
+            entry["id"] = id;
+            entry["name"] = name;
+            entry["path"] = path.empty() ? Json::nullValue : Json::Value(path);
+            data.append(entry);
+        }
+        root["data"] = data;
+        root["total"] = items.total;
+        root["pages"] = items.pages;
+        root["size"] = items.size;
+
+        const auto resp = HttpResponse::newHttpJsonResponse(root);
+        resp->setStatusCode(k200OK);
+        callback(resp);
     }
 }

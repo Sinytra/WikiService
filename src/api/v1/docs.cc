@@ -18,7 +18,7 @@ namespace api::v1 {
     Task<> DocsController::project(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                    const std::string project) const {
         const auto version = req->getOptionalParameter<std::string>("version");
-        const auto resolved = co_await getProject(project, version, std::nullopt, callback);
+        const auto resolved = co_await BaseProjectController::getProject(project, version, std::nullopt, callback);
         if (!resolved) {
             co_return;
         }
@@ -45,8 +45,8 @@ namespace api::v1 {
                 co_return errorResponse(Error::ErrBadRequest, "Missing path parameter", callback);
             }
 
-            const auto resolved = co_await getProject(project, req->getOptionalParameter<std::string>("version"),
-                                                      req->getOptionalParameter<std::string>("locale"), callback);
+            const auto resolved = co_await BaseProjectController::getProject(project, req->getOptionalParameter<std::string>("version"),
+                                                                             req->getOptionalParameter<std::string>("locale"), callback);
             if (!resolved) {
                 co_return;
             }
@@ -78,10 +78,10 @@ namespace api::v1 {
         co_return;
     }
 
-    Task<> DocsController::tree(HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+    Task<> DocsController::tree(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                 const std::string project) const {
-        const auto resolved = co_await getProject(project, req->getOptionalParameter<std::string>("version"),
-                                                  req->getOptionalParameter<std::string>("locale"), callback);
+        const auto resolved = co_await BaseProjectController::getProject(project, req->getOptionalParameter<std::string>("version"),
+                                                                         req->getOptionalParameter<std::string>("locale"), callback);
         if (!resolved) {
             co_return;
         }
@@ -104,7 +104,8 @@ namespace api::v1 {
 
     Task<> DocsController::asset(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string project) const {
         try {
-            const auto resolved = co_await getProject(project, req->getOptionalParameter<std::string>("version"), std::nullopt, callback);
+            const auto resolved = co_await BaseProjectController::getProject(project, req->getOptionalParameter<std::string>("version"),
+                                                                             std::nullopt, callback);
             if (!resolved) {
                 co_return;
             }
