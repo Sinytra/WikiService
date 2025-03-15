@@ -9,7 +9,6 @@
 #include <unordered_map>
 
 #include <content/game_recipes.h>
-#include <drogon/HttpAppFramework.h>
 #include <fmt/args.h>
 #include <git2.h>
 #include <include/uri.h>
@@ -402,7 +401,7 @@ namespace service {
 
     Task<std::tuple<std::optional<nlohmann::ordered_json>, Error>> ResolvedProject::getProjectContents() const {
         std::unordered_map<std::string, std::string> ids;
-        for (const auto contents = co_await projectDb_->getProjectContents();
+        for (const auto contents = co_await projectDb_->getProjectItemPages();
              const auto &[id, path]: contents)
         {
             ids.emplace(path, id);
@@ -532,14 +531,28 @@ namespace service {
         return {*meta, ProjectError::OK, ""};
     }
 
+    Task<PaginatedData<FullItemData>> ResolvedProject::getItems(const std::string query, const int page) const {
+        const auto [pages, total, size, data] = co_await projectDb_->getProjectItemsDev(query, page);
+        std::vector<FullItemData> itemData;
+        for (const auto &[id, path] : data) {
+            const auto [name, _] = co_await getItemName(id);
+            itemData.emplace_back(id, name, path);
+        }
+        co_return PaginatedData{ .total = total, .pages = pages, .size = size, .data = itemData };
+    }
+
     Task<ItemData> ResolvedProject::getItemName(const Item item) const {
-        if (const auto path = co_await projectDb_->getProjectContentPath(item.getValueOfLoc())) {
+        co_return co_await getItemName(item.getValueOfLoc());
+    }
+
+    Task<ItemData> ResolvedProject::getItemName(const std::string loc) const {
+        if (const auto path = co_await projectDb_->getProjectContentPath(loc)) {
             const auto title = readPageAttribute(*path, "title");
             co_return ItemData{ .name = title.value_or(""), .path = *path };
         }
 
         const auto projectId = project_.getValueOfId();
-        const auto parsed = ResourceLocation::parse(item.getValueOfLoc());
+        const auto parsed = ResourceLocation::parse(loc);
         const auto localeKey = locale_.empty() ? DEFAULT_LOCALE : locale_;
         const auto localized = readLangKey(localeKey, "item." + projectId + "." + parsed->path_);
 

@@ -5,7 +5,7 @@
 #include "base.h"
 
 namespace api::v1 {
-    class GameController final : public drogon::HttpController<GameController, false>, public BaseProjectController {
+    class GameController final : public drogon::HttpController<GameController, false> {
     public:
         METHOD_LIST_BEGIN
         // Content

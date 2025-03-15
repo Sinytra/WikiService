@@ -1,15 +1,15 @@
 #pragma once
 
-#include "cache.h"
-#include "error.h"
-#include <models/Project.h>
 #include <models/Item.h>
+#include <models/Project.h>
+#include <models/ProjectVersion.h>
 #include <models/RecipeIngredientItem.h>
 #include <models/RecipeIngredientTag.h>
-#include <models/ProjectVersion.h>
-#include "util.h"
-
 #include <nlohmann/json_fwd.hpp>
+#include "cache.h"
+#include "database.h"
+#include "error.h"
+#include "util.h"
 
 using namespace drogon_model::postgres;
 
@@ -23,19 +23,16 @@ namespace service {
         Json::Value platforms;
     };
 
-    enum class ProjectError {
-        OK,
-        REQUIRES_AUTH,
-        NO_REPOSITORY,
-        REPO_TOO_LARGE,
-        NO_BRANCH,
-        NO_PATH,
-        INVALID_META,
-        UNKNOWN
-    };
+    enum class ProjectError { OK, REQUIRES_AUTH, NO_REPOSITORY, REPO_TOO_LARGE, NO_BRANCH, NO_PATH, INVALID_META, UNKNOWN };
     std::string projectErrorToString(ProjectError status);
 
     struct ItemData {
+        std::string name;
+        std::string path;
+    };
+
+    struct FullItemData {
+        std::string id;
         std::string name;
         std::string path;
     };
@@ -72,6 +69,8 @@ namespace service {
 
         std::tuple<std::optional<nlohmann::json>, ProjectError, std::string> validateProjectMetadata() const;
 
+        drogon::Task<PaginatedData<FullItemData>> getItems(std::string query, int page) const;
+
         const Project &getProject() const;
 
         const std::optional<ProjectVersion> &getProjectVersion() const;
@@ -85,6 +84,8 @@ namespace service {
 
         // Content
         drogon::Task<ItemData> getItemName(Item item) const;
+        drogon::Task<ItemData> getItemName(std::string loc) const;
+
     private:
         drogon::Task<Json::Value> ingredientToJson(int slot, std::vector<RecipeIngredientItem> ingredients) const;
         drogon::Task<Json::Value> ingredientToJson(const RecipeIngredientTag &tag) const;

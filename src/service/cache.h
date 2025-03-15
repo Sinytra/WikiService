@@ -16,11 +16,17 @@ namespace service {
 
     template<class T>
     drogon::Task<T> patientlyAwaitTaskResult(const std::shared_future<T> task) {
-        using namespace logging;
-
         const auto currentLoop = trantor::EventLoop::getEventLoopOfCurrentThread();
         co_await drogon::switchThreadCoro(cacheAwaiterThreadPool.getNextLoop());
         const auto result = task.get();
+        co_await drogon::switchThreadCoro(currentLoop);
+        co_return result;
+    }
+
+    template<class T>
+    drogon::Task<T> supplyAsync(std::function<T()> task) {
+        const auto currentLoop = trantor::EventLoop::getEventLoopOfCurrentThread();
+        const auto result = co_await drogon::queueInLoopCoro<T>(cacheAwaiterThreadPool.getNextLoop(), task);
         co_await drogon::switchThreadCoro(currentLoop);
         co_return result;
     }

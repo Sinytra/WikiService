@@ -8,6 +8,7 @@
 #include <fstream>
 
 #include <git2.h>
+#include <include/uri.h>
 #include <models/ProjectVersion.h>
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/callback_sink.h>
@@ -153,6 +154,16 @@ std::unordered_map<std::string, std::string> listRepoBranches(git_repository *re
     }
 
     return branches;
+}
+
+bool is_local_url(const std::string &str) {
+    try {
+        const uri url{str};
+        const auto scheme = url.get_scheme();
+        return scheme == "file";
+    } catch (std::exception e) {
+        return false;
+    }
 }
 
 class FormattedCallbackSink final : public spdlog::sinks::base_sink<std::mutex> {
@@ -316,10 +327,14 @@ namespace service {
         clone_opts.fetch_opts.callbacks.transfer_progress = fetch_progress;
         clone_opts.fetch_opts.callbacks.payload = &d;
         clone_opts.checkout_branch = branch.c_str();
-        clone_opts.fetch_opts.depth = 1;
+        if (!is_local_url(url)) {
+            clone_opts.fetch_opts.depth = 1;
+        }
 
         git_repository *repo = nullptr;
-        const int error = git_clone(&repo, url.c_str(), path.c_str(), &clone_opts);
+        const int error = co_await supplyAsync<int>([&repo, &url, &path, &clone_opts]() -> int {
+            return git_clone(&repo, url.c_str(), path.c_str(), &clone_opts);
+        });
 
         if (error < 0) {
             const git_error *e = git_error_last();

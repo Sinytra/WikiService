@@ -1,10 +1,11 @@
 #pragma once
 
-#include "database_base.h"
-#include <models/ProjectVersion.h>
-#include <models/Project.h>
+#include <database.h>
+#include <database_base.h>
 #include <models/Item.h>
-#include "resolved.h"
+#include <models/Project.h>
+#include <models/ProjectVersion.h>
+#include <resolved.h>
 
 using namespace drogon_model::postgres;
 
@@ -26,10 +27,12 @@ namespace service {
         drogon::Task<Error> addTagItemEntry(std::string tag, std::string item) const;
         drogon::Task<Error> addTagTagEntry(std::string parentTag, std::string childTag) const;
 
-        drogon::Task<std::vector<ProjectContent>> getProjectContents() const;
+        drogon::Task<PaginatedData<ProjectContent>> getProjectItemsDev(std::string query, int page) const;
+        drogon::Task<std::vector<ProjectContent>> getProjectItemPages() const;
         drogon::Task<int> getProjectContentCount() const;
         drogon::Task<std::optional<std::string>> getProjectContentPath(std::string id) const;
         drogon::Task<Error> addProjectContentPage(std::string id, std::string path) const;
+
     private:
         const ResolvedProject &project_;
         const std::string projectId_;
