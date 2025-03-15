@@ -23,7 +23,8 @@ using namespace std::chrono_literals;
 std::string createSessionCacheKey(const std::string &sessionId) { return "session:" + sessionId; }
 
 namespace service {
-    Auth::Auth(const std::string &appUrl, const OAuthApp &ghApp, const OAuthApp &mrApp, Database &db, MemoryCache &ch, Platforms &pl, GitHub &gh) :
+    Auth::Auth(const std::string &appUrl, const OAuthApp &ghApp, const OAuthApp &mrApp, Database &db, MemoryCache &ch, Platforms &pl,
+               GitHub &gh) :
         database_(db), cache_(ch), platforms_(pl), github_(gh), appUrl_(appUrl), githubApp_(ghApp), modrinthApp_(mrApp) {}
 
     std::string Auth::getGitHubOAuthInitURL() const {
@@ -109,7 +110,7 @@ namespace service {
         root["avatar_url"] = (*profileJson)["avatar_url"].asString();
         root["modrinth_id"] = user->getModrinthId() ? user->getValueOfModrinthId() : Json::Value::null;
 
-        co_return UserSession{ .sessionId = id, .username = *username, .user = *user, .profile = root};
+        co_return UserSession{.sessionId = id, .username = *username, .user = *user, .profile = root};
     }
 
     Task<> Auth::expireSession(const std::string id) const { co_await cache_.erase(createSessionCacheKey(id)); }
@@ -160,12 +161,10 @@ namespace service {
     }
 
     Task<std::optional<User>> Auth::getGitHubTokenUser(const std::string token) const {
-        if (token.starts_with("ghp_")) {
-            if (const auto [ghProfile, ghErr](co_await github_.getAuthenticatedUser(token)); ghProfile) {
-                const auto username = (*ghProfile)["login"].asString();
-                const auto user = co_await database_.getUser(strToLower(username));
-                co_return user;
-            }
+        if (const auto [ghProfile, ghErr](co_await github_.getAuthenticatedUser(token)); ghProfile) {
+            const auto username = (*ghProfile)["login"].asString();
+            const auto user = co_await database_.getUser(strToLower(username));
+            co_return user;
         }
         co_return std::nullopt;
     }
