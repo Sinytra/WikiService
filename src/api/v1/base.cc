@@ -1,4 +1,7 @@
 #include "base.h"
+
+#include <auth.h>
+
 #include "error.h"
 
 using namespace drogon;
@@ -20,10 +23,10 @@ namespace api::v1 {
         co_return co_await getProject(project, version, std::nullopt, callback);
     }
 
-    Task<std::optional<ResolvedProject>>
-    BaseProjectController::getProject(const std::string &project, const std::optional<std::string> &version,
-                                      const std::optional<std::string> &locale,
-                                      const std::function<void(const HttpResponsePtr &)> callback) {
+    Task<std::optional<ResolvedProject>> BaseProjectController::getProject(const std::string &project,
+                                                                           const std::optional<std::string> &version,
+                                                                           const std::optional<std::string> &locale,
+                                                                           const std::function<void(const HttpResponsePtr &)> callback) {
         if (project.empty()) {
             errorResponse(Error::ErrBadRequest, "Missing project parameter", callback);
             co_return std::nullopt;
@@ -42,5 +45,31 @@ namespace api::v1 {
         }
 
         co_return *resolved;
+    }
+
+    Task<std::optional<ResolvedProject>>
+    BaseProjectController::getUserProject(const HttpRequestPtr req, const std::string &id, const std::optional<std::string> &version,
+                                          const std::optional<std::string> &locale,
+                                          const std::function<void(const HttpResponsePtr &)> callback) {
+        const auto session(co_await global::auth->getSession(req));
+        if (!session) {
+            simpleError(Error::ErrUnauthorized, "unauthorized", callback);
+            co_return std::nullopt;
+        }
+
+        const auto project = co_await global::database->getUserProject(session->username, id);
+        if (!project) {
+            simpleError(Error::ErrBadRequest, "not_found", callback);
+            co_return std::nullopt;
+        }
+
+
+        const auto [resolved, resErr](co_await global::storage->getProject(*project, version, locale));
+        if (!resolved) {
+            errorResponse(resErr, "Resolution failure", callback);
+            co_return std::nullopt;
+        }
+
+        co_return resolved;
     }
 }
