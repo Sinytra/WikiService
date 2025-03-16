@@ -13,11 +13,14 @@ namespace api::v1 {
                              std::string project);
 
         static drogon::Task<std::optional<service::ResolvedProject>>
-        getVersionedProject(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
-                            std::string project);
+        getVersionedProject(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback, std::string project);
 
         static drogon::Task<std::optional<service::ResolvedProject>>
         getProject(const std::string &project, const std::optional<std::string> &version, const std::optional<std::string> &locale,
                    std::function<void(const drogon::HttpResponsePtr &)> callback);
+
+        static drogon::Task<std::optional<service::ResolvedProject>>
+        getUserProject(drogon::HttpRequestPtr req, const std::string &project, const std::optional<std::string> &version,
+                       const std::optional<std::string> &locale, std::function<void(const drogon::HttpResponsePtr &)> callback);
     };
 }

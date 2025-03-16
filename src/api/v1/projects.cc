@@ -12,6 +12,7 @@
 #include <service/storage.h>
 #include <service/util.h>
 
+#include "base.h"
 #include "error.h"
 
 #define MODID_MINECRAFT "minecraft"
@@ -499,21 +500,9 @@ namespace api::v1 {
 
     Task<> ProjectsController::getContentPages(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                                const std::string id) const {
-        const auto session(co_await global::auth->getSession(req));
-        if (!session) {
-            simpleError(Error::ErrUnauthorized, "unauthorized", callback);
-            co_return;
-        }
-
-        const auto project = co_await global::database->getUserProject(session->username, id);
-        if (!project) {
-            simpleError(Error::ErrBadRequest, "not_found", callback);
-            co_return;
-        }
-
-        const auto [resolved, err] = co_await global::storage->getProject(*project, std::nullopt, std::nullopt);
+        const auto version = req->getOptionalParameter<std::string>("version");
+        const auto resolved = co_await BaseProjectController::getUserProject(req, id, version, std::nullopt, callback);
         if (!resolved) {
-            simpleError(Error::ErrBadRequest, "not_found", callback);
             co_return;
         }
 
