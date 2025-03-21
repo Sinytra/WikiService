@@ -31,6 +31,7 @@ namespace api::v1 {
         ADD_METHOD_TO(ProjectsController::remove,           "/api/v1/dev/projects/{1:id}",                  drogon::Delete, "AuthFilter");
         ADD_METHOD_TO(ProjectsController::invalidate,       "/api/v1/dev/projects/{1:id}/invalidate",       drogon::Post,   "AuthFilter");
         ADD_METHOD_TO(ProjectsController::getContentPages,  "/api/v1/dev/projects/{1:id}/content/pages",    drogon::Get,    "AuthFilter");
+        ADD_METHOD_TO(ProjectsController::getVersions,      "/api/v1/dev/projects/{1:id}/versions",         drogon::Get,    "AuthFilter");
         // Dev content
         METHOD_LIST_END
         // clang-format on
@@ -62,14 +63,17 @@ namespace api::v1 {
         drogon::Task<> getContentPages(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
                                        std::string id) const;
 
+        drogon::Task<> getVersions(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
+                                   std::string id) const;
+
     private:
         nlohmann::json processPlatforms(const nlohmann::json &metadata) const;
 
-        drogon::Task<std::optional<service::PlatformProject>>
+        drogon::Task<service::PlatformProject>
         validatePlatform(const std::string &id, const std::string &repo, const std::string &platform, const std::string &slug,
                          bool checkExisting, User user, std::function<void(const drogon::HttpResponsePtr &)> callback) const;
 
-        drogon::Task<std::optional<ValidatedProjectData>> validateProjectData(const Json::Value &json, User user,
+        drogon::Task<ValidatedProjectData> validateProjectData(const Json::Value &json, User user,
                                                                               std::function<void(const drogon::HttpResponsePtr &)> callback,
                                                                               bool checkExisting) const;
 

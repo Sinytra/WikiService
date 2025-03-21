@@ -78,9 +78,13 @@ namespace service {
         co_return sessionId;
     }
 
-    Task<std::optional<UserSession>> Auth::getSession(const HttpRequestPtr req) const {
+    Task<UserSession> Auth::getSession(const HttpRequestPtr req) const {
         const auto token = req->getParameter("token");
-        co_return co_await getSession(token);
+        const auto session = co_await getSession(token);
+        if (!session) {
+            throw ApiException(Error::ErrUnauthorized, "unauthorized");
+        }
+        co_return *session;
     }
 
     Task<std::optional<UserSession>> Auth::getSession(const std::string id) const {

@@ -19,21 +19,15 @@ namespace api::v1 {
                                    const std::string project) const {
         const auto version = req->getOptionalParameter<std::string>("version");
         const auto resolved = co_await BaseProjectController::getProject(project, version, std::nullopt, callback);
-        if (!resolved) {
-            co_return;
+
+        if (version && !co_await resolved.hasVersion(*version)) {
+            throw ApiException(Error::ErrNotFound, "Version not found");
         }
 
-        if (version && !co_await resolved->hasVersion(*version)) {
-            errorResponse(Error::ErrNotFound, "Version not found", callback);
-            co_return;
-        }
-
-        const auto json = co_await resolved->toJsonVerbose();
+        const auto json = co_await resolved.toJsonVerbose();
         const auto resp = HttpResponse::newHttpJsonResponse(json);
         resp->setStatusCode(k200OK);
         callback(resp);
-
-        co_return;
     }
 
     Task<> DocsController::page(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string project) const {
@@ -42,27 +36,24 @@ namespace api::v1 {
             std::string path = req->getPath().substr(prefix.size());
 
             if (path.empty()) {
-                co_return errorResponse(Error::ErrBadRequest, "Missing path parameter", callback);
+                throw ApiException(Error::ErrBadRequest, "Missing path parameter");
             }
 
             const auto resolved = co_await BaseProjectController::getProject(project, req->getOptionalParameter<std::string>("version"),
                                                                              req->getOptionalParameter<std::string>("locale"), callback);
-            if (!resolved) {
-                co_return;
-            }
 
-            const auto [page, pageError](resolved->readFile(path));
+            const auto [page, pageError](resolved.readFile(path));
             if (pageError != Error::Ok) {
                 const auto optionalParam = req->getOptionalParameter<std::string>("optional");
                 const auto optional = optionalParam.has_value() && optionalParam == "true";
 
-                co_return errorResponse(optional ? Error::Ok : pageError, "File not found", callback);
+                throw ApiException(optional ? Error::Ok : pageError, "File not found");
             }
 
             Json::Value root;
-            root["project"] = co_await resolved->toJson();
+            root["project"] = co_await resolved.toJson();
             root["content"] = page.content;
-            if (resolved->getProject().getValueOfIsPublic() && !page.editUrl.empty()) {
+            if (resolved.getProject().getValueOfIsPublic() && !page.editUrl.empty()) {
                 root["edit_url"] = page.editUrl;
             }
 
@@ -82,52 +73,42 @@ namespace api::v1 {
                                 const std::string project) const {
         const auto resolved = co_await BaseProjectController::getProject(project, req->getOptionalParameter<std::string>("version"),
                                                                          req->getOptionalParameter<std::string>("locale"), callback);
-        if (!resolved) {
-            co_return;
-        }
 
-        const auto [tree, treeError](resolved->getDirectoryTree());
+        const auto [tree, treeError](resolved.getDirectoryTree());
         if (treeError != Error::Ok) {
-            co_return errorResponse(treeError, "Error getting directory tree", callback);
+            throw ApiException(treeError, "Error getting directory tree");
         }
 
         nlohmann::json root;
-        root["project"] = parkourJson(co_await resolved->toJson());
+        root["project"] = parkourJson(co_await resolved.toJson());
         root["tree"] = tree;
 
-        const auto resp = HttpResponse::newHttpJsonResponse(unparkourJson(root));
-        resp->setStatusCode(k200OK);
-        callback(resp);
-
-        co_return;
+        callback(jsonResponse(root));
     }
 
     Task<> DocsController::asset(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string project) const {
         try {
             const auto resolved = co_await BaseProjectController::getProject(project, req->getOptionalParameter<std::string>("version"),
                                                                              std::nullopt, callback);
-            if (!resolved) {
-                co_return;
-            }
 
             std::string prefix = std::format("/api/v1/docs/{}/asset/", project);
             std::string location = req->getPath().substr(prefix.size());
 
             if (location.empty()) {
-                co_return errorResponse(Error::ErrBadRequest, "Missing location parameter", callback);
+                throw ApiException(Error::ErrBadRequest, "Missing location parameter");
             }
 
             const auto resourceLocation = ResourceLocation::parse(location);
             if (!resourceLocation) {
-                co_return errorResponse(Error::ErrBadRequest, "Invalid location specified", callback);
+                throw ApiException(Error::ErrBadRequest, "Invalid location specified");
             }
 
-            const auto asset = resolved->getAsset(*resourceLocation);
+            const auto asset = resolved.getAsset(*resourceLocation);
             if (!asset) {
                 const auto optionalParam = req->getOptionalParameter<std::string>("optional");
                 const auto optional = optionalParam.has_value() && optionalParam == "true";
 
-                co_return errorResponse(optional ? Error::Ok : Error::ErrNotFound, "Asset not found", callback);
+                throw ApiException(optional ? Error::Ok : Error::ErrNotFound, "Asset not found");
             }
 
             const auto response = HttpResponse::newFileResponse(absolute(*asset).string());

@@ -35,6 +35,14 @@ namespace service {
         std::string id;
         std::string name;
         std::string path;
+
+        friend void to_json(nlohmann::json &j, const FullItemData &obj) {
+            j = nlohmann::json{
+                {"id", obj.id},
+                {"name", obj.name},
+                {"path", obj.path.empty() ? nlohmann::json(nullptr) : nlohmann::json(obj.path)}
+            };
+        }
     };
 
     // See resolved_db.h
@@ -69,7 +77,8 @@ namespace service {
 
         std::tuple<std::optional<nlohmann::json>, ProjectError, std::string> validateProjectMetadata() const;
 
-        drogon::Task<PaginatedData<FullItemData>> getItems(std::string query, int page) const;
+        drogon::Task<PaginatedData<FullItemData>> getItems(TableQueryParams params) const;
+        drogon::Task<PaginatedData<ProjectVersion>> getVersions(TableQueryParams params) const;
 
         const Project &getProject() const;
 
