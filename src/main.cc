@@ -10,6 +10,7 @@
 #include <service/github.h>
 #include <service/cloudflare.h>
 
+#include <api/v1/error.h>
 #include <git2.h>
 #include <log/log.h>
 
@@ -32,6 +33,21 @@ namespace global {
     std::shared_ptr<Auth> auth;
 
     std::shared_ptr<Platforms> platforms;
+}
+
+void globalExceptionHandler(const std::exception& e, const HttpRequestPtr& req, std::function<void (const HttpResponsePtr &)>&& callback) {
+    if (const auto cast = dynamic_cast<const ApiException *>(&e); cast != nullptr) {
+        const auto resp = HttpResponse::newHttpJsonResponse(std::move(cast->data));
+        resp->setStatusCode(api::v1::mapError(cast->error));
+
+        callback(resp);
+        return;
+    }
+
+    logger.error("Unhandled exception: {}", e.what());
+    const auto fallbackResp = HttpResponse::newHttpResponse();
+    fallbackResp->setStatusCode(k500InternalServerError);
+    callback(fallbackResp);
 }
 
 int main() {
@@ -70,6 +86,7 @@ int main() {
         app().registerController(projectsController);
         app().registerController(projectWSController);
         app().registerController(gameController);
+        app().setExceptionHandler(globalExceptionHandler);
 
         cacheAwaiterThreadPool.start();
         git_libgit2_init();

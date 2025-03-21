@@ -29,23 +29,4 @@ namespace api::v1 {
         }
         return Error::ErrInternal;
     }
-
-    void errorResponse(const Error &error, const std::string &message, const std::function<void(const HttpResponsePtr &)> &callback) {
-        Json::Value json;
-        json["error"] = message;
-        const auto resp = HttpResponse::newHttpJsonResponse(std::move(json));
-        resp->setStatusCode(mapError(error));
-
-        callback(resp);
-    }
-
-    void simpleError(const Error &error, const std::string &message, const std::function<void(const HttpResponsePtr &)> &callback,
-                     const std::function<void(Json::Value &)> &jsonBuilder) {
-        Json::Value root;
-        root["error"] = message;
-        jsonBuilder(root);
-        const auto resp = HttpResponse::newHttpJsonResponse(root);
-        resp->setStatusCode(mapError(error));
-        callback(resp);
-    }
 }

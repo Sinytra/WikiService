@@ -5,7 +5,7 @@
 #include <log/log.h>
 #include <models/Recipe.h>
 #include <models/User.h>
-#include <nlohmann/json_fwd.hpp>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include "database_base.h"
 #include "error.h"
@@ -21,6 +21,10 @@ namespace service {
         int total;
         int size;
         std::vector<T> data;
+
+        friend void to_json(nlohmann::json &j, const PaginatedData &obj) {
+            j = nlohmann::json{{"total", obj.total}, {"pages", obj.pages}, {"size", obj.size}, {"data", obj.data}};
+        }
     };
     struct ProjectSearchResponse {
         int pages;

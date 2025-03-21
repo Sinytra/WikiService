@@ -9,6 +9,8 @@
 #include <service/database.h>
 #include <service/error.h>
 #include <service/schemas.h>
+// ReSharper disable once CppUnusedIncludeDirective
+#include <service/serializers.h>
 #include <service/storage.h>
 #include <service/util.h>
 
@@ -61,28 +63,25 @@ namespace api::v1 {
         return projects;
     }
 
-    Task<std::optional<PlatformProject>> ProjectsController::validatePlatform(const std::string &id, const std::string &repo,
+    Task<PlatformProject> ProjectsController::validatePlatform(const std::string &id, const std::string &repo,
                                                                               const std::string &platform, const std::string &slug,
                                                                               const bool checkExisting, const User user,
                                                                               std::function<void(const HttpResponsePtr &)> callback) const {
         if (platform == PLATFORM_CURSEFORGE && !global::platforms->curseforge_.isAvailable()) {
-            simpleError(Error::ErrBadRequest, "cf_unavailable", callback);
-            co_return std::nullopt;
+            throw ApiException(Error::ErrBadRequest, "cf_unavailable");
         }
 
         auto &platInstance = global::platforms->getPlatform(platform);
 
         const auto platformProj = co_await platInstance.getProject(slug);
         if (!platformProj) {
-            simpleError(Error::ErrBadRequest, "no_project", callback,
-                        [&](Json::Value &root) { root["details"] = "Platform: " + platform; });
-            co_return std::nullopt;
+            throw ApiException(Error::ErrBadRequest, "no_project",
+                [&](Json::Value &root) { root["details"] = "Platform: " + platform; });
         }
 
         if (platformProj->type == _unknown) {
-            simpleError(Error::ErrBadRequest, "unsupported_type", callback,
+            throw ApiException(Error::ErrBadRequest, "unsupported_type",
                         [&](Json::Value &root) { root["details"] = "Platform: " + platform; });
-            co_return std::nullopt;
         }
 
         bool skipCheck = false;
@@ -97,15 +96,14 @@ namespace api::v1 {
         }
         if (!skipCheck) {
             if (const auto verified = co_await platInstance.verifyProjectAccess(*platformProj, user, repo); !verified) {
-                simpleError(Error::ErrBadRequest, "ownership", callback, [&](Json::Value &root) {
+                throw ApiException(Error::ErrBadRequest, "ownership", [&](Json::Value &root) {
                     root["details"] = "Platform: " + platform;
                     root["can_verify_mr"] = platform == PLATFORM_MODRINTH && !user.getModrinthId();
                 });
-                co_return std::nullopt;
             }
         }
 
-        co_return platformProj;
+        co_return *platformProj;
     }
 
     /**
@@ -125,7 +123,7 @@ namespace api::v1 {
      * - no_path: Invalid path / metadata not found at given path
      * - invalid_meta: Metadata file format is invalid
      */
-    Task<std::optional<ValidatedProjectData>> ProjectsController::validateProjectData(const Json::Value &json, const User user,
+    Task<ValidatedProjectData> ProjectsController::validateProjectData(const Json::Value &json, const User user,
                                                                                       std::function<void(const HttpResponsePtr &)> callback,
                                                                                       const bool checkExisting) const {
         // Required
@@ -137,8 +135,7 @@ namespace api::v1 {
             const uri repoUri(repo);
         } catch (const std::exception &e) {
             logger.error("Invalid repository URL provided: {} Error: {}", repo, e.what());
-            simpleError(Error::ErrBadRequest, "no_repository", callback);
-            co_return std::nullopt;
+            throw ApiException(Error::ErrBadRequest, "no_repository");
         }
 
         Project tempProject;
@@ -149,30 +146,24 @@ namespace api::v1 {
 
         const auto [resolved, err, details] = co_await global::storage->setupValidateTempProject(tempProject);
         if (err != ProjectError::OK) {
-            simpleError(Error::ErrBadRequest, projectErrorToString(err), callback,
+            throw ApiException(Error::ErrBadRequest, projectErrorToString(err),
                         [&details](Json::Value &root) { root["details"] = details; });
-            co_return std::nullopt;
         }
 
         const std::string id = (*resolved)["id"];
         if (id == MODID_MINECRAFT || id.size() < 2) {
-            simpleError(Error::ErrBadRequest, "illegal_id", callback);
-            co_return std::nullopt;
+            throw ApiException(Error::ErrBadRequest, "illegal_id");
         }
 
         const auto platforms = processPlatforms(*resolved);
         if (platforms.empty()) {
-            simpleError(Error::ErrBadRequest, "no_platforms", callback);
-            co_return std::nullopt;
+            throw ApiException(Error::ErrBadRequest, "no_platforms");
         }
 
         std::unordered_map<std::string, PlatformProject> platformProjects;
         for (const auto &[key, val]: platforms.items()) {
             const auto platformProj = co_await validatePlatform(id, repo, key, val, checkExisting, user, callback);
-            if (!platformProj) {
-                co_return std::nullopt;
-            }
-            platformProjects.emplace(key, *platformProj);
+            platformProjects.emplace(key, platformProj);
         }
         const auto &preferredProj =
             platforms.contains(PLATFORM_MODRINTH) ? platformProjects[PLATFORM_MODRINTH] : platformProjects.begin()->second;
@@ -192,7 +183,7 @@ namespace api::v1 {
         co_return ValidatedProjectData{.project = project, .platforms = platforms};
     }
 
-    Task<> ProjectsController::greet(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback) const {
+    Task<> ProjectsController::greet(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
         const auto resp = HttpResponse::newHttpResponse();
         resp->setStatusCode(k200OK);
         resp->setBody("Service operational");
@@ -200,7 +191,7 @@ namespace api::v1 {
         co_return;
     }
 
-    Task<> ProjectsController::listIDs(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback) const {
+    Task<> ProjectsController::listIDs(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
         const auto ids = co_await global::database->getProjectIDs();
 
         Json::Value root(Json::arrayValue);
@@ -216,12 +207,8 @@ namespace api::v1 {
     Task<> ProjectsController::listUserProjects(const HttpRequestPtr req,
                                                 const std::function<void(const HttpResponsePtr &)> callback) const {
         const auto session(co_await global::auth->getSession(req));
-        if (!session) {
-            simpleError(Error::ErrUnauthorized, "unauthorized", callback);
-            co_return;
-        }
+        const auto projects = co_await global::database->getUserProjects(session.username);
 
-        const auto projects = co_await global::database->getUserProjects(session->username);
         Json::Value projectsJson(Json::arrayValue);
         for (const auto &project: projects) {
             Json::Value json = projectToJson(project, true);
@@ -230,7 +217,7 @@ namespace api::v1 {
         }
 
         Json::Value root;
-        root["profile"] = session->profile;
+        root["profile"] = session.profile;
         root["projects"] = projectsJson;
 
         const auto resp = HttpResponse::newHttpJsonResponse(root);
@@ -241,50 +228,27 @@ namespace api::v1 {
 
     Task<> ProjectsController::getProject(const HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback,
                                           const std::string id) const {
-        const auto session(co_await global::auth->getSession(req));
-        if (!session) {
-            simpleError(Error::ErrUnauthorized, "unauthorized", callback);
-            co_return;
-        }
-
-        const auto project = co_await global::database->getUserProject(session->username, id);
-        if (!project) {
-            simpleError(Error::ErrBadRequest, "not_found", callback);
-            co_return;
-        }
+        const auto project{co_await BaseProjectController::getUserProject(req, id)};
 
         Json::Value root;
-        if (const auto resolved = co_await global::storage->maybeGetProject(*project)) {
+        if (const auto resolved = co_await global::storage->maybeGetProject(project)) {
             root = co_await resolved->toJson(true);
         } else {
-            root = projectToJson(*project, true);
+            root = projectToJson(project, true);
         }
-        root["status"] = projectStatusToString(co_await global::storage->getProjectStatus(*project));
+        root["status"] = projectStatusToString(co_await global::storage->getProjectStatus(project));
 
         const auto resp = HttpResponse::newHttpJsonResponse(root);
         resp->setStatusCode(k200OK);
         callback(resp);
-        co_return;
     }
 
     Task<> ProjectsController::getProjectLog(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback,
                                              std::string id) const {
-        const auto session(co_await global::auth->getSession(req));
-        if (!session) {
-            simpleError(Error::ErrUnauthorized, "unauthorized", callback);
-            co_return;
-        }
-
-        const auto project = co_await global::database->getUserProject(session->username, id);
-        if (!project) {
-            simpleError(Error::ErrBadRequest, "not_found", callback);
-            co_return;
-        }
-
-        const auto log = global::storage->getProjectLog(*project);
+        const auto project{co_await BaseProjectController::getUserProject(req, id)};
+        const auto log{global::storage->getProjectLog(project)};
         if (!log) {
-            simpleError(Error::ErrNotFound, "not_found", callback);
-            co_return;
+            throw ApiException(Error::ErrNotFound, "not_found");
         }
 
         Json::Value root;
@@ -293,7 +257,6 @@ namespace api::v1 {
         const auto resp = HttpResponse::newHttpJsonResponse(root);
         resp->setStatusCode(k200OK);
         callback(resp);
-        co_return;
     }
 
     Task<> ProjectsController::listPopularProjects(HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
@@ -310,24 +273,20 @@ namespace api::v1 {
     }
 
     Task<> ProjectsController::create(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback) const {
-        const auto session(co_await global::auth->getSession(req));
-        if (!session) {
-            co_return simpleError(Error::ErrUnauthorized, "unauthorized", callback);
-        }
-
+        const auto session{co_await global::auth->getSession(req)};
         auto json(req->getJsonObject());
         if (!json) {
-            co_return errorResponse(Error::ErrBadRequest, req->getJsonError(), callback);
+            throw ApiException(Error::ErrBadRequest, req->getJsonError());
         }
         if (const auto error = validateJson(schemas::projectRegister, *json)) {
-            co_return simpleError(Error::ErrBadRequest, error->msg, callback);
+            throw ApiException(Error::ErrBadRequest, error->msg);
         }
 
         const auto isCommunity = (*json)["is_community"].asBool();
 
         // TODO Add support for community projects
         if (isCommunity) {
-            co_return simpleError(Error::ErrInternal, "unsupported", callback);
+            throw ApiException(Error::ErrInternal, "unsupported");
         }
 
         const auto repo = (*json)["repo"].asString();
@@ -335,32 +294,29 @@ namespace api::v1 {
         const auto path = (*json)["path"].asString();
 
         if (co_await global::database->existsForRepo(repo, branch, path)) {
-            co_return simpleError(Error::ErrBadRequest, "exists", callback);
+            throw ApiException(Error::ErrBadRequest, "exists");
         }
 
-        auto validated = co_await validateProjectData(*json, session->user, callback, false);
-        if (!validated) {
-            co_return;
-        }
-        auto [project, platforms] = *validated;
+        auto validated = co_await validateProjectData(*json, session.user, callback, false);
+        auto [project, platforms] = validated;
         project.setIsCommunity(isCommunity);
 
         if (co_await global::database->existsForData(project.getValueOfId(), platforms)) {
-            co_return simpleError(Error::ErrBadRequest, "exists", callback);
+            throw ApiException(Error::ErrBadRequest, "exists");
         }
 
         const auto [result, resultErr] = co_await global::database->createProject(project);
         if (resultErr != Error::Ok) {
             logger.error("Failed to create project {} in database", project.getValueOfId());
-            co_return simpleError(Error::ErrInternal, "internal", callback);
+            throw ApiException(Error::ErrInternal, "internal");
         }
 
-        if (const auto assignErr = co_await global::database->assignUserProject(session->username, result->getValueOfId(), "member");
+        if (const auto assignErr = co_await global::database->assignUserProject(session.username, result->getValueOfId(), "member");
             assignErr != Error::Ok)
         {
-            logger.error("Failed to assign project {} to user {}", result->getValueOfId(), session->username);
+            logger.error("Failed to assign project {} to user {}", result->getValueOfId(), session.username);
             co_await global::database->removeProject(result->getValueOfId());
-            co_return simpleError(Error::ErrInternal, "internal", callback);
+            throw ApiException(Error::ErrInternal, "internal");
         }
 
         Json::Value root;
@@ -374,32 +330,25 @@ namespace api::v1 {
     }
 
     Task<> ProjectsController::update(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback) const {
-        const auto session(co_await global::auth->getSession(req));
-        if (!session) {
-            co_return simpleError(Error::ErrUnauthorized, "unauthorized", callback);
-        }
+        const auto session{co_await global::auth->getSession(req)};
 
         const auto json(req->getJsonObject());
         if (!json) {
-            co_return errorResponse(Error::ErrBadRequest, req->getJsonError(), callback);
+            throw ApiException(Error::ErrBadRequest, req->getJsonError());
         }
         if (const auto error = validateJson(schemas::projectRegister, *json)) {
-            co_return simpleError(Error::ErrBadRequest, error->msg, callback);
+            throw ApiException(Error::ErrBadRequest, error->msg);
         }
 
-        auto validated = co_await validateProjectData(*json, session->user, callback, true);
-        if (!validated) {
-            co_return;
-        }
-        auto [project, platforms] = *validated;
+        auto [project, platforms] = co_await validateProjectData(*json, session.user, callback, true);
 
         if (const auto [proj, projErr] = co_await global::database->getProjectSource(project.getValueOfId()); !proj) {
-            co_return simpleError(Error::ErrBadRequest, "not_found", callback);
+            throw ApiException(Error::ErrBadRequest, "not_found");
         }
 
         if (const auto error = co_await global::database->updateProject(project); error != Error::Ok) {
             logger.error("Failed to update project {} in database", project.getValueOfId());
-            co_return simpleError(Error::ErrInternal, "internal", callback);
+            throw ApiException(Error::ErrInternal, "internal");
         }
 
         Json::Value root;
@@ -412,34 +361,22 @@ namespace api::v1 {
         reloadProject(project);
     }
 
-    Task<> ProjectsController::remove(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback,
+    Task<> ProjectsController::remove(const HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback,
                                       const std::string id) const {
-        const auto session(co_await global::auth->getSession(req));
-        if (!session) {
-            simpleError(Error::ErrUnauthorized, "unauthorized", callback);
-            co_return;
-        }
+        const auto project = co_await BaseProjectController::getUserProject(req, id);
 
-        const auto project = co_await global::database->getUserProject(session->username, id);
-        if (!project) {
-            simpleError(Error::ErrBadRequest, "not_found", callback);
-            co_return;
-        }
-
-        if (const auto error = co_await global::database->removeProject(project->getValueOfId()); error != Error::Ok) {
+        if (const auto error = co_await global::database->removeProject(project.getValueOfId()); error != Error::Ok) {
             logger.error("Failed to delete project {} in database", id);
-            co_return simpleError(Error::ErrInternal, "internal", callback);
+            throw ApiException(Error::ErrInternal, "internal");
         }
 
-        co_await global::storage->invalidateProject(*project);
+        co_await global::storage->invalidateProject(project);
 
         Json::Value root;
         root["message"] = "Project deleted successfully";
         const auto resp = HttpResponse::newHttpJsonResponse(root);
         resp->setStatusCode(k200OK);
         callback(resp);
-
-        co_return;
     }
 
     Task<> ProjectsController::invalidate(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
@@ -452,18 +389,13 @@ namespace api::v1 {
         }
 
         if (username.empty()) {
-            const auto session(co_await global::auth->getSession(req));
-            if (!session) {
-                simpleError(Error::ErrUnauthorized, "unauthorized", callback);
-                co_return;
-            }
-            username = session->username;
+            const auto session{co_await global::auth->getSession(req)};
+            username = session.username;
         }
 
         const auto project = co_await global::database->getUserProject(username, id);
         if (!project) {
-            simpleError(Error::ErrBadRequest, "not_found", callback);
-            co_return;
+            throw ApiException(Error::ErrBadRequest, "not_found");
         }
 
         // Invalidate ahead of reloading
@@ -502,30 +434,14 @@ namespace api::v1 {
                                                const std::string id) const {
         const auto version = req->getOptionalParameter<std::string>("version");
         const auto resolved = co_await BaseProjectController::getUserProject(req, id, version, std::nullopt, callback);
-        if (!resolved) {
-            co_return;
-        }
+        const auto items{co_await resolved.getItems(getTableQueryParams(req))};
+        callback(jsonResponse(items));
+    }
 
-        const auto query = req->getOptionalParameter<std::string>("query").value_or("");
-        const auto page = req->getOptionalParameter<int>("page").value_or(1);
-
-        const auto items = co_await resolved->getItems(query, page);
-        Json::Value root;
-        Json::Value data(Json::arrayValue);
-        for (const auto &[id, name, path] : items.data) {
-            Json::Value entry;
-            entry["id"] = id;
-            entry["name"] = name;
-            entry["path"] = path.empty() ? Json::nullValue : Json::Value(path);
-            data.append(entry);
-        }
-        root["data"] = data;
-        root["total"] = items.total;
-        root["pages"] = items.pages;
-        root["size"] = items.size;
-
-        const auto resp = HttpResponse::newHttpJsonResponse(root);
-        resp->setStatusCode(k200OK);
-        callback(resp);
+    Task<> ProjectsController::getVersions(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+                                           const std::string id) const {
+        const auto resolved = co_await BaseProjectController::getUserProject(req, id, std::nullopt, std::nullopt, callback);
+        const auto versions{co_await resolved.getVersions(getTableQueryParams(req))};
+        callback(jsonResponse(versions));
     }
 }

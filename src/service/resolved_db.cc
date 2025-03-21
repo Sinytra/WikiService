@@ -5,6 +5,17 @@ using namespace drogon;
 using namespace drogon::orm;
 
 namespace service {
+    std::string paginatedQuery(const std::string &dataQuery, const int pageSize, const int page) {
+        return std::format("WITH search_data AS ({}), "
+                           "    total_count AS (SELECT COUNT(*) AS total_rows FROM search_data) "
+                           "SELECT search_data.*, "
+                           "    total_count.total_rows, "
+                           "    CEIL(total_count.total_rows::DECIMAL / {}) AS total_pages "
+                           "FROM search_data, total_count "
+                           "LIMIT 20 OFFSET ({} - 1) * {};",
+                           dataQuery, pageSize, page, pageSize);
+    }
+
     ProjectDatabaseAccess::ProjectDatabaseAccess(const ResolvedProject &p) : project_(p), projectId_(p.getProject().getValueOfId()) {}
 
     Task<std::vector<ProjectVersion>> ProjectDatabaseAccess::getVersions() const {
@@ -14,6 +25,37 @@ namespace service {
                 co_return co_await mapper.findBy(Criteria(ProjectVersion::Cols::_project_id, CompareOperator::EQ, projectId_));
             });
         co_return res.value_or(std::vector<ProjectVersion>{});
+    }
+
+    Task<PaginatedData<ProjectVersion>> ProjectDatabaseAccess::getVersionsDev(const std::string searchQuery, const int page) const {
+        // language=postgresql
+        static constexpr auto query = "SELECT * FROM project_version \
+                                       WHERE project_id = $1 \
+                                       AND (name ILIKE '%' || $2 || '%' OR branch ILIKE '%' || $2 || '%') \
+                                       ORDER BY name";
+
+        const auto [res, err] = co_await handleDatabaseOperation<PaginatedData<ProjectVersion>>(
+            [&](const DbClientPtr &client) -> Task<PaginatedData<ProjectVersion>> {
+                constexpr int size = 20;
+                const auto actualQuery = paginatedQuery(query, size, page);
+
+                const auto results = co_await client->execSqlCoro(actualQuery, projectId_, searchQuery);
+
+                if (results.empty()) {
+                    throw DrogonDbException{};
+                }
+
+                const int totalRows = results[0]["total_rows"].as<int>();
+                const int totalPages = results[0]["total_pages"].as<int>();
+
+                std::vector<ProjectVersion> contents;
+                for (const auto &row: results) {
+                    contents.emplace_back(row);
+                }
+
+                co_return PaginatedData{.total = totalRows, .pages = totalPages, .size = size, .data = contents};
+            });
+        co_return res.value_or(PaginatedData<ProjectVersion>{});
     }
 
     Task<Error> ProjectDatabaseAccess::addProjectItem(const std::string item) const {
@@ -96,17 +138,6 @@ namespace service {
             co_return Error::Ok;
         });
         co_return res.value_or(err);
-    }
-
-    std::string paginatedQuery(const std::string &dataQuery, const int pageSize, const int page) {
-        return std::format("WITH search_data AS ({}), "
-                           "    total_count AS (SELECT COUNT(*) AS total_rows FROM search_data) "
-                           "SELECT search_data.*, "
-                           "    total_count.total_rows, "
-                           "    CEIL(total_count.total_rows::DECIMAL / {}) AS total_pages "
-                           "FROM search_data, total_count "
-                           "LIMIT 20 OFFSET ({} - 1) * {};",
-                           dataQuery, pageSize, page, pageSize);
     }
 
     Task<PaginatedData<ProjectContent>> ProjectDatabaseAccess::getProjectItemsDev(const std::string searchQuery, const int page) const {

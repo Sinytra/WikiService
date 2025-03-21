@@ -531,14 +531,18 @@ namespace service {
         return {*meta, ProjectError::OK, ""};
     }
 
-    Task<PaginatedData<FullItemData>> ResolvedProject::getItems(const std::string query, const int page) const {
-        const auto [pages, total, size, data] = co_await projectDb_->getProjectItemsDev(query, page);
+    Task<PaginatedData<FullItemData>> ResolvedProject::getItems(const TableQueryParams params) const {
+        const auto [pages, total, size, data] = co_await projectDb_->getProjectItemsDev(params.query, params.page);
         std::vector<FullItemData> itemData;
         for (const auto &[id, path] : data) {
             const auto [name, _] = co_await getItemName(id);
             itemData.emplace_back(id, name, path);
         }
         co_return PaginatedData{ .total = total, .pages = pages, .size = size, .data = itemData };
+    }
+
+    Task<PaginatedData<ProjectVersion>> ResolvedProject::getVersions(const TableQueryParams params) const {
+        co_return co_await projectDb_->getVersionsDev(params.query, params.page);
     }
 
     Task<ItemData> ResolvedProject::getItemName(const Item item) const {

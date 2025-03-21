@@ -12,6 +12,38 @@
 
 using namespace logging;
 
+template<typename T>
+concept JsonSerializable = requires(nlohmann::json &j, const T &obj) {
+    {
+        to_json(j, obj)
+    };
+};
+
+struct TableQueryParams {
+    std::string query;
+    int page;
+};
+
+TableQueryParams getTableQueryParams(const drogon::HttpRequestPtr& req);
+
+drogon::HttpResponsePtr jsonResponse(const nlohmann::json &json);
+
+struct ApiException final : std::runtime_error {
+    using std::runtime_error::runtime_error;
+
+    service::Error error;
+    Json::Value data;
+
+    ApiException(const service::Error err, const std::string& message, const std::function<void(Json::Value &)> &jsonBuilder = nullptr)
+        : std::runtime_error(message), error(err)
+    {
+        data["error"] = message;
+        if (jsonBuilder) {
+            jsonBuilder(data);
+        }
+    }
+};
+
 struct ResourceLocation {
     static constexpr std::string DEFAULT_NAMESPACE = "minecraft";
     static constexpr std::string COMMON_NAMESPACE = "c";

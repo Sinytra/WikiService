@@ -28,7 +28,7 @@ namespace service {
         std::string getGitHubOAuthInitURL() const;
         drogon::Task<std::string> createUserSession(std::string username, std::string profile) const;
         drogon::Task<std::optional<std::string>> requestUserAccessToken(std::string code) const;
-        drogon::Task<std::optional<UserSession>> getSession(drogon::HttpRequestPtr req) const;
+        drogon::Task<UserSession> getSession(drogon::HttpRequestPtr req) const;
         drogon::Task<std::optional<UserSession>> getSession(std::string id) const;
         drogon::Task<> expireSession(std::string id) const;
 

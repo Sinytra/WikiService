@@ -20,6 +20,7 @@ namespace service {
         explicit ProjectDatabaseAccess(const ResolvedProject &);
 
         drogon::Task<std::vector<ProjectVersion>> getVersions() const;
+        drogon::Task<PaginatedData<ProjectVersion>> getVersionsDev(std::string query, int page) const;
 
         drogon::Task<Error> addProjectItem(std::string item) const;
         drogon::Task<Error> addTag(std::string tag) const;

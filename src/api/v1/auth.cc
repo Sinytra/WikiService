@@ -4,8 +4,8 @@
 #include <include/uri.h>
 #include <log/log.h>
 #include <service/crypto.h>
-#include <service/github.h>
 #include <service/database.h>
+#include <service/github.h>
 #include <service/util.h>
 #include <string>
 
@@ -29,7 +29,7 @@ namespace api::v1 {
     Task<> AuthController::callbackGithub(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback,
                                           std::string code) const {
         if (code.empty()) {
-            co_return errorResponse(Error::ErrBadRequest, "Missing code parameter", callback);
+            throw ApiException(Error::ErrBadRequest, "Missing code parameter");
         }
 
         if (const auto token = co_await global::auth->requestUserAccessToken(code)) {
@@ -85,7 +85,7 @@ namespace api::v1 {
     Task<> AuthController::linkModrinth(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
         const auto token = req->getParameter("token");
         if (token.empty()) {
-            co_return errorResponse(Error::ErrBadRequest, "Missing token parameter", callback);
+            throw ApiException(Error::ErrBadRequest, "Missing token parameter");
         }
         const auto encryptToken = crypto::encryptString(token, config_.tokenSecret);
 
@@ -95,25 +95,25 @@ namespace api::v1 {
         co_return;
     }
 
-    Task<> AuthController::callbackModrinth(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string code,
-                                            std::string state) const {
+    Task<> AuthController::callbackModrinth(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+                                            const std::string code, const std::string state) const {
         if (code.empty()) {
-            co_return errorResponse(Error::ErrBadRequest, "Missing code parameter", callback);
+            throw ApiException(Error::ErrBadRequest, "Missing code parameter");
         }
         if (state.empty()) {
-            co_return errorResponse(Error::ErrBadRequest, "Missing state parameter", callback);
+            throw ApiException(Error::ErrBadRequest, "Missing state parameter");
         }
 
         const auto decryptedToken = crypto::decryptString(state, config_.tokenSecret);
 
         const auto session = co_await global::auth->getSession(decryptedToken);
         if (!session) {
-            co_return errorResponse(Error::ErrUnauthorized, "Unauthorized", callback);
+            throw ApiException(Error::ErrUnauthorized, "Unauthorized");
         }
 
         if (const auto token = co_await global::auth->requestModrinthUserAccessToken(code)) {
             if (const auto result = co_await global::auth->linkModrinthAccount(session->username, *token); result != Error::Ok) {
-                co_return errorResponse(result, "Error linking Modrinth account", callback);
+                throw ApiException(result, "Error linking Modrinth account");
             }
 
             const auto resp = HttpResponse::newRedirectionResponse(config_.settingsCallbackUrl);
@@ -124,55 +124,39 @@ namespace api::v1 {
         const auto resp = HttpResponse::newHttpResponse();
         resp->setStatusCode(k400BadRequest);
         callback(resp);
-
-        co_return;
     }
 
     Task<> AuthController::unlinkModrinth(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
-        const auto session = co_await global::auth->getSession(req);
-        if (!session) {
-            co_return errorResponse(Error::ErrUnauthorized, "Unauthorized", callback);
-        }
+        const auto session{co_await global::auth->getSession(req)};
 
-        if (const auto result = co_await global::database->unlinkUserModrinthAccount(session->username); result != Error::Ok) {
-            co_return errorResponse(result, "Failed to unlink Modrinth account", callback);
+        if (const auto result = co_await global::database->unlinkUserModrinthAccount(session.username); result != Error::Ok) {
+            throw ApiException(result, "Failed to unlink Modrinth account");
         }
 
         callback(HttpResponse::newHttpResponse());
-
-        co_return;
     }
 
     Task<> AuthController::userProfile(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
-        const auto session = co_await global::auth->getSession(req);
-        if (!session) {
-            co_return errorResponse(Error::ErrUnauthorized, "Unauthorized", callback);
-        }
-
-        Json::Value root = session->profile;
-        root["created_at"] = session->user.getValueOfCreatedAt().toCustomFormattedString("%Y-%m-%d");
+        const auto session{co_await global::auth->getSession(req)};
+        Json::Value root = session.profile;
+        root["created_at"] = session.user.getValueOfCreatedAt().toCustomFormattedString("%Y-%m-%d");
         const auto resp = HttpResponse::newHttpJsonResponse(root);
         resp->setStatusCode(k200OK);
         callback(resp);
-
-        co_return;
     }
 
     Task<> AuthController::deleteAccount(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
-        const auto session = co_await global::auth->getSession(req);
-        if (!session) {
-            co_return errorResponse(Error::ErrUnauthorized, "Unauthorized", callback);
+        const auto session{co_await global::auth->getSession(req)};
+
+        if (const auto result = co_await global::database->deleteUserProjects(session.username); result != Error::Ok) {
+            throw ApiException(result, "Error deleting account");
         }
 
-        if (const auto result = co_await global::database->deleteUserProjects(session->username); result != Error::Ok) {
-            co_return errorResponse(result, "Error deleting account", callback);
+        if (const auto result = co_await global::database->deleteUser(session.username); result != Error::Ok) {
+            throw ApiException(result, "Error deleting account");
         }
 
-        if (const auto result = co_await global::database->deleteUser(session->username); result != Error::Ok) {
-            co_return errorResponse(result, "Error deleting account", callback);
-        }
-
-        co_await global::auth->expireSession(session->sessionId);
+        co_await global::auth->expireSession(session.sessionId);
 
         Cookie cookie;
         cookie.setKey(SESSION_COOKIE);

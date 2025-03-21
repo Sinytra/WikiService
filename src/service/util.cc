@@ -9,6 +9,18 @@ using namespace drogon;
 using namespace logging;
 using namespace service;
 
+TableQueryParams getTableQueryParams(const HttpRequestPtr& req) {
+    const auto query = req->getOptionalParameter<std::string>("query").value_or("");
+    const auto page = req->getOptionalParameter<int>("page").value_or(1);
+    return TableQueryParams{ .query = query, .page = page };
+}
+
+HttpResponsePtr jsonResponse(const nlohmann::json &json) {
+    const auto resp = HttpResponse::newHttpJsonResponse(unparkourJson(json));
+    resp->setStatusCode(k200OK);
+    return resp;
+}
+
 std::string removeLeadingSlash(const std::string &s) { return s.starts_with('/') ? s.substr(1) : s; }
 
 std::string removeTrailingSlash(const std::string &s) { return s.ends_with('/') ? s.substr(0, s.size() - 1) : s; }
