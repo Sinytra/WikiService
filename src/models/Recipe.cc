@@ -14,7 +14,7 @@ using namespace drogon::orm;
 using namespace drogon_model::postgres;
 
 const std::string Recipe::Cols::_id = "\"id\"";
-const std::string Recipe::Cols::_project_id = "\"project_id\"";
+const std::string Recipe::Cols::_version_id = "\"version_id\"";
 const std::string Recipe::Cols::_loc = "\"loc\"";
 const std::string Recipe::Cols::_type = "\"type\"";
 const std::string Recipe::primaryKeyName = "id";
@@ -23,7 +23,7 @@ const std::string Recipe::tableName = "\"recipe\"";
 
 const std::vector<typename Recipe::MetaData> Recipe::metaData_={
 {"id","int64_t","bigint",8,1,1,1},
-{"project_id","std::string","text",0,0,0,1},
+{"version_id","int64_t","bigint",8,0,0,1},
 {"loc","std::string","character varying",255,0,0,1},
 {"type","std::string","character varying",255,0,0,1}
 };
@@ -40,9 +40,9 @@ Recipe::Recipe(const Row &r, const ssize_t indexOffset) noexcept
         {
             id_=std::make_shared<int64_t>(r["id"].as<int64_t>());
         }
-        if(!r["project_id"].isNull())
+        if(!r["version_id"].isNull())
         {
-            projectId_=std::make_shared<std::string>(r["project_id"].as<std::string>());
+            versionId_=std::make_shared<int64_t>(r["version_id"].as<int64_t>());
         }
         if(!r["loc"].isNull())
         {
@@ -70,7 +70,7 @@ Recipe::Recipe(const Row &r, const ssize_t indexOffset) noexcept
         index = offset + 1;
         if(!r[index].isNull())
         {
-            projectId_=std::make_shared<std::string>(r[index].as<std::string>());
+            versionId_=std::make_shared<int64_t>(r[index].as<int64_t>());
         }
         index = offset + 2;
         if(!r[index].isNull())
@@ -106,7 +106,7 @@ Recipe::Recipe(const Json::Value &pJson, const std::vector<std::string> &pMasque
         dirtyFlag_[1] = true;
         if(!pJson[pMasqueradingVector[1]].isNull())
         {
-            projectId_=std::make_shared<std::string>(pJson[pMasqueradingVector[1]].asString());
+            versionId_=std::make_shared<int64_t>((int64_t)pJson[pMasqueradingVector[1]].asInt64());
         }
     }
     if(!pMasqueradingVector[2].empty() && pJson.isMember(pMasqueradingVector[2]))
@@ -137,12 +137,12 @@ Recipe::Recipe(const Json::Value &pJson) noexcept(false)
             id_=std::make_shared<int64_t>((int64_t)pJson["id"].asInt64());
         }
     }
-    if(pJson.isMember("project_id"))
+    if(pJson.isMember("version_id"))
     {
         dirtyFlag_[1]=true;
-        if(!pJson["project_id"].isNull())
+        if(!pJson["version_id"].isNull())
         {
-            projectId_=std::make_shared<std::string>(pJson["project_id"].asString());
+            versionId_=std::make_shared<int64_t>((int64_t)pJson["version_id"].asInt64());
         }
     }
     if(pJson.isMember("loc"))
@@ -183,7 +183,7 @@ void Recipe::updateByMasqueradedJson(const Json::Value &pJson,
         dirtyFlag_[1] = true;
         if(!pJson[pMasqueradingVector[1]].isNull())
         {
-            projectId_=std::make_shared<std::string>(pJson[pMasqueradingVector[1]].asString());
+            versionId_=std::make_shared<int64_t>((int64_t)pJson[pMasqueradingVector[1]].asInt64());
         }
     }
     if(!pMasqueradingVector[2].empty() && pJson.isMember(pMasqueradingVector[2]))
@@ -213,12 +213,12 @@ void Recipe::updateByJson(const Json::Value &pJson) noexcept(false)
             id_=std::make_shared<int64_t>((int64_t)pJson["id"].asInt64());
         }
     }
-    if(pJson.isMember("project_id"))
+    if(pJson.isMember("version_id"))
     {
         dirtyFlag_[1] = true;
-        if(!pJson["project_id"].isNull())
+        if(!pJson["version_id"].isNull())
         {
-            projectId_=std::make_shared<std::string>(pJson["project_id"].asString());
+            versionId_=std::make_shared<int64_t>((int64_t)pJson["version_id"].asInt64());
         }
     }
     if(pJson.isMember("loc"))
@@ -261,25 +261,20 @@ const typename Recipe::PrimaryKeyType & Recipe::getPrimaryKey() const
     return *id_;
 }
 
-const std::string &Recipe::getValueOfProjectId() const noexcept
+const int64_t &Recipe::getValueOfVersionId() const noexcept
 {
-    static const std::string defaultValue = std::string();
-    if(projectId_)
-        return *projectId_;
+    static const int64_t defaultValue = int64_t();
+    if(versionId_)
+        return *versionId_;
     return defaultValue;
 }
-const std::shared_ptr<std::string> &Recipe::getProjectId() const noexcept
+const std::shared_ptr<int64_t> &Recipe::getVersionId() const noexcept
 {
-    return projectId_;
+    return versionId_;
 }
-void Recipe::setProjectId(const std::string &pProjectId) noexcept
+void Recipe::setVersionId(const int64_t &pVersionId) noexcept
 {
-    projectId_ = std::make_shared<std::string>(pProjectId);
-    dirtyFlag_[1] = true;
-}
-void Recipe::setProjectId(std::string &&pProjectId) noexcept
-{
-    projectId_ = std::make_shared<std::string>(std::move(pProjectId));
+    versionId_ = std::make_shared<int64_t>(pVersionId);
     dirtyFlag_[1] = true;
 }
 
@@ -334,7 +329,7 @@ void Recipe::updateId(const uint64_t id)
 const std::vector<std::string> &Recipe::insertColumns() noexcept
 {
     static const std::vector<std::string> inCols={
-        "project_id",
+        "version_id",
         "loc",
         "type"
     };
@@ -345,9 +340,9 @@ void Recipe::outputArgs(drogon::orm::internal::SqlBinder &binder) const
 {
     if(dirtyFlag_[1])
     {
-        if(getProjectId())
+        if(getVersionId())
         {
-            binder << getValueOfProjectId();
+            binder << getValueOfVersionId();
         }
         else
         {
@@ -400,9 +395,9 @@ void Recipe::updateArgs(drogon::orm::internal::SqlBinder &binder) const
 {
     if(dirtyFlag_[1])
     {
-        if(getProjectId())
+        if(getVersionId())
         {
-            binder << getValueOfProjectId();
+            binder << getValueOfVersionId();
         }
         else
         {
@@ -443,13 +438,13 @@ Json::Value Recipe::toJson() const
     {
         ret["id"]=Json::Value();
     }
-    if(getProjectId())
+    if(getVersionId())
     {
-        ret["project_id"]=getValueOfProjectId();
+        ret["version_id"]=(Json::Int64)getValueOfVersionId();
     }
     else
     {
-        ret["project_id"]=Json::Value();
+        ret["version_id"]=Json::Value();
     }
     if(getLoc())
     {
@@ -489,9 +484,9 @@ Json::Value Recipe::toMasqueradedJson(
         }
         if(!pMasqueradingVector[1].empty())
         {
-            if(getProjectId())
+            if(getVersionId())
             {
-                ret[pMasqueradingVector[1]]=getValueOfProjectId();
+                ret[pMasqueradingVector[1]]=(Json::Int64)getValueOfVersionId();
             }
             else
             {
@@ -531,13 +526,13 @@ Json::Value Recipe::toMasqueradedJson(
     {
         ret["id"]=Json::Value();
     }
-    if(getProjectId())
+    if(getVersionId())
     {
-        ret["project_id"]=getValueOfProjectId();
+        ret["version_id"]=(Json::Int64)getValueOfVersionId();
     }
     else
     {
-        ret["project_id"]=Json::Value();
+        ret["version_id"]=Json::Value();
     }
     if(getLoc())
     {
@@ -565,14 +560,14 @@ bool Recipe::validateJsonForCreation(const Json::Value &pJson, std::string &err)
         if(!validJsonOfField(0, "id", pJson["id"], err, true))
             return false;
     }
-    if(pJson.isMember("project_id"))
+    if(pJson.isMember("version_id"))
     {
-        if(!validJsonOfField(1, "project_id", pJson["project_id"], err, true))
+        if(!validJsonOfField(1, "version_id", pJson["version_id"], err, true))
             return false;
     }
     else
     {
-        err="The project_id column cannot be null";
+        err="The version_id column cannot be null";
         return false;
     }
     if(pJson.isMember("loc"))
@@ -674,9 +669,9 @@ bool Recipe::validateJsonForUpdate(const Json::Value &pJson, std::string &err)
         err = "The value of primary key must be set in the json object for update";
         return false;
     }
-    if(pJson.isMember("project_id"))
+    if(pJson.isMember("version_id"))
     {
-        if(!validJsonOfField(1, "project_id", pJson["project_id"], err, false))
+        if(!validJsonOfField(1, "version_id", pJson["version_id"], err, false))
             return false;
     }
     if(pJson.isMember("loc"))
@@ -765,7 +760,7 @@ bool Recipe::validJsonOfField(size_t index,
                 err="The " + fieldName + " column cannot be null";
                 return false;
             }
-            if(!pJson.isString())
+            if(!pJson.isInt64())
             {
                 err="Type error in the "+fieldName+" field";
                 return false;

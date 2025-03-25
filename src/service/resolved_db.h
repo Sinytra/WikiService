@@ -37,5 +37,6 @@ namespace service {
     private:
         const ResolvedProject &project_;
         const std::string projectId_;
+        const int64_t versionId_;
     };
 }

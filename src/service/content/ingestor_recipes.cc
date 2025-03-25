@@ -168,11 +168,11 @@ namespace content {
         CoroMapper<Recipe> recipeMapper(clientPtr);
 
         const auto [id, type, ingredients] = recipe;
-        const auto projectId = project_.getProject().getValueOfId();
+        const auto versionId = project_.getProjectVersion().getValueOfId();
 
         // language=postgresql
         const auto row =
-            co_await clientPtr->execSqlCoro("INSERT INTO recipe VALUES (DEFAULT, $1, $2, $3) RETURNING id", projectId, id, type);
+            co_await clientPtr->execSqlCoro("INSERT INTO recipe VALUES (DEFAULT, $1, $2, $3) RETURNING id", versionId, id, type);
         const auto recipeId = row.front().at("id").as<int64_t>();
 
         for (auto &[ingredientId, slot, count, input, isTag]: ingredients) {

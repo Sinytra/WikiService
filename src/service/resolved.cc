@@ -188,14 +188,11 @@ Task<> addPageIDs(const std::unordered_map<std::string, std::string> &ids, nlohm
     }
 }
 
-template<typename T>
-Task<Json::Value> appendSources(const std::string col, const int64_t item) {
-    const auto items = co_await global::database->getRelated<T>(col, item);
+Task<Json::Value> appendItemSources(const int64_t item) {
+    const auto items = co_await global::database->getItemSourceProjects(item);
     Json::Value root(Json::arrayValue);
     for (const auto &res: items) {
-        if (!res.getValueOfProjectId().empty()) {
-            root.append(res.getValueOfProjectId());
-        }
+        root.append(res);
     }
     co_return root;
 }
@@ -249,10 +246,6 @@ namespace service {
 
         return removeTrailingSlash(project.getValueOfSourceRepo()) + "/" + result;
     }
-
-    ResolvedProject::ResolvedProject(const Project &p, const std::filesystem::path &r, const std::filesystem::path &d) :
-        project_(p), defaultVersion_(nullptr), rootDir_(r), docsDir_(d), version_(std::nullopt),
-        projectDb_(std::make_shared<ProjectDatabaseAccess>(*this)) {}
 
     ResolvedProject::ResolvedProject(const Project &p, const std::filesystem::path &r, const std::filesystem::path &d,
                                      const ProjectVersion &v) :
@@ -439,7 +432,7 @@ namespace service {
 
     const Project &ResolvedProject::getProject() const { return project_; }
 
-    const std::optional<ProjectVersion> &ResolvedProject::getProjectVersion() const { return version_; }
+    const ProjectVersion &ResolvedProject::getProjectVersion() const { return version_; }
 
     const std::filesystem::path &ResolvedProject::getDocsDirectoryPath() const { return docsDir_; }
 
@@ -578,7 +571,7 @@ namespace service {
             }
             itemJson["has_page"] = !path.empty();
             itemJson["count"] = ingredient.getValueOfCount();
-            itemJson["sources"] = co_await appendSources<ProjectItem>(ProjectItem::Cols::_item_id, ingredient.getValueOfItemId());
+            itemJson["sources"] = co_await appendItemSources(ingredient.getValueOfItemId());
             itemsJson.append(itemJson);
         }
         root["items"] = itemsJson;
@@ -605,7 +598,7 @@ namespace service {
                         itemJson["name"] = name;
                     }
                     itemJson["has_page"] = !path.empty();
-                    itemJson["sources"] = co_await appendSources<ProjectItem>(ProjectItem::Cols::_item_id, item.getValueOfId());
+                    itemJson["sources"] = co_await appendItemSources(item.getValueOfId());
                     itemsJson.append(itemJson);
                 }
                 tagJson["items"] = itemsJson;
@@ -618,7 +611,7 @@ namespace service {
     }
 
     Task<std::optional<Json::Value>> ResolvedProject::getRecipe(std::string id) const {
-        const auto result = co_await global::database->getProjectRecipe(project_.getValueOfId(), id);
+        const auto result = co_await global::database->getProjectRecipe(version_.getValueOfId(), id);
         if (!result) {
             co_return std::nullopt;
         }

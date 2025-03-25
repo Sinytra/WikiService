@@ -16,13 +16,15 @@ namespace service {
                            dataQuery, pageSize, page, pageSize);
     }
 
-    ProjectDatabaseAccess::ProjectDatabaseAccess(const ResolvedProject &p) : project_(p), projectId_(p.getProject().getValueOfId()) {}
+    ProjectDatabaseAccess::ProjectDatabaseAccess(const ResolvedProject &p) :
+        project_(p), projectId_(p.getProject().getValueOfId()), versionId_(p.getProjectVersion().getValueOfId()) {}
 
     Task<std::vector<ProjectVersion>> ProjectDatabaseAccess::getVersions() const {
         const auto [res, err] = co_await handleDatabaseOperation<std::vector<ProjectVersion>>(
             [&](const DbClientPtr &client) -> Task<std::vector<ProjectVersion>> {
                 CoroMapper<ProjectVersion> mapper(client);
-                co_return co_await mapper.findBy(Criteria(ProjectVersion::Cols::_project_id, CompareOperator::EQ, projectId_));
+                co_return co_await mapper.findBy(Criteria(ProjectVersion::Cols::_project_id, CompareOperator::EQ, projectId_) &&
+                                                 Criteria(ProjectVersion::Cols::_name, CompareOperator::IsNotNull));
             });
         co_return res.value_or(std::vector<ProjectVersion>{});
     }
@@ -60,13 +62,13 @@ namespace service {
 
     Task<Error> ProjectDatabaseAccess::addProjectItem(const std::string item) const {
         // language=postgresql
-        static constexpr auto query = "INSERT INTO project_item (item_id, project_id) \
+        static constexpr auto query = "INSERT INTO project_item (item_id, version_id) \
                                        SELECT id, $2 FROM item WHERE loc = $1 \
                                        ON CONFLICT DO NOTHING";
         const auto [res, err] = co_await handleDatabaseOperation<Error>([&, item](const DbClientPtr &client) -> Task<Error> {
             // language=postgresql
             co_await client->execSqlCoro("INSERT INTO item VALUES (DEFAULT, $1) ON CONFLICT DO NOTHING", item);
-            co_await client->execSqlCoro(query, item, projectId_);
+            co_await client->execSqlCoro(query, item, versionId_);
             co_return Error::Ok;
         });
         co_return res.value_or(err);
@@ -74,14 +76,14 @@ namespace service {
 
     Task<Error> ProjectDatabaseAccess::addTag(const std::string tag) const {
         // language=postgresql
-        static constexpr auto query = "INSERT INTO project_tag (tag_id, project_id) \
+        static constexpr auto query = "INSERT INTO project_tag (tag_id, version_id) \
                                        SELECT id, $2 FROM tag WHERE loc = $1 \
                                        ON CONFLICT DO NOTHING";
 
         const auto [res, err] = co_await handleDatabaseOperation<Error>([&, tag](const DbClientPtr &client) -> Task<Error> {
             // language=postgresql
             co_await client->execSqlCoro("INSERT INTO tag VALUES (DEFAULT, $1) ON CONFLICT DO NOTHING", tag);
-            co_await client->execSqlCoro(query, tag, projectId_);
+            co_await client->execSqlCoro(query, tag, versionId_);
             co_return Error::Ok;
         });
         co_return res.value_or(err);
@@ -92,11 +94,11 @@ namespace service {
         static constexpr auto query = "SELECT item.* FROM tag_item_flat \
                                        JOIN item ON item.id = child \
                                        JOIN project_item pitem ON pitem.item_id = item.id \
-                                       WHERE parent = $1 AND (pitem.project_id IS NULL OR pitem.project_id = $2)";
+                                       WHERE parent = $1 AND (pitem.version_id IS NULL OR pitem.version_id = $2)";
 
         const auto [res, err] =
             co_await handleDatabaseOperation<std::vector<Item>>([&, tag](const DbClientPtr &client) -> Task<std::vector<Item>> {
-                const auto results = co_await client->execSqlCoro(query, tag, projectId_);
+                const auto results = co_await client->execSqlCoro(query, tag, versionId_);
                 std::vector<Item> tagItems;
                 for (const auto &row: results) {
                     tagItems.emplace_back(row);
@@ -112,12 +114,12 @@ namespace service {
                                               SELECT pt.id, pip.id FROM project_tag pt CROSS JOIN project_item pip \
                                               JOIN tag ON tag.id = pt.tag_id \
                                               JOIN item ON item.id = pip.item_id \
-                                              WHERE (pt.project_id IS NULL OR pt.project_id = $1) \
-                                                AND (pip.project_id IS NULL OR pip.project_id = $1) \
+                                              WHERE (pt.version_id IS NULL OR pt.version_id = $1) \
+                                                AND (pip.version_id IS NULL OR pip.version_id = $1) \
                                                 AND tag.loc = $2 AND item.loc = $3 \
                                               ON CONFLICT DO NOTHING";
         const auto [res, err] = co_await handleDatabaseOperation<Error>([&, tag, item](const DbClientPtr &client) -> Task<Error> {
-            co_await client->execSqlCoro(tagItemQuery, projectId_, tag, item);
+            co_await client->execSqlCoro(tagItemQuery, versionId_, tag, item);
             co_return Error::Ok;
         });
         co_return res.value_or(Error::ErrInternal);
@@ -129,12 +131,12 @@ namespace service {
                                              SELECT tp.id, tc.id FROM project_tag tp CROSS JOIN project_tag tc \
                                              JOIN tag p ON p.id = tp.tag_id \
                                              JOIN tag c ON c.id = tc.tag_id \
-                                             WHERE (tp.project_id IS NULL OR tp.project_id = $1) \
-                                               AND (tc.project_id IS NULL OR tc.project_id = $1) \
+                                             WHERE (tp.version_id IS NULL OR tp.version_id = $1) \
+                                               AND (tc.version_id IS NULL OR tc.version_id = $1) \
                                                AND p.loc = $2 AND c.loc = $3 \
                                              ON CONFLICT DO NOTHING";
         const auto [res, err] = co_await handleDatabaseOperation<Error>([&, parentTag, childTag](const DbClientPtr &client) -> Task<Error> {
-            co_await client->execSqlCoro(tagTagQuery, projectId_, parentTag, childTag);
+            co_await client->execSqlCoro(tagTagQuery, versionId_, parentTag, childTag);
             co_return Error::Ok;
         });
         co_return res.value_or(err);
@@ -145,9 +147,8 @@ namespace service {
         static constexpr auto query = "SELECT item.loc, path FROM project_item pitem \
                                        LEFT JOIN project_item_page pip ON pitem.id = pip.item_id \
                                        JOIN item ON item.id = pitem.item_id \
-                                       WHERE pitem.project_id = $1 AND (pip IS NULL OR starts_with(pip.path, '.content/')) \
-                                       AND (pip.version_id = $2 OR $2 IS NULL) \
-                                       AND item.loc ILIKE '%' || $3 || '%' \
+                                       WHERE pitem.version_id = $1 AND (pip IS NULL OR starts_with(pip.path, '.content/')) \
+                                       AND item.loc ILIKE '%' || $2 || '%' \
                                        ORDER BY item.loc";
 
         const auto [res, err] = co_await handleDatabaseOperation<PaginatedData<ProjectContent>>(
@@ -155,9 +156,7 @@ namespace service {
                 constexpr int size = 20;
                 const auto actualQuery = paginatedQuery(query, size, page);
 
-                const auto version = project_.getProjectVersion();
-                const auto results = version ? co_await client->execSqlCoro(actualQuery, projectId_, version->getValueOfId(), searchQuery)
-                                             : co_await client->execSqlCoro(actualQuery, projectId_, nullptr, searchQuery);
+                const auto results = co_await client->execSqlCoro(actualQuery, versionId_, searchQuery);
 
                 if (results.empty()) {
                     throw DrogonDbException{};
@@ -183,14 +182,11 @@ namespace service {
         static constexpr auto query = "SELECT item.loc, path FROM project_item pitem \
                                        JOIN project_item_page pip ON pitem.id = pip.item_id \
                                        JOIN item ON item.id = pitem.item_id \
-                                       WHERE pitem.project_id = $1 AND starts_with(pip.path, '.content/') \
-                                       AND (pip.version_id = $2 OR $2 IS NULL)";
+                                       WHERE pitem.version_id = $1 AND starts_with(pip.path, '.content/')";
 
         const auto [res, err] = co_await handleDatabaseOperation<std::vector<ProjectContent>>(
             [&](const DbClientPtr &client) -> Task<std::vector<ProjectContent>> {
-                const auto version = project_.getProjectVersion();
-                const auto results = version ? co_await client->execSqlCoro(query, projectId_, version->getValueOfId())
-                                             : co_await client->execSqlCoro(query, projectId_, nullptr);
+                const auto results = co_await client->execSqlCoro(query, versionId_);
                 std::vector<ProjectContent> contents;
                 for (const auto &row: results) {
                     const auto id = row[0].as<std::string>();
@@ -206,13 +202,10 @@ namespace service {
         // language=postgresql
         static constexpr auto query = "SELECT count(*) FROM project_item pitem \
                                        JOIN project_item_page pip ON pitem.id = pip.item_id \
-                                       WHERE pitem.project_id = $1 AND starts_with(pip.path, '.content/') \
-                                       AND (pip.version_id = $2 OR $2 IS NULL)";
+                                       WHERE pitem.version_id = $1 AND starts_with(pip.path, '.content/')";
 
         const auto [res, err] = co_await handleDatabaseOperation<int>([&](const DbClientPtr &client) -> Task<int> {
-            const auto version = project_.getProjectVersion();
-            const auto results = version ? co_await client->execSqlCoro(query, projectId_, version->getValueOfId())
-                                         : co_await client->execSqlCoro(query, projectId_, nullptr);
+            const auto results = co_await client->execSqlCoro(query, versionId_);
             if (results.size() != 1) {
                 throw DrogonDbException{};
             }
@@ -226,13 +219,10 @@ namespace service {
         static constexpr auto query = "SELECT path FROM project_item pitem \
                                        JOIN project_item_page pip ON pitem.id = pip.item_id \
                                        JOIN item i ON pitem.item_id = i.id \
-                                       WHERE pitem.project_id = $1 AND i.loc = $2 \
-                                       AND (pip.version_id = $3 OR $3 IS NULL)";
+                                       WHERE pitem.version_id = $1 AND i.loc = $2";
 
         const auto [res, err] = co_await handleDatabaseOperation<std::string>([&, id](const DbClientPtr &client) -> Task<std::string> {
-            const auto version = project_.getProjectVersion();
-            const auto results = version ? co_await client->execSqlCoro(query, projectId_, id, version->getValueOfId())
-                                         : co_await client->execSqlCoro(query, projectId_, id, nullptr);
+            const auto results = co_await client->execSqlCoro(query, versionId_, id);
             if (results.size() != 1) {
                 throw DrogonDbException{};
             }
@@ -245,17 +235,13 @@ namespace service {
 
     Task<Error> ProjectDatabaseAccess::addProjectContentPage(const std::string id, const std::string path) const {
         // language=postgresql
-        static constexpr auto pageQuery = "INSERT INTO project_item_page (version_id, item_id, path) \
-                                           SELECT $1 as version_id, pitem.id as item_id, $2 as path \
+        static constexpr auto pageQuery = "INSERT INTO project_item_page (item_id, path) \
+                                           SELECT pitem.id as item_id, $1 as path \
                                            FROM project_item pitem \
                                            JOIN item i ON pitem.item_id = i.id \
-                                           WHERE i.loc = $3 AND pitem.project_id = $4";
+                                           WHERE i.loc = $2 AND pitem.version_id = $3";
         const auto [res, err] = co_await handleDatabaseOperation<Error>([&, id, path](const DbClientPtr &client) -> Task<Error> {
-            if (const auto version = project_.getProjectVersion()) {
-                co_await client->execSqlCoro(pageQuery, version->getValueOfId(), path, id, projectId_);
-            } else {
-                co_await client->execSqlCoro(pageQuery, nullptr, path, id, projectId_);
-            }
+            co_await client->execSqlCoro(pageQuery, path, id, versionId_);
             co_return Error::Ok;
         });
         co_return res.value_or(err);

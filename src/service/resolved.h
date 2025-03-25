@@ -50,7 +50,6 @@ namespace service {
 
     class ResolvedProject {
     public:
-        explicit ResolvedProject(const Project &, const std::filesystem::path &, const std::filesystem::path &);
         explicit ResolvedProject(const Project &, const std::filesystem::path &, const std::filesystem::path &, const ProjectVersion &);
 
         void setDefaultVersion(const ResolvedProject &defaultVersion);
@@ -82,7 +81,7 @@ namespace service {
 
         const Project &getProject() const;
 
-        const std::optional<ProjectVersion> &getProjectVersion() const;
+        const ProjectVersion &getProjectVersion() const;
 
         const std::filesystem::path &getDocsDirectoryPath() const;
 
@@ -106,7 +105,7 @@ namespace service {
         std::filesystem::path docsDir_;
 
         std::string locale_;
-        std::optional<ProjectVersion> version_;
+        ProjectVersion version_;
 
         std::shared_ptr<ProjectDatabaseAccess> projectDb_;
     };

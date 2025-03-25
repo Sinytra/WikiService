@@ -3,7 +3,6 @@
 #include <database.h>
 #include <drogon/drogon.h>
 #include <fstream>
-#include <models/Recipe.h>
 #include <resolved_db.h>
 
 #define EXT_JSON ".json"
@@ -27,11 +26,17 @@ namespace content {
     Task<Error> wipeExistingData(const DbClientPtr clientPtr, const std::string id) {
         logger.info("Wiping existing data for project {}", id);
         // language=postgresql
-        co_await clientPtr->execSqlCoro("DELETE FROM recipe WHERE project_id = $1", id);
+        co_await clientPtr->execSqlCoro(
+            "DELETE FROM recipe WHERE version_id IN (SELECT id FROM project_version WHERE project_id = $1)",
+            id);
         // language=postgresql
-        co_await clientPtr->execSqlCoro("DELETE FROM project_item WHERE project_id = $1", id);
+        co_await clientPtr->execSqlCoro(
+            "DELETE FROM project_item WHERE version_id IN (SELECT id FROM project_version WHERE project_id = $1)",
+            id);
         // language=postgresql
-        co_await clientPtr->execSqlCoro("DELETE FROM project_tag WHERE project_id = $1", id);
+        co_await clientPtr->execSqlCoro(
+            "DELETE FROM project_tag WHERE version_id IN (SELECT id FROM project_version WHERE project_id = $1)",
+            id);
         co_return Error::Ok;
     }
 

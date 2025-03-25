@@ -45,7 +45,7 @@ class Recipe
     struct Cols
     {
         static const std::string _id;
-        static const std::string _project_id;
+        static const std::string _version_id;
         static const std::string _loc;
         static const std::string _type;
     };
@@ -107,14 +107,13 @@ class Recipe
     ///Set the value of the column id
     void setId(const int64_t &pId) noexcept;
 
-    /**  For column project_id  */
-    ///Get the value of the column project_id, returns the default value if the column is null
-    const std::string &getValueOfProjectId() const noexcept;
+    /**  For column version_id  */
+    ///Get the value of the column version_id, returns the default value if the column is null
+    const int64_t &getValueOfVersionId() const noexcept;
     ///Return a shared_ptr object pointing to the column const value, or an empty shared_ptr object if the column is null
-    const std::shared_ptr<std::string> &getProjectId() const noexcept;
-    ///Set the value of the column project_id
-    void setProjectId(const std::string &pProjectId) noexcept;
-    void setProjectId(std::string &&pProjectId) noexcept;
+    const std::shared_ptr<int64_t> &getVersionId() const noexcept;
+    ///Set the value of the column version_id
+    void setVersionId(const int64_t &pVersionId) noexcept;
 
     /**  For column loc  */
     ///Get the value of the column loc, returns the default value if the column is null
@@ -157,7 +156,7 @@ class Recipe
     ///For mysql or sqlite3
     void updateId(const uint64_t id);
     std::shared_ptr<int64_t> id_;
-    std::shared_ptr<std::string> projectId_;
+    std::shared_ptr<int64_t> versionId_;
     std::shared_ptr<std::string> loc_;
     std::shared_ptr<std::string> type_;
     struct MetaData
@@ -193,7 +192,7 @@ class Recipe
             ++parametersCount;
         if(dirtyFlag_[1])
         {
-            sql += "project_id,";
+            sql += "version_id,";
             ++parametersCount;
         }
         if(dirtyFlag_[2])

@@ -24,7 +24,7 @@ const std::string ProjectVersion::tableName = "\"project_version\"";
 const std::vector<typename ProjectVersion::MetaData> ProjectVersion::metaData_={
 {"id","int64_t","bigint",8,1,1,1},
 {"project_id","std::string","text",0,0,0,1},
-{"name","std::string","character varying",255,0,0,1},
+{"name","std::string","character varying",255,0,0,0},
 {"branch","std::string","character varying",255,0,0,1}
 };
 const std::string &ProjectVersion::getColumnName(size_t index) noexcept(false)
@@ -304,6 +304,11 @@ void ProjectVersion::setName(std::string &&pName) noexcept
     name_ = std::make_shared<std::string>(std::move(pName));
     dirtyFlag_[2] = true;
 }
+void ProjectVersion::setNameToNull() noexcept
+{
+    name_.reset();
+    dirtyFlag_[2] = true;
+}
 
 const std::string &ProjectVersion::getValueOfBranch() const noexcept
 {
@@ -580,11 +585,6 @@ bool ProjectVersion::validateJsonForCreation(const Json::Value &pJson, std::stri
         if(!validJsonOfField(2, "name", pJson["name"], err, true))
             return false;
     }
-    else
-    {
-        err="The name column cannot be null";
-        return false;
-    }
     if(pJson.isMember("branch"))
     {
         if(!validJsonOfField(3, "branch", pJson["branch"], err, true))
@@ -635,11 +635,6 @@ bool ProjectVersion::validateMasqueradedJsonForCreation(const Json::Value &pJson
               if(!validJsonOfField(2, pMasqueradingVector[2], pJson[pMasqueradingVector[2]], err, true))
                   return false;
           }
-        else
-        {
-            err="The " + pMasqueradingVector[2] + " column cannot be null";
-            return false;
-        }
       }
       if(!pMasqueradingVector[3].empty())
       {
@@ -774,8 +769,7 @@ bool ProjectVersion::validJsonOfField(size_t index,
         case 2:
             if(pJson.isNull())
             {
-                err="The " + fieldName + " column cannot be null";
-                return false;
+                return true;
             }
             if(!pJson.isString())
             {

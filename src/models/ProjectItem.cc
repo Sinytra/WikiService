@@ -15,15 +15,15 @@ using namespace drogon_model::postgres;
 
 const std::string ProjectItem::Cols::_id = "\"id\"";
 const std::string ProjectItem::Cols::_item_id = "\"item_id\"";
-const std::string ProjectItem::Cols::_project_id = "\"project_id\"";
+const std::string ProjectItem::Cols::_version_id = "\"version_id\"";
 const std::string ProjectItem::primaryKeyName = "id";
 const bool ProjectItem::hasPrimaryKey = true;
 const std::string ProjectItem::tableName = "\"project_item\"";
 
 const std::vector<typename ProjectItem::MetaData> ProjectItem::metaData_={
 {"id","int64_t","bigint",8,1,1,1},
-{"item_id","int64_t","bigint",8,0,0,0},
-{"project_id","std::string","text",0,0,0,0}
+{"item_id","int64_t","bigint",8,0,0,1},
+{"version_id","int64_t","bigint",8,0,0,1}
 };
 const std::string &ProjectItem::getColumnName(size_t index) noexcept(false)
 {
@@ -42,9 +42,9 @@ ProjectItem::ProjectItem(const Row &r, const ssize_t indexOffset) noexcept
         {
             itemId_=std::make_shared<int64_t>(r["item_id"].as<int64_t>());
         }
-        if(!r["project_id"].isNull())
+        if(!r["version_id"].isNull())
         {
-            projectId_=std::make_shared<std::string>(r["project_id"].as<std::string>());
+            versionId_=std::make_shared<int64_t>(r["version_id"].as<int64_t>());
         }
     }
     else
@@ -69,7 +69,7 @@ ProjectItem::ProjectItem(const Row &r, const ssize_t indexOffset) noexcept
         index = offset + 2;
         if(!r[index].isNull())
         {
-            projectId_=std::make_shared<std::string>(r[index].as<std::string>());
+            versionId_=std::make_shared<int64_t>(r[index].as<int64_t>());
         }
     }
 
@@ -103,7 +103,7 @@ ProjectItem::ProjectItem(const Json::Value &pJson, const std::vector<std::string
         dirtyFlag_[2] = true;
         if(!pJson[pMasqueradingVector[2]].isNull())
         {
-            projectId_=std::make_shared<std::string>(pJson[pMasqueradingVector[2]].asString());
+            versionId_=std::make_shared<int64_t>((int64_t)pJson[pMasqueradingVector[2]].asInt64());
         }
     }
 }
@@ -126,12 +126,12 @@ ProjectItem::ProjectItem(const Json::Value &pJson) noexcept(false)
             itemId_=std::make_shared<int64_t>((int64_t)pJson["item_id"].asInt64());
         }
     }
-    if(pJson.isMember("project_id"))
+    if(pJson.isMember("version_id"))
     {
         dirtyFlag_[2]=true;
-        if(!pJson["project_id"].isNull())
+        if(!pJson["version_id"].isNull())
         {
-            projectId_=std::make_shared<std::string>(pJson["project_id"].asString());
+            versionId_=std::make_shared<int64_t>((int64_t)pJson["version_id"].asInt64());
         }
     }
 }
@@ -164,7 +164,7 @@ void ProjectItem::updateByMasqueradedJson(const Json::Value &pJson,
         dirtyFlag_[2] = true;
         if(!pJson[pMasqueradingVector[2]].isNull())
         {
-            projectId_=std::make_shared<std::string>(pJson[pMasqueradingVector[2]].asString());
+            versionId_=std::make_shared<int64_t>((int64_t)pJson[pMasqueradingVector[2]].asInt64());
         }
     }
 }
@@ -186,12 +186,12 @@ void ProjectItem::updateByJson(const Json::Value &pJson) noexcept(false)
             itemId_=std::make_shared<int64_t>((int64_t)pJson["item_id"].asInt64());
         }
     }
-    if(pJson.isMember("project_id"))
+    if(pJson.isMember("version_id"))
     {
         dirtyFlag_[2] = true;
-        if(!pJson["project_id"].isNull())
+        if(!pJson["version_id"].isNull())
         {
-            projectId_=std::make_shared<std::string>(pJson["project_id"].asString());
+            versionId_=std::make_shared<int64_t>((int64_t)pJson["version_id"].asInt64());
         }
     }
 }
@@ -234,36 +234,21 @@ void ProjectItem::setItemId(const int64_t &pItemId) noexcept
     itemId_ = std::make_shared<int64_t>(pItemId);
     dirtyFlag_[1] = true;
 }
-void ProjectItem::setItemIdToNull() noexcept
-{
-    itemId_.reset();
-    dirtyFlag_[1] = true;
-}
 
-const std::string &ProjectItem::getValueOfProjectId() const noexcept
+const int64_t &ProjectItem::getValueOfVersionId() const noexcept
 {
-    static const std::string defaultValue = std::string();
-    if(projectId_)
-        return *projectId_;
+    static const int64_t defaultValue = int64_t();
+    if(versionId_)
+        return *versionId_;
     return defaultValue;
 }
-const std::shared_ptr<std::string> &ProjectItem::getProjectId() const noexcept
+const std::shared_ptr<int64_t> &ProjectItem::getVersionId() const noexcept
 {
-    return projectId_;
+    return versionId_;
 }
-void ProjectItem::setProjectId(const std::string &pProjectId) noexcept
+void ProjectItem::setVersionId(const int64_t &pVersionId) noexcept
 {
-    projectId_ = std::make_shared<std::string>(pProjectId);
-    dirtyFlag_[2] = true;
-}
-void ProjectItem::setProjectId(std::string &&pProjectId) noexcept
-{
-    projectId_ = std::make_shared<std::string>(std::move(pProjectId));
-    dirtyFlag_[2] = true;
-}
-void ProjectItem::setProjectIdToNull() noexcept
-{
-    projectId_.reset();
+    versionId_ = std::make_shared<int64_t>(pVersionId);
     dirtyFlag_[2] = true;
 }
 
@@ -275,7 +260,7 @@ const std::vector<std::string> &ProjectItem::insertColumns() noexcept
 {
     static const std::vector<std::string> inCols={
         "item_id",
-        "project_id"
+        "version_id"
     };
     return inCols;
 }
@@ -295,9 +280,9 @@ void ProjectItem::outputArgs(drogon::orm::internal::SqlBinder &binder) const
     }
     if(dirtyFlag_[2])
     {
-        if(getProjectId())
+        if(getVersionId())
         {
-            binder << getValueOfProjectId();
+            binder << getValueOfVersionId();
         }
         else
         {
@@ -335,9 +320,9 @@ void ProjectItem::updateArgs(drogon::orm::internal::SqlBinder &binder) const
     }
     if(dirtyFlag_[2])
     {
-        if(getProjectId())
+        if(getVersionId())
         {
-            binder << getValueOfProjectId();
+            binder << getValueOfVersionId();
         }
         else
         {
@@ -364,13 +349,13 @@ Json::Value ProjectItem::toJson() const
     {
         ret["item_id"]=Json::Value();
     }
-    if(getProjectId())
+    if(getVersionId())
     {
-        ret["project_id"]=getValueOfProjectId();
+        ret["version_id"]=(Json::Int64)getValueOfVersionId();
     }
     else
     {
-        ret["project_id"]=Json::Value();
+        ret["version_id"]=Json::Value();
     }
     return ret;
 }
@@ -405,9 +390,9 @@ Json::Value ProjectItem::toMasqueradedJson(
         }
         if(!pMasqueradingVector[2].empty())
         {
-            if(getProjectId())
+            if(getVersionId())
             {
-                ret[pMasqueradingVector[2]]=getValueOfProjectId();
+                ret[pMasqueradingVector[2]]=(Json::Int64)getValueOfVersionId();
             }
             else
             {
@@ -433,13 +418,13 @@ Json::Value ProjectItem::toMasqueradedJson(
     {
         ret["item_id"]=Json::Value();
     }
-    if(getProjectId())
+    if(getVersionId())
     {
-        ret["project_id"]=getValueOfProjectId();
+        ret["version_id"]=(Json::Int64)getValueOfVersionId();
     }
     else
     {
-        ret["project_id"]=Json::Value();
+        ret["version_id"]=Json::Value();
     }
     return ret;
 }
@@ -456,10 +441,20 @@ bool ProjectItem::validateJsonForCreation(const Json::Value &pJson, std::string 
         if(!validJsonOfField(1, "item_id", pJson["item_id"], err, true))
             return false;
     }
-    if(pJson.isMember("project_id"))
+    else
     {
-        if(!validJsonOfField(2, "project_id", pJson["project_id"], err, true))
+        err="The item_id column cannot be null";
+        return false;
+    }
+    if(pJson.isMember("version_id"))
+    {
+        if(!validJsonOfField(2, "version_id", pJson["version_id"], err, true))
             return false;
+    }
+    else
+    {
+        err="The version_id column cannot be null";
+        return false;
     }
     return true;
 }
@@ -488,6 +483,11 @@ bool ProjectItem::validateMasqueradedJsonForCreation(const Json::Value &pJson,
               if(!validJsonOfField(1, pMasqueradingVector[1], pJson[pMasqueradingVector[1]], err, true))
                   return false;
           }
+        else
+        {
+            err="The " + pMasqueradingVector[1] + " column cannot be null";
+            return false;
+        }
       }
       if(!pMasqueradingVector[2].empty())
       {
@@ -496,6 +496,11 @@ bool ProjectItem::validateMasqueradedJsonForCreation(const Json::Value &pJson,
               if(!validJsonOfField(2, pMasqueradingVector[2], pJson[pMasqueradingVector[2]], err, true))
                   return false;
           }
+        else
+        {
+            err="The " + pMasqueradingVector[2] + " column cannot be null";
+            return false;
+        }
       }
     }
     catch(const Json::LogicError &e)
@@ -522,9 +527,9 @@ bool ProjectItem::validateJsonForUpdate(const Json::Value &pJson, std::string &e
         if(!validJsonOfField(1, "item_id", pJson["item_id"], err, false))
             return false;
     }
-    if(pJson.isMember("project_id"))
+    if(pJson.isMember("version_id"))
     {
-        if(!validJsonOfField(2, "project_id", pJson["project_id"], err, false))
+        if(!validJsonOfField(2, "version_id", pJson["version_id"], err, false))
             return false;
     }
     return true;
@@ -595,7 +600,8 @@ bool ProjectItem::validJsonOfField(size_t index,
         case 1:
             if(pJson.isNull())
             {
-                return true;
+                err="The " + fieldName + " column cannot be null";
+                return false;
             }
             if(!pJson.isInt64())
             {
@@ -606,9 +612,10 @@ bool ProjectItem::validJsonOfField(size_t index,
         case 2:
             if(pJson.isNull())
             {
-                return true;
+                err="The " + fieldName + " column cannot be null";
+                return false;
             }
-            if(!pJson.isString())
+            if(!pJson.isInt64())
             {
                 err="Type error in the "+fieldName+" field";
                 return false;

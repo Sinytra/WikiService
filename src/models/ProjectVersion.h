@@ -124,6 +124,7 @@ class ProjectVersion
     ///Set the value of the column name
     void setName(const std::string &pName) noexcept;
     void setName(std::string &&pName) noexcept;
+    void setNameToNull() noexcept;
 
     /**  For column branch  */
     ///Get the value of the column branch, returns the default value if the column is null

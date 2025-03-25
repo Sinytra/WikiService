@@ -46,7 +46,7 @@ class ProjectItem
     {
         static const std::string _id;
         static const std::string _item_id;
-        static const std::string _project_id;
+        static const std::string _version_id;
     };
 
     static const int primaryKeyNumber;
@@ -113,17 +113,14 @@ class ProjectItem
     const std::shared_ptr<int64_t> &getItemId() const noexcept;
     ///Set the value of the column item_id
     void setItemId(const int64_t &pItemId) noexcept;
-    void setItemIdToNull() noexcept;
 
-    /**  For column project_id  */
-    ///Get the value of the column project_id, returns the default value if the column is null
-    const std::string &getValueOfProjectId() const noexcept;
+    /**  For column version_id  */
+    ///Get the value of the column version_id, returns the default value if the column is null
+    const int64_t &getValueOfVersionId() const noexcept;
     ///Return a shared_ptr object pointing to the column const value, or an empty shared_ptr object if the column is null
-    const std::shared_ptr<std::string> &getProjectId() const noexcept;
-    ///Set the value of the column project_id
-    void setProjectId(const std::string &pProjectId) noexcept;
-    void setProjectId(std::string &&pProjectId) noexcept;
-    void setProjectIdToNull() noexcept;
+    const std::shared_ptr<int64_t> &getVersionId() const noexcept;
+    ///Set the value of the column version_id
+    void setVersionId(const int64_t &pVersionId) noexcept;
 
 
     static size_t getColumnNumber() noexcept {  return 3;  }
@@ -149,7 +146,7 @@ class ProjectItem
     void updateId(const uint64_t id);
     std::shared_ptr<int64_t> id_;
     std::shared_ptr<int64_t> itemId_;
-    std::shared_ptr<std::string> projectId_;
+    std::shared_ptr<int64_t> versionId_;
     struct MetaData
     {
         const std::string colName_;
@@ -188,7 +185,7 @@ class ProjectItem
         }
         if(dirtyFlag_[2])
         {
-            sql += "project_id,";
+            sql += "version_id,";
             ++parametersCount;
         }
         needSelection=true;

@@ -332,9 +332,8 @@ namespace service {
         }
 
         git_repository *repo = nullptr;
-        const int error = co_await supplyAsync<int>([&repo, &url, &path, &clone_opts]() -> int {
-            return git_clone(&repo, url.c_str(), path.c_str(), &clone_opts);
-        });
+        const int error = co_await supplyAsync<int>(
+            [&repo, &url, &path, &clone_opts]() -> int { return git_clone(&repo, url.c_str(), path.c_str(), &clone_opts); });
 
         if (error < 0) {
             const git_error *e = git_error_last();
@@ -362,7 +361,8 @@ namespace service {
         co_return {repo, ProjectError::OK};
     }
 
-    std::unordered_map<std::string, std::string> readVersionsFromMetadata(const nlohmann::json &metadata, const std::string &defaultBranch) {
+    std::unordered_map<std::string, std::string> readVersionsFromMetadata(const nlohmann::json &metadata,
+                                                                          const std::string &defaultBranch) {
         std::unordered_map<std::string, std::string> versions;
 
         if (metadata.contains("versions") && metadata["versions"].is_object()) {
@@ -405,6 +405,15 @@ namespace service {
         co_return resolvedVersions;
     }
 
+    Task<std::optional<ProjectVersion>> createDefaultVersion(const Project &project) {
+        logger.debug("Adding default version for project {}", project.getValueOfId());
+        ProjectVersion defaultVersion;
+        defaultVersion.setProjectId(project.getValueOfId());
+        defaultVersion.setBranch(project.getValueOfSourceBranch());
+        auto [persistedDefaultVersion, dbErr] = co_await global::database->createProjectVersion(defaultVersion);
+        co_return persistedDefaultVersion;
+    }
+
     Task<ProjectError> Storage::setupProject(const Project &project) const {
         const auto baseDir = getBaseDir();
         const auto clonePath = baseDir.path() / TEMP_DIR / project.getValueOfId();
@@ -422,7 +431,18 @@ namespace service {
             co_return cloneError;
         }
 
-        ResolvedProject resolved{project, clonePath, clonePath / removeLeadingSlash(project.getValueOfSourcePath())};
+        if (const auto dbDelErr = co_await global::database->deleteProjectVersions(project.getValueOfId()); dbDelErr != Error::Ok) {
+            logger->error("Error cleaning up existing versions");
+            co_return ProjectError::UNKNOWN;
+        }
+
+        auto defaultVersion = co_await createDefaultVersion(project);
+        if (!defaultVersion) {
+            logger->error("Project version creation database error.");
+            co_return ProjectError::UNKNOWN;
+        }
+
+        ResolvedProject resolved{project, clonePath, clonePath / removeLeadingSlash(project.getValueOfSourcePath()), *defaultVersion};
 
         const auto branches = listRepoBranches(repo);
         const auto versions = co_await setupProjectVersions(resolved, branches, logger);
@@ -451,7 +471,7 @@ namespace service {
         logger->info("Project import complete");
 
         // TODO Does not work on first import
-        ResolvedProject finalResolved{project, dest, dest / removeLeadingSlash(project.getValueOfSourcePath())};
+        ResolvedProject finalResolved{project, dest, dest / removeLeadingSlash(project.getValueOfSourcePath()), *defaultVersion};
         content::Ingestor ingestor{finalResolved, logger};
         try {
             co_await ingestor.ingestGameContentData();
@@ -517,7 +537,16 @@ namespace service {
             co_return {resolved, Error::Ok};
         }
 
-        ResolvedProject resolved{project, rootDir, docsDir};
+        auto resolvedDefaultVersion = co_await global::database->getDefaultProjectVersion(project.getValueOfId());
+        if (!resolvedDefaultVersion) {
+            auto defaultVersion = co_await createDefaultVersion(project);
+            if (!defaultVersion) {
+                co_return {std::nullopt, Error::ErrNotFound};
+            }
+            resolvedDefaultVersion = defaultVersion;
+        }
+
+        ResolvedProject resolved{project, rootDir, docsDir, *resolvedDefaultVersion};
         resolved.setLocale(locale);
         co_return {resolved, Error::Ok};
     }
@@ -616,7 +645,7 @@ namespace service {
             co_return {std::nullopt, ProjectError::NO_PATH, ""};
         }
 
-        const ResolvedProject resolved{project, clonePath, docsPath};
+        const ResolvedProject resolved{project, clonePath, docsPath, ProjectVersion{}};
 
         // Validate metadata
         const auto [json, error, details] = resolved.validateProjectMetadata();

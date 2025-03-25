@@ -46,6 +46,8 @@ namespace service {
         drogon::Task<Error> removeProject(const std::string &id) const;
         drogon::Task<std::tuple<std::optional<ProjectVersion>, Error>> createProjectVersion(ProjectVersion version) const;
         drogon::Task<std::optional<ProjectVersion>> getProjectVersion(std::string project, std::string name) const;
+        drogon::Task<std::optional<ProjectVersion>> getDefaultProjectVersion(std::string project) const;
+        drogon::Task<Error> deleteProjectVersions(std::string project) const;
 
         drogon::Task<std::tuple<std::optional<Project>, Error>> getProjectSource(std::string id) const;
 
@@ -69,8 +71,9 @@ namespace service {
 
         drogon::Task<Error> addTag(std::string tag) const;
         drogon::Task<Error> refreshFlatTagItemView() const;
+        drogon::Task<std::vector<std::string>> getItemSourceProjects(int64_t item) const;
 
-        drogon::Task<std::optional<Recipe>> getProjectRecipe(std::string project, std::string recipe) const;
+        drogon::Task<std::optional<Recipe>> getProjectRecipe(int64_t version, std::string recipe) const;
         drogon::Task<std::vector<Recipe>> getItemUsageInRecipes(std::string item) const;
         drogon::Task<std::vector<ContentUsage>> getObtainableItemsBy(std::string item) const;
     };

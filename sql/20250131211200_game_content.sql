@@ -2,7 +2,7 @@ CREATE TABLE project_version
 (
     id bigserial PRIMARY KEY,
     project_id text NOT NULL REFERENCES project (id) ON DELETE CASCADE,
-    name varchar(255) NOT NULL,
+    name varchar(255),
     branch varchar(255) NOT NULL,
 --    game_version varchar(255) NOT NULL
 
@@ -21,20 +21,19 @@ CREATE TABLE project_item
 (
     id         bigserial PRIMARY KEY,
     item_id    bigint NOT NULL REFERENCES item (id) ON DELETE CASCADE,
-    project_id text REFERENCES project (id) ON DELETE CASCADE,
+    version_id bigint REFERENCES project_version (id) ON DELETE CASCADE,
 
-    UNIQUE (item_id, project_id)
+    UNIQUE (item_id, version_id)
 );
 
 CREATE UNIQUE INDEX unique_item_no_project
     ON project_item (item_id)
-    WHERE project_id IS NULL;
+    WHERE version_id IS NULL;
 
 CREATE TABLE project_item_page
 (
     item_id   bigint NOT NULL REFERENCES project_item (id) ON DELETE CASCADE,
-    path text NOT NULL,
-    version_id bigint REFERENCES project_version (id) ON DELETE CASCADE
+    path text NOT NULL
 );
 
 CREATE TABLE tag
@@ -49,14 +48,14 @@ CREATE TABLE project_tag
 (
     id         bigserial PRIMARY KEY,
     tag_id     bigint NOT NULL REFERENCES tag (id) ON DELETE CASCADE,
-    project_id text REFERENCES project (id) ON DELETE CASCADE,
+    version_id bigint REFERENCES project_version (id) ON DELETE CASCADE,
 
-    UNIQUE (tag_id, project_id)
+    UNIQUE (tag_id, version_id)
 );
 
 CREATE UNIQUE INDEX unique_tag_no_project
     ON project_tag (tag_id)
-    WHERE project_id IS NULL;
+    WHERE version_id IS NULL;
 
 CREATE TABLE tag_item
 (
@@ -109,11 +108,11 @@ EXECUTE PROCEDURE tags_insert_trigger_func();
 CREATE TABLE recipe
 (
     id         bigserial PRIMARY KEY,
-    project_id text NOT NULL REFERENCES project (id) ON DELETE CASCADE NOT NULL,
+    version_id bigint NOT NULL REFERENCES project_version (id) ON DELETE CASCADE,
     loc        varchar(255)                                   NOT NULL,
     type       varchar(255)                                   NOT NULL,
 
-    UNIQUE (project_id, loc)
+    UNIQUE (version_id, loc)
 );
 
 CREATE TABLE recipe_ingredient_tag
@@ -138,6 +137,7 @@ CREATE TABLE recipe_ingredient_item
     PRIMARY KEY (recipe_id, item_id, slot, input)
 );
 
+-- TODO Bind to versions
 CREATE MATERIALIZED VIEW tag_item_flat AS
 SELECT *
 FROM (WITH RECURSIVE tag_hierarchy AS (SELECT tp.tag_id                                 AS parent,

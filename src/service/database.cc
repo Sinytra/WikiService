@@ -90,6 +90,29 @@ namespace service {
         co_return res;
     }
 
+    Task<std::optional<ProjectVersion>> Database::getDefaultProjectVersion(std::string project) const {
+        const auto [res, err] =
+           co_await handleDatabaseOperation<ProjectVersion>([project](const DbClientPtr &client) -> Task<ProjectVersion> {
+               // language=postgresql
+               const auto results =
+                   co_await client->execSqlCoro("SELECT * FROM project_version WHERE project_id = $1 AND name IS NULL", project);
+               if (results.size() != 1) {
+                   throw DrogonDbException{};
+               }
+               co_return ProjectVersion(results.front());
+           });
+        co_return res;
+    }
+
+    Task<Error> Database::deleteProjectVersions(std::string project) const {
+        const auto [res, err] = co_await handleDatabaseOperation<Error>([project](const DbClientPtr &client) -> Task<Error> {
+            CoroMapper<ProjectVersion> mapper(client);
+            co_await mapper.deleteBy(Criteria(ProjectVersion::Cols::_project_id, CompareOperator::EQ, project));
+            co_return Error::Ok;
+        });
+        co_return res.value_or(err);
+    }
+
     Task<std::tuple<ProjectSearchResponse, Error>> Database::findProjects(const std::string query, const std::string types,
                                                                           const std::string sort, int page) const {
         const auto [res, err] = co_await handleDatabaseOperation<ProjectSearchResponse>(
@@ -292,7 +315,7 @@ namespace service {
 
     Task<Error> Database::addTag(const std::string tag) const {
         // language=postgresql
-        static constexpr auto query = "INSERT INTO project_tag (tag_id, project_id) \
+        static constexpr auto query = "INSERT INTO project_tag (tag_id, version_id) \
                                        SELECT id, NULL FROM tag WHERE loc = $1 \
                                        ON CONFLICT DO NOTHING";
 
@@ -314,11 +337,30 @@ namespace service {
         co_return res.value_or(err);
     }
 
-    Task<std::optional<Recipe>> Database::getProjectRecipe(std::string project, std::string recipe) const {
-        const auto [res, err] = co_await handleDatabaseOperation<Recipe>([project, recipe](const DbClientPtr &client) -> Task<Recipe> {
+    Task<std::vector<std::string>> Database::getItemSourceProjects(int64_t item) const {
+        // language=postgresql
+        static constexpr auto query = "SELECT pv.project_id FROM project_item pitem \
+                                       JOIN project_version pv ON pv.id = pitem.version_id \
+                                       WHERE pitem.item_id = $1";
+
+        const auto [res, err] = co_await handleDatabaseOperation<std::vector<std::string>>([item](const DbClientPtr &client) -> Task<std::vector<std::string>> {
+            const auto results = co_await client->execSqlCoro(query, item);
+                std::vector<std::string> projects;
+                for (const auto &row: results) {
+                    const auto projectId = row[0].as<std::string>();
+                    projects.push_back(projectId);
+                }
+                co_return projects;
+        });
+        co_return res.value_or(std::vector<std::string>{});
+    }
+
+    // TODO Move to resolved db
+    Task<std::optional<Recipe>> Database::getProjectRecipe(const int64_t version, const std::string recipe) const {
+        const auto [res, err] = co_await handleDatabaseOperation<Recipe>([version, recipe](const DbClientPtr &client) -> Task<Recipe> {
             CoroMapper<Recipe> mapper(client);
-            const auto results = co_await mapper.findBy(Criteria(Recipe::Cols::_project_id, CompareOperator::EQ, project) &&
-                                                        Criteria(Recipe::Cols::_loc, CompareOperator::EQ, recipe));
+             const auto results = co_await mapper.findBy(Criteria(Recipe::Cols::_version_id, CompareOperator::EQ, version) &&
+                                                         Criteria(Recipe::Cols::_loc, CompareOperator::EQ, recipe));
             if (results.size() != 1) {
                 throw DrogonDbException{};
             }
@@ -348,9 +390,10 @@ namespace service {
 
     Task<std::vector<ContentUsage>> Database::getObtainableItemsBy(std::string item) const {
         // language=postgresql
-        static constexpr auto query = "SELECT pitem.project_id, item.id, item.loc, pip.path FROM recipe r \
+        static constexpr auto query = "SELECT ver.project_id, item.id, item.loc, pip.path FROM recipe r \
                                        JOIN recipe_ingredient_item ri ON r.id = ri.recipe_id \
                                        JOIN project_item pitem ON ri.item_id = pitem.item_id \
+                                       JOIN project_version ver ON pitem.version_id = ver.id \
                                        JOIN item ON pitem.item_id = item.id \
                                        LEFT JOIN project_item_page pip ON pitem.id = pip.item_id \
                                        WHERE NOT ri.input AND EXISTS ( \
