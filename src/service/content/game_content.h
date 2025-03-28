@@ -28,8 +28,10 @@ namespace content {
     public:
         explicit Ingestor(service::ResolvedProject &, const std::shared_ptr<spdlog::logger> &);
 
-        drogon::Task<service::Error> ingestGameContentData() const;
+        drogon::Task<service::Error> runIngestor() const;
     private:
+        drogon::Task<service::Error> ingestGameContentData() const;
+
         const service::ResolvedProject &project_;
         const std::shared_ptr<spdlog::logger> &logger_;
     };

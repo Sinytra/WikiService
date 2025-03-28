@@ -85,7 +85,7 @@ namespace service {
 
         const std::filesystem::path &getDocsDirectoryPath() const;
 
-        const ProjectDatabaseAccess &getProjectDatabase() const;
+        ProjectDatabaseAccess &getProjectDatabase() const;
 
         drogon::Task<Json::Value> toJson(bool full = false) const;
         drogon::Task<Json::Value> toJsonVerbose() const;

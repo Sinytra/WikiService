@@ -70,10 +70,8 @@ namespace service {
         drogon::Task<Error> assignUserProject(std::string username, std::string id, std::string role) const;
 
         drogon::Task<Error> addTag(std::string tag) const;
-        drogon::Task<Error> refreshFlatTagItemView() const;
         drogon::Task<std::vector<std::string>> getItemSourceProjects(int64_t item) const;
 
-        drogon::Task<std::optional<Recipe>> getProjectRecipe(int64_t version, std::string recipe) const;
         drogon::Task<std::vector<Recipe>> getItemUsageInRecipes(std::string item) const;
         drogon::Task<std::vector<ContentUsage>> getObtainableItemsBy(std::string item) const;
     };

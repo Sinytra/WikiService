@@ -10,6 +10,7 @@
 #include <git2.h>
 #include <include/uri.h>
 #include <models/ProjectVersion.h>
+#include <resolved_db.h>
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/callback_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
@@ -414,6 +415,14 @@ namespace service {
         co_return persistedDefaultVersion;
     }
 
+    Task<std::optional<ProjectVersion>> getOrCreateDefaultVersion(const Project &project) {
+        auto resolvedDefaultVersion = co_await global::database->getDefaultProjectVersion(project.getValueOfId());
+        if (!resolvedDefaultVersion) {
+            co_return co_await createDefaultVersion(project);
+        }
+        co_return resolvedDefaultVersion;
+    }
+
     Task<ProjectError> Storage::setupProject(const Project &project) const {
         const auto baseDir = getBaseDir();
         const auto clonePath = baseDir.path() / TEMP_DIR / project.getValueOfId();
@@ -431,12 +440,7 @@ namespace service {
             co_return cloneError;
         }
 
-        if (const auto dbDelErr = co_await global::database->deleteProjectVersions(project.getValueOfId()); dbDelErr != Error::Ok) {
-            logger->error("Error cleaning up existing versions");
-            co_return ProjectError::UNKNOWN;
-        }
-
-        auto defaultVersion = co_await createDefaultVersion(project);
+        auto defaultVersion = co_await getOrCreateDefaultVersion(project);
         if (!defaultVersion) {
             logger->error("Project version creation database error.");
             co_return ProjectError::UNKNOWN;
@@ -445,7 +449,10 @@ namespace service {
         ResolvedProject resolved{project, clonePath, clonePath / removeLeadingSlash(project.getValueOfSourcePath()), *defaultVersion};
 
         const auto branches = listRepoBranches(repo);
-        const auto versions = co_await setupProjectVersions(resolved, branches, logger);
+        auto versions = co_await resolved.getProjectDatabase().getVersions();
+        if (versions.empty()) {
+            versions = co_await setupProjectVersions(resolved, branches, logger);
+        }
 
         const auto dest = getProjectDirPath(project);
         copyProjectFiles(project, clonePath, dest, logger);
@@ -468,20 +475,21 @@ namespace service {
 
         git_repository_free(repo);
 
-        logger->info("Project import complete");
+        logger->info("Project clone complete");
 
         // TODO Does not work on first import
         ResolvedProject finalResolved{project, dest, dest / removeLeadingSlash(project.getValueOfSourcePath()), *defaultVersion};
+
         content::Ingestor ingestor{finalResolved, logger};
-        try {
-            co_await ingestor.ingestGameContentData();
-        } catch (std::exception e) {
-            logger->error("Error ingesting project data");
-            logging::logger.error("Error ingesting project data: {}", e.what());
+        if (const auto result = co_await ingestor.runIngestor(); result != Error::Ok) {
+            logger->error("!!================================!!");
+            logger->error("!!      Project setup failed      !!");
+            logger->error("!!================================!!");
+            co_return ProjectError::UNKNOWN;
         }
 
         logger->info("====================================");
-        logger->info("Project setup complete");
+        logger->info("==     Project setup complete     ==");
         logger->info("====================================");
 
         co_return ProjectError::OK;
@@ -537,16 +545,12 @@ namespace service {
             co_return {resolved, Error::Ok};
         }
 
-        auto resolvedDefaultVersion = co_await global::database->getDefaultProjectVersion(project.getValueOfId());
-        if (!resolvedDefaultVersion) {
-            auto defaultVersion = co_await createDefaultVersion(project);
-            if (!defaultVersion) {
-                co_return {std::nullopt, Error::ErrNotFound};
-            }
-            resolvedDefaultVersion = defaultVersion;
+        const auto defaultVersion = co_await getOrCreateDefaultVersion(project);
+        if (!defaultVersion) {
+            co_return {std::nullopt, Error::ErrNotFound};
         }
 
-        ResolvedProject resolved{project, rootDir, docsDir, *resolvedDefaultVersion};
+        ResolvedProject resolved{project, rootDir, docsDir, *defaultVersion};
         resolved.setLocale(locale);
         co_return {resolved, Error::Ok};
     }

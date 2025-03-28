@@ -25,6 +25,10 @@ std::string buildSearchVectorQuery(std::string query) {
 }
 
 namespace service {
+    DbClientPtr DatabaseBase::getDbClientPtr() const {
+        return app().getFastDbClient();
+    }
+
     Task<std::tuple<std::optional<Project>, Error>> Database::getProjectSource(const std::string id) const {
         co_return co_await handleDatabaseOperation<Project>([id](const DbClientPtr &client) -> Task<Project> {
             CoroMapper<Project> mapper(client);
@@ -92,15 +96,15 @@ namespace service {
 
     Task<std::optional<ProjectVersion>> Database::getDefaultProjectVersion(std::string project) const {
         const auto [res, err] =
-           co_await handleDatabaseOperation<ProjectVersion>([project](const DbClientPtr &client) -> Task<ProjectVersion> {
-               // language=postgresql
-               const auto results =
-                   co_await client->execSqlCoro("SELECT * FROM project_version WHERE project_id = $1 AND name IS NULL", project);
-               if (results.size() != 1) {
-                   throw DrogonDbException{};
-               }
-               co_return ProjectVersion(results.front());
-           });
+            co_await handleDatabaseOperation<ProjectVersion>([project](const DbClientPtr &client) -> Task<ProjectVersion> {
+                // language=postgresql
+                const auto results =
+                    co_await client->execSqlCoro("SELECT * FROM project_version WHERE project_id = $1 AND name IS NULL", project);
+                if (results.size() != 1) {
+                    throw DrogonDbException{};
+                }
+                co_return ProjectVersion(results.front());
+            });
         co_return res;
     }
 
@@ -328,45 +332,23 @@ namespace service {
         co_return res.value_or(err);
     }
 
-    Task<Error> Database::refreshFlatTagItemView() const {
-        const auto [res, err] = co_await handleDatabaseOperation<Error>([](const DbClientPtr &client) -> Task<Error> {
-            // language=postgresql
-            co_await client->execSqlCoro("REFRESH MATERIALIZED VIEW tag_item_flat;");
-            co_return Error::Ok;
-        });
-        co_return res.value_or(err);
-    }
-
     Task<std::vector<std::string>> Database::getItemSourceProjects(int64_t item) const {
         // language=postgresql
         static constexpr auto query = "SELECT pv.project_id FROM project_item pitem \
                                        JOIN project_version pv ON pv.id = pitem.version_id \
                                        WHERE pitem.item_id = $1";
 
-        const auto [res, err] = co_await handleDatabaseOperation<std::vector<std::string>>([item](const DbClientPtr &client) -> Task<std::vector<std::string>> {
-            const auto results = co_await client->execSqlCoro(query, item);
+        const auto [res, err] =
+            co_await handleDatabaseOperation<std::vector<std::string>>([item](const DbClientPtr &client) -> Task<std::vector<std::string>> {
+                const auto results = co_await client->execSqlCoro(query, item);
                 std::vector<std::string> projects;
                 for (const auto &row: results) {
                     const auto projectId = row[0].as<std::string>();
                     projects.push_back(projectId);
                 }
                 co_return projects;
-        });
+            });
         co_return res.value_or(std::vector<std::string>{});
-    }
-
-    // TODO Move to resolved db
-    Task<std::optional<Recipe>> Database::getProjectRecipe(const int64_t version, const std::string recipe) const {
-        const auto [res, err] = co_await handleDatabaseOperation<Recipe>([version, recipe](const DbClientPtr &client) -> Task<Recipe> {
-            CoroMapper<Recipe> mapper(client);
-             const auto results = co_await mapper.findBy(Criteria(Recipe::Cols::_version_id, CompareOperator::EQ, version) &&
-                                                         Criteria(Recipe::Cols::_loc, CompareOperator::EQ, recipe));
-            if (results.size() != 1) {
-                throw DrogonDbException{};
-            }
-            co_return results.front();
-        });
-        co_return res;
     }
 
     Task<std::vector<Recipe>> Database::getItemUsageInRecipes(std::string item) const {

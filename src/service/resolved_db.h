@@ -3,7 +3,6 @@
 #include <database.h>
 #include <database_base.h>
 #include <models/Item.h>
-#include <models/Project.h>
 #include <models/ProjectVersion.h>
 #include <resolved.h>
 
@@ -18,6 +17,10 @@ namespace service {
     class ProjectDatabaseAccess : public DatabaseBase {
     public:
         explicit ProjectDatabaseAccess(const ResolvedProject &);
+
+        drogon::orm::DbClientPtr getDbClientPtr() const override;
+
+        void setDBClientPointer(const drogon::orm::DbClientPtr &client);
 
         drogon::Task<std::vector<ProjectVersion>> getVersions() const;
         drogon::Task<PaginatedData<ProjectVersion>> getVersionsDev(std::string query, int page) const;
@@ -34,9 +37,14 @@ namespace service {
         drogon::Task<std::optional<std::string>> getProjectContentPath(std::string id) const;
         drogon::Task<Error> addProjectContentPage(std::string id, std::string path) const;
 
+        drogon::Task<std::optional<Recipe>> getProjectRecipe(std::string recipe) const;
+
+        drogon::Task<Error> refreshFlatTagItemView() const;
     private:
         const ResolvedProject &project_;
         const std::string projectId_;
         const int64_t versionId_;
+
+        drogon::orm::DbClientPtr clientPtr_;
     };
 }

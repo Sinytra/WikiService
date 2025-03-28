@@ -19,6 +19,10 @@ namespace service {
     ProjectDatabaseAccess::ProjectDatabaseAccess(const ResolvedProject &p) :
         project_(p), projectId_(p.getProject().getValueOfId()), versionId_(p.getProjectVersion().getValueOfId()) {}
 
+    DbClientPtr ProjectDatabaseAccess::getDbClientPtr() const { return clientPtr_ ? clientPtr_ : DatabaseBase::getDbClientPtr(); }
+
+    void ProjectDatabaseAccess::setDBClientPointer(const DbClientPtr &client) { clientPtr_ = client; }
+
     Task<std::vector<ProjectVersion>> ProjectDatabaseAccess::getVersions() const {
         const auto [res, err] = co_await handleDatabaseOperation<std::vector<ProjectVersion>>(
             [&](const DbClientPtr &client) -> Task<std::vector<ProjectVersion>> {
@@ -242,6 +246,28 @@ namespace service {
                                            WHERE i.loc = $2 AND pitem.version_id = $3";
         const auto [res, err] = co_await handleDatabaseOperation<Error>([&, id, path](const DbClientPtr &client) -> Task<Error> {
             co_await client->execSqlCoro(pageQuery, path, id, versionId_);
+            co_return Error::Ok;
+        });
+        co_return res.value_or(err);
+    }
+
+    Task<std::optional<Recipe>> ProjectDatabaseAccess::getProjectRecipe(std::string recipe) const {
+        const auto [res, err] = co_await handleDatabaseOperation<Recipe>([&, recipe](const DbClientPtr &client) -> Task<Recipe> {
+            CoroMapper<Recipe> mapper(client);
+            const auto results = co_await mapper.findBy(Criteria(Recipe::Cols::_version_id, CompareOperator::EQ, versionId_) &&
+                                                        Criteria(Recipe::Cols::_loc, CompareOperator::EQ, recipe));
+            if (results.size() != 1) {
+                throw DrogonDbException{};
+            }
+            co_return results.front();
+        });
+        co_return res;
+    }
+
+    Task<Error> ProjectDatabaseAccess::refreshFlatTagItemView() const {
+        const auto [res, err] = co_await handleDatabaseOperation<Error>([](const DbClientPtr &client) -> Task<Error> {
+            // language=postgresql
+            co_await client->execSqlCoro("REFRESH MATERIALIZED VIEW tag_item_flat;");
             co_return Error::Ok;
         });
         co_return res.value_or(err);

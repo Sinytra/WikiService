@@ -164,7 +164,7 @@ namespace content {
     }
 
     Task<Error> RecipesSubIngestor::addRecipe(const ModRecipe recipe) const {
-        const auto clientPtr = app().getFastDbClient();
+        const auto clientPtr = project_.getProjectDatabase().getDbClientPtr();
         CoroMapper<Recipe> recipeMapper(clientPtr);
 
         const auto [id, type, ingredients] = recipe;
@@ -205,9 +205,10 @@ namespace content {
     }
 
     Task<Error> RecipesSubIngestor::execute() {
-        logger_->info("Importing {} recipes", recipes_.size());
+        logger_->info("Adding {} recipes", recipes_.size());
 
         for (const auto &recipe: recipes_) {
+            logger_->trace("Registering recipe '{}'", recipe.id);
             co_await addRecipe(recipe);
         }
 

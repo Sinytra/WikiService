@@ -436,7 +436,7 @@ namespace service {
 
     const std::filesystem::path &ResolvedProject::getDocsDirectoryPath() const { return docsDir_; }
 
-    const ProjectDatabaseAccess &ResolvedProject::getProjectDatabase() const {
+    ProjectDatabaseAccess &ResolvedProject::getProjectDatabase() const {
         return *projectDb_;
     }
 
@@ -611,7 +611,7 @@ namespace service {
     }
 
     Task<std::optional<Json::Value>> ResolvedProject::getRecipe(std::string id) const {
-        const auto result = co_await global::database->getProjectRecipe(version_.getValueOfId(), id);
+        const auto result = co_await projectDb_->getProjectRecipe(id);
         if (!result) {
             co_return std::nullopt;
         }

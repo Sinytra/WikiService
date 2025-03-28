@@ -9,11 +9,13 @@
 namespace service {
     class DatabaseBase {
     protected:
+        virtual drogon::orm::DbClientPtr getDbClientPtr() const;
+
         template<typename Ret>
         drogon::Task<std::tuple<std::optional<Ret>, Error>>
         handleDatabaseOperation(const std::function<drogon::Task<Ret>(const drogon::orm::DbClientPtr &client)> &func) const {
             try {
-                const auto clientPtr = drogon::app().getFastDbClient();
+                const auto clientPtr = getDbClientPtr();
                 const Ret result = co_await func(clientPtr);
                 co_return {result, Error::Ok};
             } catch (const drogon::orm::Failure &e) {

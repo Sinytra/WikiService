@@ -36,7 +36,7 @@ namespace content {
 
         const std::set allowedNamespaces{ResourceLocation::DEFAULT_NAMESPACE, ResourceLocation::COMMON_NAMESPACE, projectModid};
 
-        projectLog.info("======= Ingesting item tags =======");
+        projectLog.info("Ingesting item tags");
 
         // [namespace]
         for (const auto &namespaceDir: fs::directory_iterator(dataRoot)) {
@@ -121,6 +121,7 @@ namespace content {
 
             std::optional<std::string> project = resloc->namespace_ == projectModid ? std::make_optional(projectModid) : std::nullopt;
 
+            projectLog.trace("Registering tag '{}'", tag);
             co_await project_.getProjectDatabase().addTag(tag);
         }
 
@@ -146,7 +147,7 @@ namespace content {
     Task<Error> TagsSubIngestor::finish() {
         if (tagIds_.size() > 0) {
             logger.debug("Refreshing flat tag->item view after data ingestion");
-            co_await global::database->refreshFlatTagItemView();
+            co_await project_.getProjectDatabase().refreshFlatTagItemView();
         }
         co_return Error::Ok;
     }
