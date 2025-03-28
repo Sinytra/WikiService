@@ -157,6 +157,65 @@ std::unordered_map<std::string, std::string> listRepoBranches(git_repository *re
     return branches;
 }
 
+std::string formatISOTime(const git_time_t &time, const int offset) {
+    // time += offset * 60;
+
+    const std::time_t utc_time = time;
+    const std::tm *tm_ptr = std::gmtime(&utc_time);
+
+    std::ostringstream oss;
+    oss << std::put_time(tm_ptr, "%Y-%m-%dT%H:%M:%SZ");
+    return oss.str();
+}
+
+std::optional<GitRevision> getLatestCommitInfo(git_repository *repo) {
+    git_oid oid;
+    if (git_reference_name_to_id(&oid, repo, "HEAD") != 0) {
+        logger.error("Failed to get HEAD commit ID");
+        return std::nullopt;
+    }
+
+    git_commit *commit = nullptr;
+    if (git_commit_lookup(&commit, repo, &oid) != 0) {
+        logger.error("Failed to lookup commit");
+        return std::nullopt;
+    }
+
+    // Get full commit hash
+    char full_hash[GIT_OID_HEXSZ + 1] = {};
+    git_oid_fmt(full_hash, &oid);
+
+    // Get short commit hash
+    char short_hash[8] = {};
+    git_oid_tostr(short_hash, sizeof(short_hash), &oid);
+
+    // Get commit message
+    const char *message = git_commit_summary(commit);
+
+    // Get author details
+    const git_signature *author = git_commit_author(commit);
+    const char *author_name = author->name;
+    const char *author_email = author->email;
+
+    // Get commit date
+    const git_time_t commit_time = git_commit_time(commit);
+    const int offset = git_commit_time_offset(commit);
+    const auto commitDate = formatISOTime(commit_time, offset);
+
+    git_commit_free(commit);
+
+    return GitRevision{.hash = short_hash, .fullHash = full_hash, .message = message, .authorName = author_name, .authorEmail = author_email, .date = commitDate};
+}
+
+std::optional<GitRevision> getLatestCommitInfo(const fs::path &path) {
+    git_repository* repo = nullptr;
+    if (git_repository_open(&repo, absolute(path).c_str()) != 0) {
+        logger.error("Failed to open repository: {}", path.string());
+        return std::nullopt;
+    }
+    return getLatestCommitInfo(repo);
+}
+
 bool is_local_url(const std::string &str) {
     try {
         const uri url{str};
@@ -446,7 +505,14 @@ namespace service {
             co_return ProjectError::UNKNOWN;
         }
 
-        ResolvedProject resolved{project, clonePath, clonePath / removeLeadingSlash(project.getValueOfSourcePath()), *defaultVersion};
+        const auto revision = getLatestCommitInfo(repo);
+        if (!revision) {
+            logger->error("Error getting commit information");
+            co_return ProjectError::UNKNOWN;
+        }
+
+        ResolvedProject resolved{project, *revision, clonePath, clonePath / removeLeadingSlash(project.getValueOfSourcePath()),
+                                 *defaultVersion};
 
         const auto branches = listRepoBranches(repo);
         auto versions = co_await resolved.getProjectDatabase().getVersions();
@@ -478,7 +544,7 @@ namespace service {
         logger->info("Project clone complete");
 
         // TODO Does not work on first import
-        ResolvedProject finalResolved{project, dest, dest / removeLeadingSlash(project.getValueOfSourcePath()), *defaultVersion};
+        ResolvedProject finalResolved{project, *revision, dest, dest / removeLeadingSlash(project.getValueOfSourcePath()), *defaultVersion};
 
         content::Ingestor ingestor{finalResolved, logger};
         if (const auto result = co_await ingestor.runIngestor(); result != Error::Ok) {
@@ -532,6 +598,12 @@ namespace service {
             }
         }
 
+        const auto revision = getLatestCommitInfo(rootDir);
+        if (!revision) {
+            logger.error("Error getting commit information");
+            co_return {std::nullopt, Error::ErrInternal};
+        }
+
         const auto docsDir = rootDir / removeLeadingSlash(project.getValueOfSourcePath());
 
         if (version) {
@@ -540,7 +612,7 @@ namespace service {
                 co_return {std::nullopt, Error::ErrNotFound};
             }
 
-            ResolvedProject resolved{project, rootDir, docsDir, *resolvedVersion};
+            ResolvedProject resolved{project, *revision, rootDir, docsDir, *resolvedVersion};
             resolved.setLocale(locale);
             co_return {resolved, Error::Ok};
         }
@@ -550,7 +622,7 @@ namespace service {
             co_return {std::nullopt, Error::ErrNotFound};
         }
 
-        ResolvedProject resolved{project, rootDir, docsDir, *defaultVersion};
+        ResolvedProject resolved{project, *revision, rootDir, docsDir, *defaultVersion};
         resolved.setLocale(locale);
         co_return {resolved, Error::Ok};
     }
@@ -649,7 +721,7 @@ namespace service {
             co_return {std::nullopt, ProjectError::NO_PATH, ""};
         }
 
-        const ResolvedProject resolved{project, clonePath, docsPath, ProjectVersion{}};
+        const ResolvedProject resolved{project, GitRevision{}, clonePath, docsPath, ProjectVersion{}};
 
         // Validate metadata
         const auto [json, error, details] = resolved.validateProjectMetadata();

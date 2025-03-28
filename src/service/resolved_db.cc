@@ -37,6 +37,7 @@ namespace service {
         // language=postgresql
         static constexpr auto query = "SELECT * FROM project_version \
                                        WHERE project_id = $1 \
+                                       AND name IS NOT NULL \
                                        AND (name ILIKE '%' || $2 || '%' OR branch ILIKE '%' || $2 || '%') \
                                        ORDER BY name";
 

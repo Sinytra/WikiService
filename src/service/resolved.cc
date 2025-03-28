@@ -10,7 +10,6 @@
 
 #include <content/game_recipes.h>
 #include <fmt/args.h>
-#include <git2.h>
 #include <include/uri.h>
 #include <models/Item.h>
 #include <models/ProjectItem.h>
@@ -28,18 +27,14 @@ using namespace drogon;
 using namespace drogon_model::postgres;
 namespace fs = std::filesystem;
 
-std::unordered_map<std::string, std::string> GIT_PROVIDERS = {{"github.com", "blob/{branch}/{base}/{path}"}};
+struct GitProvider {
+    std::string filePath;
+    std::string commitPath;
+};
 
-std::string formatISOTime(git_time_t time, const int offset) {
-    // time += offset * 60;
-
-    const std::time_t utc_time = time;
-    const std::tm *tm_ptr = std::gmtime(&utc_time);
-
-    std::ostringstream oss;
-    oss << std::put_time(tm_ptr, "%Y-%m-%dT%H:%M:%SZ");
-    return oss.str();
-}
+std::unordered_map<std::string, GitProvider> GIT_PROVIDERS = {
+    {"github.com", GitProvider{ .filePath = "blob/{branch}/{base}/{path}", .commitPath = "commit/{hash}" }}
+};
 
 struct FolderMetadataEntry {
     const std::string name;
@@ -49,6 +44,18 @@ struct FolderMetadata {
     std::vector<std::string> keys;
     std::map<std::string, FolderMetadataEntry> entries;
 };
+
+std::optional<GitProvider> getGitProvider(const std::string &url) {
+    const uri parsed{url};
+    const auto domain = parsed.get_host();
+
+    const auto provider = GIT_PROVIDERS.find(domain);
+    if (provider == GIT_PROVIDERS.end()) {
+        return std::nullopt;
+    }
+
+    return provider->second;
+}
 
 std::string getDocsTreeEntryName(std::string s) {
     if (s.ends_with(DOCS_FILE_EXT)) {
@@ -230,11 +237,8 @@ namespace service {
     }
 
     std::string formatEditUrl(const Project &project, const std::string &filePath) {
-        const uri parsed{project.getValueOfSourceRepo()};
-        const auto domain = parsed.get_host();
-
-        const auto provider = GIT_PROVIDERS.find(domain);
-        if (provider == GIT_PROVIDERS.end()) {
+        const auto provider = getGitProvider(project.getValueOfSourceRepo());
+        if (!provider) {
             return "";
         }
 
@@ -242,14 +246,27 @@ namespace service {
         store.push_back(fmt::arg("branch", project.getValueOfSourceBranch()));
         store.push_back(fmt::arg("base", removeLeadingSlash(project.getValueOfSourcePath())));
         store.push_back(fmt::arg("path", removeTrailingSlash(filePath)));
-        const std::string result = fmt::vformat(provider->second, store);
+        const auto result = vformat(provider->filePath, store);
 
         return removeTrailingSlash(project.getValueOfSourceRepo()) + "/" + result;
     }
 
-    ResolvedProject::ResolvedProject(const Project &p, const std::filesystem::path &r, const std::filesystem::path &d,
-                                     const ProjectVersion &v) :
-        project_(p), defaultVersion_(nullptr), rootDir_(r), docsDir_(d), version_(v),
+    std::string formatCommitUrl(const Project &project, const std::string &hash) {
+        const auto provider = getGitProvider(project.getValueOfSourceRepo());
+        if (!provider) {
+            return "";
+        }
+
+        fmt::dynamic_format_arg_store<fmt::format_context> store;
+        store.push_back(fmt::arg("hash", hash));
+        const auto result = vformat(provider->commitPath, store);
+
+        return removeTrailingSlash(project.getValueOfSourceRepo()) + "/" + result;
+    }
+
+    ResolvedProject::ResolvedProject(const Project &p, const GitRevision &rev, const std::filesystem::path &r,
+                                     const std::filesystem::path &d, const ProjectVersion &v) :
+        project_(p), revision_(rev), defaultVersion_(nullptr), rootDir_(r), docsDir_(d), version_(v),
         projectDb_(std::make_shared<ProjectDatabaseAccess>(*this)) {}
 
     void ResolvedProject::setDefaultVersion(const ResolvedProject &defaultVersion) {
@@ -394,9 +411,7 @@ namespace service {
 
     Task<std::tuple<std::optional<nlohmann::ordered_json>, Error>> ResolvedProject::getProjectContents() const {
         std::unordered_map<std::string, std::string> ids;
-        for (const auto contents = co_await projectDb_->getProjectItemPages();
-             const auto &[id, path]: contents)
-        {
+        for (const auto contents = co_await projectDb_->getProjectItemPages(); const auto &[id, path]: contents) {
             ids.emplace(path, id);
         }
 
@@ -436,9 +451,7 @@ namespace service {
 
     const std::filesystem::path &ResolvedProject::getDocsDirectoryPath() const { return docsDir_; }
 
-    ProjectDatabaseAccess &ResolvedProject::getProjectDatabase() const {
-        return *projectDb_;
-    }
+    ProjectDatabaseAccess &ResolvedProject::getProjectDatabase() const { return *projectDb_; }
 
     Task<Json::Value> ResolvedProject::toJson(const bool full) const {
         const auto versions = co_await getAvailableVersions();
@@ -460,6 +473,13 @@ namespace service {
                 localesJson.append(item);
             }
             projectJson["locales"] = localesJson;
+        }
+
+        if (full && !revision_.hash.empty()) {
+            projectJson["revision"] = unparkourJson(revision_);
+            if (const auto url = formatCommitUrl(project_, revision_.fullHash); !url.empty()) {
+                projectJson["revision"]["url"] = url;
+            }
         }
 
         co_return projectJson;
@@ -527,25 +547,23 @@ namespace service {
     Task<PaginatedData<FullItemData>> ResolvedProject::getItems(const TableQueryParams params) const {
         const auto [pages, total, size, data] = co_await projectDb_->getProjectItemsDev(params.query, params.page);
         std::vector<FullItemData> itemData;
-        for (const auto &[id, path] : data) {
+        for (const auto &[id, path]: data) {
             const auto [name, _] = co_await getItemName(id);
             itemData.emplace_back(id, name, path);
         }
-        co_return PaginatedData{ .total = total, .pages = pages, .size = size, .data = itemData };
+        co_return PaginatedData{.total = total, .pages = pages, .size = size, .data = itemData};
     }
 
     Task<PaginatedData<ProjectVersion>> ResolvedProject::getVersions(const TableQueryParams params) const {
         co_return co_await projectDb_->getVersionsDev(params.query, params.page);
     }
 
-    Task<ItemData> ResolvedProject::getItemName(const Item item) const {
-        co_return co_await getItemName(item.getValueOfLoc());
-    }
+    Task<ItemData> ResolvedProject::getItemName(const Item item) const { co_return co_await getItemName(item.getValueOfLoc()); }
 
     Task<ItemData> ResolvedProject::getItemName(const std::string loc) const {
         if (const auto path = co_await projectDb_->getProjectContentPath(loc)) {
             const auto title = readPageAttribute(*path, "title");
-            co_return ItemData{ .name = title.value_or(""), .path = *path };
+            co_return ItemData{.name = title.value_or(""), .path = *path};
         }
 
         const auto projectId = project_.getValueOfId();
@@ -553,7 +571,7 @@ namespace service {
         const auto localeKey = locale_.empty() ? DEFAULT_LOCALE : locale_;
         const auto localized = readLangKey(localeKey, "item." + projectId + "." + parsed->path_);
 
-        co_return ItemData{ .name = localized.value_or(""), .path = "" };
+        co_return ItemData{.name = localized.value_or(""), .path = ""};
     }
 
     Task<Json::Value> ResolvedProject::ingredientToJson(const int slot, const std::vector<RecipeIngredientItem> ingredients) const {
@@ -587,9 +605,7 @@ namespace service {
             tagJson["id"] = dbTag.getValueOfLoc();
             {
                 Json::Value itemsJson(Json::arrayValue);
-                for (const auto tagItems = co_await projectDb_->getTagItemsFlat(tag.getValueOfTagId());
-                     const auto &item: tagItems)
-                {
+                for (const auto tagItems = co_await projectDb_->getTagItemsFlat(tag.getValueOfTagId()); const auto &item: tagItems) {
                     const auto [name, path] = co_await getItemName(item);
 
                     Json::Value itemJson;

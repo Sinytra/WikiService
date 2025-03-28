@@ -45,12 +45,31 @@ namespace service {
         }
     };
 
+    struct GitRevision {
+        std::string hash;
+        std::string fullHash;
+        std::string message;
+        std::string authorName;
+        std::string authorEmail;
+        std::string date;
+
+        friend void to_json(nlohmann::json &j, const GitRevision &obj) {
+            j = nlohmann::json{
+                {"hash", obj.hash},
+                {"message", obj.message},
+                {"authorName", obj.authorName},
+                {"authorEmail", obj.authorEmail},
+                {"date", obj.date}
+            };
+        }
+    };
+
     // See resolved_db.h
     class ProjectDatabaseAccess;
 
     class ResolvedProject {
     public:
-        explicit ResolvedProject(const Project &, const std::filesystem::path &, const std::filesystem::path &, const ProjectVersion &);
+        explicit ResolvedProject(const Project &, const GitRevision &, const std::filesystem::path &, const std::filesystem::path &, const ProjectVersion &);
 
         void setDefaultVersion(const ResolvedProject &defaultVersion);
 
@@ -99,6 +118,7 @@ namespace service {
         drogon::Task<Json::Value> ingredientToJson(const RecipeIngredientTag &tag) const;
 
         Project project_;
+        GitRevision revision_;
         std::shared_ptr<ResolvedProject> defaultVersion_;
 
         std::filesystem::path rootDir_;
