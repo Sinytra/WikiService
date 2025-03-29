@@ -63,10 +63,9 @@ namespace api::v1 {
         return projects;
     }
 
-    Task<PlatformProject> ProjectsController::validatePlatform(const std::string &id, const std::string &repo,
-                                                                              const std::string &platform, const std::string &slug,
-                                                                              const bool checkExisting, const User user,
-                                                                              std::function<void(const HttpResponsePtr &)> callback) const {
+    Task<PlatformProject> ProjectsController::validatePlatform(const std::string &id, const std::string &repo, const std::string &platform,
+                                                               const std::string &slug, const bool checkExisting, const User user,
+                                                               std::function<void(const HttpResponsePtr &)> callback) const {
         if (platform == PLATFORM_CURSEFORGE && !global::platforms->curseforge_.isAvailable()) {
             throw ApiException(Error::ErrBadRequest, "cf_unavailable");
         }
@@ -75,13 +74,12 @@ namespace api::v1 {
 
         const auto platformProj = co_await platInstance.getProject(slug);
         if (!platformProj) {
-            throw ApiException(Error::ErrBadRequest, "no_project",
-                [&](Json::Value &root) { root["details"] = "Platform: " + platform; });
+            throw ApiException(Error::ErrBadRequest, "no_project", [&](Json::Value &root) { root["details"] = "Platform: " + platform; });
         }
 
         if (platformProj->type == _unknown) {
             throw ApiException(Error::ErrBadRequest, "unsupported_type",
-                        [&](Json::Value &root) { root["details"] = "Platform: " + platform; });
+                               [&](Json::Value &root) { root["details"] = "Platform: " + platform; });
         }
 
         bool skipCheck = false;
@@ -124,8 +122,8 @@ namespace api::v1 {
      * - invalid_meta: Metadata file format is invalid
      */
     Task<ValidatedProjectData> ProjectsController::validateProjectData(const Json::Value &json, const User user,
-                                                                                      std::function<void(const HttpResponsePtr &)> callback,
-                                                                                      const bool checkExisting) const {
+                                                                       std::function<void(const HttpResponsePtr &)> callback,
+                                                                       const bool checkExisting) const {
         // Required
         const auto branch = json["branch"].asString();
         const auto repo = json["repo"].asString();
@@ -147,7 +145,7 @@ namespace api::v1 {
         const auto [resolved, err, details] = co_await global::storage->setupValidateTempProject(tempProject);
         if (err != ProjectError::OK) {
             throw ApiException(Error::ErrBadRequest, projectErrorToString(err),
-                        [&details](Json::Value &root) { root["details"] = details; });
+                               [&details](Json::Value &root) { root["details"] = details; });
         }
 
         const std::string id = (*resolved)["id"];
@@ -436,6 +434,14 @@ namespace api::v1 {
         const auto resolved = co_await BaseProjectController::getUserProject(req, id, version, std::nullopt, callback);
         const auto items{co_await resolved.getItems(getTableQueryParams(req))};
         callback(jsonResponse(items));
+    }
+
+    Task<> ProjectsController::getContentTags(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+                                              const std::string id) const {
+        const auto version = req->getOptionalParameter<std::string>("version");
+        const auto resolved = co_await BaseProjectController::getUserProject(req, id, version, std::nullopt, callback);
+        const auto tags{co_await resolved.getTags(getTableQueryParams(req))};
+        callback(jsonResponse(tags));
     }
 
     Task<> ProjectsController::getVersions(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,

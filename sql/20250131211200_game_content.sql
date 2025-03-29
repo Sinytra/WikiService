@@ -137,21 +137,20 @@ CREATE TABLE recipe_ingredient_item
     PRIMARY KEY (recipe_id, item_id, slot, input)
 );
 
--- TODO Bind to versions
 CREATE MATERIALIZED VIEW tag_item_flat AS
 SELECT *
-FROM (WITH RECURSIVE tag_hierarchy AS (SELECT tp.tag_id                                 AS parent,
-                                              tc.tag_id                                 AS child,
-                                              array [ tp.tag_id, tc.tag_id ]::bigint[] AS track
+FROM (WITH RECURSIVE tag_hierarchy AS (SELECT tp.id                            AS parent,
+                                              tc.id                            AS child,
+                                              array [ tp.id, tc.id ]::bigint[] AS track
                                        FROM tag_tag
                                                 JOIN project_tag tp ON tag_tag.parent = tp.id
                                                 JOIN project_tag tc ON tag_tag.child = tc.id
                                        UNION ALL
-                                       SELECT tp.tag_id AS parent, tc.tag_id AS child, tag_hierarchy.track || tc.tag_id
+                                       SELECT tp.id AS parent, tc.id AS child, tag_hierarchy.track || tc.id
                                        FROM tag_tag n
                                                 JOIN project_tag tp ON n.parent = tp.id
                                                 JOIN project_tag tc ON n.child = tc.id
-                                                JOIN tag_hierarchy ON tp.tag_id = tag_hierarchy.child)
+                                                JOIN tag_hierarchy ON tp.id = tag_hierarchy.child)
       -- Combine tag relationships with direct tag-to-item mappings
       SELECT th.parent AS parent, project_item.item_id AS child
       FROM tag_hierarchy th
@@ -162,7 +161,7 @@ FROM (WITH RECURSIVE tag_hierarchy AS (SELECT tp.tag_id                         
       UNION ALL
 
       -- Include direct tag-to-item mappings
-      SELECT project_tag.tag_id AS parent, project_item.item_id AS child
+      SELECT project_tag.id AS parent, project_item.item_id AS child
       FROM tag_item
                JOIN project_tag on project_tag.id = tag_item.tag_id
                JOIN project_item ON project_item.id = tag_item.item_id) as subq;

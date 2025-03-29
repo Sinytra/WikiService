@@ -554,6 +554,20 @@ namespace service {
         co_return PaginatedData{.total = total, .pages = pages, .size = size, .data = itemData};
     }
 
+    Task<PaginatedData<FullTagData>> ResolvedProject::getTags(TableQueryParams params) const {
+        const auto [pages, total, size, data] = co_await projectDb_->getProjectTagsDev(params.query, params.page);
+        std::vector<FullTagData> tagData;
+        for (const auto &[id, loc]: data) {
+            const auto tagItems = co_await projectDb_->getProjectTagItemsFlat(id);
+            std::vector<std::string> items;
+            for (auto &item : tagItems) {
+                items.push_back(item.getValueOfLoc());
+            }
+            tagData.emplace_back(loc, items);
+        }
+        co_return PaginatedData{.total = total, .pages = pages, .size = size, .data = tagData};
+    }
+
     Task<PaginatedData<ProjectVersion>> ResolvedProject::getVersions(const TableQueryParams params) const {
         co_return co_await projectDb_->getVersionsDev(params.query, params.page);
     }

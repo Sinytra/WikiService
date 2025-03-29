@@ -96,10 +96,30 @@ namespace service {
 
     Task<std::vector<Item>> ProjectDatabaseAccess::getTagItemsFlat(const int64_t tag) const {
         // language=postgresql
+        static constexpr auto query = "SELECT * FROM tag_item_flat \
+                                       WHERE parent IN ( \
+                                          SELECT ptag.id FROM project_tag ptag \
+                                          JOIN tag t on ptag.tag_id = t.id \
+                                          WHERE t.id = $1 AND ptag.version_id = $2)";
+
+        const auto [res, err] =
+            co_await handleDatabaseOperation<std::vector<Item>>([&, tag](const DbClientPtr &client) -> Task<std::vector<Item>> {
+                const auto results = co_await client->execSqlCoro(query, tag, versionId_);
+                std::vector<Item> tagItems;
+                for (const auto &row: results) {
+                    tagItems.emplace_back(row);
+                }
+                co_return tagItems;
+            });
+        co_return res.value_or(std::vector<Item>{});
+    }
+
+    Task<std::vector<Item>> ProjectDatabaseAccess::getProjectTagItemsFlat(const int64_t tag) const {
+        // language=postgresql
         static constexpr auto query = "SELECT item.* FROM tag_item_flat \
                                        JOIN item ON item.id = child \
                                        JOIN project_item pitem ON pitem.item_id = item.id \
-                                       WHERE parent = $1 AND (pitem.version_id IS NULL OR pitem.version_id = $2)";
+                                       WHERE parent = $1 AND pitem.version_id = $2";
 
         const auto [res, err] =
             co_await handleDatabaseOperation<std::vector<Item>>([&, tag](const DbClientPtr &client) -> Task<std::vector<Item>> {
@@ -119,8 +139,8 @@ namespace service {
                                               SELECT pt.id, pip.id FROM project_tag pt CROSS JOIN project_item pip \
                                               JOIN tag ON tag.id = pt.tag_id \
                                               JOIN item ON item.id = pip.item_id \
-                                              WHERE (pt.version_id IS NULL OR pt.version_id = $1) \
-                                                AND (pip.version_id IS NULL OR pip.version_id = $1) \
+                                              WHERE pt.version_id = $1 \
+                                                AND pip.version_id = $1 \
                                                 AND tag.loc = $2 AND item.loc = $3 \
                                               ON CONFLICT DO NOTHING";
         const auto [res, err] = co_await handleDatabaseOperation<Error>([&, tag, item](const DbClientPtr &client) -> Task<Error> {
@@ -136,8 +156,8 @@ namespace service {
                                              SELECT tp.id, tc.id FROM project_tag tp CROSS JOIN project_tag tc \
                                              JOIN tag p ON p.id = tp.tag_id \
                                              JOIN tag c ON c.id = tc.tag_id \
-                                             WHERE (tp.version_id IS NULL OR tp.version_id = $1) \
-                                               AND (tc.version_id IS NULL OR tc.version_id = $1) \
+                                             WHERE tp.version_id = $1 \
+                                               AND tc.version_id = $1 \
                                                AND p.loc = $2 AND c.loc = $3 \
                                              ON CONFLICT DO NOTHING";
         const auto [res, err] = co_await handleDatabaseOperation<Error>([&, parentTag, childTag](const DbClientPtr &client) -> Task<Error> {
@@ -180,6 +200,40 @@ namespace service {
                 co_return PaginatedData{.total = totalRows, .pages = totalPages, .size = size, .data = contents};
             });
         co_return res.value_or(PaginatedData<ProjectContent>{});
+    }
+
+    Task<PaginatedData<ProjectTag>> ProjectDatabaseAccess::getProjectTagsDev(const std::string searchQuery, const int page) const {
+        // language=postgresql
+        static constexpr auto query = "SELECT ptag.id, tag.loc FROM project_tag ptag \
+                                       JOIN tag ON tag.id = ptag.tag_id \
+                                       WHERE ptag.version_id = $1 \
+                                       AND tag.loc ILIKE '%' || $2 || '%' \
+                                       ORDER BY tag.loc";
+
+        const auto [res, err] =
+            co_await handleDatabaseOperation<PaginatedData<ProjectTag>>([&](const DbClientPtr &client) -> Task<PaginatedData<ProjectTag>> {
+                constexpr int size = 20;
+                const auto actualQuery = paginatedQuery(query, size, page);
+
+                const auto results = co_await client->execSqlCoro(actualQuery, versionId_, searchQuery);
+
+                if (results.empty()) {
+                    throw DrogonDbException{};
+                }
+
+                const int totalRows = results[0]["total_rows"].as<int>();
+                const int totalPages = results[0]["total_pages"].as<int>();
+
+                std::vector<ProjectTag> contents;
+                for (const auto &row: results) {
+                    const auto id = row[0].as<int64_t>();
+                    const auto loc = row[1].as<std::string>();
+                    contents.emplace_back(id, loc);
+                }
+
+                co_return PaginatedData{.total = totalRows, .pages = totalPages, .size = size, .data = contents};
+            });
+        co_return res.value_or(PaginatedData<ProjectTag>{});
     }
 
     Task<std::vector<ProjectContent>> ProjectDatabaseAccess::getProjectItemPages() const {

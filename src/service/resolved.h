@@ -45,6 +45,18 @@ namespace service {
         }
     };
 
+    struct FullTagData {
+        std::string id;
+        std::vector<std::string> items;
+
+        friend void to_json(nlohmann::json &j, const FullTagData &obj) {
+            j = nlohmann::json{
+                    {"id", obj.id},
+                    {"items", obj.items},
+            };
+        }
+    };
+
     struct GitRevision {
         std::string hash;
         std::string fullHash;
@@ -96,6 +108,7 @@ namespace service {
         std::tuple<std::optional<nlohmann::json>, ProjectError, std::string> validateProjectMetadata() const;
 
         drogon::Task<PaginatedData<FullItemData>> getItems(TableQueryParams params) const;
+        drogon::Task<PaginatedData<FullTagData>> getTags(TableQueryParams params) const;
         drogon::Task<PaginatedData<ProjectVersion>> getVersions(TableQueryParams params) const;
 
         const Project &getProject() const;
