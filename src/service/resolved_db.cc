@@ -167,15 +167,8 @@ namespace service {
         co_return res.value_or(err);
     }
 
-    Task<PaginatedData<ProjectContent>> ProjectDatabaseAccess::getProjectItemsDev(const std::string searchQuery, const int page) const {
-        // language=postgresql
-        static constexpr auto query = "SELECT item.loc, path FROM project_item pitem \
-                                       LEFT JOIN project_item_page pip ON pitem.id = pip.item_id \
-                                       JOIN item ON item.id = pitem.item_id \
-                                       WHERE pitem.version_id = $1 AND (pip IS NULL OR starts_with(pip.path, '.content/')) \
-                                       AND item.loc ILIKE '%' || $2 || '%' \
-                                       ORDER BY item.loc";
-
+    Task<PaginatedData<ProjectContent>> ProjectDatabaseAccess::getContentBase(const std::string query, const std::string searchQuery,
+                                                                              const int page) const {
         const auto [res, err] = co_await handleDatabaseOperation<PaginatedData<ProjectContent>>(
             [&](const DbClientPtr &client) -> Task<PaginatedData<ProjectContent>> {
                 constexpr int size = 20;
@@ -200,6 +193,35 @@ namespace service {
                 co_return PaginatedData{.total = totalRows, .pages = totalPages, .size = size, .data = contents};
             });
         co_return res.value_or(PaginatedData<ProjectContent>{});
+    }
+
+    Task<PaginatedData<ProjectContent>> ProjectDatabaseAccess::getProjectItemsDev(const std::string searchQuery, const int page) const {
+        // language=postgresql
+        static constexpr auto query = "SELECT item.loc, path FROM project_item pitem \
+                                       LEFT JOIN project_item_page pip ON pitem.id = pip.item_id \
+                                       JOIN item ON item.id = pitem.item_id \
+                                       WHERE pitem.version_id = $1 AND (pip IS NULL OR starts_with(pip.path, '.content/')) \
+                                       AND item.loc ILIKE '%' || $2 || '%' \
+                                       ORDER BY item.loc";
+        co_return co_await getContentBase(query, searchQuery, page);
+    }
+
+    Task<PaginatedData<ProjectContent>> ProjectDatabaseAccess::getProjectTagItemsDev(const std::string tag, const std::string searchQuery,
+                                                                                     const int page) const {
+        // language=postgresql
+        static constexpr auto query = "SELECT item.loc, path "
+                                      "FROM project_tag ptag "
+                                      "    JOIN tag t ON ptag.tag_id = t.id "
+                                      "    JOIN tag_item_flat flat ON flat.parent = ptag.id "
+                                      "    JOIN item ON item.id = flat.child "
+                                      "    JOIN project_item pitem ON pitem.item_id = item.id "
+                                      "    LEFT JOIN project_item_page pip ON pitem.id = pip.item_id "
+                                      " WHERE ptag.version_id = $1 "
+                                      "     AND pitem.version_id = $1 AND t.loc = '{}' "
+                                      "     AND (pip IS NULL OR starts_with(pip.path, '.content/')) "
+                                      "     AND item.loc ILIKE '%' || $2 || '%' "
+                                      " ORDER BY item.loc";
+        co_return co_await getContentBase(std::format(query, tag), searchQuery, page);
     }
 
     Task<PaginatedData<ProjectTag>> ProjectDatabaseAccess::getProjectTagsDev(const std::string searchQuery, const int page) const {

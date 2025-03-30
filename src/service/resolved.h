@@ -109,6 +109,7 @@ namespace service {
 
         drogon::Task<PaginatedData<FullItemData>> getItems(TableQueryParams params) const;
         drogon::Task<PaginatedData<FullTagData>> getTags(TableQueryParams params) const;
+        drogon::Task<PaginatedData<FullItemData>> getTagItems(std::string tag, TableQueryParams params) const;
         drogon::Task<PaginatedData<ProjectVersion>> getVersions(TableQueryParams params) const;
 
         const Project &getProject() const;

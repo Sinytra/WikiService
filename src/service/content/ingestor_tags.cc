@@ -119,8 +119,6 @@ namespace content {
                 continue;
             }
 
-            std::optional<std::string> project = resloc->namespace_ == projectModid ? std::make_optional(projectModid) : std::nullopt;
-
             projectLog.trace("Registering tag '{}'", tag);
             co_await project_.getProjectDatabase().addTag(tag);
         }
@@ -134,7 +132,7 @@ namespace content {
 
                 if (isTag) {
                     const auto tagId = entry.substr(1);
-                    co_await project_.getProjectDatabase().addTagTagEntry(key, entry);
+                    co_await project_.getProjectDatabase().addTagTagEntry(key, tagId);
                 } else {
                     co_await project_.getProjectDatabase().addTagItemEntry(key, entry);
                 }

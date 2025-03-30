@@ -37,8 +37,9 @@ namespace service {
         drogon::Task<Error> addTagItemEntry(std::string tag, std::string item) const;
         drogon::Task<Error> addTagTagEntry(std::string parentTag, std::string childTag) const;
 
-        drogon::Task<PaginatedData<ProjectContent>> getProjectItemsDev(std::string query, int page) const;
-        drogon::Task<PaginatedData<ProjectTag>> getProjectTagsDev(std::string query, int page) const;
+        drogon::Task<PaginatedData<ProjectContent>> getProjectItemsDev(std::string searchQuery, int page) const;
+        drogon::Task<PaginatedData<ProjectContent>> getProjectTagItemsDev(std::string tag, std::string searchQuery, int page) const;
+        drogon::Task<PaginatedData<ProjectTag>> getProjectTagsDev(std::string searchQuery, int page) const;
         drogon::Task<std::vector<ProjectContent>> getProjectItemPages() const;
         drogon::Task<int> getProjectContentCount() const;
         drogon::Task<std::optional<std::string>> getProjectContentPath(std::string id) const;
@@ -48,6 +49,8 @@ namespace service {
 
         drogon::Task<Error> refreshFlatTagItemView() const;
     private:
+        drogon::Task<PaginatedData<ProjectContent>> getContentBase(std::string query, std::string searchQuery, int page) const;
+
         const ResolvedProject &project_;
         const std::string projectId_;
         const int64_t versionId_;

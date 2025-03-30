@@ -444,6 +444,20 @@ namespace api::v1 {
         callback(jsonResponse(tags));
     }
 
+    Task<> ProjectsController::getTagItems(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+                                           const std::string id) const {
+        const auto prefix = std::format("/api/v1/dev/projects/{}/content/tags/", id);
+        const auto tag = req->getPath().substr(prefix.size());
+        if (tag.empty()) {
+            throw ApiException(Error::ErrBadRequest, "Missing tag parameter");
+        }
+
+        const auto version = req->getOptionalParameter<std::string>("version");
+        const auto resolved = co_await BaseProjectController::getUserProject(req, id, version, std::nullopt, callback);
+        const auto items{co_await resolved.getTagItems(tag, getTableQueryParams(req))};
+        callback(jsonResponse(items));
+    }
+
     Task<> ProjectsController::getVersions(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                            const std::string id) const {
         const auto resolved = co_await BaseProjectController::getUserProject(req, id, std::nullopt, std::nullopt, callback);

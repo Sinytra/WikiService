@@ -133,9 +133,8 @@ namespace service {
                 else /*if (sort == "relevance")*/
                     sortQuery = "ORDER BY ts_rank(search_vector, to_tsquery('simple', $1)) DESC";
 
-                const auto clientPtr = app().getFastDbClient();
                 // clang-format off
-                const auto results = co_await clientPtr->execSqlCoro(
+                const auto results = co_await client->execSqlCoro(
                     "WITH search_data AS ("
                     "    SELECT *"
                     "    FROM project"
