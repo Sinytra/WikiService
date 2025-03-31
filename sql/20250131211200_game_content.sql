@@ -152,7 +152,7 @@ FROM (WITH RECURSIVE tag_hierarchy AS (SELECT tp.id                            A
                                                 JOIN project_tag tc ON n.child = tc.id
                                                 JOIN tag_hierarchy ON tp.id = tag_hierarchy.child)
       -- Combine tag relationships with direct tag-to-item mappings
-      SELECT th.parent AS parent, project_item.item_id AS child
+      SELECT th.parent AS parent, project_item.id AS child
       FROM tag_hierarchy th
                JOIN project_tag ON project_tag.tag_id = th.child
                JOIN tag_item ti ON project_tag.id = ti.tag_id
@@ -161,7 +161,7 @@ FROM (WITH RECURSIVE tag_hierarchy AS (SELECT tp.id                            A
       UNION ALL
 
       -- Include direct tag-to-item mappings
-      SELECT project_tag.id AS parent, project_item.item_id AS child
+      SELECT project_tag.id AS parent, project_item.id AS child
       FROM tag_item
                JOIN project_tag on project_tag.id = tag_item.tag_id
                JOIN project_item ON project_item.id = tag_item.item_id) as subq;

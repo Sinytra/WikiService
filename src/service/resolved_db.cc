@@ -96,11 +96,14 @@ namespace service {
 
     Task<std::vector<Item>> ProjectDatabaseAccess::getTagItemsFlat(const int64_t tag) const {
         // language=postgresql
-        static constexpr auto query = "SELECT * FROM tag_item_flat \
+        static constexpr auto query = "SELECT item.* FROM tag_item_flat \
+                                       JOIN project_item pitem ON pitem.id = child \
+                                       JOIN item ON item.id = pitem.item_id \
                                        WHERE parent IN ( \
                                           SELECT ptag.id FROM project_tag ptag \
                                           JOIN tag t on ptag.tag_id = t.id \
-                                          WHERE t.id = $1 AND ptag.version_id = $2)";
+                                          WHERE t.id = $1 \
+                                          AND (ptag.version_id IS NULL OR ptag.version_id = $2))";
 
         const auto [res, err] =
             co_await handleDatabaseOperation<std::vector<Item>>([&, tag](const DbClientPtr &client) -> Task<std::vector<Item>> {
@@ -117,9 +120,10 @@ namespace service {
     Task<std::vector<Item>> ProjectDatabaseAccess::getProjectTagItemsFlat(const int64_t tag) const {
         // language=postgresql
         static constexpr auto query = "SELECT item.* FROM tag_item_flat \
-                                       JOIN item ON item.id = child \
-                                       JOIN project_item pitem ON pitem.item_id = item.id \
-                                       WHERE parent = $1 AND pitem.version_id = $2";
+                                       JOIN project_item pitem ON pitem.id = child \
+                                       JOIN item ON item.id = pitem.item_id \
+                                       WHERE parent = $1 \
+                                       AND (pitem.version_id IS NULL OR pitem.version_id = $2)";
 
         const auto [res, err] =
             co_await handleDatabaseOperation<std::vector<Item>>([&, tag](const DbClientPtr &client) -> Task<std::vector<Item>> {
@@ -167,34 +171,6 @@ namespace service {
         co_return res.value_or(err);
     }
 
-    Task<PaginatedData<ProjectContent>> ProjectDatabaseAccess::getContentBase(const std::string query, const std::string searchQuery,
-                                                                              const int page) const {
-        const auto [res, err] = co_await handleDatabaseOperation<PaginatedData<ProjectContent>>(
-            [&](const DbClientPtr &client) -> Task<PaginatedData<ProjectContent>> {
-                constexpr int size = 20;
-                const auto actualQuery = paginatedQuery(query, size, page);
-
-                const auto results = co_await client->execSqlCoro(actualQuery, versionId_, searchQuery);
-
-                if (results.empty()) {
-                    throw DrogonDbException{};
-                }
-
-                const int totalRows = results[0]["total_rows"].as<int>();
-                const int totalPages = results[0]["total_pages"].as<int>();
-
-                std::vector<ProjectContent> contents;
-                for (const auto &row: results) {
-                    const auto id = row[0].as<std::string>();
-                    const auto path = row[1].isNull() ? "" : row[1].as<std::string>();
-                    contents.emplace_back(id, path);
-                }
-
-                co_return PaginatedData{.total = totalRows, .pages = totalPages, .size = size, .data = contents};
-            });
-        co_return res.value_or(PaginatedData<ProjectContent>{});
-    }
-
     Task<PaginatedData<ProjectContent>> ProjectDatabaseAccess::getProjectItemsDev(const std::string searchQuery, const int page) const {
         // language=postgresql
         static constexpr auto query = "SELECT item.loc, path FROM project_item pitem \
@@ -203,7 +179,12 @@ namespace service {
                                        WHERE pitem.version_id = $1 AND (pip IS NULL OR starts_with(pip.path, '.content/')) \
                                        AND item.loc ILIKE '%' || $2 || '%' \
                                        ORDER BY item.loc";
-        co_return co_await getContentBase(query, searchQuery, page);
+
+        co_return co_await handlePaginatedQuery<ProjectContent>(query, searchQuery, page, [](const Row &row) {
+            const auto id = row[0].as<std::string>();
+            const auto path = row[1].isNull() ? "" : row[1].as<std::string>();
+            return ProjectContent{id, path};
+        });
     }
 
     Task<PaginatedData<ProjectContent>> ProjectDatabaseAccess::getProjectTagItemsDev(const std::string tag, const std::string searchQuery,
@@ -213,15 +194,20 @@ namespace service {
                                       "FROM project_tag ptag "
                                       "    JOIN tag t ON ptag.tag_id = t.id "
                                       "    JOIN tag_item_flat flat ON flat.parent = ptag.id "
-                                      "    JOIN item ON item.id = flat.child "
-                                      "    JOIN project_item pitem ON pitem.item_id = item.id "
+                                      "    JOIN project_item pitem ON pitem.id = flat.child "
+                                      "    JOIN item ON item.id = pitem.item_id "
                                       "    LEFT JOIN project_item_page pip ON pitem.id = pip.item_id "
                                       " WHERE ptag.version_id = $1 "
                                       "     AND pitem.version_id = $1 AND t.loc = '{}' "
                                       "     AND (pip IS NULL OR starts_with(pip.path, '.content/')) "
                                       "     AND item.loc ILIKE '%' || $2 || '%' "
                                       " ORDER BY item.loc";
-        co_return co_await getContentBase(std::format(query, tag), searchQuery, page);
+
+        co_return co_await handlePaginatedQuery<ProjectContent>(std::format(query, tag), searchQuery, page, [](const Row &row) {
+            const auto id = row[0].as<std::string>();
+            const auto path = row[1].isNull() ? "" : row[1].as<std::string>();
+            return ProjectContent{id, path};
+        });
     }
 
     Task<PaginatedData<ProjectTag>> ProjectDatabaseAccess::getProjectTagsDev(const std::string searchQuery, const int page) const {
@@ -232,30 +218,21 @@ namespace service {
                                        AND tag.loc ILIKE '%' || $2 || '%' \
                                        ORDER BY tag.loc";
 
-        const auto [res, err] =
-            co_await handleDatabaseOperation<PaginatedData<ProjectTag>>([&](const DbClientPtr &client) -> Task<PaginatedData<ProjectTag>> {
-                constexpr int size = 20;
-                const auto actualQuery = paginatedQuery(query, size, page);
+        co_return co_await handlePaginatedQuery<ProjectTag>(query, searchQuery, page, [](const Row &row) {
+            const auto id = row[0].as<int64_t>();
+            const auto loc = row[1].as<std::string>();
+            return ProjectTag{id, loc};
+        });
+    }
 
-                const auto results = co_await client->execSqlCoro(actualQuery, versionId_, searchQuery);
+    Task<PaginatedData<Recipe>> ProjectDatabaseAccess::getProjectRecipesDev(std::string searchQuery, int page) const {
+        // language=postgresql
+        static constexpr auto query = "SELECT * FROM recipe \
+                                       WHERE version_id = $1 \
+                                       AND recipe.loc ILIKE '%' || $2 || '%' \
+                                       ORDER BY recipe.loc";
 
-                if (results.empty()) {
-                    throw DrogonDbException{};
-                }
-
-                const int totalRows = results[0]["total_rows"].as<int>();
-                const int totalPages = results[0]["total_pages"].as<int>();
-
-                std::vector<ProjectTag> contents;
-                for (const auto &row: results) {
-                    const auto id = row[0].as<int64_t>();
-                    const auto loc = row[1].as<std::string>();
-                    contents.emplace_back(id, loc);
-                }
-
-                co_return PaginatedData{.total = totalRows, .pages = totalPages, .size = size, .data = contents};
-            });
-        co_return res.value_or(PaginatedData<ProjectTag>{});
+        co_return co_await handlePaginatedQuery<Recipe>(query, searchQuery, page, [](const Row &row) { return Recipe(row); });
     }
 
     Task<std::vector<ProjectContent>> ProjectDatabaseAccess::getProjectItemPages() const {

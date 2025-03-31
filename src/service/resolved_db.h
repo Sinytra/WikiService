@@ -19,9 +19,38 @@ namespace service {
         std::string loc;
     };
 
+    std::string paginatedQuery(const std::string &dataQuery, int pageSize, int page);
+
     class ProjectDatabaseAccess : public DatabaseBase {
     public:
         explicit ProjectDatabaseAccess(const ResolvedProject &);
+
+        template<typename Ret>
+        drogon::Task<PaginatedData<Ret>> handlePaginatedQuery(const std::string query, const std::string searchQuery, const int page,
+                                                              const std::function<Ret(const drogon::orm::Row &)> callback) const {
+            const auto [res, err] = co_await handleDatabaseOperation<PaginatedData<Ret>>(
+                [&](const drogon::orm::DbClientPtr &client) -> drogon::Task<PaginatedData<Ret>> {
+                    constexpr int size = 20;
+                    const auto actualQuery = paginatedQuery(query, size, page);
+
+                    const auto results = co_await client->execSqlCoro(actualQuery, versionId_, searchQuery);
+
+                    if (results.empty()) {
+                        throw drogon::orm::DrogonDbException{};
+                    }
+
+                    const int totalRows = results[0]["total_rows"].template as<int>();
+                    const int totalPages = results[0]["total_pages"].template as<int>();
+
+                    std::vector<Ret> contents;
+                    for (const auto &row: results) {
+                        contents.emplace_back(callback(row));
+                    }
+
+                    co_return PaginatedData{.total = totalRows, .pages = totalPages, .size = size, .data = contents};
+                });
+            co_return res.value_or(PaginatedData<Ret>{});
+        }
 
         drogon::orm::DbClientPtr getDbClientPtr() const override;
 
@@ -40,6 +69,7 @@ namespace service {
         drogon::Task<PaginatedData<ProjectContent>> getProjectItemsDev(std::string searchQuery, int page) const;
         drogon::Task<PaginatedData<ProjectContent>> getProjectTagItemsDev(std::string tag, std::string searchQuery, int page) const;
         drogon::Task<PaginatedData<ProjectTag>> getProjectTagsDev(std::string searchQuery, int page) const;
+        drogon::Task<PaginatedData<Recipe>> getProjectRecipesDev(std::string searchQuery, int page) const;
         drogon::Task<std::vector<ProjectContent>> getProjectItemPages() const;
         drogon::Task<int> getProjectContentCount() const;
         drogon::Task<std::optional<std::string>> getProjectContentPath(std::string id) const;
@@ -48,9 +78,8 @@ namespace service {
         drogon::Task<std::optional<Recipe>> getProjectRecipe(std::string recipe) const;
 
         drogon::Task<Error> refreshFlatTagItemView() const;
-    private:
-        drogon::Task<PaginatedData<ProjectContent>> getContentBase(std::string query, std::string searchQuery, int page) const;
 
+    private:
         const ResolvedProject &project_;
         const std::string projectId_;
         const int64_t versionId_;

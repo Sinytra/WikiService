@@ -38,10 +38,7 @@ namespace service {
 
         friend void to_json(nlohmann::json &j, const FullItemData &obj) {
             j = nlohmann::json{
-                {"id", obj.id},
-                {"name", obj.name},
-                {"path", obj.path.empty() ? nlohmann::json(nullptr) : nlohmann::json(obj.path)}
-            };
+                {"id", obj.id}, {"name", obj.name}, {"path", obj.path.empty() ? nlohmann::json(nullptr) : nlohmann::json(obj.path)}};
         }
     };
 
@@ -51,9 +48,19 @@ namespace service {
 
         friend void to_json(nlohmann::json &j, const FullTagData &obj) {
             j = nlohmann::json{
-                    {"id", obj.id},
-                    {"items", obj.items},
+                {"id", obj.id},
+                {"items", obj.items},
             };
+        }
+    };
+
+    struct FullRecipeData {
+        std::string id;
+        std::string type;
+        nlohmann::json data;
+
+        friend void to_json(nlohmann::json &j, const FullRecipeData &obj) {
+            j = nlohmann::json{{"id", obj.id}, {"type", obj.type}, {"data", obj.data}};
         }
     };
 
@@ -66,13 +73,11 @@ namespace service {
         std::string date;
 
         friend void to_json(nlohmann::json &j, const GitRevision &obj) {
-            j = nlohmann::json{
-                {"hash", obj.hash},
-                {"message", obj.message},
-                {"authorName", obj.authorName},
-                {"authorEmail", obj.authorEmail},
-                {"date", obj.date}
-            };
+            j = nlohmann::json{{"hash", obj.hash},
+                               {"message", obj.message},
+                               {"authorName", obj.authorName},
+                               {"authorEmail", obj.authorEmail},
+                               {"date", obj.date}};
         }
     };
 
@@ -81,7 +86,8 @@ namespace service {
 
     class ResolvedProject {
     public:
-        explicit ResolvedProject(const Project &, const GitRevision &, const std::filesystem::path &, const std::filesystem::path &, const ProjectVersion &);
+        explicit ResolvedProject(const Project &, const GitRevision &, const std::filesystem::path &, const std::filesystem::path &,
+                                 const ProjectVersion &);
 
         void setDefaultVersion(const ResolvedProject &defaultVersion);
 
@@ -110,6 +116,7 @@ namespace service {
         drogon::Task<PaginatedData<FullItemData>> getItems(TableQueryParams params) const;
         drogon::Task<PaginatedData<FullTagData>> getTags(TableQueryParams params) const;
         drogon::Task<PaginatedData<FullItemData>> getTagItems(std::string tag, TableQueryParams params) const;
+        drogon::Task<PaginatedData<FullRecipeData>> getRecipes(TableQueryParams params) const;
         drogon::Task<PaginatedData<ProjectVersion>> getVersions(TableQueryParams params) const;
 
         const Project &getProject() const;

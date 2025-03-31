@@ -33,6 +33,7 @@ namespace api::v1 {
         ADD_METHOD_TO(ProjectsController::getContentPages,  "/api/v1/dev/projects/{1:id}/content/pages",        drogon::Get,    "AuthFilter");
         ADD_METHOD_TO(ProjectsController::getContentTags,   "/api/v1/dev/projects/{1:id}/content/tags",         drogon::Get,    "AuthFilter");
         ADD_METHOD_TO(ProjectsController::getTagItems,      "/api/v1/dev/projects/{1:id}/content/tags/.*",      drogon::Get,    "AuthFilter");
+        ADD_METHOD_TO(ProjectsController::getRecipes,       "/api/v1/dev/projects/{1:id}/content/recipes",      drogon::Get,    "AuthFilter");
         ADD_METHOD_TO(ProjectsController::getVersions,      "/api/v1/dev/projects/{1:id}/versions",             drogon::Get,    "AuthFilter");
         // Dev content
         METHOD_LIST_END
@@ -69,6 +70,9 @@ namespace api::v1 {
                                       std::string id) const;
 
         drogon::Task<> getTagItems(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
+                                   std::string id) const;
+
+        drogon::Task<> getRecipes(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
                                    std::string id) const;
 
         drogon::Task<> getVersions(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,

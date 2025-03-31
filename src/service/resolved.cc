@@ -578,6 +578,16 @@ namespace service {
         co_return PaginatedData{.total = total, .pages = pages, .size = size, .data = itemData};
     }
 
+    Task<PaginatedData<FullRecipeData>> ResolvedProject::getRecipes(const TableQueryParams params) const {
+        const auto [pages, total, size, data] = co_await projectDb_->getProjectRecipesDev(params.query, params.page);
+        std::vector<FullRecipeData> recipeDate;
+        for (const auto &recipe: data) {
+            const auto resolved = co_await getRecipe(recipe.getValueOfLoc());
+            recipeDate.emplace_back(recipe.getValueOfLoc(), recipe.getValueOfType(), resolved ? parkourJson(*resolved) : nlohmann::json{});
+        }
+        co_return PaginatedData{.total = total, .pages = pages, .size = size, .data = recipeDate};
+    }
+
     Task<PaginatedData<ProjectVersion>> ResolvedProject::getVersions(const TableQueryParams params) const {
         co_return co_await projectDb_->getVersionsDev(params.query, params.page);
     }
