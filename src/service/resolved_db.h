@@ -76,6 +76,7 @@ namespace service {
         drogon::Task<Error> addProjectContentPage(std::string id, std::string path) const;
 
         drogon::Task<std::optional<Recipe>> getProjectRecipe(std::string recipe) const;
+        drogon::Task<std::vector<std::string>> getItemRecipes(std::string item) const;
 
         drogon::Task<Error> refreshFlatTagItemView() const;
 

@@ -318,6 +318,24 @@ namespace service {
         co_return res;
     }
 
+    Task<std::vector<std::string>> ProjectDatabaseAccess::getItemRecipes(std::string item) const {
+        // language=postgresql
+        static constexpr auto query = "SELECT recipe.loc FROM recipe \
+                                       JOIN project_version ver ON ver.id = version_id \
+                                       JOIN recipe_ingredient_item ritem ON ritem.recipe_id = recipe.id \
+                                       JOIN item ON item.id = ritem.item_id \
+                                       WHERE NOT ritem.input AND version_id = $1 AND item.loc = $2";
+        const auto [res, err] = co_await handleDatabaseOperation<std::vector<std::string>>([&, item](const DbClientPtr &client) -> Task<std::vector<std::string>> {
+            const auto results = co_await client->execSqlCoro(query, versionId_, item);
+            std::vector<std::string> ids;
+            for (const auto &row: results) {
+                ids.emplace_back(row[0].as<std::string>());
+            }
+            co_return ids;
+        });
+        co_return res.value_or(std::vector<std::string>{});
+    }
+
     Task<Error> ProjectDatabaseAccess::refreshFlatTagItemView() const {
         const auto [res, err] = co_await handleDatabaseOperation<Error>([](const DbClientPtr &client) -> Task<Error> {
             // language=postgresql

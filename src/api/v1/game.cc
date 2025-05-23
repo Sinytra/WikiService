@@ -3,6 +3,7 @@
 #include <string>
 
 #include "error.h"
+#include "resolved_db.h"
 
 using namespace std;
 using namespace drogon;
@@ -45,6 +46,25 @@ namespace api::v1 {
             root["edit_url"] = page.editUrl;
         }
 
+        callback(HttpResponse::newHttpJsonResponse(root));
+    }
+
+    Task<> GameController::contentItemRecipe(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+                                             const std::string project, const std::string item) const {
+        if (item.empty()) {
+            throw ApiException(Error::ErrBadRequest, "Insufficient parameters");
+        }
+
+        const auto resolved = co_await BaseProjectController::getProjectWithParams(req, callback, project);
+        const auto recipeIds = co_await resolved.getProjectDatabase().getItemRecipes(item);
+        Json::Value root(Json::arrayValue);
+        for (const auto &id : recipeIds) {
+            if (const auto recipe = co_await resolved.getRecipe(id)) {
+                root.append(*recipe);
+            } else {
+                logger.error("Missing recipe {} for item {} / {}", id, project, item);
+            }
+        }
         callback(HttpResponse::newHttpJsonResponse(root));
     }
 

@@ -677,6 +677,7 @@ namespace service {
             co_await global::database->getRelated<RecipeIngredientTag>(RecipeIngredientTag::Cols::_recipe_id, result->getValueOfId());
 
         Json::Value json;
+        json["id"] = result->getValueOfLoc();
         json["type"] = *displaySchema;
         json["type"]["id"] = type;
         {
