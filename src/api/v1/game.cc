@@ -48,7 +48,6 @@ namespace api::v1 {
         callback(HttpResponse::newHttpJsonResponse(root));
     }
 
-    // TODO DB content items not tied to version
     Task<> GameController::contentItemUsage(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                             const std::string project, const std::string item) const {
         if (item.empty()) {

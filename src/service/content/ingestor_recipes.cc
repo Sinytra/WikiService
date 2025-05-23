@@ -8,7 +8,6 @@
 
 using namespace drogon;
 using namespace drogon::orm;
-using namespace logging;
 using namespace service;
 namespace fs = std::filesystem;
 
@@ -23,18 +22,39 @@ struct RecipeType {
 std::optional<RecipeIngredient> readRecipeIngredient(const nlohmann::json &json, const int slot) {
     std::string itemId;
     bool isTag;
-    if (json.contains("item")) {
-        itemId = json["item"];
-        isTag = false;
+    if (json.is_string()) {
+        if (const auto value = json.get<std::string>(); value.starts_with('#')) {
+            itemId = value.substr(1);
+            isTag = true;
+        } else {
+            itemId = value;
+            isTag = false;
+        }
+    } else if (json.is_object()) {
+        if (json.contains("item")) {
+            itemId = json["item"];
+            isTag = false;
+        } else {
+            itemId = json["tag"];
+            isTag = true;
+        }
     } else {
-        itemId = json["tag"];
-        isTag = true;
+        return std::nullopt;
     }
     return RecipeIngredient{itemId, slot, 1, true, isTag};
 }
 
-// TODO Support 1.21.4+ recipe ingredients
-std::optional<ModRecipe> readShapedCraftingRecipe(const std::string &id, const std::string &type, const nlohmann::json &json, spdlog::logger &logger) {
+std::optional<RecipeIngredient> parseRecipeIngredient(const nlohmann::json &json, const int slot, spdlog::logger &logger) {
+    const auto ingredient = readRecipeIngredient(json, slot);
+    if (!ingredient) {
+        logger.info("Invalid ingredient, skipping recipe");
+        return std::nullopt;
+    }
+    return ingredient;
+}
+
+std::optional<ModRecipe> readShapedCraftingRecipe(const std::string &id, const std::string &type, const nlohmann::json &json,
+                                                  spdlog::logger &logger) {
     const auto keys = json.at("key");
     const auto pattern = json.at("pattern");
     std::string concat = "";
@@ -51,15 +71,18 @@ std::optional<ModRecipe> readShapedCraftingRecipe(const std::string &id, const s
 
         if (const auto keyValue = keys[key]; keyValue.is_array()) {
             for (const auto &item: keyValue) {
-                recipe.ingredients.emplace_back(item, i + 1, 1, true, false);
+                if (const auto ingredient = parseRecipeIngredient(item, i + 1, logger)) {
+                    recipe.ingredients.push_back(*ingredient);
+                } else {
+                    return std::nullopt;
+                }
             }
         } else {
-            const auto ingredient = readRecipeIngredient(keyValue, i + 1);
-            if (!ingredient) {
-                logger.info("Invalid ingredient, skipping recipe");
+            if (const auto ingredient = readRecipeIngredient(keyValue, i + 1)) {
+                recipe.ingredients.push_back(*ingredient);
+            } else {
                 return std::nullopt;
             }
-            recipe.ingredients.push_back(*ingredient);
         }
     }
 
@@ -71,7 +94,8 @@ std::optional<ModRecipe> readShapedCraftingRecipe(const std::string &id, const s
     return recipe;
 }
 
-std::optional<ModRecipe> readShapelessCraftingRecipe(const std::string &id, const std::string &type, const nlohmann::json &json, spdlog::logger &logger) {
+std::optional<ModRecipe> readShapelessCraftingRecipe(const std::string &id, const std::string &type, const nlohmann::json &json,
+                                                     spdlog::logger &logger) {
     ModRecipe recipe{.id = id, .type = type};
 
     const auto ingredients = json["ingredients"];
@@ -105,7 +129,7 @@ namespace content {
         return std::nullopt;
     }
 
-    std::optional<ModRecipe> readRecipe(const std::string &namespace_, const fs::path &root, const fs::path &path, spdlog::logger &projectLogger) {
+    std::optional<ModRecipe> readRecipe(const std::string &namespace_, const fs::path &root, const fs::path &path, spdlog::logger &logger) {
         fs::path relativePath = relative(path, root);
         const auto fileName = relativePath.string();
         const auto id = namespace_ + ":" + fileName.substr(0, fileName.find_last_of('.'));
@@ -124,7 +148,7 @@ namespace content {
         // Ingest recipe
         const auto type = json->at("type").get<std::string>();
         if (const auto knownType = recipeTypes.find(type); knownType != recipeTypes.end()) {
-            return knownType->second.processor(id, type, *json, projectLogger);
+            return knownType->second.processor(id, type, *json, logger);
         }
 
         return std::nullopt;

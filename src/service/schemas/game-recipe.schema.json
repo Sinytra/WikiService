@@ -37,7 +37,7 @@
             "title": "key",
             "description": "All keys used for this shaped crafting recipe.",
             "additionalProperties": {
-              "type": ["object", "array"],
+              "type": ["object", "array", "string"],
               "description": "The ingredient corresponding to this key.",
               "properties": {
                 "item": {
@@ -50,6 +50,7 @@
                 }
               },
               "items": {
+                "type": ["object", "string"],
                 "properties": {
                   "item": {
                     "description": "An item ID.",

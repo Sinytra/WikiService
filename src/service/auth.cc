@@ -19,6 +19,7 @@
 
 #define SESSION_ID_LEN 64
 
+using namespace logging;
 using namespace drogon;
 using namespace drogon_model::postgres;
 using namespace std::chrono_literals;

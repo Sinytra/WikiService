@@ -10,8 +10,6 @@
 #include <optional>
 #include <string>
 
-using namespace logging;
-
 template<typename T>
 concept JsonSerializable = requires(nlohmann::json &j, const T &obj) {
     {
@@ -97,7 +95,7 @@ std::optional<T> tryParseJson(const std::string_view json) {
     try {
         return T::parse(json);
     } catch (const nlohmann::json::parse_error &e) {
-        logger.error("JSON parse error: {}", e.what());
+        logging::logger.error("JSON parse error: {}", e.what());
         return std::nullopt;
     }
 }
