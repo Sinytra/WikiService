@@ -16,6 +16,10 @@ namespace service {
         handleDatabaseOperation(const std::function<drogon::Task<Ret>(const drogon::orm::DbClientPtr &client)> &func) const {
             try {
                 const auto clientPtr = getDbClientPtr();
+                if (!clientPtr) {
+                    co_return {std::nullopt, Error::ErrInternal};
+                }
+
                 const Ret result = co_await func(clientPtr);
                 co_return {result, Error::Ok};
             } catch (const drogon::orm::Failure &e) {

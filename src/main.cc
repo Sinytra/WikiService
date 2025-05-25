@@ -4,6 +4,7 @@
 #include "api/v1/game.h"
 #include "api/v1/projects.h"
 #include "api/v1/websocket.h"
+#include "api/v1/system.h"
 
 #include "config.h"
 #include <service/database.h>
@@ -79,6 +80,7 @@ int main() {
         auto projectsController(make_shared<api::v1::ProjectsController>());
         auto projectWSController(make_shared<api::v1::ProjectWebSocketController>());
         auto gameController(make_shared<api::v1::GameController>());
+        auto systemController(make_shared<api::v1::SystemController>());
 
         app().registerController(authController);
         app().registerController(controller);
@@ -86,6 +88,7 @@ int main() {
         app().registerController(projectsController);
         app().registerController(projectWSController);
         app().registerController(gameController);
+        app().registerController(systemController);
         app().setExceptionHandler(globalExceptionHandler);
 
         cacheAwaiterThreadPool.start();

@@ -108,12 +108,16 @@ EXECUTE PROCEDURE tags_insert_trigger_func();
 CREATE TABLE recipe
 (
     id         bigserial PRIMARY KEY,
-    version_id bigint NOT NULL REFERENCES project_version (id) ON DELETE CASCADE,
+    version_id bigint REFERENCES project_version (id) ON DELETE CASCADE,
     loc        varchar(255)                                   NOT NULL,
     type       varchar(255)                                   NOT NULL,
 
     UNIQUE (version_id, loc)
 );
+
+CREATE UNIQUE INDEX unique_recipe_no_project
+    ON recipe (loc)
+    WHERE version_id IS NULL;
 
 CREATE TABLE recipe_ingredient_tag
 (

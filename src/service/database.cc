@@ -25,9 +25,13 @@ std::string buildSearchVectorQuery(std::string query) {
 }
 
 namespace service {
-    DbClientPtr DatabaseBase::getDbClientPtr() const {
-        return app().getFastDbClient();
-    }
+    DbClientPtr DatabaseBase::getDbClientPtr() const { return app().getFastDbClient(); }
+
+    Database::Database() = default;
+
+    Database::Database(const DbClientPtr &client) : clientPtr_(client) {}
+
+    DbClientPtr Database::getDbClientPtr() const { return clientPtr_ ? clientPtr_ : app().getFastDbClient(); }
 
     Task<std::tuple<std::optional<Project>, Error>> Database::getProjectSource(const std::string id) const {
         co_return co_await handleDatabaseOperation<Project>([id](const DbClientPtr &client) -> Task<Project> {
@@ -316,21 +320,6 @@ namespace service {
         co_return res.value_or(err);
     }
 
-    Task<Error> Database::addTag(const std::string tag) const {
-        // language=postgresql
-        static constexpr auto query = "INSERT INTO project_tag (tag_id, version_id) \
-                                       SELECT id, NULL FROM tag WHERE loc = $1 \
-                                       ON CONFLICT DO NOTHING";
-
-        const auto [res, err] = co_await handleDatabaseOperation<Error>([tag](const DbClientPtr &client) -> Task<Error> {
-            // language=postgresql
-            co_await client->execSqlCoro("INSERT INTO tag VALUES (DEFAULT, $1) ON CONFLICT DO NOTHING", tag);
-            co_await client->execSqlCoro(query, tag);
-            co_return Error::Ok;
-        });
-        co_return res.value_or(err);
-    }
-
     Task<std::vector<std::string>> Database::getItemSourceProjects(int64_t item) const {
         // language=postgresql
         static constexpr auto query = "SELECT pv.project_id FROM project_item pitem \
@@ -396,5 +385,14 @@ namespace service {
                 co_return usages;
             });
         co_return res.value_or(std::vector<ContentUsage>{});
+    }
+
+    Task<std::optional<DataImport>> Database::addDataImportRecord(const DataImport data) const {
+        const auto [res, err] = co_await handleDatabaseOperation<DataImport>([&data](const DbClientPtr &client) -> Task<DataImport> {
+            CoroMapper<DataImport> mapper(client);
+
+            co_return co_await mapper.insert(data);
+        });
+        co_return res;
     }
 }

@@ -12,6 +12,8 @@
 
 #include <models/ProjectVersion.h>
 
+#include "models/DataImport.h"
+
 using namespace drogon_model::postgres;
 
 namespace service {
@@ -40,6 +42,11 @@ namespace service {
 
     class Database : public DatabaseBase {
     public:
+        explicit Database();
+        explicit Database(const drogon::orm::DbClientPtr &);
+
+        drogon::orm::DbClientPtr getDbClientPtr() const override;
+
         drogon::Task<std::vector<std::string>> getProjectIDs() const;
         drogon::Task<std::tuple<std::optional<Project>, Error>> createProject(const Project &project) const;
         drogon::Task<Error> updateProject(const Project &project) const;
@@ -69,11 +76,22 @@ namespace service {
         drogon::Task<std::optional<Project>> getUserProject(std::string username, std::string id) const;
         drogon::Task<Error> assignUserProject(std::string username, std::string id, std::string role) const;
 
+        drogon::Task<Error> addItem(std::string item) const;
         drogon::Task<Error> addTag(std::string tag) const;
+        drogon::Task<Error> addTagItemEntry(std::string tag, std::string item) const;
+        drogon::Task<Error> addTagTagEntry(std::string parentTag, std::string childTag) const;
+        drogon::Task<int64_t> addRecipe(std::string id, std::string type) const;
+        drogon::Task<Error> addRecipeIngredientItem(int64_t recipe_id, std::string item, int slot, int count, bool input) const;
+        drogon::Task<Error> addRecipeIngredientTag(int64_t recipe_id, std::string tag, int slot, int count, bool input) const;
+
         drogon::Task<std::vector<std::string>> getItemSourceProjects(int64_t item) const;
 
         drogon::Task<std::vector<Recipe>> getItemUsageInRecipes(std::string item) const;
         drogon::Task<std::vector<ContentUsage>> getObtainableItemsBy(std::string item) const;
+
+        drogon::Task<std::optional<DataImport>> addDataImportRecord(DataImport data) const;
+    private:
+        drogon::orm::DbClientPtr clientPtr_;
     };
 }
 

@@ -7,6 +7,7 @@ add_library(api STATIC
         error.cc
         projects.cc
         websocket.cc
+        system.cc
 )
 
 target_link_libraries(api PRIVATE

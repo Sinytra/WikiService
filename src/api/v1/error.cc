@@ -10,7 +10,8 @@ namespace {
     const unordered_map<Error, HttpStatusCode> errorMap = {{Error::Ok, k200OK},
                                                            {Error::ErrNotFound, k404NotFound},
                                                            {Error::ErrBadRequest, k400BadRequest},
-                                                           {Error::ErrUnauthorized, k401Unauthorized}};
+                                                           {Error::ErrUnauthorized, k401Unauthorized},
+                                                           {Error::ErrForbidden, k403Forbidden}};
 }
 
 namespace api::v1 {
@@ -21,8 +22,8 @@ namespace api::v1 {
         return k500InternalServerError;
     }
 
-    Error mapStatusCode(const HttpStatusCode& code) {
-        for (const auto &[error, statusCode] : errorMap) {
+    Error mapStatusCode(const HttpStatusCode &code) {
+        for (const auto &[error, statusCode]: errorMap) {
             if (code == statusCode) {
                 return error;
             }
