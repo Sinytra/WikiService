@@ -25,6 +25,17 @@ std::string buildSearchVectorQuery(std::string query) {
 }
 
 namespace service {
+    std::string paginatedQuery(const std::string &dataQuery, const int pageSize, const int page) {
+        return std::format("WITH search_data AS ({}), "
+                           "    total_count AS (SELECT COUNT(*) AS total_rows FROM search_data) "
+                           "SELECT search_data.*, "
+                           "    total_count.total_rows, "
+                           "    CEIL(total_count.total_rows::DECIMAL / {}) AS total_pages "
+                           "FROM search_data, total_count "
+                           "LIMIT 20 OFFSET ({} - 1) * {};",
+                           dataQuery, pageSize, page, pageSize);
+    }
+
     DbClientPtr DatabaseBase::getDbClientPtr() const { return app().getFastDbClient(); }
 
     Database::Database() = default;

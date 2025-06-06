@@ -4,6 +4,7 @@
 #include <log/log.h>
 #include <models/Project.h>
 #include <service/util.h>
+#include <service/serializers.h>
 
 #include "service/auth.h"
 #include "service/system_data/system_data_import.h"
@@ -25,6 +26,14 @@ namespace api::v1 {
         if (const auto role = session.user.getValueOfRole(); role != ROLE_ADMIN) {
             throw ApiException(Error::ErrForbidden, "forbidden");
         }
+    }
+
+    Task<> SystemController::getDataImports(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
+        co_await ensurePrivilegedAccess(req);
+
+        const auto [query, page] = getTableQueryParams(req);
+        const auto imports{co_await global::database->getDataImports(query, page)};
+        callback(jsonResponse(imports));
     }
 
     Task<> SystemController::importData(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {

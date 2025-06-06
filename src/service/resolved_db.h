@@ -19,15 +19,14 @@ namespace service {
         std::string loc;
     };
 
-    std::string paginatedQuery(const std::string &dataQuery, int pageSize, int page);
-
     class ProjectDatabaseAccess : public DatabaseBase {
     public:
         explicit ProjectDatabaseAccess(const ResolvedProject &);
 
         template<typename Ret>
         drogon::Task<PaginatedData<Ret>> handlePaginatedQuery(const std::string query, const std::string searchQuery, const int page,
-                                                              const std::function<Ret(const drogon::orm::Row &)> callback) const {
+                                                              const std::function<Ret(const drogon::orm::Row &)> callback =
+                                                              [](const drogon::orm::Row &row) { return Ret(row); }) const {
             const auto [res, err] = co_await handleDatabaseOperation<PaginatedData<Ret>>(
                 [&](const drogon::orm::DbClientPtr &client) -> drogon::Task<PaginatedData<Ret>> {
                     constexpr int size = 20;

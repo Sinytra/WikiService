@@ -36,6 +36,7 @@ add_library(service STATIC
         crypto.cc
         database.cc
         database_content.cc
+        database_system.cc
         github.cc
         platforms.cc
         resolved.cc

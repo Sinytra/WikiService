@@ -3,10 +3,25 @@
 #include <drogon/HttpAppFramework.h>
 #include <drogon/utils/coroutine.h>
 #include <drogon/orm/CoroMapper.h>
+#include <nlohmann/json.hpp>
 #include <log/log.h>
 #include "error.h"
 
 namespace service {
+    template<class T>
+    struct PaginatedData {
+        int pages;
+        int total;
+        int size;
+        std::vector<T> data;
+
+        friend void to_json(nlohmann::json &j, const PaginatedData &obj) {
+            j = nlohmann::json{{"total", obj.total}, {"pages", obj.pages}, {"size", obj.size}, {"data", obj.data}};
+        }
+    };
+
+    std::string paginatedQuery(const std::string &dataQuery, int pageSize, int page);
+
     class DatabaseBase {
     protected:
         virtual drogon::orm::DbClientPtr getDbClientPtr() const;
@@ -28,6 +43,34 @@ namespace service {
             } catch ([[maybe_unused]] const drogon::orm::DrogonDbException &e) {
                 co_return {std::nullopt, Error::ErrNotFound};
             }
+        }
+
+        template<typename Ret>
+        drogon::Task<PaginatedData<Ret>> handlePaginatedQuery(const std::string query, const std::string searchQuery, const int page,
+                                                              const std::function<Ret(const drogon::orm::Row &)> callback =
+                                                              [](const drogon::orm::Row &row) { return Ret(row); }) const {
+            const auto [res, err] = co_await handleDatabaseOperation<PaginatedData<Ret>>(
+                [&](const drogon::orm::DbClientPtr &client) -> drogon::Task<PaginatedData<Ret>> {
+                    constexpr int size = 20;
+                    const auto actualQuery = paginatedQuery(query, size, page);
+
+                    const auto results = co_await client->execSqlCoro(actualQuery, searchQuery);
+
+                    if (results.empty()) {
+                        throw drogon::orm::DrogonDbException{};
+                    }
+
+                    const int totalRows = results[0]["total_rows"].template as<int>();
+                    const int totalPages = results[0]["total_pages"].template as<int>();
+
+                    std::vector<Ret> contents;
+                    for (const auto &row: results) {
+                        contents.emplace_back(callback(row));
+                    }
+
+                    co_return PaginatedData{.total = totalRows, .pages = totalPages, .size = size, .data = contents};
+                });
+            co_return res.value_or(PaginatedData<Ret>{});
         }
 
     public:

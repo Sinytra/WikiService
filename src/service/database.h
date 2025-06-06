@@ -17,17 +17,6 @@
 using namespace drogon_model::postgres;
 
 namespace service {
-    template<class T>
-    struct PaginatedData {
-        int pages;
-        int total;
-        int size;
-        std::vector<T> data;
-
-        friend void to_json(nlohmann::json &j, const PaginatedData &obj) {
-            j = nlohmann::json{{"total", obj.total}, {"pages", obj.pages}, {"size", obj.size}, {"data", obj.data}};
-        }
-    };
     struct ProjectSearchResponse {
         int pages;
         int total;
@@ -90,6 +79,7 @@ namespace service {
         drogon::Task<std::vector<ContentUsage>> getObtainableItemsBy(std::string item) const;
 
         drogon::Task<std::optional<DataImport>> addDataImportRecord(DataImport data) const;
+        drogon::Task<PaginatedData<DataImport>> getDataImports(std::string searchQuery, int page) const;
     private:
         drogon::orm::DbClientPtr clientPtr_;
     };
