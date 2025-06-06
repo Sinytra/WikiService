@@ -1,0 +1,13 @@
+#pragma once
+
+#ifdef DETECTED_PROJECT_VERSION
+
+#define PROJECT_VERSION DETECTED_PROJECT_VERSION
+#define PROJECT_GIT_HASH DETECTED_GIT_HASH
+
+#else
+
+#define PROJECT_VERSION "unknown"
+#define PROJECT_GIT_HASH "unknown"
+
+#endif

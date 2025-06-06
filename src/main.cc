@@ -7,6 +7,7 @@
 #include "api/v1/system.h"
 
 #include "config.h"
+#include "version.h"
 #include <service/database.h>
 #include <service/github.h>
 #include <service/cloudflare.h>
@@ -53,7 +54,7 @@ void globalExceptionHandler(const std::exception& e, const HttpRequestPtr& req, 
 
 int main() {
     constexpr auto port(8080);
-    logger.info("Starting wiki service server on port {}", port);
+    logger.info("Starting wiki service version {} on port {}", PROJECT_VERSION, port);
 
     try {
         const auto level = trantor::Logger::logLevel();

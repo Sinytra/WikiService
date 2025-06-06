@@ -116,6 +116,7 @@ namespace service {
         root["username"] = (*profileJson)["login"].asString();
         root["avatar_url"] = (*profileJson)["avatar_url"].asString();
         root["modrinth_id"] = user->getModrinthId() ? user->getValueOfModrinthId() : Json::Value::null;
+        root["role"] = user->getValueOfRole();
 
         co_return UserSession{.sessionId = id, .username = *username, .user = *user, .profile = root};
     }

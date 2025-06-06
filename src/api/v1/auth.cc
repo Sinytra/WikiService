@@ -140,6 +140,7 @@ namespace api::v1 {
         const auto session{co_await global::auth->getSession(req)};
         Json::Value root = session.profile;
         root["created_at"] = session.user.getValueOfCreatedAt().toCustomFormattedString("%Y-%m-%d");
+
         const auto resp = HttpResponse::newHttpJsonResponse(root);
         resp->setStatusCode(k200OK);
         callback(resp);

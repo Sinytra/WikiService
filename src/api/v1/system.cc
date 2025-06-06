@@ -5,6 +5,7 @@
 #include <models/Project.h>
 #include <service/util.h>
 #include <service/serializers.h>
+#include <version.h>
 
 #include "service/auth.h"
 #include "service/system_data/system_data_import.h"
@@ -28,6 +29,28 @@ namespace api::v1 {
         }
     }
 
+    Task<> SystemController::getSystemInformation(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
+        co_await ensurePrivilegedAccess(req);
+
+        const auto imports{co_await global::database->getDataImports("", 1)};
+        const auto latestImport = imports.size > 0 ? imports.data.front() : nlohmann::json{nullptr};
+        const auto projectCount{co_await global::database->getTotalModelCount<Project>()};
+        const auto userCount{co_await global::database->getTotalModelCount<User>()};
+
+        nlohmann::json root;
+        root["version"] = PROJECT_VERSION;
+        root["version_hash"] = PROJECT_GIT_HASH;
+        root["latest_data"] = latestImport;
+        {
+            nlohmann::json stats;
+            stats["projects"] = projectCount;
+            stats["users"] = userCount;
+            root["stats"] = stats;
+        }
+
+        callback(jsonResponse(root));
+    }
+
     Task<> SystemController::getDataImports(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
         co_await ensurePrivilegedAccess(req);
 
@@ -45,7 +68,7 @@ namespace api::v1 {
         }
         const auto parsed = parkourJson(*json);
 
-        const sys::SystemDataImporter importer;
+        constexpr sys::SystemDataImporter importer;
         const auto result = co_await importer.importData(parsed);
 
         const auto resp = HttpResponse::newHttpResponse();

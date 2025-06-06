@@ -9,7 +9,7 @@ namespace service {
         // language=postgresql
         static constexpr auto query = "SELECT * FROM data_import \
                                        WHERE game_version ILIKE '%' || $1 || '%' \
-                                       ORDER BY created_at";
+                                       ORDER BY created_at DESC";
 
         co_return co_await handlePaginatedQuery<DataImport>(query, searchQuery, page);
     }

@@ -1,10 +1,10 @@
 #pragma once
 
 #include <drogon/HttpAppFramework.h>
-#include <drogon/utils/coroutine.h>
 #include <drogon/orm/CoroMapper.h>
-#include <nlohmann/json.hpp>
+#include <drogon/utils/coroutine.h>
 #include <log/log.h>
+#include <nlohmann/json.hpp>
 #include "error.h"
 
 namespace service {
@@ -46,9 +46,9 @@ namespace service {
         }
 
         template<typename Ret>
-        drogon::Task<PaginatedData<Ret>> handlePaginatedQuery(const std::string query, const std::string searchQuery, const int page,
-                                                              const std::function<Ret(const drogon::orm::Row &)> callback =
-                                                              [](const drogon::orm::Row &row) { return Ret(row); }) const {
+        drogon::Task<PaginatedData<Ret>> handlePaginatedQuery(
+            const std::string query, const std::string searchQuery, const int page,
+            const std::function<Ret(const drogon::orm::Row &)> callback = [](const drogon::orm::Row &row) { return Ret(row); }) const {
             const auto [res, err] = co_await handleDatabaseOperation<PaginatedData<Ret>>(
                 [&](const drogon::orm::DbClientPtr &client) -> drogon::Task<PaginatedData<Ret>> {
                     constexpr int size = 20;
@@ -74,6 +74,16 @@ namespace service {
         }
 
     public:
+        template<typename T>
+        drogon::Task<size_t> getTotalModelCount() const {
+            const auto [res, err] =
+                co_await handleDatabaseOperation<size_t>([](const drogon::orm::DbClientPtr &client) -> drogon::Task<size_t> {
+                    drogon::orm::CoroMapper<T> mapper(client);
+                    co_return co_await mapper.count();
+                });
+            co_return res.value_or(-1);
+        }
+
         template<typename T, typename U>
         drogon::Task<std::vector<T>> getRelated(const std::string col, const U id) const {
             const auto [res, err] = co_await handleDatabaseOperation<std::vector<T>>(
