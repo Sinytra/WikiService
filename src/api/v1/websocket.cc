@@ -1,8 +1,8 @@
 #include "websocket.h"
 #include "error.h"
 
+#include <database/database.h>
 #include <log/log.h>
-#include <service/database.h>
 
 using namespace std;
 using namespace drogon;

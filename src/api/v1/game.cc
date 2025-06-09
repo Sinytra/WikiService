@@ -2,8 +2,8 @@
 
 #include <string>
 
+#include <database/resolved_db.h>
 #include "error.h"
-#include "resolved_db.h"
 
 using namespace std;
 using namespace drogon;

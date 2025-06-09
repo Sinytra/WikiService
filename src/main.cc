@@ -6,11 +6,11 @@
 #include "api/v1/websocket.h"
 #include "api/v1/system.h"
 
+#include <service/cloudflare.h>
+#include <service/database/database.h>
+#include <service/github.h>
 #include "config.h"
 #include "version.h"
-#include <service/database.h>
-#include <service/github.h>
-#include <service/cloudflare.h>
 
 #include <api/v1/error.h>
 #include <git2.h>

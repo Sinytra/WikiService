@@ -7,12 +7,13 @@
 #include <models/User.h>
 #include <nlohmann/json.hpp>
 #include <optional>
+#include <service/error.h>
 #include "database_base.h"
-#include "error.h"
 
 #include <models/ProjectVersion.h>
 
 #include "models/DataImport.h"
+#include "models/Deployment.h"
 
 using namespace drogon_model::postgres;
 
@@ -27,6 +28,27 @@ namespace service {
         std::string loc;
         std::string project;
         std::string path;
+    };
+    struct DeploymentData {
+        std::string id;
+        std::string project_id;
+        std::string commit_hash;
+        std::string commit_message;
+        std::string status;
+        std::string user_id;
+        std::string created_at;
+
+        friend void to_json(nlohmann::json& j, const DeploymentData& d) {
+            j = nlohmann::json{
+            {"id", d.id},
+            {"project_id", d.project_id},
+            {"commit_hash", d.commit_hash},
+            {"commit_message", d.commit_message},
+            {"status", d.status},
+            {"user_id", d.user_id.empty() ? nlohmann::json(nullptr) : nlohmann::json(d.user_id)},
+            {"created_at", d.created_at}
+            };
+        }
     };
 
     class Database : public DatabaseBase {
@@ -80,6 +102,13 @@ namespace service {
 
         drogon::Task<std::optional<DataImport>> addDataImportRecord(DataImport data) const;
         drogon::Task<PaginatedData<DataImport>> getDataImports(std::string searchQuery, int page) const;
+
+        drogon::Task<PaginatedData<DeploymentData>> getDeployments(std::string projectId, int page) const;
+        drogon::Task<std::optional<Deployment>> getDeployment(std::string id) const;
+        drogon::Task<std::optional<Deployment>> getActiveDeployment(std::string projectId) const;
+        drogon::Task<std::optional<Deployment>> addDeployment(Deployment deployment) const;
+        drogon::Task<std::optional<Deployment>> updateDeployment(Deployment deployment) const;
+        drogon::Task<Error> deleteDeployment(std::string id) const;
     private:
         drogon::orm::DbClientPtr clientPtr_;
     };

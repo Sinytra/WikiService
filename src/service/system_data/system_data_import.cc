@@ -2,9 +2,9 @@
 #include <drogon/HttpAppFramework.h>
 #include <log/log.h>
 
+#include <database/database.h>
 #include "schemas.h"
 #include "service/auth.h"
-#include "service/database.h"
 #include "util.h"
 
 using namespace drogon;

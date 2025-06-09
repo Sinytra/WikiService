@@ -1,9 +1,9 @@
 #include "game_content.h"
 
-#include <database.h>
+#include <database/database.h>
+#include <database/resolved_db.h>
 #include <drogon/drogon.h>
 #include <fstream>
-#include <resolved_db.h>
 
 #define EXT_JSON ".json"
 #define CONTENT_DIR ".content/"

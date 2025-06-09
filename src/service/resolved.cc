@@ -1,6 +1,6 @@
 #include "resolved.h"
-#include "database.h"
-#include "resolved_db.h"
+#include "database/database.h"
+#include "database/resolved_db.h"
 #include "schemas.h"
 #include "util.h"
 

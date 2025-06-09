@@ -1,10 +1,10 @@
-#include <database.h>
+#include <database/database.h>
 
 
 #include "game_content.h"
 
+#include <database/resolved_db.h>
 #include <drogon/drogon.h>
-#include <resolved_db.h>
 #include <schemas.h>
 
 #define EXT_JSON ".json"

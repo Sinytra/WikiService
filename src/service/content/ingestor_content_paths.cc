@@ -1,7 +1,7 @@
 #include "game_content.h"
 
+#include <database/resolved_db.h>
 #include <drogon/drogon.h>
-#include <resolved_db.h>
 
 #define EXT_MDX ".mdx"
 #define CONTENT_DIR ".content/"

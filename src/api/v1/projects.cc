@@ -1,12 +1,12 @@
 #include "projects.h"
 
+#include <database/database.h>
 #include <include/uri.h>
 #include <log/log.h>
 #include <models/UserProject.h>
 #include <service/auth.h>
 #include <service/cloudflare.h>
 #include <service/crypto.h>
-#include <service/database.h>
 #include <service/error.h>
 #include <service/schemas.h>
 // ReSharper disable once CppUnusedIncludeDirective
@@ -324,7 +324,7 @@ namespace api::v1 {
         resp->setStatusCode(k200OK);
         callback(resp);
 
-        reloadProject(*result);
+        enqueueDeploy(*result, session.username);
     }
 
     Task<> ProjectsController::update(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback) const {
@@ -356,7 +356,7 @@ namespace api::v1 {
         resp->setStatusCode(k200OK);
         callback(resp);
 
-        reloadProject(project);
+        enqueueDeploy(project, session.username);
     }
 
     Task<> ProjectsController::remove(const HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback,
@@ -377,8 +377,8 @@ namespace api::v1 {
         callback(resp);
     }
 
-    Task<> ProjectsController::invalidate(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
-                                          const std::string id) const {
+    Task<> ProjectsController::redeployProject(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+                                               const std::string id) const {
         std::string username = "";
 
         const auto token = req->getParameter("token");
@@ -396,34 +396,28 @@ namespace api::v1 {
             throw ApiException(Error::ErrBadRequest, "not_found");
         }
 
-        // Invalidate ahead of reloading
-        co_await global::storage->invalidateProject(*project);
+        if (co_await global::storage->getProjectStatus(*project) == LOADING) {
+            throw ApiException(Error::ErrBadRequest, "pending_deployment");
+        }
 
-        reloadProject(*project, false);
+        enqueueDeploy(*project, username);
 
         Json::Value root;
-        root["message"] = "Project reload started successfully";
+        root["message"] = "Project deploy started successfully";
         const auto resp = HttpResponse::newHttpJsonResponse(root);
         resp->setStatusCode(k200OK);
         callback(resp);
     }
 
-    void ProjectsController::reloadProject(const Project &project, bool invalidate) const {
+    void ProjectsController::enqueueDeploy(const Project &project, const std::string userId) const {
         const auto currentLoop = trantor::EventLoop::getEventLoopOfCurrentThread();
-        currentLoop->queueInLoop(async_func([this, project, invalidate]() -> Task<> {
-            if (invalidate) {
-                logger.debug("Invalidating project '{}'", project.getValueOfId());
-                co_await global::storage->invalidateProject(project);
-            }
+        currentLoop->queueInLoop(async_func([this, project, userId]() -> Task<> {
+            logger.debug("Deploying project '{}' from branch '{}'", project.getValueOfId(), project.getValueOfSourceBranch());
 
-            logger.debug("Reloading project '{}'", project.getValueOfId());
-
-            if (const auto [resolved, resErr](co_await global::storage->getProject(project, std::nullopt, std::nullopt));
-                resErr == Error::Ok)
-            {
-                logger.debug("Project '{}' reloaded successfully", project.getValueOfId());
+            if (const auto [resolved, resErr](co_await global::storage->deployProject(project, userId)); resErr == Error::Ok) {
+                logger.debug("Project '{}' deployed successfully", project.getValueOfId());
             } else {
-                logger.error("Encountered error while reloading project '{}'", project.getValueOfId());
+                logger.error("Encountered error while deploying project '{}'", project.getValueOfId());
             }
         }));
     }
@@ -458,7 +452,8 @@ namespace api::v1 {
         callback(jsonResponse(items));
     }
 
-    Task<> ProjectsController::getRecipes(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback, const std::string id) const {
+    Task<> ProjectsController::getRecipes(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+                                          const std::string id) const {
         const auto version = req->getOptionalParameter<std::string>("version");
         const auto resolved = co_await BaseProjectController::getUserProject(req, id, version, std::nullopt, callback);
         const auto recipes{co_await resolved.getRecipes(getTableQueryParams(req))};
@@ -470,5 +465,13 @@ namespace api::v1 {
         const auto resolved = co_await BaseProjectController::getUserProject(req, id, std::nullopt, std::nullopt, callback);
         const auto versions{co_await resolved.getVersions(getTableQueryParams(req))};
         callback(jsonResponse(versions));
+    }
+
+    Task<> ProjectsController::getDeployments(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+                                              const std::string id) const {
+        const auto project = co_await BaseProjectController::getUserProject(req, id);
+        const auto deployments = co_await global::database->getDeployments(project.getValueOfId(), getTableQueryParams(req).page);
+
+        callback(jsonResponse(deployments));
     }
 }

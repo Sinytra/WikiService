@@ -1,10 +1,10 @@
 #include "auth.h"
 #include "error.h"
 
+#include <database/database.h>
 #include <include/uri.h>
 #include <log/log.h>
 #include <service/crypto.h>
-#include <service/database.h>
 #include <service/github.h>
 #include <service/util.h>
 #include <string>

@@ -1,8 +1,8 @@
 #include "ingestor_recipes.h"
+#include <database/database.h>
+#include <database/resolved_db.h>
 #include <content/builtin_recipe_type.h>
-#include <database.h>
 #include <drogon/drogon.h>
-#include <resolved_db.h>
 #include <schemas.h>
 #include "game_content.h"
 

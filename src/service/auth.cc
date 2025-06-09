@@ -1,7 +1,7 @@
 #include "auth.h"
 
+#include <database/database.h>
 #include <models/User.h>
-#include <service/database.h>
 #include <service/github.h>
 #include <service/platforms.h>
 

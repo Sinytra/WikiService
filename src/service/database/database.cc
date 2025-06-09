@@ -1,6 +1,6 @@
 #include "database.h"
-#include "log/log.h"
-#include "util.h"
+#include <service/util.h>
+#include <log/log.h>
 
 #include <drogon/drogon.h>
 #include <models/User.h>

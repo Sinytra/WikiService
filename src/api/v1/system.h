@@ -2,7 +2,7 @@
 
 #include <drogon/HttpController.h>
 
-#include "service/database.h"
+#include <service/database/database.h>
 
 namespace api::v1 {
     class SystemController final : public drogon::HttpController<SystemController, false> {

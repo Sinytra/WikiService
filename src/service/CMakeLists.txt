@@ -29,18 +29,20 @@ add_library(service STATIC
         content/ingestor_content_paths.cc
         content/ingestor_tags.cc
         content/ingestor_recipes.cc
+        database/database.cc
+        database/database_content.cc
+        database/database_system.cc
+        database/database_deployments.cc
+        database/resolved_db.cc
         system_data/system_data_import.cc
         auth.cc
         cache.cc
         cloudflare.cc
         crypto.cc
-        database.cc
-        database_content.cc
-        database_system.cc
+        deployment.cc
         github.cc
         platforms.cc
         resolved.cc
-        resolved_db.cc
         schemas.cc
         storage.cc
         util.cc

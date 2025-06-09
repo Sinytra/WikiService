@@ -5,7 +5,7 @@
 #include <drogon/utils/coroutine.h>
 #include <log/log.h>
 #include <nlohmann/json.hpp>
-#include "error.h"
+#include <service/error.h>
 
 namespace service {
     template<class T>
@@ -45,16 +45,23 @@ namespace service {
             }
         }
 
-        template<typename Ret>
+        template<typename Ret, typename... Arguments>
+        drogon::Task<PaginatedData<Ret>> handlePaginatedQueryWithArgs(const std::string query, const int page, Arguments &&...args) const {
+            co_return co_await handlePaginatedQuery<Ret, Arguments...>(
+                query, page, [](const drogon::orm::Row &row) { return Ret(row); }, std::forward<Arguments>(args)...);
+        }
+
+        template<typename Ret, typename... Arguments>
         drogon::Task<PaginatedData<Ret>> handlePaginatedQuery(
-            const std::string query, const std::string searchQuery, const int page,
-            const std::function<Ret(const drogon::orm::Row &)> callback = [](const drogon::orm::Row &row) { return Ret(row); }) const {
+            const std::string query, const int page,
+            const std::function<Ret(const drogon::orm::Row &)> callback = [](const drogon::orm::Row &row) { return Ret(row); },
+            Arguments &&...args) const {
             const auto [res, err] = co_await handleDatabaseOperation<PaginatedData<Ret>>(
                 [&](const drogon::orm::DbClientPtr &client) -> drogon::Task<PaginatedData<Ret>> {
                     constexpr int size = 20;
                     const auto actualQuery = paginatedQuery(query, size, page);
 
-                    const auto results = co_await client->execSqlCoro(actualQuery, searchQuery);
+                    const auto results = co_await client->execSqlCoro(actualQuery, std::forward<Arguments>(args)...);
 
                     if (results.empty()) {
                         throw drogon::orm::DrogonDbException{};

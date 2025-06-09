@@ -11,6 +11,6 @@ namespace service {
                                        WHERE game_version ILIKE '%' || $1 || '%' \
                                        ORDER BY created_at DESC";
 
-        co_return co_await handlePaginatedQuery<DataImport>(query, searchQuery, page);
+        co_return co_await handlePaginatedQueryWithArgs<DataImport>(query, page, searchQuery);
     }
 }

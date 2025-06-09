@@ -41,22 +41,24 @@ namespace service {
 
         drogon::Task<std::tuple<std::optional<ResolvedProject>, Error>> getProject(const Project &project, const std::optional<std::string> &version, const std::optional<std::string> &locale);
 
-        drogon::Task<Error> invalidateProject(const Project &project);
+        drogon::Task<Error> invalidateProject(const Project &project) const;
 
-        drogon::Task<std::optional<ResolvedProject>> maybeGetProject(const Project &project);
+        drogon::Task<std::optional<ResolvedProject>> maybeGetProject(const Project &project) const;
 
-        drogon::Task<ProjectStatus> getProjectStatus(const Project &project);
+        drogon::Task<ProjectStatus> getProjectStatus(const Project &project) const;
 
         std::optional<std::string> getProjectLog(const Project &project) const;
 
         drogon::Task<std::tuple<std::optional<nlohmann::json>, ProjectError, std::string>> setupValidateTempProject(const Project &project) const;
+
+        drogon::Task<std::tuple<std::optional<Deployment>, Error>> deployProject(const Project &project, std::string userId);
     private:
-        drogon::Task<ProjectError> setupProject(const Project &project) const;
-        drogon::Task<ProjectError> setupProjectCached(const Project &project);
+        drogon::Task<ProjectError> setupProject(const Project &project, Deployment& deployment) const;
+        drogon::Task<std::tuple<std::optional<Deployment>, ProjectError>> setupProjectCached(const Project &project, const std::string userId);
         std::filesystem::directory_entry getBaseDir() const;
         std::filesystem::path getProjectLogPath(const Project &project) const;
         std::filesystem::path getProjectDirPath(const Project &project, const std::string &version) const;
-        drogon::Task<std::tuple<std::optional<ResolvedProject>, Error>> findProject(const Project &project, const std::optional<std::string> &version, const std::optional<std::string> &locale, bool setup);
+        drogon::Task<std::tuple<std::optional<ResolvedProject>, Error>> findProject(const Project &project, const std::optional<std::string> &version, const std::optional<std::string> &locale) const;
         std::shared_ptr<spdlog::logger> getProjectLogger(const Project &project, bool file = true) const;
 
         const std::string &basePath_;

@@ -1,19 +1,21 @@
 #include "storage.h"
 
-#include <database.h>
+#include <database/database.h>
 
 #include "util.h"
 
 #include <filesystem>
 #include <fstream>
 
+#include <database/resolved_db.h>
 #include <git2.h>
 #include <include/uri.h>
 #include <models/ProjectVersion.h>
-#include <resolved_db.h>
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/callback_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
+
+#include "deployment.h"
 
 #define TEMP_DIR ".temp"
 #define LATEST_VERSION "latest"
@@ -343,7 +345,22 @@ namespace service {
     }
 
     std::shared_ptr<spdlog::logger> Storage::getProjectLogger(const Project &project, bool file) const {
+        static std::shared_mutex loggersMapLock;
+
         const auto id = project.getValueOfId();
+        {
+            std::shared_lock<std::shared_mutex> readLock;
+            // Get existing logger
+            if (const auto existing = spdlog::get(id)) {
+                return existing;
+            }
+        }
+
+        std::unique_lock<std::shared_mutex> writeLock;
+        // Re-check
+        if (const auto existing = spdlog::get(id)) {
+            return existing;
+        }
 
         std::vector<spdlog::sink_ptr> sinks;
 
@@ -482,17 +499,17 @@ namespace service {
         co_return resolvedDefaultVersion;
     }
 
-    Task<ProjectError> Storage::setupProject(const Project &project) const {
+    Task<ProjectError> Storage::setupProject(const Project &project, Deployment& deployment) const {
         const auto baseDir = getBaseDir();
         const auto clonePath = baseDir.path() / TEMP_DIR / project.getValueOfId();
         remove_all(clonePath);
 
-        const auto projectBaseDir = getBaseDir().path() / project.getValueOfId();
-        remove_all(projectBaseDir);
-
         const auto logger = getProjectLogger(project);
 
         logger->info("Setting up project");
+
+        deployment.setStatus(deploymentStatusToString(DeploymentStatus::LOADING));
+        co_await global::database->updateDeployment(deployment);
 
         const auto [repo, cloneError] = co_await gitCloneProject(project, clonePath, project.getValueOfSourceBranch(), logger);
         if (!repo || cloneError != ProjectError::OK) {
@@ -511,8 +528,17 @@ namespace service {
             co_return ProjectError::UNKNOWN;
         }
 
+        deployment.setRevision(nlohmann::json(*revision).dump());
+        co_await global::database->updateDeployment(deployment);
+
         ResolvedProject resolved{project, *revision, clonePath, clonePath / removeLeadingSlash(project.getValueOfSourcePath()),
                                  *defaultVersion};
+
+        // TODO Ingest from other versions?
+        content::Ingestor ingestor{resolved, logger};
+        if (const auto result = co_await ingestor.runIngestor(); result != Error::Ok) {
+            co_return ProjectError::UNKNOWN;
+        }
 
         const auto branches = listRepoBranches(repo);
         auto versions = co_await resolved.getProjectDatabase().getVersions();
@@ -541,61 +567,64 @@ namespace service {
 
         git_repository_free(repo);
 
-        logger->info("Project clone complete");
-
-        // TODO Does not work on first import
-        ResolvedProject finalResolved{project, *revision, dest, dest / removeLeadingSlash(project.getValueOfSourcePath()), *defaultVersion};
-
-        content::Ingestor ingestor{finalResolved, logger};
-        if (const auto result = co_await ingestor.runIngestor(); result != Error::Ok) {
-            logger->error("!!================================!!");
-            logger->error("!!      Project setup failed      !!");
-            logger->error("!!================================!!");
-            co_return ProjectError::UNKNOWN;
-        }
-
-        logger->info("====================================");
-        logger->info("==     Project setup complete     ==");
-        logger->info("====================================");
-
         co_return ProjectError::OK;
     }
 
-    Task<ProjectError> Storage::setupProjectCached(const Project &project) {
+    Task<std::tuple<std::optional<Deployment>, ProjectError>> Storage::setupProjectCached(const Project &project, const std::string userId) {
         const auto taskKey = createProjectSetupKey(project);
 
-        if (const auto pending = co_await getOrStartTask<ProjectError>(taskKey)) {
+        if (const auto pending = co_await getOrStartTask<std::tuple<std::optional<Deployment>, ProjectError>>(taskKey)) {
             co_return co_await patientlyAwaitTaskResult(*pending);
         }
 
-        auto result = co_await setupProject(project);
+        Deployment tmpDep;
+        tmpDep.setId(project.getValueOfId());
+        tmpDep.setProjectId(project.getValueOfId());
+        tmpDep.setStatus(deploymentStatusToString(DeploymentStatus::CREATED));
+        if (!userId.empty()) tmpDep.setUserId(userId);
+        const auto dbResult = co_await global::database->addDeployment(tmpDep);
+        if (!dbResult) {
+            co_return {std::nullopt, ProjectError::UNKNOWN};
+        }
+        auto deployment = *dbResult;
+
+        // Clean logs
+        fs::remove(getProjectLogPath(project));
+
+        const auto projectLogger = getProjectLogger(project);
+        auto result = co_await setupProject(project, deployment);
         if (result == ProjectError::OK) {
+            projectLogger->info("====================================");
+            projectLogger->info("==     Project setup complete     ==");
+            projectLogger->info("====================================");
+
             global::connections->broadcast(project.getValueOfId(), WS_SUCCESS);
+
+            deployment.setStatus(deploymentStatusToString(DeploymentStatus::SUCCESS));
         } else {
+            projectLogger->error("!!================================!!");
+            projectLogger->error("!!      Project setup failed      !!");
+            projectLogger->error("!!================================!!");
+
             global::connections->broadcast(project.getValueOfId(), WS_ERROR);
+
+            deployment.setStatus(deploymentStatusToString(DeploymentStatus::ERROR));
         }
 
+        co_await global::database->updateDeployment(deployment);
         global::connections->shutdown(project.getValueOfId());
 
-        co_return co_await completeTask<ProjectError>(taskKey, std::move(result));
+        co_return co_await completeTask<std::tuple<std::optional<Deployment>, ProjectError>>(taskKey, {deployment, result});
     }
 
     Task<std::tuple<std::optional<ResolvedProject>, Error>> Storage::findProject(const Project &project,
                                                                                  const std::optional<std::string> &version,
-                                                                                 const std::optional<std::string> &locale,
-                                                                                 const bool setup) {
+                                                                                 const std::optional<std::string> &locale) const {
         const auto branch = project.getValueOfSourceBranch();
         const auto rootDir = getProjectDirPath(project, version.value_or(""));
 
         if (!exists(rootDir)) {
-            if (!setup) {
-                co_return {std::nullopt, Error::ErrNotFound};
-            }
-
-            if (const auto res = co_await setupProjectCached(project); res != ProjectError::OK) {
-                logger.error("Failed to setup project '{}'", project.getValueOfId());
-                co_return {std::nullopt, Error::ErrInternal};
-            }
+            co_return {std::nullopt, Error::ErrNotFound};
         }
 
         const auto revision = getLatestCommitInfo(rootDir);
@@ -629,10 +658,10 @@ namespace service {
 
     Task<std::tuple<std::optional<ResolvedProject>, Error>>
     Storage::getProject(const Project &project, const std::optional<std::string> &version, const std::optional<std::string> &locale) {
-        const auto [defaultProject, error] = co_await findProject(project, std::nullopt, locale, true);
+        const auto [defaultProject, error] = co_await findProject(project, std::nullopt, locale);
 
         if (defaultProject && version) {
-            if (auto [vProject, vError] = co_await findProject(project, version, locale, false); vProject) {
+            if (auto [vProject, vError] = co_await findProject(project, version, locale); vProject) {
                 vProject->setDefaultVersion(*defaultProject);
                 co_return {vProject, vError};
             }
@@ -644,9 +673,8 @@ namespace service {
         co_return {defaultProject, error};
     }
 
-    Task<Error> Storage::invalidateProject(const Project &project) {
-        const auto [resolved, error] = co_await findProject(project, std::nullopt, std::nullopt, false);
-        if (!resolved) {
+    Task<Error> Storage::invalidateProject(const Project &project) const {
+        if (const auto [resolved, error] = co_await findProject(project, std::nullopt, std::nullopt); !resolved) {
             co_return error;
         }
 
@@ -658,15 +686,13 @@ namespace service {
         co_return Error::Ok;
     }
 
-    Task<std::optional<ResolvedProject>> Storage::maybeGetProject(const Project &project) {
-        const auto [resolved, error] = co_await findProject(project, std::nullopt, std::nullopt, false);
+    Task<std::optional<ResolvedProject>> Storage::maybeGetProject(const Project &project) const {
+        const auto [resolved, error] = co_await findProject(project, std::nullopt, std::nullopt);
         co_return resolved;
     }
 
-    Task<ProjectStatus> Storage::getProjectStatus(const Project &project) {
-        const auto taskKey = createProjectSetupKey(project);
-
-        if (const auto pending = getPendingTask<ProjectError>(taskKey)) {
+    Task<ProjectStatus> Storage::getProjectStatus(const Project &project) const {
+        if (hasPendingTask(createProjectSetupKey(project))) {
             co_return LOADING;
         }
 
@@ -732,5 +758,17 @@ namespace service {
 
         remove_all(clonePath);
         co_return {*json, ProjectError::OK, ""};
+    }
+
+    Task<std::tuple<std::optional<Deployment>, Error>> Storage::deployProject(const Project &project, const std::string userId) {
+        if (hasPendingTask(createProjectSetupKey(project))) {
+            co_return {std::nullopt, Error::ErrInternal};
+        }
+
+        const auto [deployment, error] = co_await setupProjectCached(project, userId);
+        if (error != ProjectError::OK) {
+            co_return {std::nullopt, Error::ErrInternal};
+        }
+        co_return {deployment, Error::Ok};
     }
 }

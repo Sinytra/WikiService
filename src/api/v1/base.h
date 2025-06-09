@@ -2,8 +2,8 @@
 
 #include <drogon/HttpController.h>
 
-#include "service/database.h"
-#include "service/storage.h"
+#include <service/database/database.h>
+#include <service/storage.h>
 
 namespace api::v1 {
     class BaseProjectController {

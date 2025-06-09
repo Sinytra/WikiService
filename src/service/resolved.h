@@ -7,7 +7,7 @@
 #include <models/RecipeIngredientTag.h>
 #include <nlohmann/json_fwd.hpp>
 #include "cache.h"
-#include "database.h"
+#include "database/database.h"
 #include "error.h"
 #include "util.h"
 
@@ -72,13 +72,7 @@ namespace service {
         std::string authorEmail;
         std::string date;
 
-        friend void to_json(nlohmann::json &j, const GitRevision &obj) {
-            j = nlohmann::json{{"hash", obj.hash},
-                               {"message", obj.message},
-                               {"authorName", obj.authorName},
-                               {"authorEmail", obj.authorEmail},
-                               {"date", obj.date}};
-        }
+        NLOHMANN_DEFINE_TYPE_INTRUSIVE(GitRevision, hash, message, authorName, authorEmail, date)
     };
 
     // See resolved_db.h

@@ -72,6 +72,10 @@ namespace service {
             return std::nullopt;
         }
 
+        bool hasPendingTask(const std::string &key) const {
+            return pendingTasks_.contains(key);
+        }
+
         template<class T>
         drogon::Task<std::optional<std::shared_future<T>>> getOrStartTask(const std::string &key) {
             if (const auto pending = getPendingTask<T>(key)) {
