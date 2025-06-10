@@ -56,7 +56,6 @@ namespace content {
             co_return result;
         } catch (std::exception e) {
             logger.error("Error ingesting project data: {}", e.what());
-            projectLog.error("Error ingesting project data");
 
             project_.getProjectDatabase().setDBClientPointer(clientPtr);
             co_return Error::ErrInternal;

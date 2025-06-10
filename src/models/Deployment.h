@@ -48,6 +48,7 @@ class Deployment
         static const std::string _project_id;
         static const std::string _revision;
         static const std::string _status;
+        static const std::string _active;
         static const std::string _user_id;
         static const std::string _created_at;
     };
@@ -138,6 +139,14 @@ class Deployment
     void setStatus(const std::string &pStatus) noexcept;
     void setStatus(std::string &&pStatus) noexcept;
 
+    /**  For column active  */
+    ///Get the value of the column active, returns the default value if the column is null
+    const bool &getValueOfActive() const noexcept;
+    ///Return a shared_ptr object pointing to the column const value, or an empty shared_ptr object if the column is null
+    const std::shared_ptr<bool> &getActive() const noexcept;
+    ///Set the value of the column active
+    void setActive(const bool &pActive) noexcept;
+
     /**  For column user_id  */
     ///Get the value of the column user_id, returns the default value if the column is null
     const std::string &getValueOfUserId() const noexcept;
@@ -157,7 +166,7 @@ class Deployment
     void setCreatedAt(const ::trantor::Date &pCreatedAt) noexcept;
 
 
-    static size_t getColumnNumber() noexcept {  return 6;  }
+    static size_t getColumnNumber() noexcept {  return 7;  }
     static const std::string &getColumnName(size_t index) noexcept(false);
 
     Json::Value toJson() const;
@@ -182,6 +191,7 @@ class Deployment
     std::shared_ptr<std::string> projectId_;
     std::shared_ptr<std::string> revision_;
     std::shared_ptr<std::string> status_;
+    std::shared_ptr<bool> active_;
     std::shared_ptr<std::string> userId_;
     std::shared_ptr<::trantor::Date> createdAt_;
     struct MetaData
@@ -195,7 +205,7 @@ class Deployment
         const bool notNull_;
     };
     static const std::vector<MetaData> metaData_;
-    bool dirtyFlag_[6]={ false };
+    bool dirtyFlag_[7]={ false };
   public:
     static const std::string &sqlForFindingByPrimaryKey()
     {
@@ -233,14 +243,20 @@ class Deployment
             sql += "status,";
             ++parametersCount;
         }
-        if(dirtyFlag_[4])
+        sql += "active,";
+        ++parametersCount;
+        if(!dirtyFlag_[4])
+        {
+            needSelection=true;
+        }
+        if(dirtyFlag_[5])
         {
             sql += "user_id,";
             ++parametersCount;
         }
         sql += "created_at,";
         ++parametersCount;
-        if(!dirtyFlag_[5])
+        if(!dirtyFlag_[6])
         {
             needSelection=true;
         }
@@ -280,7 +296,16 @@ class Deployment
             n = snprintf(placeholderStr,sizeof(placeholderStr),"$%d,",placeholder++);
             sql.append(placeholderStr, n);
         }
+        else
+        {
+            sql +="default,";
+        }
         if(dirtyFlag_[5])
+        {
+            n = snprintf(placeholderStr,sizeof(placeholderStr),"$%d,",placeholder++);
+            sql.append(placeholderStr, n);
+        }
+        if(dirtyFlag_[6])
         {
             n = snprintf(placeholderStr,sizeof(placeholderStr),"$%d,",placeholder++);
             sql.append(placeholderStr, n);

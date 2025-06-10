@@ -37,17 +37,17 @@ namespace service {
         std::string status;
         std::string user_id;
         std::string created_at;
+        bool current;
 
-        friend void to_json(nlohmann::json& j, const DeploymentData& d) {
-            j = nlohmann::json{
-            {"id", d.id},
-            {"project_id", d.project_id},
-            {"commit_hash", d.commit_hash},
-            {"commit_message", d.commit_message},
-            {"status", d.status},
-            {"user_id", d.user_id.empty() ? nlohmann::json(nullptr) : nlohmann::json(d.user_id)},
-            {"created_at", d.created_at}
-            };
+        friend void to_json(nlohmann::json &j, const DeploymentData &d) {
+            j = nlohmann::json{{"id", d.id},
+                               {"project_id", d.project_id},
+                               {"commit_hash", d.commit_hash},
+                               {"commit_message", d.commit_message},
+                               {"status", d.status},
+                               {"user_id", d.user_id.empty() ? nlohmann::json(nullptr) : nlohmann::json(d.user_id)},
+                               {"created_at", d.created_at},
+                               {"current", d.current}};
         }
     };
 
@@ -108,10 +108,30 @@ namespace service {
         drogon::Task<std::optional<Deployment>> getActiveDeployment(std::string projectId) const;
         drogon::Task<std::optional<Deployment>> addDeployment(Deployment deployment) const;
         drogon::Task<std::optional<Deployment>> updateDeployment(Deployment deployment) const;
+        drogon::Task<Error> deactivateDeployments(std::string projectId) const;
         drogon::Task<Error> deleteDeployment(std::string id) const;
+
     private:
         drogon::orm::DbClientPtr clientPtr_;
     };
+
+    template<typename Ret>
+    drogon::Task<std::tuple<std::optional<Ret>, Error>>
+    executeTransaction(const std::function<drogon::Task<Ret>(const Database &client)> &func) {
+        try {
+            const auto clientPtr = drogon::app().getFastDbClient();
+            const auto transPtr = co_await clientPtr->newTransactionCoro();
+            const Database transDb{transPtr};
+
+            const Ret result = co_await func(transDb);
+            co_return {result, Error::Ok};
+        } catch (const drogon::orm::Failure &e) {
+            logging::logger.error("Error executing transaction: {}", e.what());
+            co_return {std::nullopt, Error::ErrInternal};
+        } catch ([[maybe_unused]] const drogon::orm::DrogonDbException &e) {
+            co_return {std::nullopt, Error::ErrNotFound};
+        }
+    }
 }
 
 namespace global {

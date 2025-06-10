@@ -36,6 +36,8 @@ namespace api::v1 {
         ADD_METHOD_TO(ProjectsController::getRecipes,       "/api/v1/dev/projects/{1:id}/content/recipes",      drogon::Get,    "AuthFilter");
         ADD_METHOD_TO(ProjectsController::getVersions,      "/api/v1/dev/projects/{1:id}/versions",             drogon::Get,    "AuthFilter");
         ADD_METHOD_TO(ProjectsController::getDeployments,   "/api/v1/dev/projects/{1:id}/deployments",          drogon::Get,    "AuthFilter");
+        // TODO Deployment controller
+        ADD_METHOD_TO(ProjectsController::deleteDeployment, "/api/v1/dev/deployments/{1:id}",                   drogon::Delete, "AuthFilter");
         // Dev content
         METHOD_LIST_END
         // clang-format on
@@ -82,6 +84,9 @@ namespace api::v1 {
         drogon::Task<> getDeployments(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
                                       std::string id) const;
 
+        drogon::Task<> deleteDeployment(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
+                                        std::string id) const;
+
     private:
         nlohmann::json processPlatforms(const nlohmann::json &metadata) const;
 
@@ -93,6 +98,6 @@ namespace api::v1 {
                                                                std::function<void(const drogon::HttpResponsePtr &)> callback,
                                                                bool checkExisting) const;
 
-        void enqueueDeploy(const Project &project, const std::string userId) const;
+        void enqueueDeploy(const Project &project, std::string userId) const;
     };
 }

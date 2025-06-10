@@ -206,11 +206,16 @@ std::optional<GitRevision> getLatestCommitInfo(git_repository *repo) {
 
     git_commit_free(commit);
 
-    return GitRevision{.hash = short_hash, .fullHash = full_hash, .message = message, .authorName = author_name, .authorEmail = author_email, .date = commitDate};
+    return GitRevision{.hash = short_hash,
+                       .fullHash = full_hash,
+                       .message = message,
+                       .authorName = author_name,
+                       .authorEmail = author_email,
+                       .date = commitDate};
 }
 
 std::optional<GitRevision> getLatestCommitInfo(const fs::path &path) {
-    git_repository* repo = nullptr;
+    git_repository *repo = nullptr;
     if (git_repository_open(&repo, absolute(path).c_str()) != 0) {
         logger.error("Failed to open repository: {}", path.string());
         return std::nullopt;
@@ -499,9 +504,24 @@ namespace service {
         co_return resolvedDefaultVersion;
     }
 
-    Task<ProjectError> Storage::setupProject(const Project &project, Deployment& deployment) const {
+    Task<Error> setActiveDeployment(const std::string projectId, Deployment &deployment) {
+        const auto [res, err] = co_await executeTransaction<Error>([projectId, &deployment](const Database &client) -> Task<Error> {
+            if (const auto dbErr = co_await client.deactivateDeployments(projectId); dbErr != Error::Ok) {
+                co_return dbErr;
+            }
+
+            deployment.setActive(true);
+            co_await client.updateDeployment(deployment);
+
+            co_return Error::Ok;
+        });
+        co_return res.value_or(err);
+    }
+
+    Task<ProjectError> Storage::setupProject(const Project &project, Deployment &deployment) const {
         const auto baseDir = getBaseDir();
-        const auto clonePath = baseDir.path() / TEMP_DIR / project.getValueOfId();
+        const auto projectId = project.getValueOfId();
+        const auto clonePath = baseDir.path() / TEMP_DIR / projectId;
         remove_all(clonePath);
 
         const auto logger = getProjectLogger(project);
@@ -537,6 +557,7 @@ namespace service {
         // TODO Ingest from other versions?
         content::Ingestor ingestor{resolved, logger};
         if (const auto result = co_await ingestor.runIngestor(); result != Error::Ok) {
+            logger->error("Error ingesting project data");
             co_return ProjectError::UNKNOWN;
         }
 
@@ -567,10 +588,16 @@ namespace service {
 
         git_repository_free(repo);
 
+        if (const auto err = co_await setActiveDeployment(projectId, deployment); err != Error::Ok) {
+            logger->error("Error setting active deployment");
+            co_return ProjectError::UNKNOWN;
+        }
+
         co_return ProjectError::OK;
     }
 
-    Task<std::tuple<std::optional<Deployment>, ProjectError>> Storage::setupProjectCached(const Project &project, const std::string userId) {
+    Task<std::tuple<std::optional<Deployment>, ProjectError>> Storage::setupProjectCached(const Project &project,
+                                                                                          const std::string userId) {
         const auto taskKey = createProjectSetupKey(project);
 
         if (const auto pending = co_await getOrStartTask<std::tuple<std::optional<Deployment>, ProjectError>>(taskKey)) {
@@ -581,7 +608,8 @@ namespace service {
         tmpDep.setId(project.getValueOfId());
         tmpDep.setProjectId(project.getValueOfId());
         tmpDep.setStatus(deploymentStatusToString(DeploymentStatus::CREATED));
-        if (!userId.empty()) tmpDep.setUserId(userId);
+        if (!userId.empty())
+            tmpDep.setUserId(userId);
         const auto dbResult = co_await global::database->addDeployment(tmpDep);
         if (!dbResult) {
             co_return {std::nullopt, ProjectError::UNKNOWN};

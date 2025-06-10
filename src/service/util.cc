@@ -21,6 +21,14 @@ HttpResponsePtr jsonResponse(const nlohmann::json &json) {
     return resp;
 }
 
+HttpResponsePtr simpleResponse(const std::string &msg) {
+    Json::Value root;
+    root["message"] = msg;
+    const auto resp = HttpResponse::newHttpJsonResponse(root);
+    resp->setStatusCode(k200OK);
+    return resp;
+}
+
 std::string removeLeadingSlash(const std::string &s) { return s.starts_with('/') ? s.substr(1) : s; }
 
 std::string removeTrailingSlash(const std::string &s) { return s.ends_with('/') ? s.substr(0, s.size() - 1) : s; }

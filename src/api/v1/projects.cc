@@ -370,11 +370,7 @@ namespace api::v1 {
 
         co_await global::storage->invalidateProject(project);
 
-        Json::Value root;
-        root["message"] = "Project deleted successfully";
-        const auto resp = HttpResponse::newHttpJsonResponse(root);
-        resp->setStatusCode(k200OK);
-        callback(resp);
+        callback(simpleResponse("Project deleted successfully"));
     }
 
     Task<> ProjectsController::redeployProject(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
@@ -470,8 +466,29 @@ namespace api::v1 {
     Task<> ProjectsController::getDeployments(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                               const std::string id) const {
         const auto project = co_await BaseProjectController::getUserProject(req, id);
-        const auto deployments = co_await global::database->getDeployments(project.getValueOfId(), getTableQueryParams(req).page);
+        auto deployments = co_await global::database->getDeployments(project.getValueOfId(), getTableQueryParams(req).page);
 
         callback(jsonResponse(deployments));
+    }
+
+    Task<> ProjectsController::deleteDeployment(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+                                                const std::string id) const {
+        const auto deployment(co_await global::database->getDeployment(id));
+        if (!deployment) {
+            throw ApiException(Error::ErrBadRequest, "not_found");
+        }
+        const auto project(co_await BaseProjectController::getUserProject(req, deployment->getValueOfProjectId()));
+
+        if (const auto error = co_await global::database->deleteDeployment(id); error != Error::Ok) {
+            logger.error("Failed to delete deployment {} in database", id);
+            throw ApiException(Error::ErrInternal, "internal");
+        }
+
+        if (deployment->getValueOfActive()) {
+            logger.debug("Invalidating project after active deployment was removed");
+            co_await global::storage->invalidateProject(project);
+        }
+
+        callback(simpleResponse("Deployment deleted successfully"));
     }
 }

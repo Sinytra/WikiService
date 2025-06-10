@@ -28,12 +28,13 @@ $$ LANGUAGE plpgsql;
 
 CREATE TABLE deployment
 (
-    id          varchar(28) PRIMARY KEY,
-    project_id  text                                   NOT NULL REFERENCES project (id) ON DELETE CASCADE,
-    revision    jsonb,
-    status      varchar(255)                           NOT NULL,
-    user_id     text references user_ (id),
-    created_at  timestamp(3) default CURRENT_TIMESTAMP NOT NULL
+    id         varchar(28) PRIMARY KEY,
+    project_id text         NOT NULL REFERENCES project (id) ON DELETE CASCADE,
+    revision   jsonb,
+    status     varchar(255) NOT NULL,
+    active     bool         NOT NULL DEFAULT FALSE,
+    user_id    text references user_ (id),
+    created_at timestamp(3)          default CURRENT_TIMESTAMP NOT NULL
 );
 
 CREATE OR REPLACE TRIGGER deployment_set_id
@@ -41,3 +42,5 @@ CREATE OR REPLACE TRIGGER deployment_set_id
     ON deployment
     FOR EACH ROW
 EXECUTE FUNCTION set_random_id(28);
+
+CREATE UNIQUE INDEX single_active_deployment ON deployment (project_id, active) WHERE active;

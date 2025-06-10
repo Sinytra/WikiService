@@ -26,6 +26,8 @@ TableQueryParams getTableQueryParams(const drogon::HttpRequestPtr& req);
 
 drogon::HttpResponsePtr jsonResponse(const nlohmann::json &json);
 
+drogon::HttpResponsePtr simpleResponse(const std::string &msg);
+
 struct ApiException final : std::runtime_error {
     using std::runtime_error::runtime_error;
 
