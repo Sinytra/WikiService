@@ -62,6 +62,7 @@ struct JsonValidationError {
 void replaceAll(std::string &s, std::string const &toReplace, std::string const &replaceWith);
 
 std::optional<Json::Value> parseJsonString(const std::string &str);
+Json::Value parseJsonOrThrow(const std::string &str);
 std::optional<nlohmann::json> parseJsonFile(const std::filesystem::path &path);
 
 std::string serializeJsonString(const Json::Value &value);

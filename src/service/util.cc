@@ -76,6 +76,14 @@ void replaceAll(std::string &s, std::string const &toReplace, std::string const 
     s.swap(buf);
 }
 
+Json::Value parseJsonOrThrow(const std::string &str) {
+    const auto parsed = parseJsonString(str);
+    if (!parsed) {
+        throw ApiException(Error::ErrInternal, "Error parsing JSON string");
+    }
+    return *parsed;
+}
+
 std::optional<Json::Value> parseJsonString(const std::string &str) {
     Json::Value root;
     JSONCPP_STRING err;

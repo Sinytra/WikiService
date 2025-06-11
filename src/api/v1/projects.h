@@ -37,6 +37,7 @@ namespace api::v1 {
         ADD_METHOD_TO(ProjectsController::getVersions,      "/api/v1/dev/projects/{1:id}/versions",             drogon::Get,    "AuthFilter");
         ADD_METHOD_TO(ProjectsController::getDeployments,   "/api/v1/dev/projects/{1:id}/deployments",          drogon::Get,    "AuthFilter");
         // TODO Deployment controller
+        ADD_METHOD_TO(ProjectsController::getDeployment,    "/api/v1/dev/deployments/{1:id}",                   drogon::Get,    "AuthFilter");
         ADD_METHOD_TO(ProjectsController::deleteDeployment, "/api/v1/dev/deployments/{1:id}",                   drogon::Delete, "AuthFilter");
         // Dev content
         METHOD_LIST_END
@@ -83,6 +84,9 @@ namespace api::v1 {
 
         drogon::Task<> getDeployments(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
                                       std::string id) const;
+
+        drogon::Task<> getDeployment(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
+                                     std::string id) const;
 
         drogon::Task<> deleteDeployment(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
                                         std::string id) const;

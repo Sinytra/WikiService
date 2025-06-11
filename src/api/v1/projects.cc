@@ -471,6 +471,20 @@ namespace api::v1 {
         callback(jsonResponse(deployments));
     }
 
+    Task<> ProjectsController::getDeployment(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+                                             const std::string id) const {
+        const auto deployment(co_await global::database->getDeployment(id));
+        if (!deployment) {
+            throw ApiException(Error::ErrBadRequest, "not_found");
+        }
+        const auto project(co_await BaseProjectController::getUserProject(req, deployment->getValueOfProjectId()));
+
+        Json::Value root(deployment->toJson());
+        root["revision"] = deployment->getRevision() ? parseJsonOrThrow(deployment->getValueOfRevision()) : Json::nullValue;
+
+        callback(HttpResponse::newHttpJsonResponse(root));
+    }
+
     Task<> ProjectsController::deleteDeployment(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                                 const std::string id) const {
         const auto deployment(co_await global::database->getDeployment(id));
