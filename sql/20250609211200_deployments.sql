@@ -28,13 +28,18 @@ $$ LANGUAGE plpgsql;
 
 CREATE TABLE deployment
 (
-    id         varchar(28) PRIMARY KEY,
-    project_id text         NOT NULL REFERENCES project (id) ON DELETE CASCADE,
-    revision   jsonb,
-    status     varchar(255) NOT NULL,
-    active     bool         NOT NULL DEFAULT FALSE,
-    user_id    text references user_ (id),
-    created_at timestamp(3)          default CURRENT_TIMESTAMP NOT NULL
+    id            varchar(28) PRIMARY KEY,
+    project_id    text         NOT NULL REFERENCES project (id) ON DELETE CASCADE,
+    revision      jsonb,
+    status        varchar(255) NOT NULL,
+    active        bool         NOT NULL DEFAULT FALSE,
+    user_id       text references user_ (id),
+
+    source_repo   text         not null,
+    source_branch text         not null,
+    source_path   text         not null,
+
+    created_at    timestamp(3)          default CURRENT_TIMESTAMP NOT NULL
 );
 
 CREATE OR REPLACE TRIGGER deployment_set_id

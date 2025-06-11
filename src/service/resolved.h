@@ -72,19 +72,19 @@ namespace service {
         std::string authorEmail;
         std::string date;
 
-        NLOHMANN_DEFINE_TYPE_INTRUSIVE(GitRevision, hash, message, authorName, authorEmail, date)
+        NLOHMANN_DEFINE_TYPE_INTRUSIVE(GitRevision, hash, fullHash, message, authorName, authorEmail, date)
     };
 
     // See resolved_db.h
     class ProjectDatabaseAccess;
 
+    std::string formatCommitUrl(const Project &project, const std::string &hash);
+
     class ResolvedProject {
     public:
-        explicit ResolvedProject(const Project &, const GitRevision &, const std::filesystem::path &, const std::filesystem::path &,
-                                 const ProjectVersion &);
+        explicit ResolvedProject(const Project &, const std::filesystem::path &, const std::filesystem::path &, const ProjectVersion &);
 
         void setDefaultVersion(const ResolvedProject &defaultVersion);
-
         bool setLocale(const std::optional<std::string> &locale);
 
         bool hasLocale(const std::string &locale) const;
@@ -133,7 +133,6 @@ namespace service {
         drogon::Task<Json::Value> ingredientToJson(const RecipeIngredientTag &tag) const;
 
         Project project_;
-        GitRevision revision_;
         std::shared_ptr<ResolvedProject> defaultVersion_;
 
         std::filesystem::path rootDir_;

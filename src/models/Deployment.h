@@ -50,6 +50,9 @@ class Deployment
         static const std::string _status;
         static const std::string _active;
         static const std::string _user_id;
+        static const std::string _source_repo;
+        static const std::string _source_branch;
+        static const std::string _source_path;
         static const std::string _created_at;
     };
 
@@ -157,6 +160,33 @@ class Deployment
     void setUserId(std::string &&pUserId) noexcept;
     void setUserIdToNull() noexcept;
 
+    /**  For column source_repo  */
+    ///Get the value of the column source_repo, returns the default value if the column is null
+    const std::string &getValueOfSourceRepo() const noexcept;
+    ///Return a shared_ptr object pointing to the column const value, or an empty shared_ptr object if the column is null
+    const std::shared_ptr<std::string> &getSourceRepo() const noexcept;
+    ///Set the value of the column source_repo
+    void setSourceRepo(const std::string &pSourceRepo) noexcept;
+    void setSourceRepo(std::string &&pSourceRepo) noexcept;
+
+    /**  For column source_branch  */
+    ///Get the value of the column source_branch, returns the default value if the column is null
+    const std::string &getValueOfSourceBranch() const noexcept;
+    ///Return a shared_ptr object pointing to the column const value, or an empty shared_ptr object if the column is null
+    const std::shared_ptr<std::string> &getSourceBranch() const noexcept;
+    ///Set the value of the column source_branch
+    void setSourceBranch(const std::string &pSourceBranch) noexcept;
+    void setSourceBranch(std::string &&pSourceBranch) noexcept;
+
+    /**  For column source_path  */
+    ///Get the value of the column source_path, returns the default value if the column is null
+    const std::string &getValueOfSourcePath() const noexcept;
+    ///Return a shared_ptr object pointing to the column const value, or an empty shared_ptr object if the column is null
+    const std::shared_ptr<std::string> &getSourcePath() const noexcept;
+    ///Set the value of the column source_path
+    void setSourcePath(const std::string &pSourcePath) noexcept;
+    void setSourcePath(std::string &&pSourcePath) noexcept;
+
     /**  For column created_at  */
     ///Get the value of the column created_at, returns the default value if the column is null
     const ::trantor::Date &getValueOfCreatedAt() const noexcept;
@@ -166,7 +196,7 @@ class Deployment
     void setCreatedAt(const ::trantor::Date &pCreatedAt) noexcept;
 
 
-    static size_t getColumnNumber() noexcept {  return 7;  }
+    static size_t getColumnNumber() noexcept {  return 10;  }
     static const std::string &getColumnName(size_t index) noexcept(false);
 
     Json::Value toJson() const;
@@ -193,6 +223,9 @@ class Deployment
     std::shared_ptr<std::string> status_;
     std::shared_ptr<bool> active_;
     std::shared_ptr<std::string> userId_;
+    std::shared_ptr<std::string> sourceRepo_;
+    std::shared_ptr<std::string> sourceBranch_;
+    std::shared_ptr<std::string> sourcePath_;
     std::shared_ptr<::trantor::Date> createdAt_;
     struct MetaData
     {
@@ -205,7 +238,7 @@ class Deployment
         const bool notNull_;
     };
     static const std::vector<MetaData> metaData_;
-    bool dirtyFlag_[7]={ false };
+    bool dirtyFlag_[10]={ false };
   public:
     static const std::string &sqlForFindingByPrimaryKey()
     {
@@ -254,9 +287,24 @@ class Deployment
             sql += "user_id,";
             ++parametersCount;
         }
+        if(dirtyFlag_[6])
+        {
+            sql += "source_repo,";
+            ++parametersCount;
+        }
+        if(dirtyFlag_[7])
+        {
+            sql += "source_branch,";
+            ++parametersCount;
+        }
+        if(dirtyFlag_[8])
+        {
+            sql += "source_path,";
+            ++parametersCount;
+        }
         sql += "created_at,";
         ++parametersCount;
-        if(!dirtyFlag_[6])
+        if(!dirtyFlag_[9])
         {
             needSelection=true;
         }
@@ -306,6 +354,21 @@ class Deployment
             sql.append(placeholderStr, n);
         }
         if(dirtyFlag_[6])
+        {
+            n = snprintf(placeholderStr,sizeof(placeholderStr),"$%d,",placeholder++);
+            sql.append(placeholderStr, n);
+        }
+        if(dirtyFlag_[7])
+        {
+            n = snprintf(placeholderStr,sizeof(placeholderStr),"$%d,",placeholder++);
+            sql.append(placeholderStr, n);
+        }
+        if(dirtyFlag_[8])
+        {
+            n = snprintf(placeholderStr,sizeof(placeholderStr),"$%d,",placeholder++);
+            sql.append(placeholderStr, n);
+        }
+        if(dirtyFlag_[9])
         {
             n = snprintf(placeholderStr,sizeof(placeholderStr),"$%d,",placeholder++);
             sql.append(placeholderStr, n);

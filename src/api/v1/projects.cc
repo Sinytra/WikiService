@@ -480,7 +480,17 @@ namespace api::v1 {
         const auto project(co_await BaseProjectController::getUserProject(req, deployment->getValueOfProjectId()));
 
         Json::Value root(deployment->toJson());
-        root["revision"] = deployment->getRevision() ? parseJsonOrThrow(deployment->getValueOfRevision()) : Json::nullValue;
+
+        if (const auto revisionStr(deployment->getRevision()); revisionStr) {
+            root["revision"] = parseJsonOrThrow(*revisionStr);
+
+            const GitRevision revision = nlohmann::json::parse(*revisionStr);
+            if (const auto url = formatCommitUrl(project, revision.fullHash); !url.empty()) {
+                root["revision"]["url"] = url;
+            }
+        } else {
+            root["revision"] = Json::nullValue;
+        }
 
         callback(HttpResponse::newHttpJsonResponse(root));
     }

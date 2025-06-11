@@ -33,8 +33,7 @@ struct GitProvider {
 };
 
 std::unordered_map<std::string, GitProvider> GIT_PROVIDERS = {
-    {"github.com", GitProvider{ .filePath = "blob/{branch}/{base}/{path}", .commitPath = "commit/{hash}" }}
-};
+    {"github.com", GitProvider{.filePath = "blob/{branch}/{base}/{path}", .commitPath = "commit/{hash}"}}};
 
 struct FolderMetadataEntry {
     const std::string name;
@@ -264,9 +263,9 @@ namespace service {
         return removeTrailingSlash(project.getValueOfSourceRepo()) + "/" + result;
     }
 
-    ResolvedProject::ResolvedProject(const Project &p, const GitRevision &rev, const std::filesystem::path &r,
-                                     const std::filesystem::path &d, const ProjectVersion &v) :
-        project_(p), revision_(rev), defaultVersion_(nullptr), rootDir_(r), docsDir_(d), version_(v),
+    ResolvedProject::ResolvedProject(const Project &p, const std::filesystem::path &r, const std::filesystem::path &d,
+                                     const ProjectVersion &v) :
+        project_(p), defaultVersion_(nullptr), rootDir_(r), docsDir_(d), version_(v),
         projectDb_(std::make_shared<ProjectDatabaseAccess>(*this)) {}
 
     void ResolvedProject::setDefaultVersion(const ResolvedProject &defaultVersion) {
@@ -475,10 +474,16 @@ namespace service {
             projectJson["locales"] = localesJson;
         }
 
-        if (full && !revision_.hash.empty()) {
-            projectJson["revision"] = unparkourJson(revision_);
-            if (const auto url = formatCommitUrl(project_, revision_.fullHash); !url.empty()) {
-                projectJson["revision"]["url"] = url;
+        if (full) {
+            if (const auto latestDeployment = co_await global::database->getActiveDeployment(project_.getValueOfId())) {
+                if (const auto revisionStr = latestDeployment->getRevision()) {
+                    projectJson["revision"] = parseJsonOrThrow(*revisionStr);
+
+                    const GitRevision revision = nlohmann::json::parse(*revisionStr);
+                    if (const auto url = formatCommitUrl(project_, revision.fullHash); !url.empty()) {
+                        projectJson["revision"]["url"] = url;
+                    }
+                }
             }
         }
 
@@ -560,7 +565,7 @@ namespace service {
         for (const auto &[id, loc]: data) {
             const auto tagItems = co_await projectDb_->getProjectTagItemsFlat(id);
             std::vector<std::string> items;
-            for (auto &item : tagItems) {
+            for (auto &item: tagItems) {
                 items.push_back(item.getValueOfLoc());
             }
             tagData.emplace_back(loc, items);

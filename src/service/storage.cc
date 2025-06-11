@@ -551,8 +551,7 @@ namespace service {
         deployment.setRevision(nlohmann::json(*revision).dump());
         co_await global::database->updateDeployment(deployment);
 
-        ResolvedProject resolved{project, *revision, clonePath, clonePath / removeLeadingSlash(project.getValueOfSourcePath()),
-                                 *defaultVersion};
+        ResolvedProject resolved{project, clonePath, clonePath / removeLeadingSlash(project.getValueOfSourcePath()), *defaultVersion};
 
         // TODO Ingest from other versions?
         content::Ingestor ingestor{resolved, logger};
@@ -608,6 +607,9 @@ namespace service {
         tmpDep.setId(project.getValueOfId());
         tmpDep.setProjectId(project.getValueOfId());
         tmpDep.setStatus(deploymentStatusToString(DeploymentStatus::CREATED));
+        tmpDep.setSourceRepo(project.getValueOfSourceRepo());
+        tmpDep.setSourceBranch(project.getValueOfSourceBranch());
+        tmpDep.setSourcePath(project.getValueOfSourcePath());
         if (!userId.empty())
             tmpDep.setUserId(userId);
         const auto dbResult = co_await global::database->addDeployment(tmpDep);
@@ -655,12 +657,6 @@ namespace service {
             co_return {std::nullopt, Error::ErrNotFound};
         }
 
-        const auto revision = getLatestCommitInfo(rootDir);
-        if (!revision) {
-            logger.error("Error getting commit information");
-            co_return {std::nullopt, Error::ErrInternal};
-        }
-
         const auto docsDir = rootDir / removeLeadingSlash(project.getValueOfSourcePath());
 
         if (version) {
@@ -669,7 +665,7 @@ namespace service {
                 co_return {std::nullopt, Error::ErrNotFound};
             }
 
-            ResolvedProject resolved{project, *revision, rootDir, docsDir, *resolvedVersion};
+            ResolvedProject resolved{project, rootDir, docsDir, *resolvedVersion};
             resolved.setLocale(locale);
             co_return {resolved, Error::Ok};
         }
@@ -679,7 +675,7 @@ namespace service {
             co_return {std::nullopt, Error::ErrNotFound};
         }
 
-        ResolvedProject resolved{project, *revision, rootDir, docsDir, *defaultVersion};
+        ResolvedProject resolved{project, rootDir, docsDir, *defaultVersion};
         resolved.setLocale(locale);
         co_return {resolved, Error::Ok};
     }
@@ -775,7 +771,7 @@ namespace service {
             co_return {std::nullopt, ProjectError::NO_PATH, ""};
         }
 
-        const ResolvedProject resolved{project, GitRevision{}, clonePath, docsPath, ProjectVersion{}};
+        const ResolvedProject resolved{project, clonePath, docsPath, ProjectVersion{}};
 
         // Validate metadata
         const auto [json, error, details] = resolved.validateProjectMetadata();

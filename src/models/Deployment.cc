@@ -19,6 +19,9 @@ const std::string Deployment::Cols::_revision = "\"revision\"";
 const std::string Deployment::Cols::_status = "\"status\"";
 const std::string Deployment::Cols::_active = "\"active\"";
 const std::string Deployment::Cols::_user_id = "\"user_id\"";
+const std::string Deployment::Cols::_source_repo = "\"source_repo\"";
+const std::string Deployment::Cols::_source_branch = "\"source_branch\"";
+const std::string Deployment::Cols::_source_path = "\"source_path\"";
 const std::string Deployment::Cols::_created_at = "\"created_at\"";
 const std::string Deployment::primaryKeyName = "id";
 const bool Deployment::hasPrimaryKey = true;
@@ -31,6 +34,9 @@ const std::vector<typename Deployment::MetaData> Deployment::metaData_={
 {"status","std::string","character varying",255,0,0,1},
 {"active","bool","boolean",1,0,0,1},
 {"user_id","std::string","text",0,0,0,0},
+{"source_repo","std::string","text",0,0,0,1},
+{"source_branch","std::string","text",0,0,0,1},
+{"source_path","std::string","text",0,0,0,1},
 {"created_at","::trantor::Date","timestamp without time zone",0,0,0,1}
 };
 const std::string &Deployment::getColumnName(size_t index) noexcept(false)
@@ -66,6 +72,18 @@ Deployment::Deployment(const Row &r, const ssize_t indexOffset) noexcept
         {
             userId_=std::make_shared<std::string>(r["user_id"].as<std::string>());
         }
+        if(!r["source_repo"].isNull())
+        {
+            sourceRepo_=std::make_shared<std::string>(r["source_repo"].as<std::string>());
+        }
+        if(!r["source_branch"].isNull())
+        {
+            sourceBranch_=std::make_shared<std::string>(r["source_branch"].as<std::string>());
+        }
+        if(!r["source_path"].isNull())
+        {
+            sourcePath_=std::make_shared<std::string>(r["source_path"].as<std::string>());
+        }
         if(!r["created_at"].isNull())
         {
             auto timeStr = r["created_at"].as<std::string>();
@@ -92,7 +110,7 @@ Deployment::Deployment(const Row &r, const ssize_t indexOffset) noexcept
     else
     {
         size_t offset = (size_t)indexOffset;
-        if(offset + 7 > r.size())
+        if(offset + 10 > r.size())
         {
             LOG_FATAL << "Invalid SQL result for this model";
             return;
@@ -131,6 +149,21 @@ Deployment::Deployment(const Row &r, const ssize_t indexOffset) noexcept
         index = offset + 6;
         if(!r[index].isNull())
         {
+            sourceRepo_=std::make_shared<std::string>(r[index].as<std::string>());
+        }
+        index = offset + 7;
+        if(!r[index].isNull())
+        {
+            sourceBranch_=std::make_shared<std::string>(r[index].as<std::string>());
+        }
+        index = offset + 8;
+        if(!r[index].isNull())
+        {
+            sourcePath_=std::make_shared<std::string>(r[index].as<std::string>());
+        }
+        index = offset + 9;
+        if(!r[index].isNull())
+        {
             auto timeStr = r[index].as<std::string>();
             struct tm stm;
             memset(&stm,0,sizeof(stm));
@@ -157,7 +190,7 @@ Deployment::Deployment(const Row &r, const ssize_t indexOffset) noexcept
 
 Deployment::Deployment(const Json::Value &pJson, const std::vector<std::string> &pMasqueradingVector) noexcept(false)
 {
-    if(pMasqueradingVector.size() != 7)
+    if(pMasqueradingVector.size() != 10)
     {
         LOG_ERROR << "Bad masquerading vector";
         return;
@@ -215,7 +248,31 @@ Deployment::Deployment(const Json::Value &pJson, const std::vector<std::string> 
         dirtyFlag_[6] = true;
         if(!pJson[pMasqueradingVector[6]].isNull())
         {
-            auto timeStr = pJson[pMasqueradingVector[6]].asString();
+            sourceRepo_=std::make_shared<std::string>(pJson[pMasqueradingVector[6]].asString());
+        }
+    }
+    if(!pMasqueradingVector[7].empty() && pJson.isMember(pMasqueradingVector[7]))
+    {
+        dirtyFlag_[7] = true;
+        if(!pJson[pMasqueradingVector[7]].isNull())
+        {
+            sourceBranch_=std::make_shared<std::string>(pJson[pMasqueradingVector[7]].asString());
+        }
+    }
+    if(!pMasqueradingVector[8].empty() && pJson.isMember(pMasqueradingVector[8]))
+    {
+        dirtyFlag_[8] = true;
+        if(!pJson[pMasqueradingVector[8]].isNull())
+        {
+            sourcePath_=std::make_shared<std::string>(pJson[pMasqueradingVector[8]].asString());
+        }
+    }
+    if(!pMasqueradingVector[9].empty() && pJson.isMember(pMasqueradingVector[9]))
+    {
+        dirtyFlag_[9] = true;
+        if(!pJson[pMasqueradingVector[9]].isNull())
+        {
+            auto timeStr = pJson[pMasqueradingVector[9]].asString();
             struct tm stm;
             memset(&stm,0,sizeof(stm));
             auto p = strptime(timeStr.c_str(),"%Y-%m-%d %H:%M:%S",&stm);
@@ -288,9 +345,33 @@ Deployment::Deployment(const Json::Value &pJson) noexcept(false)
             userId_=std::make_shared<std::string>(pJson["user_id"].asString());
         }
     }
-    if(pJson.isMember("created_at"))
+    if(pJson.isMember("source_repo"))
     {
         dirtyFlag_[6]=true;
+        if(!pJson["source_repo"].isNull())
+        {
+            sourceRepo_=std::make_shared<std::string>(pJson["source_repo"].asString());
+        }
+    }
+    if(pJson.isMember("source_branch"))
+    {
+        dirtyFlag_[7]=true;
+        if(!pJson["source_branch"].isNull())
+        {
+            sourceBranch_=std::make_shared<std::string>(pJson["source_branch"].asString());
+        }
+    }
+    if(pJson.isMember("source_path"))
+    {
+        dirtyFlag_[8]=true;
+        if(!pJson["source_path"].isNull())
+        {
+            sourcePath_=std::make_shared<std::string>(pJson["source_path"].asString());
+        }
+    }
+    if(pJson.isMember("created_at"))
+    {
+        dirtyFlag_[9]=true;
         if(!pJson["created_at"].isNull())
         {
             auto timeStr = pJson["created_at"].asString();
@@ -319,7 +400,7 @@ Deployment::Deployment(const Json::Value &pJson) noexcept(false)
 void Deployment::updateByMasqueradedJson(const Json::Value &pJson,
                                             const std::vector<std::string> &pMasqueradingVector) noexcept(false)
 {
-    if(pMasqueradingVector.size() != 7)
+    if(pMasqueradingVector.size() != 10)
     {
         LOG_ERROR << "Bad masquerading vector";
         return;
@@ -376,7 +457,31 @@ void Deployment::updateByMasqueradedJson(const Json::Value &pJson,
         dirtyFlag_[6] = true;
         if(!pJson[pMasqueradingVector[6]].isNull())
         {
-            auto timeStr = pJson[pMasqueradingVector[6]].asString();
+            sourceRepo_=std::make_shared<std::string>(pJson[pMasqueradingVector[6]].asString());
+        }
+    }
+    if(!pMasqueradingVector[7].empty() && pJson.isMember(pMasqueradingVector[7]))
+    {
+        dirtyFlag_[7] = true;
+        if(!pJson[pMasqueradingVector[7]].isNull())
+        {
+            sourceBranch_=std::make_shared<std::string>(pJson[pMasqueradingVector[7]].asString());
+        }
+    }
+    if(!pMasqueradingVector[8].empty() && pJson.isMember(pMasqueradingVector[8]))
+    {
+        dirtyFlag_[8] = true;
+        if(!pJson[pMasqueradingVector[8]].isNull())
+        {
+            sourcePath_=std::make_shared<std::string>(pJson[pMasqueradingVector[8]].asString());
+        }
+    }
+    if(!pMasqueradingVector[9].empty() && pJson.isMember(pMasqueradingVector[9]))
+    {
+        dirtyFlag_[9] = true;
+        if(!pJson[pMasqueradingVector[9]].isNull())
+        {
+            auto timeStr = pJson[pMasqueradingVector[9]].asString();
             struct tm stm;
             memset(&stm,0,sizeof(stm));
             auto p = strptime(timeStr.c_str(),"%Y-%m-%d %H:%M:%S",&stm);
@@ -448,9 +553,33 @@ void Deployment::updateByJson(const Json::Value &pJson) noexcept(false)
             userId_=std::make_shared<std::string>(pJson["user_id"].asString());
         }
     }
-    if(pJson.isMember("created_at"))
+    if(pJson.isMember("source_repo"))
     {
         dirtyFlag_[6] = true;
+        if(!pJson["source_repo"].isNull())
+        {
+            sourceRepo_=std::make_shared<std::string>(pJson["source_repo"].asString());
+        }
+    }
+    if(pJson.isMember("source_branch"))
+    {
+        dirtyFlag_[7] = true;
+        if(!pJson["source_branch"].isNull())
+        {
+            sourceBranch_=std::make_shared<std::string>(pJson["source_branch"].asString());
+        }
+    }
+    if(pJson.isMember("source_path"))
+    {
+        dirtyFlag_[8] = true;
+        if(!pJson["source_path"].isNull())
+        {
+            sourcePath_=std::make_shared<std::string>(pJson["source_path"].asString());
+        }
+    }
+    if(pJson.isMember("created_at"))
+    {
+        dirtyFlag_[9] = true;
         if(!pJson["created_at"].isNull())
         {
             auto timeStr = pJson["created_at"].asString();
@@ -618,6 +747,72 @@ void Deployment::setUserIdToNull() noexcept
     dirtyFlag_[5] = true;
 }
 
+const std::string &Deployment::getValueOfSourceRepo() const noexcept
+{
+    static const std::string defaultValue = std::string();
+    if(sourceRepo_)
+        return *sourceRepo_;
+    return defaultValue;
+}
+const std::shared_ptr<std::string> &Deployment::getSourceRepo() const noexcept
+{
+    return sourceRepo_;
+}
+void Deployment::setSourceRepo(const std::string &pSourceRepo) noexcept
+{
+    sourceRepo_ = std::make_shared<std::string>(pSourceRepo);
+    dirtyFlag_[6] = true;
+}
+void Deployment::setSourceRepo(std::string &&pSourceRepo) noexcept
+{
+    sourceRepo_ = std::make_shared<std::string>(std::move(pSourceRepo));
+    dirtyFlag_[6] = true;
+}
+
+const std::string &Deployment::getValueOfSourceBranch() const noexcept
+{
+    static const std::string defaultValue = std::string();
+    if(sourceBranch_)
+        return *sourceBranch_;
+    return defaultValue;
+}
+const std::shared_ptr<std::string> &Deployment::getSourceBranch() const noexcept
+{
+    return sourceBranch_;
+}
+void Deployment::setSourceBranch(const std::string &pSourceBranch) noexcept
+{
+    sourceBranch_ = std::make_shared<std::string>(pSourceBranch);
+    dirtyFlag_[7] = true;
+}
+void Deployment::setSourceBranch(std::string &&pSourceBranch) noexcept
+{
+    sourceBranch_ = std::make_shared<std::string>(std::move(pSourceBranch));
+    dirtyFlag_[7] = true;
+}
+
+const std::string &Deployment::getValueOfSourcePath() const noexcept
+{
+    static const std::string defaultValue = std::string();
+    if(sourcePath_)
+        return *sourcePath_;
+    return defaultValue;
+}
+const std::shared_ptr<std::string> &Deployment::getSourcePath() const noexcept
+{
+    return sourcePath_;
+}
+void Deployment::setSourcePath(const std::string &pSourcePath) noexcept
+{
+    sourcePath_ = std::make_shared<std::string>(pSourcePath);
+    dirtyFlag_[8] = true;
+}
+void Deployment::setSourcePath(std::string &&pSourcePath) noexcept
+{
+    sourcePath_ = std::make_shared<std::string>(std::move(pSourcePath));
+    dirtyFlag_[8] = true;
+}
+
 const ::trantor::Date &Deployment::getValueOfCreatedAt() const noexcept
 {
     static const ::trantor::Date defaultValue = ::trantor::Date();
@@ -632,7 +827,7 @@ const std::shared_ptr<::trantor::Date> &Deployment::getCreatedAt() const noexcep
 void Deployment::setCreatedAt(const ::trantor::Date &pCreatedAt) noexcept
 {
     createdAt_ = std::make_shared<::trantor::Date>(pCreatedAt);
-    dirtyFlag_[6] = true;
+    dirtyFlag_[9] = true;
 }
 
 void Deployment::updateId(const uint64_t id)
@@ -648,6 +843,9 @@ const std::vector<std::string> &Deployment::insertColumns() noexcept
         "status",
         "active",
         "user_id",
+        "source_repo",
+        "source_branch",
+        "source_path",
         "created_at"
     };
     return inCols;
@@ -723,6 +921,39 @@ void Deployment::outputArgs(drogon::orm::internal::SqlBinder &binder) const
     }
     if(dirtyFlag_[6])
     {
+        if(getSourceRepo())
+        {
+            binder << getValueOfSourceRepo();
+        }
+        else
+        {
+            binder << nullptr;
+        }
+    }
+    if(dirtyFlag_[7])
+    {
+        if(getSourceBranch())
+        {
+            binder << getValueOfSourceBranch();
+        }
+        else
+        {
+            binder << nullptr;
+        }
+    }
+    if(dirtyFlag_[8])
+    {
+        if(getSourcePath())
+        {
+            binder << getValueOfSourcePath();
+        }
+        else
+        {
+            binder << nullptr;
+        }
+    }
+    if(dirtyFlag_[9])
+    {
         if(getCreatedAt())
         {
             binder << getValueOfCreatedAt();
@@ -764,6 +995,18 @@ const std::vector<std::string> Deployment::updateColumns() const
     if(dirtyFlag_[6])
     {
         ret.push_back(getColumnName(6));
+    }
+    if(dirtyFlag_[7])
+    {
+        ret.push_back(getColumnName(7));
+    }
+    if(dirtyFlag_[8])
+    {
+        ret.push_back(getColumnName(8));
+    }
+    if(dirtyFlag_[9])
+    {
+        ret.push_back(getColumnName(9));
     }
     return ret;
 }
@@ -838,6 +1081,39 @@ void Deployment::updateArgs(drogon::orm::internal::SqlBinder &binder) const
     }
     if(dirtyFlag_[6])
     {
+        if(getSourceRepo())
+        {
+            binder << getValueOfSourceRepo();
+        }
+        else
+        {
+            binder << nullptr;
+        }
+    }
+    if(dirtyFlag_[7])
+    {
+        if(getSourceBranch())
+        {
+            binder << getValueOfSourceBranch();
+        }
+        else
+        {
+            binder << nullptr;
+        }
+    }
+    if(dirtyFlag_[8])
+    {
+        if(getSourcePath())
+        {
+            binder << getValueOfSourcePath();
+        }
+        else
+        {
+            binder << nullptr;
+        }
+    }
+    if(dirtyFlag_[9])
+    {
         if(getCreatedAt())
         {
             binder << getValueOfCreatedAt();
@@ -899,6 +1175,30 @@ Json::Value Deployment::toJson() const
     {
         ret["user_id"]=Json::Value();
     }
+    if(getSourceRepo())
+    {
+        ret["source_repo"]=getValueOfSourceRepo();
+    }
+    else
+    {
+        ret["source_repo"]=Json::Value();
+    }
+    if(getSourceBranch())
+    {
+        ret["source_branch"]=getValueOfSourceBranch();
+    }
+    else
+    {
+        ret["source_branch"]=Json::Value();
+    }
+    if(getSourcePath())
+    {
+        ret["source_path"]=getValueOfSourcePath();
+    }
+    else
+    {
+        ret["source_path"]=Json::Value();
+    }
     if(getCreatedAt())
     {
         ret["created_at"]=getCreatedAt()->toDbStringLocal();
@@ -914,7 +1214,7 @@ Json::Value Deployment::toMasqueradedJson(
     const std::vector<std::string> &pMasqueradingVector) const
 {
     Json::Value ret;
-    if(pMasqueradingVector.size() == 7)
+    if(pMasqueradingVector.size() == 10)
     {
         if(!pMasqueradingVector[0].empty())
         {
@@ -984,13 +1284,46 @@ Json::Value Deployment::toMasqueradedJson(
         }
         if(!pMasqueradingVector[6].empty())
         {
-            if(getCreatedAt())
+            if(getSourceRepo())
             {
-                ret[pMasqueradingVector[6]]=getCreatedAt()->toDbStringLocal();
+                ret[pMasqueradingVector[6]]=getValueOfSourceRepo();
             }
             else
             {
                 ret[pMasqueradingVector[6]]=Json::Value();
+            }
+        }
+        if(!pMasqueradingVector[7].empty())
+        {
+            if(getSourceBranch())
+            {
+                ret[pMasqueradingVector[7]]=getValueOfSourceBranch();
+            }
+            else
+            {
+                ret[pMasqueradingVector[7]]=Json::Value();
+            }
+        }
+        if(!pMasqueradingVector[8].empty())
+        {
+            if(getSourcePath())
+            {
+                ret[pMasqueradingVector[8]]=getValueOfSourcePath();
+            }
+            else
+            {
+                ret[pMasqueradingVector[8]]=Json::Value();
+            }
+        }
+        if(!pMasqueradingVector[9].empty())
+        {
+            if(getCreatedAt())
+            {
+                ret[pMasqueradingVector[9]]=getCreatedAt()->toDbStringLocal();
+            }
+            else
+            {
+                ret[pMasqueradingVector[9]]=Json::Value();
             }
         }
         return ret;
@@ -1043,6 +1376,30 @@ Json::Value Deployment::toMasqueradedJson(
     else
     {
         ret["user_id"]=Json::Value();
+    }
+    if(getSourceRepo())
+    {
+        ret["source_repo"]=getValueOfSourceRepo();
+    }
+    else
+    {
+        ret["source_repo"]=Json::Value();
+    }
+    if(getSourceBranch())
+    {
+        ret["source_branch"]=getValueOfSourceBranch();
+    }
+    else
+    {
+        ret["source_branch"]=Json::Value();
+    }
+    if(getSourcePath())
+    {
+        ret["source_path"]=getValueOfSourcePath();
+    }
+    else
+    {
+        ret["source_path"]=Json::Value();
     }
     if(getCreatedAt())
     {
@@ -1102,9 +1459,39 @@ bool Deployment::validateJsonForCreation(const Json::Value &pJson, std::string &
         if(!validJsonOfField(5, "user_id", pJson["user_id"], err, true))
             return false;
     }
+    if(pJson.isMember("source_repo"))
+    {
+        if(!validJsonOfField(6, "source_repo", pJson["source_repo"], err, true))
+            return false;
+    }
+    else
+    {
+        err="The source_repo column cannot be null";
+        return false;
+    }
+    if(pJson.isMember("source_branch"))
+    {
+        if(!validJsonOfField(7, "source_branch", pJson["source_branch"], err, true))
+            return false;
+    }
+    else
+    {
+        err="The source_branch column cannot be null";
+        return false;
+    }
+    if(pJson.isMember("source_path"))
+    {
+        if(!validJsonOfField(8, "source_path", pJson["source_path"], err, true))
+            return false;
+    }
+    else
+    {
+        err="The source_path column cannot be null";
+        return false;
+    }
     if(pJson.isMember("created_at"))
     {
-        if(!validJsonOfField(6, "created_at", pJson["created_at"], err, true))
+        if(!validJsonOfField(9, "created_at", pJson["created_at"], err, true))
             return false;
     }
     return true;
@@ -1113,7 +1500,7 @@ bool Deployment::validateMasqueradedJsonForCreation(const Json::Value &pJson,
                                                     const std::vector<std::string> &pMasqueradingVector,
                                                     std::string &err)
 {
-    if(pMasqueradingVector.size() != 7)
+    if(pMasqueradingVector.size() != 10)
     {
         err = "Bad masquerading vector";
         return false;
@@ -1189,6 +1576,45 @@ bool Deployment::validateMasqueradedJsonForCreation(const Json::Value &pJson,
               if(!validJsonOfField(6, pMasqueradingVector[6], pJson[pMasqueradingVector[6]], err, true))
                   return false;
           }
+        else
+        {
+            err="The " + pMasqueradingVector[6] + " column cannot be null";
+            return false;
+        }
+      }
+      if(!pMasqueradingVector[7].empty())
+      {
+          if(pJson.isMember(pMasqueradingVector[7]))
+          {
+              if(!validJsonOfField(7, pMasqueradingVector[7], pJson[pMasqueradingVector[7]], err, true))
+                  return false;
+          }
+        else
+        {
+            err="The " + pMasqueradingVector[7] + " column cannot be null";
+            return false;
+        }
+      }
+      if(!pMasqueradingVector[8].empty())
+      {
+          if(pJson.isMember(pMasqueradingVector[8]))
+          {
+              if(!validJsonOfField(8, pMasqueradingVector[8], pJson[pMasqueradingVector[8]], err, true))
+                  return false;
+          }
+        else
+        {
+            err="The " + pMasqueradingVector[8] + " column cannot be null";
+            return false;
+        }
+      }
+      if(!pMasqueradingVector[9].empty())
+      {
+          if(pJson.isMember(pMasqueradingVector[9]))
+          {
+              if(!validJsonOfField(9, pMasqueradingVector[9], pJson[pMasqueradingVector[9]], err, true))
+                  return false;
+          }
       }
     }
     catch(const Json::LogicError &e)
@@ -1235,9 +1661,24 @@ bool Deployment::validateJsonForUpdate(const Json::Value &pJson, std::string &er
         if(!validJsonOfField(5, "user_id", pJson["user_id"], err, false))
             return false;
     }
+    if(pJson.isMember("source_repo"))
+    {
+        if(!validJsonOfField(6, "source_repo", pJson["source_repo"], err, false))
+            return false;
+    }
+    if(pJson.isMember("source_branch"))
+    {
+        if(!validJsonOfField(7, "source_branch", pJson["source_branch"], err, false))
+            return false;
+    }
+    if(pJson.isMember("source_path"))
+    {
+        if(!validJsonOfField(8, "source_path", pJson["source_path"], err, false))
+            return false;
+    }
     if(pJson.isMember("created_at"))
     {
-        if(!validJsonOfField(6, "created_at", pJson["created_at"], err, false))
+        if(!validJsonOfField(9, "created_at", pJson["created_at"], err, false))
             return false;
     }
     return true;
@@ -1246,7 +1687,7 @@ bool Deployment::validateMasqueradedJsonForUpdate(const Json::Value &pJson,
                                                   const std::vector<std::string> &pMasqueradingVector,
                                                   std::string &err)
 {
-    if(pMasqueradingVector.size() != 7)
+    if(pMasqueradingVector.size() != 10)
     {
         err = "Bad masquerading vector";
         return false;
@@ -1290,6 +1731,21 @@ bool Deployment::validateMasqueradedJsonForUpdate(const Json::Value &pJson,
       if(!pMasqueradingVector[6].empty() && pJson.isMember(pMasqueradingVector[6]))
       {
           if(!validJsonOfField(6, pMasqueradingVector[6], pJson[pMasqueradingVector[6]], err, false))
+              return false;
+      }
+      if(!pMasqueradingVector[7].empty() && pJson.isMember(pMasqueradingVector[7]))
+      {
+          if(!validJsonOfField(7, pMasqueradingVector[7], pJson[pMasqueradingVector[7]], err, false))
+              return false;
+      }
+      if(!pMasqueradingVector[8].empty() && pJson.isMember(pMasqueradingVector[8]))
+      {
+          if(!validJsonOfField(8, pMasqueradingVector[8], pJson[pMasqueradingVector[8]], err, false))
+              return false;
+      }
+      if(!pMasqueradingVector[9].empty() && pJson.isMember(pMasqueradingVector[9]))
+      {
+          if(!validJsonOfField(9, pMasqueradingVector[9], pJson[pMasqueradingVector[9]], err, false))
               return false;
       }
     }
@@ -1395,6 +1851,42 @@ bool Deployment::validJsonOfField(size_t index,
             }
             break;
         case 6:
+            if(pJson.isNull())
+            {
+                err="The " + fieldName + " column cannot be null";
+                return false;
+            }
+            if(!pJson.isString())
+            {
+                err="Type error in the "+fieldName+" field";
+                return false;
+            }
+            break;
+        case 7:
+            if(pJson.isNull())
+            {
+                err="The " + fieldName + " column cannot be null";
+                return false;
+            }
+            if(!pJson.isString())
+            {
+                err="Type error in the "+fieldName+" field";
+                return false;
+            }
+            break;
+        case 8:
+            if(pJson.isNull())
+            {
+                err="The " + fieldName + " column cannot be null";
+                return false;
+            }
+            if(!pJson.isString())
+            {
+                err="Type error in the "+fieldName+" field";
+                return false;
+            }
+            break;
+        case 9:
             if(pJson.isNull())
             {
                 err="The " + fieldName + " column cannot be null";
