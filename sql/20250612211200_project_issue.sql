@@ -4,7 +4,7 @@ CREATE TABLE project_issue
     project_id    text                                   NOT NULL REFERENCES project (id) ON DELETE CASCADE,
     level         varchar(255)                           not null,
     page_path     text,
-    deployment_id varchar(28) REFERENCES deployment (id) ON DELETE CASCADE,
+    deployment_id varchar(28)                            NOT NULL REFERENCES deployment (id) ON DELETE CASCADE,
     body          jsonb                                  not null,
     created_at    timestamp(3) default CURRENT_TIMESTAMP not null
 );

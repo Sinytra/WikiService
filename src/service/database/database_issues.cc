@@ -14,54 +14,21 @@ namespace service {
         co_return res;
     }
 
-    Task<std::optional<ProjectIssueData>> Database::getProjectIssue(std::string id) const {
-        const auto [res, err] =
-            co_await handleDatabaseOperation<ProjectIssueData>([id](const DbClientPtr &client) -> Task<ProjectIssueData> {
-                CoroMapper<ProjectIssue> mapper(client);
-                const auto issue = co_await mapper.findByPrimaryKey(id);
-                co_return ProjectIssueData{.id = issue.getValueOfId(),
-                                           .project_id = issue.getValueOfProjectId(),
-                                           .level = issue.getValueOfLevel(),
-                                           .page_path = issue.getValueOfPagePath(),
-                                           .deployment_id = issue.getValueOfDeploymentId(),
-                                           .body = nlohmann::json::parse(issue.getValueOfBody()),
-                                           .created_at = issue.getValueOfCreatedAt().toCustomFormattedString("%Y-%m-%d")};
-            });
-        co_return res;
-    }
-
-    Task<std::vector<ProjectIssue>> Database::getProjectIssues(std::string projectId) const {
+    Task<std::vector<ProjectIssue>> Database::getDeploymentIssues(const std::string deploymentId) const {
         const auto [res, err] = co_await handleDatabaseOperation<std::vector<ProjectIssue>>(
-            [projectId](const DbClientPtr &client) -> Task<std::vector<ProjectIssue>> {
+            [deploymentId](const DbClientPtr &client) -> Task<std::vector<ProjectIssue>> {
                 CoroMapper<ProjectIssue> mapper(client);
                 mapper.orderBy("array_position(array['error', 'warning'], level)");
-                co_return co_await mapper.findBy(Criteria(ProjectIssue::Cols::_project_id, CompareOperator::EQ, projectId));
+                co_return co_await mapper.findBy(Criteria(ProjectIssue::Cols::_deployment_id, CompareOperator::EQ, deploymentId));
             });
         co_return res.value_or(std::vector<ProjectIssue>{});
     }
 
-    Task<Error> Database::deleteProjectIssues(std::string projectId) const {
-        const auto [res, err] = co_await handleDatabaseOperation<Error>([projectId](const DbClientPtr &client) -> Task<Error> {
-            CoroMapper<ProjectIssue> mapper(client);
-            co_await mapper.deleteBy(Criteria(ProjectIssue::Cols::_project_id, CompareOperator::EQ, projectId));
-            co_return Error::Ok;
-        });
-        co_return res.value_or(err);
-    }
-
-    Task<Error> Database::deleteDeploymentIssues(std::string deploymentId) const {
-        const auto [res, err] = co_await handleDatabaseOperation<Error>([deploymentId](const DbClientPtr &client) -> Task<Error> {
-            CoroMapper<ProjectIssue> mapper(client);
-            co_await mapper.deleteBy(Criteria(ProjectIssue::Cols::_deployment_id, CompareOperator::EQ, deploymentId));
-            co_return Error::Ok;
-        });
-        co_return res.value_or(err);
-    }
-
-    Task<std::unordered_map<std::string, int64_t>> Database::getProjectIssueStats(std::string projectId) const {
+    Task<std::unordered_map<std::string, int64_t>> Database::getActiveProjectIssueStats(std::string projectId) const {
         // language=postgresql
         static constexpr auto query = "SELECT level, count(level) AS count FROM project_issue \
                                        WHERE project_id = $1 \
+                                           AND deployment_id = (SELECT id FROM deployment d WHERE d.project_id = $1 AND d.active) \
                                        GROUP BY level";
 
         const auto [res, err] = co_await handleDatabaseOperation<std::unordered_map<std::string, int64_t>>(

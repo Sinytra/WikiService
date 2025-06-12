@@ -46,7 +46,7 @@ namespace service {
             mapper.limit(1);
             co_return co_await mapper.findOne(
                 Criteria(Deployment::Cols::_project_id, CompareOperator::EQ, projectId) &&
-                Criteria(Deployment::Cols::_status, CompareOperator::EQ, deploymentStatusToString(DeploymentStatus::SUCCESS)));
+                Criteria(Deployment::Cols::_status, CompareOperator::EQ, enumToStr(DeploymentStatus::SUCCESS)));
         });
         co_return res;
     }
@@ -58,7 +58,7 @@ namespace service {
             co_return co_await mapper.findOne(
                 Criteria(Deployment::Cols::_project_id, CompareOperator::EQ, projectId)
                 && Criteria(Deployment::Cols::_status, CompareOperator::In,
-                    std::vector{deploymentStatusToString(DeploymentStatus::CREATED), deploymentStatusToString(DeploymentStatus::LOADING)}
+                    std::vector{enumToStr(DeploymentStatus::CREATED), enumToStr(DeploymentStatus::LOADING)}
                 ));
         });
         co_return res;
@@ -100,5 +100,18 @@ namespace service {
             co_return rows < 1 ? Error::ErrInternal : Error::Ok;
         });
         co_return res.value_or(err);
+    }
+
+    Task<bool> Database::hasFailingDeployment(const std::string projectId) const {
+        // language=postgresql
+        static constexpr auto query = "SELECT * FROM deployment \
+                                       WHERE project_id = $1 AND status = 'error' \
+                                       AND created_at > (SELECT created_at FROM deployment WHERE project_id = $1 AND active)";
+
+        const auto [res, err] = co_await handleDatabaseOperation<bool>([projectId](const DbClientPtr &client) -> Task<bool> {
+            const auto rows = co_await client->execSqlCoro(query, projectId);
+            co_return rows.size() > 0;
+        });
+        co_return res.value_or(false);
     }
 }

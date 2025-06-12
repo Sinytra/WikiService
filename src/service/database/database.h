@@ -15,7 +15,6 @@
 #include "models/DataImport.h"
 #include "models/Deployment.h"
 #include "models/ProjectIssue.h"
-#include <service/project_issue.h>
 
 using namespace drogon_model::postgres;
 
@@ -50,25 +49,6 @@ namespace service {
                                {"user_id", d.user_id.empty() ? nullptr : d.user_id},
                                {"created_at", d.created_at},
                                {"current", d.current}};
-        }
-    };
-    struct ProjectIssueData {
-        std::string id;
-        std::string project_id;
-        std::string level;
-        std::string page_path;
-        std::string deployment_id;
-        nlohmann::json body;
-        std::string created_at;
-
-        friend void to_json(nlohmann::json &j, const ProjectIssueData &d) {
-            j = nlohmann::json{{"id", d.id},
-                               {"project_id", d.project_id},
-                               {"level", d.level},
-                               {"page_path", d.page_path.empty() ? nullptr : d.page_path},
-                               {"deployment_id", d.deployment_id.empty() ? nullptr : d.deployment_id},
-                               {"body", d.body},
-                               {"created_at", d.created_at}};
         }
     };
 
@@ -132,13 +112,11 @@ namespace service {
         drogon::Task<std::optional<Deployment>> updateDeployment(Deployment deployment) const;
         drogon::Task<Error> deactivateDeployments(std::string projectId) const;
         drogon::Task<Error> deleteDeployment(std::string id) const;
+        drogon::Task<bool> hasFailingDeployment(std::string projectId) const;
 
         drogon::Task<std::optional<ProjectIssue>> addProjectIssue(ProjectIssue issue) const;
-        drogon::Task<std::optional<ProjectIssueData>> getProjectIssue(std::string id) const;
-        drogon::Task<std::vector<ProjectIssue>> getProjectIssues(std::string projectId) const;
-        drogon::Task<Error> deleteProjectIssues(std::string projectId) const;
-        drogon::Task<Error> deleteDeploymentIssues(std::string deploymentId) const;
-        drogon::Task<std::unordered_map<std::string, int64_t>> getProjectIssueStats(std::string projectId) const;
+        drogon::Task<std::vector<ProjectIssue>> getDeploymentIssues(std::string deploymentId) const;
+        drogon::Task<std::unordered_map<std::string, int64_t>> getActiveProjectIssueStats(std::string projectId) const;
     private:
         drogon::orm::DbClientPtr clientPtr_;
     };

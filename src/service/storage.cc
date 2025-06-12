@@ -16,6 +16,7 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 
 #include "deployment.h"
+#include "project_issue.h"
 
 #define TEMP_DIR ".temp"
 #define LATEST_VERSION "latest"
@@ -530,7 +531,7 @@ namespace service {
 
         logger->info("Setting up project");
 
-        deployment.setStatus(deploymentStatusToString(DeploymentStatus::LOADING));
+        deployment.setStatus(enumToStr(DeploymentStatus::LOADING));
         co_await global::database->updateDeployment(deployment);
 
         const auto [repo, cloneError] = co_await gitCloneProject(project, clonePath, project.getValueOfSourceBranch(), logger);
@@ -608,7 +609,7 @@ namespace service {
         Deployment tmpDep;
         tmpDep.setId(project.getValueOfId());
         tmpDep.setProjectId(project.getValueOfId());
-        tmpDep.setStatus(deploymentStatusToString(DeploymentStatus::CREATED));
+        tmpDep.setStatus(enumToStr(DeploymentStatus::CREATED));
         tmpDep.setSourceRepo(project.getValueOfSourceRepo());
         tmpDep.setSourceBranch(project.getValueOfSourceBranch());
         tmpDep.setSourcePath(project.getValueOfSourcePath());
@@ -632,7 +633,7 @@ namespace service {
 
             global::connections->broadcast(project.getValueOfId(), WS_SUCCESS);
 
-            deployment.setStatus(deploymentStatusToString(DeploymentStatus::SUCCESS));
+            deployment.setStatus(enumToStr(DeploymentStatus::SUCCESS));
         } else {
             projectLogger->error("!!================================!!");
             projectLogger->error("!!      Project setup failed      !!");
@@ -640,7 +641,7 @@ namespace service {
 
             global::connections->broadcast(project.getValueOfId(), WS_ERROR);
 
-            deployment.setStatus(deploymentStatusToString(DeploymentStatus::ERROR));
+            deployment.setStatus(enumToStr(DeploymentStatus::ERROR));
         }
 
         co_await global::database->updateDeployment(deployment);
@@ -730,7 +731,11 @@ namespace service {
             co_return ProjectStatus::UNKNOWN;
         }
 
-        if (const auto issues = co_await global::database->getProjectIssueStats(project.getValueOfId());
+        if (co_await global::database->hasFailingDeployment(project.getValueOfId())) {
+            co_return ProjectStatus::AT_RISK;
+        }
+
+        if (const auto issues = co_await global::database->getActiveProjectIssueStats(project.getValueOfId());
             issues.contains(enumToStr(ProjectIssueLevel::ERROR))) {
             co_return ProjectStatus::AT_RISK;
         }

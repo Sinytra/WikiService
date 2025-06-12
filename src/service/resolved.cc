@@ -486,8 +486,11 @@ namespace service {
                 }
             }
 
-            const auto issueStats = co_await global::database->getProjectIssueStats(project_.getValueOfId());
+            const auto issueStats = co_await global::database->getActiveProjectIssueStats(project_.getValueOfId());
             projectJson["issue_stats"] = unparkourJson(nlohmann::json(issueStats));
+
+            const auto hasFailingDeployment = co_await global::database->hasFailingDeployment(project_.getValueOfId());
+            projectJson["has_failing_deployment"] = hasFailingDeployment;
         }
 
         co_return projectJson;

@@ -493,6 +493,12 @@ namespace api::v1 {
             root["revision"] = Json::nullValue;
         }
 
+        const auto issues(co_await global::database->getDeploymentIssues(id));
+        root["issues"] = toJson(issues);
+        for (auto &issue: root["issues"]) {
+            issue["body"] = parseJsonOrThrow(issue["body"].asString());
+        }
+
         callback(HttpResponse::newHttpJsonResponse(root));
     }
 
@@ -521,24 +527,14 @@ namespace api::v1 {
                                          const std::string id) const {
         const auto project(co_await BaseProjectController::getUserProject(req, id));
 
-        const auto issues(co_await global::database->getProjectIssues(id));
+        const auto deployment(co_await global::database->getActiveDeployment(id));
+        const auto issues =
+            deployment ? co_await global::database->getDeploymentIssues(deployment->getValueOfId()) : std::vector<ProjectIssue>();
         auto root = toJson(issues);
         for (auto &issue: root) {
             issue["body"] = parseJsonOrThrow(issue["body"].asString());
         }
 
         callback(HttpResponse::newHttpJsonResponse(root));
-    }
-
-    Task<> ProjectsController::getIssue(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
-                                        const std::string id) const {
-        const auto issue(co_await global::database->getProjectIssue(id));
-        if (!issue) {
-            throw ApiException(Error::ErrBadRequest, "not_found");
-        }
-
-        const auto project(co_await BaseProjectController::getUserProject(req, issue->project_id));
-
-        callback(jsonResponse(*issue));
     }
 }

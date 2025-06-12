@@ -1,7 +1,7 @@
 #include "deployment.h"
 
 namespace service {
-    std::string deploymentStatusToString(const DeploymentStatus status) {
+    std::string enumToStr(const DeploymentStatus status) {
         switch (status) {
             case DeploymentStatus::CREATED:
                 return "create";
