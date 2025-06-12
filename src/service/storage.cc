@@ -252,13 +252,15 @@ private:
 std::string createProjectSetupKey(const Project &project) { return "setup:" + project.getValueOfId(); }
 
 namespace service {
-    std::string projectStatusToString(const ProjectStatus status) {
+    std::string enumToStr(const ProjectStatus status) {
         switch (status) {
-            case LOADING:
+            case ProjectStatus::LOADING:
                 return "loading";
-            case LOADED:
-                return "loaded";
-            case ERROR:
+            case ProjectStatus::HEALTHY:
+                return "healthy";
+            case ProjectStatus::AT_RISK:
+                return "at_risk";
+            case ProjectStatus::ERROR:
                 return "error";
             default:
                 return "unknown";
@@ -717,18 +719,23 @@ namespace service {
 
     Task<ProjectStatus> Storage::getProjectStatus(const Project &project) const {
         if (hasPendingTask(createProjectSetupKey(project))) {
-            co_return LOADING;
+            co_return ProjectStatus::LOADING;
         }
 
         if (const auto resolved = co_await maybeGetProject(project); !resolved) {
             if (const auto filePath = getProjectLogPath(project); exists(filePath)) {
-                co_return ERROR;
+                co_return ProjectStatus::ERROR;
             }
 
-            co_return UNKNOWN;
+            co_return ProjectStatus::UNKNOWN;
         }
 
-        co_return LOADED;
+        if (const auto issues = co_await global::database->getProjectIssueStats(project.getValueOfId());
+            issues.contains(enumToStr(ProjectIssueLevel::ERROR))) {
+            co_return ProjectStatus::AT_RISK;
+        }
+
+        co_return ProjectStatus::HEALTHY;
     }
 
     std::optional<std::string> Storage::getProjectLog(const Project &project) const {

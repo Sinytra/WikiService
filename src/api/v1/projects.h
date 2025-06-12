@@ -30,16 +30,20 @@ namespace api::v1 {
         ADD_METHOD_TO(ProjectsController::update,           "/api/v1/dev/projects",                             drogon::Put,    "AuthFilter");
         ADD_METHOD_TO(ProjectsController::remove,           "/api/v1/dev/projects/{1:id}",                      drogon::Delete, "AuthFilter");
         ADD_METHOD_TO(ProjectsController::redeployProject,  "/api/v1/dev/projects/{1:id}/invalidate",           drogon::Post,   "AuthFilter");
+        // Content
         ADD_METHOD_TO(ProjectsController::getContentPages,  "/api/v1/dev/projects/{1:id}/content/pages",        drogon::Get,    "AuthFilter");
         ADD_METHOD_TO(ProjectsController::getContentTags,   "/api/v1/dev/projects/{1:id}/content/tags",         drogon::Get,    "AuthFilter");
         ADD_METHOD_TO(ProjectsController::getTagItems,      "/api/v1/dev/projects/{1:id}/content/tags/.*",      drogon::Get,    "AuthFilter");
         ADD_METHOD_TO(ProjectsController::getRecipes,       "/api/v1/dev/projects/{1:id}/content/recipes",      drogon::Get,    "AuthFilter");
         ADD_METHOD_TO(ProjectsController::getVersions,      "/api/v1/dev/projects/{1:id}/versions",             drogon::Get,    "AuthFilter");
         ADD_METHOD_TO(ProjectsController::getDeployments,   "/api/v1/dev/projects/{1:id}/deployments",          drogon::Get,    "AuthFilter");
+        // Deployments
         // TODO Deployment controller
         ADD_METHOD_TO(ProjectsController::getDeployment,    "/api/v1/dev/deployments/{1:id}",                   drogon::Get,    "AuthFilter");
         ADD_METHOD_TO(ProjectsController::deleteDeployment, "/api/v1/dev/deployments/{1:id}",                   drogon::Delete, "AuthFilter");
-        // Dev content
+        // Project issues
+        ADD_METHOD_TO(ProjectsController::getIssues,        "/api/v1/dev/projects/{1:id}/issues",               drogon::Get,    "AuthFilter");
+        ADD_METHOD_TO(ProjectsController::getIssue,         "/api/v1/dev/issues/{1:id}",                        drogon::Get,    "AuthFilter");
         METHOD_LIST_END
         // clang-format on
 
@@ -90,6 +94,12 @@ namespace api::v1 {
 
         drogon::Task<> deleteDeployment(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
                                         std::string id) const;
+
+        drogon::Task<> getIssues(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
+                                 std::string id) const;
+
+        drogon::Task<> getIssue(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
+                                std::string id) const;
 
     private:
         nlohmann::json processPlatforms(const nlohmann::json &metadata) const;

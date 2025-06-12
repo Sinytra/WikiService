@@ -4,6 +4,8 @@
 #include <database/database.h>
 #include <log/log.h>
 
+#define WS_DEPLOYMENT "<<hello<<"
+
 using namespace std;
 using namespace drogon;
 using namespace service;
@@ -43,12 +45,16 @@ namespace api::v1 {
             }
 
             // Handle already loaded project
-            if (const auto status = co_await global::storage->getProjectStatus(*project); status == LOADED || status == ERROR) {
+            const auto loadingDeployment = co_await global::database->getLoadingDeployment(projectId);
+            if (!loadingDeployment) {
                 wsConnPtr->shutdown();
                 co_return;
             }
 
             global::connections->connect(projectId, wsConnPtr);
+
+            // Send initial deployment info
+            wsConnPtr->send(WS_DEPLOYMENT + loadingDeployment->getValueOfId());
         }));
     }
 

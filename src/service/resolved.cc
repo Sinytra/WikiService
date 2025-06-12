@@ -485,6 +485,9 @@ namespace service {
                     }
                 }
             }
+
+            const auto issueStats = co_await global::database->getProjectIssueStats(project_.getValueOfId());
+            projectJson["issue_stats"] = unparkourJson(nlohmann::json(issueStats));
         }
 
         co_return projectJson;

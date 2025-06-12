@@ -33,6 +33,7 @@ add_library(service STATIC
         database/database_content.cc
         database/database_system.cc
         database/database_deployments.cc
+        database/database_issues.cc
         database/resolved_db.cc
         system_data/system_data_import.cc
         auth.cc
@@ -42,6 +43,7 @@ add_library(service STATIC
         deployment.cc
         github.cc
         platforms.cc
+        project_issue.cc
         resolved.cc
         schemas.cc
         storage.cc

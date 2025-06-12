@@ -210,7 +210,7 @@ namespace api::v1 {
         Json::Value projectsJson(Json::arrayValue);
         for (const auto &project: projects) {
             Json::Value json = projectToJson(project, true);
-            json["status"] = projectStatusToString(co_await global::storage->getProjectStatus(project));
+            json["status"] = enumToStr(co_await global::storage->getProjectStatus(project));
             projectsJson.append(json);
         }
 
@@ -234,7 +234,8 @@ namespace api::v1 {
         } else {
             root = projectToJson(project, true);
         }
-        root["status"] = projectStatusToString(co_await global::storage->getProjectStatus(project));
+        root["status"] = enumToStr(co_await global::storage->getProjectStatus(project));
+        root["has_active_deployment"] = (co_await global::database->getActiveDeployment(id)).has_value();
 
         const auto resp = HttpResponse::newHttpJsonResponse(root);
         resp->setStatusCode(k200OK);
@@ -392,7 +393,7 @@ namespace api::v1 {
             throw ApiException(Error::ErrBadRequest, "not_found");
         }
 
-        if (co_await global::storage->getProjectStatus(*project) == LOADING) {
+        if (co_await global::storage->getProjectStatus(*project) == ProjectStatus::LOADING) {
             throw ApiException(Error::ErrBadRequest, "pending_deployment");
         }
 
@@ -514,5 +515,30 @@ namespace api::v1 {
         }
 
         callback(simpleResponse("Deployment deleted successfully"));
+    }
+
+    Task<> ProjectsController::getIssues(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+                                         const std::string id) const {
+        const auto project(co_await BaseProjectController::getUserProject(req, id));
+
+        const auto issues(co_await global::database->getProjectIssues(id));
+        auto root = toJson(issues);
+        for (auto &issue: root) {
+            issue["body"] = parseJsonOrThrow(issue["body"].asString());
+        }
+
+        callback(HttpResponse::newHttpJsonResponse(root));
+    }
+
+    Task<> ProjectsController::getIssue(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+                                        const std::string id) const {
+        const auto issue(co_await global::database->getProjectIssue(id));
+        if (!issue) {
+            throw ApiException(Error::ErrBadRequest, "not_found");
+        }
+
+        const auto project(co_await BaseProjectController::getUserProject(req, issue->project_id));
+
+        callback(jsonResponse(*issue));
     }
 }

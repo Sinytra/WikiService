@@ -12,13 +12,14 @@
 using namespace drogon_model::postgres;
 
 namespace service {
-    enum ProjectStatus {
+    enum class ProjectStatus {
         UNKNOWN,
         LOADING,
-        LOADED,
+        HEALTHY,
+        AT_RISK,
         ERROR
     };
-    std::string projectStatusToString(ProjectStatus status);
+    std::string enumToStr(ProjectStatus status);
 
     class RealtimeConnectionStorage {
     public:

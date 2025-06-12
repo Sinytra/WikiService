@@ -51,6 +51,19 @@ namespace service {
         co_return res;
     }
 
+    Task<std::optional<Deployment>> Database::getLoadingDeployment(std::string projectId) const {
+        const auto [res, err] = co_await handleDatabaseOperation<Deployment>([projectId](const DbClientPtr &client) -> Task<Deployment> {
+            CoroMapper<Deployment> mapper(client);
+            mapper.limit(1);
+            co_return co_await mapper.findOne(
+                Criteria(Deployment::Cols::_project_id, CompareOperator::EQ, projectId)
+                && Criteria(Deployment::Cols::_status, CompareOperator::In,
+                    std::vector{deploymentStatusToString(DeploymentStatus::CREATED), deploymentStatusToString(DeploymentStatus::LOADING)}
+                ));
+        });
+        co_return res;
+    }
+
     Task<std::optional<Deployment>> Database::addDeployment(const Deployment deployment) const {
         const auto [res, err] = co_await handleDatabaseOperation<Deployment>([&deployment](const DbClientPtr &client) -> Task<Deployment> {
             CoroMapper<Deployment> mapper(client);

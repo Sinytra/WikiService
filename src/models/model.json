@@ -18,7 +18,8 @@
     "recipe_ingredient_item",
     "recipe_ingredient_tag",
     "data_import",
-    "deployment"
+    "deployment",
+    "project_issue"
   ],
   "relationships": {
     "enabled": true,
