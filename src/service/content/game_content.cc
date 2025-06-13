@@ -15,11 +15,23 @@ using namespace service;
 namespace fs = std::filesystem;
 
 namespace content {
-    SubIngestor::SubIngestor(const ResolvedProject &proj, const std::shared_ptr<spdlog::logger> &log) : project_(proj), logger_(log) {}
+    SubIngestor::SubIngestor(const ResolvedProject &proj, const std::shared_ptr<spdlog::logger> &log, ProjectIssueCallback &issues) :
+        project_(proj), logger_(log), issues_(issues) {}
 
     Task<Error> SubIngestor::finish() { co_return Error::Ok; }
 
-    Ingestor::Ingestor(ResolvedProject &proj, const std::shared_ptr<spdlog::logger> &log) : project_(proj), logger_(log) {}
+    Task<> SubIngestor::addIssue(const ProjectIssueLevel level, const ProjectIssueType type, const ProjectError subject,
+                                 const std::string &details, const std::string &file) const {
+        co_await issues_.addIssue(level, type, subject, details, file);
+    }
+
+    void SubIngestor::addIssueAsync(const ProjectIssueLevel level, const ProjectIssueType type, const ProjectError subject,
+                                    const std::string &details, const std::string &file) const {
+        issues_.addIssueAsync(level, type, subject, details, file);
+    }
+
+    Ingestor::Ingestor(ResolvedProject &proj, const std::shared_ptr<spdlog::logger> &log, ProjectIssueCallback &issues) :
+        project_(proj), logger_(log), issues_(issues) {}
 
     Task<Error> wipeExistingData(const DbClientPtr clientPtr, const std::string id) {
         logger.info("Wiping existing data for project {}", id);
@@ -56,6 +68,7 @@ namespace content {
             co_return result;
         } catch (std::exception e) {
             logger.error("Error ingesting project data: {}", e.what());
+            issues_.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::UNKNOWN, e.what());
 
             project_.getProjectDatabase().setDBClientPointer(clientPtr);
             co_return Error::ErrInternal;
@@ -73,9 +86,9 @@ namespace content {
         co_await wipeExistingData(project_.getProjectDatabase().getDbClientPtr(), projectId);
 
         std::map<std::string, std::unique_ptr<SubIngestor>> ingestors;
-        ingestors.emplace("Content paths", std::make_unique<ContentPathsSubIngestor>(project_, logger_));
-        ingestors.emplace("Tags", std::make_unique<TagsSubIngestor>(project_, logger_));
-        ingestors.emplace("Recipes", std::make_unique<RecipesSubIngestor>(project_, logger_));
+        ingestors.emplace("Content paths", std::make_unique<ContentPathsSubIngestor>(project_, logger_, issues_));
+        ingestors.emplace("Tags", std::make_unique<TagsSubIngestor>(project_, logger_, issues_));
+        ingestors.emplace("Recipes", std::make_unique<RecipesSubIngestor>(project_, logger_, issues_));
 
         // Prepare ingestors
         PreparationResult allResults;
@@ -85,7 +98,7 @@ namespace content {
                 const auto [items] = co_await ingestor->prepare();
                 allResults.items.insert(items.begin(), items.end());
             } catch (std::exception e) {
-                projectLog.critical("Encountered exception while preparing ingestor: {}", e.what());
+                issues_.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::UNKNOWN, e.what());
                 co_return Error::ErrInternal;
             }
         }
@@ -119,7 +132,8 @@ namespace content {
                     projectLog.error("Encountered error while executing ingestor");
                 }
             } catch (std::exception e) {
-                projectLog.critical("Encountered exception while executing ingestor [{}]", name);
+                const auto details = std::format("[{}] {}", name, e.what());
+                issues_.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::UNKNOWN, details);
                 co_return Error::ErrInternal;
             }
         }
@@ -134,7 +148,8 @@ namespace content {
                     projectLog.error("Encountered error while finishing ingestor");
                 }
             } catch (std::exception e) {
-                projectLog.critical("Encountered exception while finishing ingestor: [{}]", name);
+                const auto details = std::format("[{}] {}", name, e.what());
+                issues_.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::UNKNOWN, details);
                 co_return Error::ErrInternal;
             }
         }

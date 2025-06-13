@@ -45,11 +45,12 @@ class ProjectIssue
     struct Cols
     {
         static const std::string _id;
-        static const std::string _project_id;
         static const std::string _level;
-        static const std::string _page_path;
         static const std::string _deployment_id;
-        static const std::string _body;
+        static const std::string _type;
+        static const std::string _subject;
+        static const std::string _details;
+        static const std::string _file;
         static const std::string _created_at;
     };
 
@@ -111,15 +112,6 @@ class ProjectIssue
     void setId(const std::string &pId) noexcept;
     void setId(std::string &&pId) noexcept;
 
-    /**  For column project_id  */
-    ///Get the value of the column project_id, returns the default value if the column is null
-    const std::string &getValueOfProjectId() const noexcept;
-    ///Return a shared_ptr object pointing to the column const value, or an empty shared_ptr object if the column is null
-    const std::shared_ptr<std::string> &getProjectId() const noexcept;
-    ///Set the value of the column project_id
-    void setProjectId(const std::string &pProjectId) noexcept;
-    void setProjectId(std::string &&pProjectId) noexcept;
-
     /**  For column level  */
     ///Get the value of the column level, returns the default value if the column is null
     const std::string &getValueOfLevel() const noexcept;
@@ -129,16 +121,6 @@ class ProjectIssue
     void setLevel(const std::string &pLevel) noexcept;
     void setLevel(std::string &&pLevel) noexcept;
 
-    /**  For column page_path  */
-    ///Get the value of the column page_path, returns the default value if the column is null
-    const std::string &getValueOfPagePath() const noexcept;
-    ///Return a shared_ptr object pointing to the column const value, or an empty shared_ptr object if the column is null
-    const std::shared_ptr<std::string> &getPagePath() const noexcept;
-    ///Set the value of the column page_path
-    void setPagePath(const std::string &pPagePath) noexcept;
-    void setPagePath(std::string &&pPagePath) noexcept;
-    void setPagePathToNull() noexcept;
-
     /**  For column deployment_id  */
     ///Get the value of the column deployment_id, returns the default value if the column is null
     const std::string &getValueOfDeploymentId() const noexcept;
@@ -147,16 +129,44 @@ class ProjectIssue
     ///Set the value of the column deployment_id
     void setDeploymentId(const std::string &pDeploymentId) noexcept;
     void setDeploymentId(std::string &&pDeploymentId) noexcept;
-    void setDeploymentIdToNull() noexcept;
 
-    /**  For column body  */
-    ///Get the value of the column body, returns the default value if the column is null
-    const std::string &getValueOfBody() const noexcept;
+    /**  For column type  */
+    ///Get the value of the column type, returns the default value if the column is null
+    const std::string &getValueOfType() const noexcept;
     ///Return a shared_ptr object pointing to the column const value, or an empty shared_ptr object if the column is null
-    const std::shared_ptr<std::string> &getBody() const noexcept;
-    ///Set the value of the column body
-    void setBody(const std::string &pBody) noexcept;
-    void setBody(std::string &&pBody) noexcept;
+    const std::shared_ptr<std::string> &getType() const noexcept;
+    ///Set the value of the column type
+    void setType(const std::string &pType) noexcept;
+    void setType(std::string &&pType) noexcept;
+
+    /**  For column subject  */
+    ///Get the value of the column subject, returns the default value if the column is null
+    const std::string &getValueOfSubject() const noexcept;
+    ///Return a shared_ptr object pointing to the column const value, or an empty shared_ptr object if the column is null
+    const std::shared_ptr<std::string> &getSubject() const noexcept;
+    ///Set the value of the column subject
+    void setSubject(const std::string &pSubject) noexcept;
+    void setSubject(std::string &&pSubject) noexcept;
+
+    /**  For column details  */
+    ///Get the value of the column details, returns the default value if the column is null
+    const std::string &getValueOfDetails() const noexcept;
+    ///Return a shared_ptr object pointing to the column const value, or an empty shared_ptr object if the column is null
+    const std::shared_ptr<std::string> &getDetails() const noexcept;
+    ///Set the value of the column details
+    void setDetails(const std::string &pDetails) noexcept;
+    void setDetails(std::string &&pDetails) noexcept;
+    void setDetailsToNull() noexcept;
+
+    /**  For column file  */
+    ///Get the value of the column file, returns the default value if the column is null
+    const std::string &getValueOfFile() const noexcept;
+    ///Return a shared_ptr object pointing to the column const value, or an empty shared_ptr object if the column is null
+    const std::shared_ptr<std::string> &getFile() const noexcept;
+    ///Set the value of the column file
+    void setFile(const std::string &pFile) noexcept;
+    void setFile(std::string &&pFile) noexcept;
+    void setFileToNull() noexcept;
 
     /**  For column created_at  */
     ///Get the value of the column created_at, returns the default value if the column is null
@@ -167,7 +177,7 @@ class ProjectIssue
     void setCreatedAt(const ::trantor::Date &pCreatedAt) noexcept;
 
 
-    static size_t getColumnNumber() noexcept {  return 7;  }
+    static size_t getColumnNumber() noexcept {  return 8;  }
     static const std::string &getColumnName(size_t index) noexcept(false);
 
     Json::Value toJson() const;
@@ -189,11 +199,12 @@ class ProjectIssue
     ///For mysql or sqlite3
     void updateId(const uint64_t id);
     std::shared_ptr<std::string> id_;
-    std::shared_ptr<std::string> projectId_;
     std::shared_ptr<std::string> level_;
-    std::shared_ptr<std::string> pagePath_;
     std::shared_ptr<std::string> deploymentId_;
-    std::shared_ptr<std::string> body_;
+    std::shared_ptr<std::string> type_;
+    std::shared_ptr<std::string> subject_;
+    std::shared_ptr<std::string> details_;
+    std::shared_ptr<std::string> file_;
     std::shared_ptr<::trantor::Date> createdAt_;
     struct MetaData
     {
@@ -206,7 +217,7 @@ class ProjectIssue
         const bool notNull_;
     };
     static const std::vector<MetaData> metaData_;
-    bool dirtyFlag_[7]={ false };
+    bool dirtyFlag_[8]={ false };
   public:
     static const std::string &sqlForFindingByPrimaryKey()
     {
@@ -231,32 +242,37 @@ class ProjectIssue
         }
         if(dirtyFlag_[1])
         {
-            sql += "project_id,";
+            sql += "level,";
             ++parametersCount;
         }
         if(dirtyFlag_[2])
         {
-            sql += "level,";
+            sql += "deployment_id,";
             ++parametersCount;
         }
         if(dirtyFlag_[3])
         {
-            sql += "page_path,";
+            sql += "type,";
             ++parametersCount;
         }
         if(dirtyFlag_[4])
         {
-            sql += "deployment_id,";
+            sql += "subject,";
             ++parametersCount;
         }
         if(dirtyFlag_[5])
         {
-            sql += "body,";
+            sql += "details,";
+            ++parametersCount;
+        }
+        if(dirtyFlag_[6])
+        {
+            sql += "file,";
             ++parametersCount;
         }
         sql += "created_at,";
         ++parametersCount;
-        if(!dirtyFlag_[6])
+        if(!dirtyFlag_[7])
         {
             needSelection=true;
         }
@@ -302,6 +318,11 @@ class ProjectIssue
             sql.append(placeholderStr, n);
         }
         if(dirtyFlag_[6])
+        {
+            n = snprintf(placeholderStr,sizeof(placeholderStr),"$%d,",placeholder++);
+            sql.append(placeholderStr, n);
+        }
+        if(dirtyFlag_[7])
         {
             n = snprintf(placeholderStr,sizeof(placeholderStr),"$%d,",placeholder++);
             sql.append(placeholderStr, n);

@@ -54,6 +54,10 @@ std::optional<ResourceLocation> ResourceLocation::parse(const std::string &str) 
     return ResourceLocation{namespace_, path_};
 }
 
+std::string JsonValidationError::format() const {
+    return pointer.to_string() + " : " + msg;
+}
+
 void replaceAll(std::string &s, std::string const &toReplace, std::string const &replaceWith) {
     std::string buf;
     std::size_t pos = 0;

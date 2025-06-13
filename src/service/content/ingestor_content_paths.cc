@@ -13,15 +13,15 @@ using namespace service;
 namespace fs = std::filesystem;
 
 namespace content {
-    ContentPathsSubIngestor::ContentPathsSubIngestor(const ResolvedProject &proj, const std::shared_ptr<spdlog::logger> &log) :
-       SubIngestor(proj, log) {}
+    ContentPathsSubIngestor::ContentPathsSubIngestor(const ResolvedProject &proj, const std::shared_ptr<spdlog::logger> &log,
+                                                     ProjectIssueCallback &issues) : SubIngestor(proj, log, issues) {}
 
     Task<PreparationResult> ContentPathsSubIngestor::prepare() {
         PreparationResult result;
 
         for (const auto docsRoot = project_.getDocsDirectoryPath(); const auto &entry: fs::recursive_directory_iterator(docsRoot)) {
             if (const auto fileName = entry.path().filename().string(); !entry.is_regular_file() || entry.path().extension() != EXT_MDX ||
-                fileName.starts_with(".") && !fileName.starts_with(CONTENT_DIR))
+                                                                        fileName.starts_with(".") && !fileName.starts_with(CONTENT_DIR))
             {
                 continue;
             }
@@ -29,6 +29,8 @@ namespace content {
             if (const auto id = project_.readPageAttribute(relative_path.string(), "id")) {
                 if (pagePaths_.contains(*id)) {
                     logger_->warn("Skipping duplicate page for item {} at {}", *id, relative_path.string());
+                    co_await addIssue(ProjectIssueLevel::WARNING, ProjectIssueType::INGESTOR, ProjectError::DUPLICATE_PAGE, *id,
+                                      relative_path.string());
                     continue;
                 }
 
@@ -47,7 +49,7 @@ namespace content {
     Task<Error> ContentPathsSubIngestor::execute() {
         const auto clientPtr = app().getFastDbClient();
 
-        for (auto &[id, path] : pagePaths_) {
+        for (auto &[id, path]: pagePaths_) {
             co_await project_.getProjectDatabase().addProjectContentPage(id, path);
         }
 

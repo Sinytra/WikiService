@@ -14,11 +14,12 @@ using namespace drogon::orm;
 using namespace drogon_model::postgres;
 
 const std::string ProjectIssue::Cols::_id = "\"id\"";
-const std::string ProjectIssue::Cols::_project_id = "\"project_id\"";
 const std::string ProjectIssue::Cols::_level = "\"level\"";
-const std::string ProjectIssue::Cols::_page_path = "\"page_path\"";
 const std::string ProjectIssue::Cols::_deployment_id = "\"deployment_id\"";
-const std::string ProjectIssue::Cols::_body = "\"body\"";
+const std::string ProjectIssue::Cols::_type = "\"type\"";
+const std::string ProjectIssue::Cols::_subject = "\"subject\"";
+const std::string ProjectIssue::Cols::_details = "\"details\"";
+const std::string ProjectIssue::Cols::_file = "\"file\"";
 const std::string ProjectIssue::Cols::_created_at = "\"created_at\"";
 const std::string ProjectIssue::primaryKeyName = "id";
 const bool ProjectIssue::hasPrimaryKey = true;
@@ -26,11 +27,12 @@ const std::string ProjectIssue::tableName = "\"project_issue\"";
 
 const std::vector<typename ProjectIssue::MetaData> ProjectIssue::metaData_={
 {"id","std::string","character varying",28,0,1,1},
-{"project_id","std::string","text",0,0,0,1},
 {"level","std::string","character varying",255,0,0,1},
-{"page_path","std::string","text",0,0,0,0},
-{"deployment_id","std::string","character varying",28,0,0,0},
-{"body","std::string","jsonb",0,0,0,1},
+{"deployment_id","std::string","character varying",28,0,0,1},
+{"type","std::string","character varying",255,0,0,1},
+{"subject","std::string","character varying",255,0,0,1},
+{"details","std::string","text",0,0,0,0},
+{"file","std::string","text",0,0,0,0},
 {"created_at","::trantor::Date","timestamp without time zone",0,0,0,1}
 };
 const std::string &ProjectIssue::getColumnName(size_t index) noexcept(false)
@@ -46,25 +48,29 @@ ProjectIssue::ProjectIssue(const Row &r, const ssize_t indexOffset) noexcept
         {
             id_=std::make_shared<std::string>(r["id"].as<std::string>());
         }
-        if(!r["project_id"].isNull())
-        {
-            projectId_=std::make_shared<std::string>(r["project_id"].as<std::string>());
-        }
         if(!r["level"].isNull())
         {
             level_=std::make_shared<std::string>(r["level"].as<std::string>());
-        }
-        if(!r["page_path"].isNull())
-        {
-            pagePath_=std::make_shared<std::string>(r["page_path"].as<std::string>());
         }
         if(!r["deployment_id"].isNull())
         {
             deploymentId_=std::make_shared<std::string>(r["deployment_id"].as<std::string>());
         }
-        if(!r["body"].isNull())
+        if(!r["type"].isNull())
         {
-            body_=std::make_shared<std::string>(r["body"].as<std::string>());
+            type_=std::make_shared<std::string>(r["type"].as<std::string>());
+        }
+        if(!r["subject"].isNull())
+        {
+            subject_=std::make_shared<std::string>(r["subject"].as<std::string>());
+        }
+        if(!r["details"].isNull())
+        {
+            details_=std::make_shared<std::string>(r["details"].as<std::string>());
+        }
+        if(!r["file"].isNull())
+        {
+            file_=std::make_shared<std::string>(r["file"].as<std::string>());
         }
         if(!r["created_at"].isNull())
         {
@@ -92,7 +98,7 @@ ProjectIssue::ProjectIssue(const Row &r, const ssize_t indexOffset) noexcept
     else
     {
         size_t offset = (size_t)indexOffset;
-        if(offset + 7 > r.size())
+        if(offset + 8 > r.size())
         {
             LOG_FATAL << "Invalid SQL result for this model";
             return;
@@ -106,29 +112,34 @@ ProjectIssue::ProjectIssue(const Row &r, const ssize_t indexOffset) noexcept
         index = offset + 1;
         if(!r[index].isNull())
         {
-            projectId_=std::make_shared<std::string>(r[index].as<std::string>());
+            level_=std::make_shared<std::string>(r[index].as<std::string>());
         }
         index = offset + 2;
         if(!r[index].isNull())
         {
-            level_=std::make_shared<std::string>(r[index].as<std::string>());
+            deploymentId_=std::make_shared<std::string>(r[index].as<std::string>());
         }
         index = offset + 3;
         if(!r[index].isNull())
         {
-            pagePath_=std::make_shared<std::string>(r[index].as<std::string>());
+            type_=std::make_shared<std::string>(r[index].as<std::string>());
         }
         index = offset + 4;
         if(!r[index].isNull())
         {
-            deploymentId_=std::make_shared<std::string>(r[index].as<std::string>());
+            subject_=std::make_shared<std::string>(r[index].as<std::string>());
         }
         index = offset + 5;
         if(!r[index].isNull())
         {
-            body_=std::make_shared<std::string>(r[index].as<std::string>());
+            details_=std::make_shared<std::string>(r[index].as<std::string>());
         }
         index = offset + 6;
+        if(!r[index].isNull())
+        {
+            file_=std::make_shared<std::string>(r[index].as<std::string>());
+        }
+        index = offset + 7;
         if(!r[index].isNull())
         {
             auto timeStr = r[index].as<std::string>();
@@ -157,7 +168,7 @@ ProjectIssue::ProjectIssue(const Row &r, const ssize_t indexOffset) noexcept
 
 ProjectIssue::ProjectIssue(const Json::Value &pJson, const std::vector<std::string> &pMasqueradingVector) noexcept(false)
 {
-    if(pMasqueradingVector.size() != 7)
+    if(pMasqueradingVector.size() != 8)
     {
         LOG_ERROR << "Bad masquerading vector";
         return;
@@ -175,7 +186,7 @@ ProjectIssue::ProjectIssue(const Json::Value &pJson, const std::vector<std::stri
         dirtyFlag_[1] = true;
         if(!pJson[pMasqueradingVector[1]].isNull())
         {
-            projectId_=std::make_shared<std::string>(pJson[pMasqueradingVector[1]].asString());
+            level_=std::make_shared<std::string>(pJson[pMasqueradingVector[1]].asString());
         }
     }
     if(!pMasqueradingVector[2].empty() && pJson.isMember(pMasqueradingVector[2]))
@@ -183,7 +194,7 @@ ProjectIssue::ProjectIssue(const Json::Value &pJson, const std::vector<std::stri
         dirtyFlag_[2] = true;
         if(!pJson[pMasqueradingVector[2]].isNull())
         {
-            level_=std::make_shared<std::string>(pJson[pMasqueradingVector[2]].asString());
+            deploymentId_=std::make_shared<std::string>(pJson[pMasqueradingVector[2]].asString());
         }
     }
     if(!pMasqueradingVector[3].empty() && pJson.isMember(pMasqueradingVector[3]))
@@ -191,7 +202,7 @@ ProjectIssue::ProjectIssue(const Json::Value &pJson, const std::vector<std::stri
         dirtyFlag_[3] = true;
         if(!pJson[pMasqueradingVector[3]].isNull())
         {
-            pagePath_=std::make_shared<std::string>(pJson[pMasqueradingVector[3]].asString());
+            type_=std::make_shared<std::string>(pJson[pMasqueradingVector[3]].asString());
         }
     }
     if(!pMasqueradingVector[4].empty() && pJson.isMember(pMasqueradingVector[4]))
@@ -199,7 +210,7 @@ ProjectIssue::ProjectIssue(const Json::Value &pJson, const std::vector<std::stri
         dirtyFlag_[4] = true;
         if(!pJson[pMasqueradingVector[4]].isNull())
         {
-            deploymentId_=std::make_shared<std::string>(pJson[pMasqueradingVector[4]].asString());
+            subject_=std::make_shared<std::string>(pJson[pMasqueradingVector[4]].asString());
         }
     }
     if(!pMasqueradingVector[5].empty() && pJson.isMember(pMasqueradingVector[5]))
@@ -207,7 +218,7 @@ ProjectIssue::ProjectIssue(const Json::Value &pJson, const std::vector<std::stri
         dirtyFlag_[5] = true;
         if(!pJson[pMasqueradingVector[5]].isNull())
         {
-            body_=std::make_shared<std::string>(pJson[pMasqueradingVector[5]].asString());
+            details_=std::make_shared<std::string>(pJson[pMasqueradingVector[5]].asString());
         }
     }
     if(!pMasqueradingVector[6].empty() && pJson.isMember(pMasqueradingVector[6]))
@@ -215,7 +226,15 @@ ProjectIssue::ProjectIssue(const Json::Value &pJson, const std::vector<std::stri
         dirtyFlag_[6] = true;
         if(!pJson[pMasqueradingVector[6]].isNull())
         {
-            auto timeStr = pJson[pMasqueradingVector[6]].asString();
+            file_=std::make_shared<std::string>(pJson[pMasqueradingVector[6]].asString());
+        }
+    }
+    if(!pMasqueradingVector[7].empty() && pJson.isMember(pMasqueradingVector[7]))
+    {
+        dirtyFlag_[7] = true;
+        if(!pJson[pMasqueradingVector[7]].isNull())
+        {
+            auto timeStr = pJson[pMasqueradingVector[7]].asString();
             struct tm stm;
             memset(&stm,0,sizeof(stm));
             auto p = strptime(timeStr.c_str(),"%Y-%m-%d %H:%M:%S",&stm);
@@ -248,49 +267,57 @@ ProjectIssue::ProjectIssue(const Json::Value &pJson) noexcept(false)
             id_=std::make_shared<std::string>(pJson["id"].asString());
         }
     }
-    if(pJson.isMember("project_id"))
-    {
-        dirtyFlag_[1]=true;
-        if(!pJson["project_id"].isNull())
-        {
-            projectId_=std::make_shared<std::string>(pJson["project_id"].asString());
-        }
-    }
     if(pJson.isMember("level"))
     {
-        dirtyFlag_[2]=true;
+        dirtyFlag_[1]=true;
         if(!pJson["level"].isNull())
         {
             level_=std::make_shared<std::string>(pJson["level"].asString());
         }
     }
-    if(pJson.isMember("page_path"))
-    {
-        dirtyFlag_[3]=true;
-        if(!pJson["page_path"].isNull())
-        {
-            pagePath_=std::make_shared<std::string>(pJson["page_path"].asString());
-        }
-    }
     if(pJson.isMember("deployment_id"))
     {
-        dirtyFlag_[4]=true;
+        dirtyFlag_[2]=true;
         if(!pJson["deployment_id"].isNull())
         {
             deploymentId_=std::make_shared<std::string>(pJson["deployment_id"].asString());
         }
     }
-    if(pJson.isMember("body"))
+    if(pJson.isMember("type"))
+    {
+        dirtyFlag_[3]=true;
+        if(!pJson["type"].isNull())
+        {
+            type_=std::make_shared<std::string>(pJson["type"].asString());
+        }
+    }
+    if(pJson.isMember("subject"))
+    {
+        dirtyFlag_[4]=true;
+        if(!pJson["subject"].isNull())
+        {
+            subject_=std::make_shared<std::string>(pJson["subject"].asString());
+        }
+    }
+    if(pJson.isMember("details"))
     {
         dirtyFlag_[5]=true;
-        if(!pJson["body"].isNull())
+        if(!pJson["details"].isNull())
         {
-            body_=std::make_shared<std::string>(pJson["body"].asString());
+            details_=std::make_shared<std::string>(pJson["details"].asString());
+        }
+    }
+    if(pJson.isMember("file"))
+    {
+        dirtyFlag_[6]=true;
+        if(!pJson["file"].isNull())
+        {
+            file_=std::make_shared<std::string>(pJson["file"].asString());
         }
     }
     if(pJson.isMember("created_at"))
     {
-        dirtyFlag_[6]=true;
+        dirtyFlag_[7]=true;
         if(!pJson["created_at"].isNull())
         {
             auto timeStr = pJson["created_at"].asString();
@@ -319,7 +346,7 @@ ProjectIssue::ProjectIssue(const Json::Value &pJson) noexcept(false)
 void ProjectIssue::updateByMasqueradedJson(const Json::Value &pJson,
                                             const std::vector<std::string> &pMasqueradingVector) noexcept(false)
 {
-    if(pMasqueradingVector.size() != 7)
+    if(pMasqueradingVector.size() != 8)
     {
         LOG_ERROR << "Bad masquerading vector";
         return;
@@ -336,7 +363,7 @@ void ProjectIssue::updateByMasqueradedJson(const Json::Value &pJson,
         dirtyFlag_[1] = true;
         if(!pJson[pMasqueradingVector[1]].isNull())
         {
-            projectId_=std::make_shared<std::string>(pJson[pMasqueradingVector[1]].asString());
+            level_=std::make_shared<std::string>(pJson[pMasqueradingVector[1]].asString());
         }
     }
     if(!pMasqueradingVector[2].empty() && pJson.isMember(pMasqueradingVector[2]))
@@ -344,7 +371,7 @@ void ProjectIssue::updateByMasqueradedJson(const Json::Value &pJson,
         dirtyFlag_[2] = true;
         if(!pJson[pMasqueradingVector[2]].isNull())
         {
-            level_=std::make_shared<std::string>(pJson[pMasqueradingVector[2]].asString());
+            deploymentId_=std::make_shared<std::string>(pJson[pMasqueradingVector[2]].asString());
         }
     }
     if(!pMasqueradingVector[3].empty() && pJson.isMember(pMasqueradingVector[3]))
@@ -352,7 +379,7 @@ void ProjectIssue::updateByMasqueradedJson(const Json::Value &pJson,
         dirtyFlag_[3] = true;
         if(!pJson[pMasqueradingVector[3]].isNull())
         {
-            pagePath_=std::make_shared<std::string>(pJson[pMasqueradingVector[3]].asString());
+            type_=std::make_shared<std::string>(pJson[pMasqueradingVector[3]].asString());
         }
     }
     if(!pMasqueradingVector[4].empty() && pJson.isMember(pMasqueradingVector[4]))
@@ -360,7 +387,7 @@ void ProjectIssue::updateByMasqueradedJson(const Json::Value &pJson,
         dirtyFlag_[4] = true;
         if(!pJson[pMasqueradingVector[4]].isNull())
         {
-            deploymentId_=std::make_shared<std::string>(pJson[pMasqueradingVector[4]].asString());
+            subject_=std::make_shared<std::string>(pJson[pMasqueradingVector[4]].asString());
         }
     }
     if(!pMasqueradingVector[5].empty() && pJson.isMember(pMasqueradingVector[5]))
@@ -368,7 +395,7 @@ void ProjectIssue::updateByMasqueradedJson(const Json::Value &pJson,
         dirtyFlag_[5] = true;
         if(!pJson[pMasqueradingVector[5]].isNull())
         {
-            body_=std::make_shared<std::string>(pJson[pMasqueradingVector[5]].asString());
+            details_=std::make_shared<std::string>(pJson[pMasqueradingVector[5]].asString());
         }
     }
     if(!pMasqueradingVector[6].empty() && pJson.isMember(pMasqueradingVector[6]))
@@ -376,7 +403,15 @@ void ProjectIssue::updateByMasqueradedJson(const Json::Value &pJson,
         dirtyFlag_[6] = true;
         if(!pJson[pMasqueradingVector[6]].isNull())
         {
-            auto timeStr = pJson[pMasqueradingVector[6]].asString();
+            file_=std::make_shared<std::string>(pJson[pMasqueradingVector[6]].asString());
+        }
+    }
+    if(!pMasqueradingVector[7].empty() && pJson.isMember(pMasqueradingVector[7]))
+    {
+        dirtyFlag_[7] = true;
+        if(!pJson[pMasqueradingVector[7]].isNull())
+        {
+            auto timeStr = pJson[pMasqueradingVector[7]].asString();
             struct tm stm;
             memset(&stm,0,sizeof(stm));
             auto p = strptime(timeStr.c_str(),"%Y-%m-%d %H:%M:%S",&stm);
@@ -408,49 +443,57 @@ void ProjectIssue::updateByJson(const Json::Value &pJson) noexcept(false)
             id_=std::make_shared<std::string>(pJson["id"].asString());
         }
     }
-    if(pJson.isMember("project_id"))
-    {
-        dirtyFlag_[1] = true;
-        if(!pJson["project_id"].isNull())
-        {
-            projectId_=std::make_shared<std::string>(pJson["project_id"].asString());
-        }
-    }
     if(pJson.isMember("level"))
     {
-        dirtyFlag_[2] = true;
+        dirtyFlag_[1] = true;
         if(!pJson["level"].isNull())
         {
             level_=std::make_shared<std::string>(pJson["level"].asString());
         }
     }
-    if(pJson.isMember("page_path"))
-    {
-        dirtyFlag_[3] = true;
-        if(!pJson["page_path"].isNull())
-        {
-            pagePath_=std::make_shared<std::string>(pJson["page_path"].asString());
-        }
-    }
     if(pJson.isMember("deployment_id"))
     {
-        dirtyFlag_[4] = true;
+        dirtyFlag_[2] = true;
         if(!pJson["deployment_id"].isNull())
         {
             deploymentId_=std::make_shared<std::string>(pJson["deployment_id"].asString());
         }
     }
-    if(pJson.isMember("body"))
+    if(pJson.isMember("type"))
+    {
+        dirtyFlag_[3] = true;
+        if(!pJson["type"].isNull())
+        {
+            type_=std::make_shared<std::string>(pJson["type"].asString());
+        }
+    }
+    if(pJson.isMember("subject"))
+    {
+        dirtyFlag_[4] = true;
+        if(!pJson["subject"].isNull())
+        {
+            subject_=std::make_shared<std::string>(pJson["subject"].asString());
+        }
+    }
+    if(pJson.isMember("details"))
     {
         dirtyFlag_[5] = true;
-        if(!pJson["body"].isNull())
+        if(!pJson["details"].isNull())
         {
-            body_=std::make_shared<std::string>(pJson["body"].asString());
+            details_=std::make_shared<std::string>(pJson["details"].asString());
+        }
+    }
+    if(pJson.isMember("file"))
+    {
+        dirtyFlag_[6] = true;
+        if(!pJson["file"].isNull())
+        {
+            file_=std::make_shared<std::string>(pJson["file"].asString());
         }
     }
     if(pJson.isMember("created_at"))
     {
-        dirtyFlag_[6] = true;
+        dirtyFlag_[7] = true;
         if(!pJson["created_at"].isNull())
         {
             auto timeStr = pJson["created_at"].asString();
@@ -503,28 +546,6 @@ const typename ProjectIssue::PrimaryKeyType & ProjectIssue::getPrimaryKey() cons
     return *id_;
 }
 
-const std::string &ProjectIssue::getValueOfProjectId() const noexcept
-{
-    static const std::string defaultValue = std::string();
-    if(projectId_)
-        return *projectId_;
-    return defaultValue;
-}
-const std::shared_ptr<std::string> &ProjectIssue::getProjectId() const noexcept
-{
-    return projectId_;
-}
-void ProjectIssue::setProjectId(const std::string &pProjectId) noexcept
-{
-    projectId_ = std::make_shared<std::string>(pProjectId);
-    dirtyFlag_[1] = true;
-}
-void ProjectIssue::setProjectId(std::string &&pProjectId) noexcept
-{
-    projectId_ = std::make_shared<std::string>(std::move(pProjectId));
-    dirtyFlag_[1] = true;
-}
-
 const std::string &ProjectIssue::getValueOfLevel() const noexcept
 {
     static const std::string defaultValue = std::string();
@@ -539,39 +560,12 @@ const std::shared_ptr<std::string> &ProjectIssue::getLevel() const noexcept
 void ProjectIssue::setLevel(const std::string &pLevel) noexcept
 {
     level_ = std::make_shared<std::string>(pLevel);
-    dirtyFlag_[2] = true;
+    dirtyFlag_[1] = true;
 }
 void ProjectIssue::setLevel(std::string &&pLevel) noexcept
 {
     level_ = std::make_shared<std::string>(std::move(pLevel));
-    dirtyFlag_[2] = true;
-}
-
-const std::string &ProjectIssue::getValueOfPagePath() const noexcept
-{
-    static const std::string defaultValue = std::string();
-    if(pagePath_)
-        return *pagePath_;
-    return defaultValue;
-}
-const std::shared_ptr<std::string> &ProjectIssue::getPagePath() const noexcept
-{
-    return pagePath_;
-}
-void ProjectIssue::setPagePath(const std::string &pPagePath) noexcept
-{
-    pagePath_ = std::make_shared<std::string>(pPagePath);
-    dirtyFlag_[3] = true;
-}
-void ProjectIssue::setPagePath(std::string &&pPagePath) noexcept
-{
-    pagePath_ = std::make_shared<std::string>(std::move(pPagePath));
-    dirtyFlag_[3] = true;
-}
-void ProjectIssue::setPagePathToNull() noexcept
-{
-    pagePath_.reset();
-    dirtyFlag_[3] = true;
+    dirtyFlag_[1] = true;
 }
 
 const std::string &ProjectIssue::getValueOfDeploymentId() const noexcept
@@ -588,39 +582,110 @@ const std::shared_ptr<std::string> &ProjectIssue::getDeploymentId() const noexce
 void ProjectIssue::setDeploymentId(const std::string &pDeploymentId) noexcept
 {
     deploymentId_ = std::make_shared<std::string>(pDeploymentId);
-    dirtyFlag_[4] = true;
+    dirtyFlag_[2] = true;
 }
 void ProjectIssue::setDeploymentId(std::string &&pDeploymentId) noexcept
 {
     deploymentId_ = std::make_shared<std::string>(std::move(pDeploymentId));
+    dirtyFlag_[2] = true;
+}
+
+const std::string &ProjectIssue::getValueOfType() const noexcept
+{
+    static const std::string defaultValue = std::string();
+    if(type_)
+        return *type_;
+    return defaultValue;
+}
+const std::shared_ptr<std::string> &ProjectIssue::getType() const noexcept
+{
+    return type_;
+}
+void ProjectIssue::setType(const std::string &pType) noexcept
+{
+    type_ = std::make_shared<std::string>(pType);
+    dirtyFlag_[3] = true;
+}
+void ProjectIssue::setType(std::string &&pType) noexcept
+{
+    type_ = std::make_shared<std::string>(std::move(pType));
+    dirtyFlag_[3] = true;
+}
+
+const std::string &ProjectIssue::getValueOfSubject() const noexcept
+{
+    static const std::string defaultValue = std::string();
+    if(subject_)
+        return *subject_;
+    return defaultValue;
+}
+const std::shared_ptr<std::string> &ProjectIssue::getSubject() const noexcept
+{
+    return subject_;
+}
+void ProjectIssue::setSubject(const std::string &pSubject) noexcept
+{
+    subject_ = std::make_shared<std::string>(pSubject);
     dirtyFlag_[4] = true;
 }
-void ProjectIssue::setDeploymentIdToNull() noexcept
+void ProjectIssue::setSubject(std::string &&pSubject) noexcept
 {
-    deploymentId_.reset();
+    subject_ = std::make_shared<std::string>(std::move(pSubject));
     dirtyFlag_[4] = true;
 }
 
-const std::string &ProjectIssue::getValueOfBody() const noexcept
+const std::string &ProjectIssue::getValueOfDetails() const noexcept
 {
     static const std::string defaultValue = std::string();
-    if(body_)
-        return *body_;
+    if(details_)
+        return *details_;
     return defaultValue;
 }
-const std::shared_ptr<std::string> &ProjectIssue::getBody() const noexcept
+const std::shared_ptr<std::string> &ProjectIssue::getDetails() const noexcept
 {
-    return body_;
+    return details_;
 }
-void ProjectIssue::setBody(const std::string &pBody) noexcept
+void ProjectIssue::setDetails(const std::string &pDetails) noexcept
 {
-    body_ = std::make_shared<std::string>(pBody);
+    details_ = std::make_shared<std::string>(pDetails);
     dirtyFlag_[5] = true;
 }
-void ProjectIssue::setBody(std::string &&pBody) noexcept
+void ProjectIssue::setDetails(std::string &&pDetails) noexcept
 {
-    body_ = std::make_shared<std::string>(std::move(pBody));
+    details_ = std::make_shared<std::string>(std::move(pDetails));
     dirtyFlag_[5] = true;
+}
+void ProjectIssue::setDetailsToNull() noexcept
+{
+    details_.reset();
+    dirtyFlag_[5] = true;
+}
+
+const std::string &ProjectIssue::getValueOfFile() const noexcept
+{
+    static const std::string defaultValue = std::string();
+    if(file_)
+        return *file_;
+    return defaultValue;
+}
+const std::shared_ptr<std::string> &ProjectIssue::getFile() const noexcept
+{
+    return file_;
+}
+void ProjectIssue::setFile(const std::string &pFile) noexcept
+{
+    file_ = std::make_shared<std::string>(pFile);
+    dirtyFlag_[6] = true;
+}
+void ProjectIssue::setFile(std::string &&pFile) noexcept
+{
+    file_ = std::make_shared<std::string>(std::move(pFile));
+    dirtyFlag_[6] = true;
+}
+void ProjectIssue::setFileToNull() noexcept
+{
+    file_.reset();
+    dirtyFlag_[6] = true;
 }
 
 const ::trantor::Date &ProjectIssue::getValueOfCreatedAt() const noexcept
@@ -637,7 +702,7 @@ const std::shared_ptr<::trantor::Date> &ProjectIssue::getCreatedAt() const noexc
 void ProjectIssue::setCreatedAt(const ::trantor::Date &pCreatedAt) noexcept
 {
     createdAt_ = std::make_shared<::trantor::Date>(pCreatedAt);
-    dirtyFlag_[6] = true;
+    dirtyFlag_[7] = true;
 }
 
 void ProjectIssue::updateId(const uint64_t id)
@@ -648,11 +713,12 @@ const std::vector<std::string> &ProjectIssue::insertColumns() noexcept
 {
     static const std::vector<std::string> inCols={
         "id",
-        "project_id",
         "level",
-        "page_path",
         "deployment_id",
-        "body",
+        "type",
+        "subject",
+        "details",
+        "file",
         "created_at"
     };
     return inCols;
@@ -673,17 +739,6 @@ void ProjectIssue::outputArgs(drogon::orm::internal::SqlBinder &binder) const
     }
     if(dirtyFlag_[1])
     {
-        if(getProjectId())
-        {
-            binder << getValueOfProjectId();
-        }
-        else
-        {
-            binder << nullptr;
-        }
-    }
-    if(dirtyFlag_[2])
-    {
         if(getLevel())
         {
             binder << getValueOfLevel();
@@ -693,18 +748,7 @@ void ProjectIssue::outputArgs(drogon::orm::internal::SqlBinder &binder) const
             binder << nullptr;
         }
     }
-    if(dirtyFlag_[3])
-    {
-        if(getPagePath())
-        {
-            binder << getValueOfPagePath();
-        }
-        else
-        {
-            binder << nullptr;
-        }
-    }
-    if(dirtyFlag_[4])
+    if(dirtyFlag_[2])
     {
         if(getDeploymentId())
         {
@@ -715,11 +759,33 @@ void ProjectIssue::outputArgs(drogon::orm::internal::SqlBinder &binder) const
             binder << nullptr;
         }
     }
+    if(dirtyFlag_[3])
+    {
+        if(getType())
+        {
+            binder << getValueOfType();
+        }
+        else
+        {
+            binder << nullptr;
+        }
+    }
+    if(dirtyFlag_[4])
+    {
+        if(getSubject())
+        {
+            binder << getValueOfSubject();
+        }
+        else
+        {
+            binder << nullptr;
+        }
+    }
     if(dirtyFlag_[5])
     {
-        if(getBody())
+        if(getDetails())
         {
-            binder << getValueOfBody();
+            binder << getValueOfDetails();
         }
         else
         {
@@ -727,6 +793,17 @@ void ProjectIssue::outputArgs(drogon::orm::internal::SqlBinder &binder) const
         }
     }
     if(dirtyFlag_[6])
+    {
+        if(getFile())
+        {
+            binder << getValueOfFile();
+        }
+        else
+        {
+            binder << nullptr;
+        }
+    }
+    if(dirtyFlag_[7])
     {
         if(getCreatedAt())
         {
@@ -770,6 +847,10 @@ const std::vector<std::string> ProjectIssue::updateColumns() const
     {
         ret.push_back(getColumnName(6));
     }
+    if(dirtyFlag_[7])
+    {
+        ret.push_back(getColumnName(7));
+    }
     return ret;
 }
 
@@ -788,17 +869,6 @@ void ProjectIssue::updateArgs(drogon::orm::internal::SqlBinder &binder) const
     }
     if(dirtyFlag_[1])
     {
-        if(getProjectId())
-        {
-            binder << getValueOfProjectId();
-        }
-        else
-        {
-            binder << nullptr;
-        }
-    }
-    if(dirtyFlag_[2])
-    {
         if(getLevel())
         {
             binder << getValueOfLevel();
@@ -808,18 +878,7 @@ void ProjectIssue::updateArgs(drogon::orm::internal::SqlBinder &binder) const
             binder << nullptr;
         }
     }
-    if(dirtyFlag_[3])
-    {
-        if(getPagePath())
-        {
-            binder << getValueOfPagePath();
-        }
-        else
-        {
-            binder << nullptr;
-        }
-    }
-    if(dirtyFlag_[4])
+    if(dirtyFlag_[2])
     {
         if(getDeploymentId())
         {
@@ -830,11 +889,33 @@ void ProjectIssue::updateArgs(drogon::orm::internal::SqlBinder &binder) const
             binder << nullptr;
         }
     }
+    if(dirtyFlag_[3])
+    {
+        if(getType())
+        {
+            binder << getValueOfType();
+        }
+        else
+        {
+            binder << nullptr;
+        }
+    }
+    if(dirtyFlag_[4])
+    {
+        if(getSubject())
+        {
+            binder << getValueOfSubject();
+        }
+        else
+        {
+            binder << nullptr;
+        }
+    }
     if(dirtyFlag_[5])
     {
-        if(getBody())
+        if(getDetails())
         {
-            binder << getValueOfBody();
+            binder << getValueOfDetails();
         }
         else
         {
@@ -842,6 +923,17 @@ void ProjectIssue::updateArgs(drogon::orm::internal::SqlBinder &binder) const
         }
     }
     if(dirtyFlag_[6])
+    {
+        if(getFile())
+        {
+            binder << getValueOfFile();
+        }
+        else
+        {
+            binder << nullptr;
+        }
+    }
+    if(dirtyFlag_[7])
     {
         if(getCreatedAt())
         {
@@ -864,14 +956,6 @@ Json::Value ProjectIssue::toJson() const
     {
         ret["id"]=Json::Value();
     }
-    if(getProjectId())
-    {
-        ret["project_id"]=getValueOfProjectId();
-    }
-    else
-    {
-        ret["project_id"]=Json::Value();
-    }
     if(getLevel())
     {
         ret["level"]=getValueOfLevel();
@@ -879,14 +963,6 @@ Json::Value ProjectIssue::toJson() const
     else
     {
         ret["level"]=Json::Value();
-    }
-    if(getPagePath())
-    {
-        ret["page_path"]=getValueOfPagePath();
-    }
-    else
-    {
-        ret["page_path"]=Json::Value();
     }
     if(getDeploymentId())
     {
@@ -896,13 +972,37 @@ Json::Value ProjectIssue::toJson() const
     {
         ret["deployment_id"]=Json::Value();
     }
-    if(getBody())
+    if(getType())
     {
-        ret["body"]=getValueOfBody();
+        ret["type"]=getValueOfType();
     }
     else
     {
-        ret["body"]=Json::Value();
+        ret["type"]=Json::Value();
+    }
+    if(getSubject())
+    {
+        ret["subject"]=getValueOfSubject();
+    }
+    else
+    {
+        ret["subject"]=Json::Value();
+    }
+    if(getDetails())
+    {
+        ret["details"]=getValueOfDetails();
+    }
+    else
+    {
+        ret["details"]=Json::Value();
+    }
+    if(getFile())
+    {
+        ret["file"]=getValueOfFile();
+    }
+    else
+    {
+        ret["file"]=Json::Value();
     }
     if(getCreatedAt())
     {
@@ -919,7 +1019,7 @@ Json::Value ProjectIssue::toMasqueradedJson(
     const std::vector<std::string> &pMasqueradingVector) const
 {
     Json::Value ret;
-    if(pMasqueradingVector.size() == 7)
+    if(pMasqueradingVector.size() == 8)
     {
         if(!pMasqueradingVector[0].empty())
         {
@@ -934,9 +1034,9 @@ Json::Value ProjectIssue::toMasqueradedJson(
         }
         if(!pMasqueradingVector[1].empty())
         {
-            if(getProjectId())
+            if(getLevel())
             {
-                ret[pMasqueradingVector[1]]=getValueOfProjectId();
+                ret[pMasqueradingVector[1]]=getValueOfLevel();
             }
             else
             {
@@ -945,9 +1045,9 @@ Json::Value ProjectIssue::toMasqueradedJson(
         }
         if(!pMasqueradingVector[2].empty())
         {
-            if(getLevel())
+            if(getDeploymentId())
             {
-                ret[pMasqueradingVector[2]]=getValueOfLevel();
+                ret[pMasqueradingVector[2]]=getValueOfDeploymentId();
             }
             else
             {
@@ -956,9 +1056,9 @@ Json::Value ProjectIssue::toMasqueradedJson(
         }
         if(!pMasqueradingVector[3].empty())
         {
-            if(getPagePath())
+            if(getType())
             {
-                ret[pMasqueradingVector[3]]=getValueOfPagePath();
+                ret[pMasqueradingVector[3]]=getValueOfType();
             }
             else
             {
@@ -967,9 +1067,9 @@ Json::Value ProjectIssue::toMasqueradedJson(
         }
         if(!pMasqueradingVector[4].empty())
         {
-            if(getDeploymentId())
+            if(getSubject())
             {
-                ret[pMasqueradingVector[4]]=getValueOfDeploymentId();
+                ret[pMasqueradingVector[4]]=getValueOfSubject();
             }
             else
             {
@@ -978,9 +1078,9 @@ Json::Value ProjectIssue::toMasqueradedJson(
         }
         if(!pMasqueradingVector[5].empty())
         {
-            if(getBody())
+            if(getDetails())
             {
-                ret[pMasqueradingVector[5]]=getValueOfBody();
+                ret[pMasqueradingVector[5]]=getValueOfDetails();
             }
             else
             {
@@ -989,13 +1089,24 @@ Json::Value ProjectIssue::toMasqueradedJson(
         }
         if(!pMasqueradingVector[6].empty())
         {
-            if(getCreatedAt())
+            if(getFile())
             {
-                ret[pMasqueradingVector[6]]=getCreatedAt()->toDbStringLocal();
+                ret[pMasqueradingVector[6]]=getValueOfFile();
             }
             else
             {
                 ret[pMasqueradingVector[6]]=Json::Value();
+            }
+        }
+        if(!pMasqueradingVector[7].empty())
+        {
+            if(getCreatedAt())
+            {
+                ret[pMasqueradingVector[7]]=getCreatedAt()->toDbStringLocal();
+            }
+            else
+            {
+                ret[pMasqueradingVector[7]]=Json::Value();
             }
         }
         return ret;
@@ -1009,14 +1120,6 @@ Json::Value ProjectIssue::toMasqueradedJson(
     {
         ret["id"]=Json::Value();
     }
-    if(getProjectId())
-    {
-        ret["project_id"]=getValueOfProjectId();
-    }
-    else
-    {
-        ret["project_id"]=Json::Value();
-    }
     if(getLevel())
     {
         ret["level"]=getValueOfLevel();
@@ -1024,14 +1127,6 @@ Json::Value ProjectIssue::toMasqueradedJson(
     else
     {
         ret["level"]=Json::Value();
-    }
-    if(getPagePath())
-    {
-        ret["page_path"]=getValueOfPagePath();
-    }
-    else
-    {
-        ret["page_path"]=Json::Value();
     }
     if(getDeploymentId())
     {
@@ -1041,13 +1136,37 @@ Json::Value ProjectIssue::toMasqueradedJson(
     {
         ret["deployment_id"]=Json::Value();
     }
-    if(getBody())
+    if(getType())
     {
-        ret["body"]=getValueOfBody();
+        ret["type"]=getValueOfType();
     }
     else
     {
-        ret["body"]=Json::Value();
+        ret["type"]=Json::Value();
+    }
+    if(getSubject())
+    {
+        ret["subject"]=getValueOfSubject();
+    }
+    else
+    {
+        ret["subject"]=Json::Value();
+    }
+    if(getDetails())
+    {
+        ret["details"]=getValueOfDetails();
+    }
+    else
+    {
+        ret["details"]=Json::Value();
+    }
+    if(getFile())
+    {
+        ret["file"]=getValueOfFile();
+    }
+    else
+    {
+        ret["file"]=Json::Value();
     }
     if(getCreatedAt())
     {
@@ -1072,19 +1191,9 @@ bool ProjectIssue::validateJsonForCreation(const Json::Value &pJson, std::string
         err="The id column cannot be null";
         return false;
     }
-    if(pJson.isMember("project_id"))
-    {
-        if(!validJsonOfField(1, "project_id", pJson["project_id"], err, true))
-            return false;
-    }
-    else
-    {
-        err="The project_id column cannot be null";
-        return false;
-    }
     if(pJson.isMember("level"))
     {
-        if(!validJsonOfField(2, "level", pJson["level"], err, true))
+        if(!validJsonOfField(1, "level", pJson["level"], err, true))
             return false;
     }
     else
@@ -1092,29 +1201,49 @@ bool ProjectIssue::validateJsonForCreation(const Json::Value &pJson, std::string
         err="The level column cannot be null";
         return false;
     }
-    if(pJson.isMember("page_path"))
-    {
-        if(!validJsonOfField(3, "page_path", pJson["page_path"], err, true))
-            return false;
-    }
     if(pJson.isMember("deployment_id"))
     {
-        if(!validJsonOfField(4, "deployment_id", pJson["deployment_id"], err, true))
-            return false;
-    }
-    if(pJson.isMember("body"))
-    {
-        if(!validJsonOfField(5, "body", pJson["body"], err, true))
+        if(!validJsonOfField(2, "deployment_id", pJson["deployment_id"], err, true))
             return false;
     }
     else
     {
-        err="The body column cannot be null";
+        err="The deployment_id column cannot be null";
         return false;
+    }
+    if(pJson.isMember("type"))
+    {
+        if(!validJsonOfField(3, "type", pJson["type"], err, true))
+            return false;
+    }
+    else
+    {
+        err="The type column cannot be null";
+        return false;
+    }
+    if(pJson.isMember("subject"))
+    {
+        if(!validJsonOfField(4, "subject", pJson["subject"], err, true))
+            return false;
+    }
+    else
+    {
+        err="The subject column cannot be null";
+        return false;
+    }
+    if(pJson.isMember("details"))
+    {
+        if(!validJsonOfField(5, "details", pJson["details"], err, true))
+            return false;
+    }
+    if(pJson.isMember("file"))
+    {
+        if(!validJsonOfField(6, "file", pJson["file"], err, true))
+            return false;
     }
     if(pJson.isMember("created_at"))
     {
-        if(!validJsonOfField(6, "created_at", pJson["created_at"], err, true))
+        if(!validJsonOfField(7, "created_at", pJson["created_at"], err, true))
             return false;
     }
     return true;
@@ -1123,7 +1252,7 @@ bool ProjectIssue::validateMasqueradedJsonForCreation(const Json::Value &pJson,
                                                       const std::vector<std::string> &pMasqueradingVector,
                                                       std::string &err)
 {
-    if(pMasqueradingVector.size() != 7)
+    if(pMasqueradingVector.size() != 8)
     {
         err = "Bad masquerading vector";
         return false;
@@ -1175,6 +1304,11 @@ bool ProjectIssue::validateMasqueradedJsonForCreation(const Json::Value &pJson,
               if(!validJsonOfField(3, pMasqueradingVector[3], pJson[pMasqueradingVector[3]], err, true))
                   return false;
           }
+        else
+        {
+            err="The " + pMasqueradingVector[3] + " column cannot be null";
+            return false;
+        }
       }
       if(!pMasqueradingVector[4].empty())
       {
@@ -1183,6 +1317,11 @@ bool ProjectIssue::validateMasqueradedJsonForCreation(const Json::Value &pJson,
               if(!validJsonOfField(4, pMasqueradingVector[4], pJson[pMasqueradingVector[4]], err, true))
                   return false;
           }
+        else
+        {
+            err="The " + pMasqueradingVector[4] + " column cannot be null";
+            return false;
+        }
       }
       if(!pMasqueradingVector[5].empty())
       {
@@ -1191,17 +1330,20 @@ bool ProjectIssue::validateMasqueradedJsonForCreation(const Json::Value &pJson,
               if(!validJsonOfField(5, pMasqueradingVector[5], pJson[pMasqueradingVector[5]], err, true))
                   return false;
           }
-        else
-        {
-            err="The " + pMasqueradingVector[5] + " column cannot be null";
-            return false;
-        }
       }
       if(!pMasqueradingVector[6].empty())
       {
           if(pJson.isMember(pMasqueradingVector[6]))
           {
               if(!validJsonOfField(6, pMasqueradingVector[6], pJson[pMasqueradingVector[6]], err, true))
+                  return false;
+          }
+      }
+      if(!pMasqueradingVector[7].empty())
+      {
+          if(pJson.isMember(pMasqueradingVector[7]))
+          {
+              if(!validJsonOfField(7, pMasqueradingVector[7], pJson[pMasqueradingVector[7]], err, true))
                   return false;
           }
       }
@@ -1225,34 +1367,39 @@ bool ProjectIssue::validateJsonForUpdate(const Json::Value &pJson, std::string &
         err = "The value of primary key must be set in the json object for update";
         return false;
     }
-    if(pJson.isMember("project_id"))
-    {
-        if(!validJsonOfField(1, "project_id", pJson["project_id"], err, false))
-            return false;
-    }
     if(pJson.isMember("level"))
     {
-        if(!validJsonOfField(2, "level", pJson["level"], err, false))
-            return false;
-    }
-    if(pJson.isMember("page_path"))
-    {
-        if(!validJsonOfField(3, "page_path", pJson["page_path"], err, false))
+        if(!validJsonOfField(1, "level", pJson["level"], err, false))
             return false;
     }
     if(pJson.isMember("deployment_id"))
     {
-        if(!validJsonOfField(4, "deployment_id", pJson["deployment_id"], err, false))
+        if(!validJsonOfField(2, "deployment_id", pJson["deployment_id"], err, false))
             return false;
     }
-    if(pJson.isMember("body"))
+    if(pJson.isMember("type"))
     {
-        if(!validJsonOfField(5, "body", pJson["body"], err, false))
+        if(!validJsonOfField(3, "type", pJson["type"], err, false))
+            return false;
+    }
+    if(pJson.isMember("subject"))
+    {
+        if(!validJsonOfField(4, "subject", pJson["subject"], err, false))
+            return false;
+    }
+    if(pJson.isMember("details"))
+    {
+        if(!validJsonOfField(5, "details", pJson["details"], err, false))
+            return false;
+    }
+    if(pJson.isMember("file"))
+    {
+        if(!validJsonOfField(6, "file", pJson["file"], err, false))
             return false;
     }
     if(pJson.isMember("created_at"))
     {
-        if(!validJsonOfField(6, "created_at", pJson["created_at"], err, false))
+        if(!validJsonOfField(7, "created_at", pJson["created_at"], err, false))
             return false;
     }
     return true;
@@ -1261,7 +1408,7 @@ bool ProjectIssue::validateMasqueradedJsonForUpdate(const Json::Value &pJson,
                                                     const std::vector<std::string> &pMasqueradingVector,
                                                     std::string &err)
 {
-    if(pMasqueradingVector.size() != 7)
+    if(pMasqueradingVector.size() != 8)
     {
         err = "Bad masquerading vector";
         return false;
@@ -1305,6 +1452,11 @@ bool ProjectIssue::validateMasqueradedJsonForUpdate(const Json::Value &pJson,
       if(!pMasqueradingVector[6].empty() && pJson.isMember(pMasqueradingVector[6]))
       {
           if(!validJsonOfField(6, pMasqueradingVector[6], pJson[pMasqueradingVector[6]], err, false))
+              return false;
+      }
+      if(!pMasqueradingVector[7].empty() && pJson.isMember(pMasqueradingVector[7]))
+      {
+          if(!validJsonOfField(7, pMasqueradingVector[7], pJson[pMasqueradingVector[7]], err, false))
               return false;
       }
     }
@@ -1354,8 +1506,36 @@ bool ProjectIssue::validJsonOfField(size_t index,
                 err="Type error in the "+fieldName+" field";
                 return false;
             }
+            if(pJson.isString() && std::strlen(pJson.asCString()) > 255)
+            {
+                err="String length exceeds limit for the " +
+                    fieldName +
+                    " field (the maximum value is 255)";
+                return false;
+            }
+
             break;
         case 2:
+            if(pJson.isNull())
+            {
+                err="The " + fieldName + " column cannot be null";
+                return false;
+            }
+            if(!pJson.isString())
+            {
+                err="Type error in the "+fieldName+" field";
+                return false;
+            }
+            if(pJson.isString() && std::strlen(pJson.asCString()) > 28)
+            {
+                err="String length exceeds limit for the " +
+                    fieldName +
+                    " field (the maximum value is 28)";
+                return false;
+            }
+
+            break;
+        case 3:
             if(pJson.isNull())
             {
                 err="The " + fieldName + " column cannot be null";
@@ -1375,37 +1555,7 @@ bool ProjectIssue::validJsonOfField(size_t index,
             }
 
             break;
-        case 3:
-            if(pJson.isNull())
-            {
-                return true;
-            }
-            if(!pJson.isString())
-            {
-                err="Type error in the "+fieldName+" field";
-                return false;
-            }
-            break;
         case 4:
-            if(pJson.isNull())
-            {
-                return true;
-            }
-            if(!pJson.isString())
-            {
-                err="Type error in the "+fieldName+" field";
-                return false;
-            }
-            if(pJson.isString() && std::strlen(pJson.asCString()) > 28)
-            {
-                err="String length exceeds limit for the " +
-                    fieldName +
-                    " field (the maximum value is 28)";
-                return false;
-            }
-
-            break;
-        case 5:
             if(pJson.isNull())
             {
                 err="The " + fieldName + " column cannot be null";
@@ -1416,8 +1566,38 @@ bool ProjectIssue::validJsonOfField(size_t index,
                 err="Type error in the "+fieldName+" field";
                 return false;
             }
+            if(pJson.isString() && std::strlen(pJson.asCString()) > 255)
+            {
+                err="String length exceeds limit for the " +
+                    fieldName +
+                    " field (the maximum value is 255)";
+                return false;
+            }
+
+            break;
+        case 5:
+            if(pJson.isNull())
+            {
+                return true;
+            }
+            if(!pJson.isString())
+            {
+                err="Type error in the "+fieldName+" field";
+                return false;
+            }
             break;
         case 6:
+            if(pJson.isNull())
+            {
+                return true;
+            }
+            if(!pJson.isString())
+            {
+                err="Type error in the "+fieldName+" field";
+                return false;
+            }
+            break;
+        case 7:
             if(pJson.isNull())
             {
                 err="The " + fieldName + " column cannot be null";

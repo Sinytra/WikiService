@@ -10,6 +10,13 @@
 #include <optional>
 #include <string>
 
+#define ENUM_TO_STR(name, ...)                                                                                                             \
+    std::string enumToStr(const name cls) {                                                                                                \
+        const static std::unordered_map<name, std::string> map{__VA_ARGS__};                                                               \
+        const auto val = map.find(cls);                                                                                                    \
+        return val == map.end() ? "unknown" : val->second;                                                                                 \
+    }
+
 template<typename T>
 concept JsonSerializable = requires(nlohmann::json &j, const T &obj) {
     {
@@ -22,7 +29,7 @@ struct TableQueryParams {
     int page;
 };
 
-TableQueryParams getTableQueryParams(const drogon::HttpRequestPtr& req);
+TableQueryParams getTableQueryParams(const drogon::HttpRequestPtr &req);
 
 drogon::HttpResponsePtr jsonResponse(const nlohmann::json &json);
 
@@ -34,9 +41,8 @@ struct ApiException final : std::runtime_error {
     service::Error error;
     Json::Value data;
 
-    ApiException(const service::Error err, const std::string& message, const std::function<void(Json::Value &)> &jsonBuilder = nullptr)
-        : std::runtime_error(message), error(err)
-    {
+    ApiException(const service::Error err, const std::string &message, const std::function<void(Json::Value &)> &jsonBuilder = nullptr) :
+        std::runtime_error(message), error(err) {
         data["error"] = message;
         if (jsonBuilder) {
             jsonBuilder(data);
@@ -57,6 +63,8 @@ struct ResourceLocation {
 struct JsonValidationError {
     const nlohmann::json_pointer<std::basic_string<char>> pointer;
     const std::string msg;
+
+    std::string format() const;
 };
 
 void replaceAll(std::string &s, std::string const &toReplace, std::string const &replaceWith);
@@ -93,7 +101,7 @@ drogon::Task<std::tuple<std::optional<std::pair<drogon::HttpResponsePtr, Json::V
     drogon::HttpClientPtr client, drogon::HttpMethod method, std::string path,
     std::function<void(drogon::HttpRequestPtr &)> callback = [](drogon::HttpRequestPtr &) {});
 
-template <class T = nlohmann::json>
+template<class T = nlohmann::json>
 std::optional<T> tryParseJson(const std::string_view json) {
     try {
         return T::parse(json);

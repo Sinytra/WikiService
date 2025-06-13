@@ -27,8 +27,7 @@ namespace service {
     Task<std::unordered_map<std::string, int64_t>> Database::getActiveProjectIssueStats(std::string projectId) const {
         // language=postgresql
         static constexpr auto query = "SELECT level, count(level) AS count FROM project_issue \
-                                       WHERE project_id = $1 \
-                                           AND deployment_id = (SELECT id FROM deployment d WHERE d.project_id = $1 AND d.active) \
+                                       WHERE deployment_id = (SELECT id FROM deployment d WHERE d.project_id = $1 AND d.active) \
                                        GROUP BY level";
 
         const auto [res, err] = co_await handleDatabaseOperation<std::unordered_map<std::string, int64_t>>(

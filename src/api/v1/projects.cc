@@ -144,7 +144,7 @@ namespace api::v1 {
 
         const auto [resolved, err, details] = co_await global::storage->setupValidateTempProject(tempProject);
         if (err != ProjectError::OK) {
-            throw ApiException(Error::ErrBadRequest, projectErrorToString(err),
+            throw ApiException(Error::ErrBadRequest, enumToStr(err),
                                [&details](Json::Value &root) { root["details"] = details; });
         }
 
@@ -495,9 +495,6 @@ namespace api::v1 {
 
         const auto issues(co_await global::database->getDeploymentIssues(id));
         root["issues"] = toJson(issues);
-        for (auto &issue: root["issues"]) {
-            issue["body"] = parseJsonOrThrow(issue["body"].asString());
-        }
 
         callback(HttpResponse::newHttpJsonResponse(root));
     }
@@ -530,11 +527,7 @@ namespace api::v1 {
         const auto deployment(co_await global::database->getActiveDeployment(id));
         const auto issues =
             deployment ? co_await global::database->getDeploymentIssues(deployment->getValueOfId()) : std::vector<ProjectIssue>();
-        auto root = toJson(issues);
-        for (auto &issue: root) {
-            issue["body"] = parseJsonOrThrow(issue["body"].asString());
-        }
 
-        callback(HttpResponse::newHttpJsonResponse(root));
+        callback(HttpResponse::newHttpJsonResponse(toJson(issues)));
     }
 }

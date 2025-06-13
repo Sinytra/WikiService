@@ -40,7 +40,7 @@ namespace service {
     public:
         explicit Storage(const std::string &);
 
-        drogon::Task<std::tuple<std::optional<ResolvedProject>, Error>> getProject(const Project &project, const std::optional<std::string> &version, const std::optional<std::string> &locale);
+        drogon::Task<std::tuple<std::optional<ResolvedProject>, Error>> getProject(const Project &project, const std::optional<std::string> &version, const std::optional<std::string> &locale) const;
 
         drogon::Task<Error> invalidateProject(const Project &project) const;
 
@@ -54,8 +54,8 @@ namespace service {
 
         drogon::Task<std::tuple<std::optional<Deployment>, Error>> deployProject(const Project &project, std::string userId);
     private:
-        drogon::Task<ProjectError> setupProject(const Project &project, Deployment& deployment) const;
-        drogon::Task<std::tuple<std::optional<Deployment>, ProjectError>> setupProjectCached(const Project &project, const std::string userId);
+        drogon::Task<ProjectError> setupProject(const Project &project, Deployment& deployment, std::filesystem::path clonePath) const;
+        drogon::Task<std::tuple<std::optional<Deployment>, ProjectError>> setupProjectCached(const Project &project, std::string userId);
         std::filesystem::directory_entry getBaseDir() const;
         std::filesystem::path getProjectLogPath(const Project &project) const;
         std::filesystem::path getProjectDirPath(const Project &project, const std::string &version) const;

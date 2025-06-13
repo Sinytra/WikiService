@@ -1,11 +1,14 @@
 CREATE TABLE project_issue
 (
     id            varchar(28) PRIMARY KEY,
-    project_id    text                                   NOT NULL REFERENCES project (id) ON DELETE CASCADE,
     level         varchar(255)                           not null,
-    page_path     text,
     deployment_id varchar(28)                            NOT NULL REFERENCES deployment (id) ON DELETE CASCADE,
-    body          jsonb                                  not null,
+
+    type          varchar(255)                           NOT NULL,
+    subject       varchar(255)                           NOT NULL,
+    details       text,
+    file          text,
+
     created_at    timestamp(3) default CURRENT_TIMESTAMP not null
 );
 

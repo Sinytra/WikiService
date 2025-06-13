@@ -396,9 +396,9 @@ namespace service {
         return projectLog;
     }
 
-    Task<std::tuple<git_repository *, ProjectError>> gitCloneProject(const Project &project, const fs::path &projectPath,
-                                                                     const std::string &branch,
-                                                                     const std::shared_ptr<spdlog::logger> logger) {
+    Task<std::tuple<git_repository *, ProjectErrorInstance>> gitCloneProject(const Project &project, const fs::path &projectPath,
+                                                                             const std::string &branch,
+                                                                             const std::shared_ptr<spdlog::logger> logger) {
         const auto url = project.getValueOfSourceRepo();
         const auto path = absolute(projectPath);
 
@@ -428,22 +428,22 @@ namespace service {
 
             if (error == GIT_EAUTH) {
                 logger->error("Authentication required but none was provided", project.getValueOfSourceBranch());
-                co_return {nullptr, ProjectError::NO_REPOSITORY};
+                co_return {nullptr, {ProjectError::REQUIRES_AUTH, e->message}};
             }
             if (e->klass == GIT_ERROR_REFERENCE) {
                 logger->error("Docs branch '{}' does not exist!", project.getValueOfSourceBranch());
-                co_return {nullptr, ProjectError::NO_BRANCH};
+                co_return {nullptr, {ProjectError::NO_BRANCH, e->message}};
             }
             if (d.error == "size") {
-                co_return {nullptr, ProjectError::REPO_TOO_LARGE};
+                co_return {nullptr, {ProjectError::REPO_TOO_LARGE, e->message}};
             }
 
-            co_return {nullptr, ProjectError::UNKNOWN};
+            co_return {nullptr, {ProjectError::UNKNOWN, e->message}};
         }
 
         logger->info("Git clone successful");
 
-        co_return {repo, ProjectError::OK};
+        co_return {repo, {ProjectError::OK}};
     }
 
     std::unordered_map<std::string, std::string> readVersionsFromMetadata(const nlohmann::json &metadata,
@@ -521,12 +521,7 @@ namespace service {
         co_return res.value_or(err);
     }
 
-    Task<ProjectError> Storage::setupProject(const Project &project, Deployment &deployment) const {
-        const auto baseDir = getBaseDir();
-        const auto projectId = project.getValueOfId();
-        const auto clonePath = baseDir.path() / TEMP_DIR / projectId;
-        remove_all(clonePath);
-
+    Task<ProjectError> Storage::setupProject(const Project &project, Deployment &deployment, const fs::path clonePath) const {
         const auto logger = getProjectLogger(project);
 
         logger->info("Setting up project");
@@ -534,20 +529,25 @@ namespace service {
         deployment.setStatus(enumToStr(DeploymentStatus::LOADING));
         co_await global::database->updateDeployment(deployment);
 
+        ProjectIssueCallback issues{deployment.getValueOfId(), logger};
+
         const auto [repo, cloneError] = co_await gitCloneProject(project, clonePath, project.getValueOfSourceBranch(), logger);
-        if (!repo || cloneError != ProjectError::OK) {
-            co_return cloneError;
+        if (!repo || cloneError.error != ProjectError::OK) {
+            co_await issues.addIssue(ProjectIssueLevel::ERROR, ProjectIssueType::GIT_CLONE, cloneError.error, cloneError.message);
+            co_return cloneError.error;
         }
 
         auto defaultVersion = co_await getOrCreateDefaultVersion(project);
         if (!defaultVersion) {
             logger->error("Project version creation database error.");
+            co_await issues.addIssue(ProjectIssueLevel::ERROR, ProjectIssueType::INTERNAL, ProjectError::UNKNOWN);
             co_return ProjectError::UNKNOWN;
         }
 
         const auto revision = getLatestCommitInfo(repo);
         if (!revision) {
             logger->error("Error getting commit information");
+            co_await issues.addIssue(ProjectIssueLevel::ERROR, ProjectIssueType::GIT_INFO, ProjectError::UNKNOWN);
             co_return ProjectError::UNKNOWN;
         }
 
@@ -557,9 +557,14 @@ namespace service {
         ResolvedProject resolved{project, clonePath, clonePath / removeLeadingSlash(project.getValueOfSourcePath()), *defaultVersion};
 
         // TODO Ingest from other versions?
-        content::Ingestor ingestor{resolved, logger};
+        content::Ingestor ingestor{resolved, logger, issues};
         if (const auto result = co_await ingestor.runIngestor(); result != Error::Ok) {
             logger->error("Error ingesting project data");
+            co_return ProjectError::UNKNOWN;
+        }
+
+        if (issues.hasErrors()) {
+            logger->error("Encountered issues during project setup, aborting");
             co_return ProjectError::UNKNOWN;
         }
 
@@ -586,11 +591,9 @@ namespace service {
             copyProjectFiles(project, clonePath, versionDest, logger);
         }
 
-        remove_all(clonePath);
-
         git_repository_free(repo);
 
-        if (const auto err = co_await setActiveDeployment(projectId, deployment); err != Error::Ok) {
+        if (const auto err = co_await setActiveDeployment(project.getValueOfId(), deployment); err != Error::Ok) {
             logger->error("Error setting active deployment");
             co_return ProjectError::UNKNOWN;
         }
@@ -606,9 +609,9 @@ namespace service {
             co_return co_await patientlyAwaitTaskResult(*pending);
         }
 
+        const auto projectId = project.getValueOfId();
         Deployment tmpDep;
-        tmpDep.setId(project.getValueOfId());
-        tmpDep.setProjectId(project.getValueOfId());
+        tmpDep.setProjectId(projectId);
         tmpDep.setStatus(enumToStr(DeploymentStatus::CREATED));
         tmpDep.setSourceRepo(project.getValueOfSourceRepo());
         tmpDep.setSourceBranch(project.getValueOfSourceBranch());
@@ -624,14 +627,17 @@ namespace service {
         // Clean logs
         fs::remove(getProjectLogPath(project));
 
+        const auto clonePath = getBaseDir().path() / TEMP_DIR / projectId;
+        remove_all(clonePath);
+
         const auto projectLogger = getProjectLogger(project);
-        auto result = co_await setupProject(project, deployment);
+        auto result = co_await setupProject(project, deployment, clonePath);
         if (result == ProjectError::OK) {
             projectLogger->info("====================================");
             projectLogger->info("==     Project setup complete     ==");
             projectLogger->info("====================================");
 
-            global::connections->broadcast(project.getValueOfId(), WS_SUCCESS);
+            global::connections->broadcast(projectId, WS_SUCCESS);
 
             deployment.setStatus(enumToStr(DeploymentStatus::SUCCESS));
         } else {
@@ -639,13 +645,15 @@ namespace service {
             projectLogger->error("!!      Project setup failed      !!");
             projectLogger->error("!!================================!!");
 
-            global::connections->broadcast(project.getValueOfId(), WS_ERROR);
+            global::connections->broadcast(projectId, WS_ERROR);
 
             deployment.setStatus(enumToStr(DeploymentStatus::ERROR));
         }
 
+        remove_all(clonePath);
+
         co_await global::database->updateDeployment(deployment);
-        global::connections->shutdown(project.getValueOfId());
+        global::connections->shutdown(projectId);
 
         co_return co_await completeTask<std::tuple<std::optional<Deployment>, ProjectError>>(taskKey, {deployment, result});
     }
@@ -684,7 +692,7 @@ namespace service {
     }
 
     Task<std::tuple<std::optional<ResolvedProject>, Error>>
-    Storage::getProject(const Project &project, const std::optional<std::string> &version, const std::optional<std::string> &locale) {
+    Storage::getProject(const Project &project, const std::optional<std::string> &version, const std::optional<std::string> &locale) const {
         const auto [defaultProject, error] = co_await findProject(project, std::nullopt, locale);
 
         if (defaultProject && version) {
@@ -736,7 +744,8 @@ namespace service {
         }
 
         if (const auto issues = co_await global::database->getActiveProjectIssueStats(project.getValueOfId());
-            issues.contains(enumToStr(ProjectIssueLevel::ERROR))) {
+            issues.contains(enumToStr(ProjectIssueLevel::ERROR)))
+        {
             co_return ProjectStatus::AT_RISK;
         }
 
@@ -770,10 +779,10 @@ namespace service {
 
         // Clone project - validates repo and branch
         if (const auto [repo, cloneError] = co_await gitCloneProject(project, clonePath, project.getValueOfSourceBranch(), logger);
-            !repo || cloneError != ProjectError::OK)
+            !repo || cloneError.error != ProjectError::OK)
         {
             remove_all(clonePath);
-            co_return {std::nullopt, cloneError, ""};
+            co_return {std::nullopt, cloneError.error, cloneError.message};
         }
 
         // Validate path

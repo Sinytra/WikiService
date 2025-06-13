@@ -1,7 +1,7 @@
 #include "ingestor_recipes.h"
+#include <content/builtin_recipe_type.h>
 #include <database/database.h>
 #include <database/resolved_db.h>
-#include <content/builtin_recipe_type.h>
 #include <drogon/drogon.h>
 #include <schemas.h>
 #include "game_content.h"
@@ -12,7 +12,7 @@ using namespace service;
 namespace fs = std::filesystem;
 
 using RecipeProcessor = std::function<std::optional<ModRecipe>(const std::string &id, const std::string &type, const nlohmann::json &json,
-                                                               spdlog::logger &logger)>;
+                                                               const ProjectFileIssueCallback &issues)>;
 
 struct RecipeType {
     nlohmann::json displaySchema;
@@ -44,17 +44,17 @@ std::optional<RecipeIngredient> readRecipeIngredient(const nlohmann::json &json,
     return RecipeIngredient{itemId, slot, 1, true, isTag};
 }
 
-std::optional<RecipeIngredient> parseRecipeIngredient(const nlohmann::json &json, const int slot, spdlog::logger &logger) {
+std::optional<RecipeIngredient> parseRecipeIngredient(const nlohmann::json &json, const int slot, const ProjectFileIssueCallback &issues) {
     const auto ingredient = readRecipeIngredient(json, slot);
     if (!ingredient) {
-        logger.info("Invalid ingredient, skipping recipe");
+        issues.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::INVALID_INGREDIENT, json.dump());
         return std::nullopt;
     }
     return ingredient;
 }
 
 std::optional<ModRecipe> readShapedCraftingRecipe(const std::string &id, const std::string &type, const nlohmann::json &json,
-                                                  spdlog::logger &logger) {
+                                                  const ProjectFileIssueCallback &issues) {
     const auto keys = json.at("key");
     const auto pattern = json.at("pattern");
     std::string concat = "";
@@ -71,14 +71,14 @@ std::optional<ModRecipe> readShapedCraftingRecipe(const std::string &id, const s
 
         if (const auto keyValue = keys[key]; keyValue.is_array()) {
             for (const auto &item: keyValue) {
-                if (const auto ingredient = parseRecipeIngredient(item, i + 1, logger)) {
+                if (const auto ingredient = parseRecipeIngredient(item, i + 1, issues)) {
                     recipe.ingredients.push_back(*ingredient);
                 } else {
                     return std::nullopt;
                 }
             }
         } else {
-            if (const auto ingredient = readRecipeIngredient(keyValue, i + 1)) {
+            if (const auto ingredient = parseRecipeIngredient(keyValue, i + 1, issues)) {
                 recipe.ingredients.push_back(*ingredient);
             } else {
                 return std::nullopt;
@@ -95,14 +95,13 @@ std::optional<ModRecipe> readShapedCraftingRecipe(const std::string &id, const s
 }
 
 std::optional<ModRecipe> readShapelessCraftingRecipe(const std::string &id, const std::string &type, const nlohmann::json &json,
-                                                     spdlog::logger &logger) {
+                                                     const ProjectFileIssueCallback &issues) {
     ModRecipe recipe{.id = id, .type = type};
 
     const auto ingredients = json["ingredients"];
     for (int i = 0; i < ingredients.size(); ++i) {
-        const auto ingredient = readRecipeIngredient(ingredients[i], i + 1);
+        const auto ingredient = parseRecipeIngredient(ingredients[i], i + 1, issues);
         if (!ingredient) {
-            logger.info("Invalid ingredient, skipping recipe");
             return std::nullopt;
         }
         recipe.ingredients.push_back(*ingredient);
@@ -120,7 +119,6 @@ std::unordered_map<std::string, RecipeType> recipeTypes{
     {"minecraft:crafting_shaped", {recipe_type::builtin::shapedCrafting, readShapedCraftingRecipe}},
     {"minecraft:crafting_shapeless", {recipe_type::builtin::shapedCrafting, readShapelessCraftingRecipe}}};
 
-
 namespace content {
     std::optional<Json::Value> getRecipeType(const std::string &type) {
         if (const auto knownType = recipeTypes.find(type); knownType != recipeTypes.end()) {
@@ -129,33 +127,8 @@ namespace content {
         return std::nullopt;
     }
 
-    std::optional<ModRecipe> readRecipe(const std::string &namespace_, const fs::path &root, const fs::path &path, spdlog::logger &logger) {
-        fs::path relativePath = relative(path, root);
-        const auto fileName = relativePath.string();
-        const auto id = namespace_ + ":" + fileName.substr(0, fileName.find_last_of('.'));
-
-        // Read and validate JSON
-        const auto json = parseJsonFile(path);
-        if (!json) {
-            logger.warn("Skipping invalid recipe {}", id);
-            return std::nullopt;
-        }
-        if (const auto error = validateJson(schemas::gameRecipe, *json)) {
-            logger.warn("Skipping non-matching recipe {}", id);
-            return std::nullopt;
-        }
-
-        // Ingest recipe
-        const auto type = json->at("type").get<std::string>();
-        if (const auto knownType = recipeTypes.find(type); knownType != recipeTypes.end()) {
-            return knownType->second.processor(id, type, *json, logger);
-        }
-
-        return std::nullopt;
-    }
-
-    RecipesSubIngestor::RecipesSubIngestor(const ResolvedProject &proj, const std::shared_ptr<spdlog::logger> &log) :
-        SubIngestor(proj, log) {}
+    RecipesSubIngestor::RecipesSubIngestor(const ResolvedProject &proj, const std::shared_ptr<spdlog::logger> &log,
+                                           ProjectIssueCallback &issues) : SubIngestor(proj, log, issues) {}
 
     Task<PreparationResult> RecipesSubIngestor::prepare() {
         PreparationResult result;
@@ -173,7 +146,7 @@ namespace content {
                 continue;
             }
 
-            if (const auto recipe = readRecipe(modid, recipesRoot, entry.path(), *logger_)) {
+            if (const auto recipe = readRecipe(modid, recipesRoot, entry.path())) {
                 recipes_.push_back(*recipe);
 
                 for (const auto &item: recipe->ingredients) {
@@ -185,6 +158,35 @@ namespace content {
         }
 
         co_return result;
+    }
+
+    std::optional<ModRecipe> RecipesSubIngestor::readRecipe(const std::string &namespace_, const std::filesystem::path &root,
+                                                            const std::filesystem::path &path) const {
+        fs::path relativePath = relative(path, root);
+        const auto fileName = relativePath.string();
+        const auto id = namespace_ + ":" + fileName.substr(0, fileName.find_last_of('.'));
+        ProjectFileIssueCallback fileIssues{issues_, fileName};
+
+        // Read and validate JSON
+        const auto json = parseJsonFile(path);
+        if (!json) {
+            fileIssues.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::INVALID_FILE);
+            return std::nullopt;
+        }
+        if (const auto error = validateJson(schemas::gameRecipe, *json)) {
+            fileIssues.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::INVALID_FORMAT, error->format());
+            return std::nullopt;
+        }
+
+        // Ingest recipe
+        const auto type = json->at("type").get<std::string>();
+        if (const auto knownType = recipeTypes.find(type); knownType != recipeTypes.end()) {
+            return knownType->second.processor(id, type, *json, fileIssues);
+        }
+
+        fileIssues.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::UNKNOWN_RECIPE_TYPE, type);
+
+        return std::nullopt;
     }
 
     Task<Error> RecipesSubIngestor::addRecipe(const ModRecipe recipe) const {

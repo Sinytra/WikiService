@@ -17,8 +17,8 @@ using namespace service;
 namespace fs = std::filesystem;
 
 namespace content {
-    TagsSubIngestor::TagsSubIngestor(const ResolvedProject &proj, const std::shared_ptr<spdlog::logger> &log) :
-       SubIngestor(proj, log) {}
+    TagsSubIngestor::TagsSubIngestor(const ResolvedProject &proj, const std::shared_ptr<spdlog::logger> &log,
+                                     ProjectIssueCallback &issues) : SubIngestor(proj, log, issues) {}
 
     Task<PreparationResult> TagsSubIngestor::prepare() {
         PreparationResult result;
