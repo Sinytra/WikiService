@@ -32,6 +32,20 @@ nlohmann::json schemas::projectUpdate = R"(
 }
 )"_json;
 
+nlohmann::json schemas::projectIssue = R"(
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Project page issue",
+    "type": "object",
+    "properties": {
+        "level": { "type": "string", "enum": [ "warning", "error" ] },
+        "path": { "type": "string" },
+        "details": { "type": "string" }
+    },
+    "required": ["level", "path", "details"]
+}
+)"_json;
+
 nlohmann::json schemas::projectMetadata = R"(@PROJECT_META_SCHEMA@)"_json;
 
 nlohmann::json schemas::folderMetadata = R"(@FOLDER_META_SCHEMA@)"_json;

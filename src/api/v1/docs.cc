@@ -18,16 +18,14 @@ namespace api::v1 {
     Task<> DocsController::project(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                    const std::string project) const {
         const auto version = req->getOptionalParameter<std::string>("version");
-        const auto resolved = co_await BaseProjectController::getProject(project, version, std::nullopt, callback);
+        const auto resolved = co_await BaseProjectController::getProject(project, version, std::nullopt);
 
         if (version && !co_await resolved.hasVersion(*version)) {
             throw ApiException(Error::ErrNotFound, "Version not found");
         }
 
         const auto json = co_await resolved.toJsonVerbose();
-        const auto resp = HttpResponse::newHttpJsonResponse(json);
-        resp->setStatusCode(k200OK);
-        callback(resp);
+        callback(HttpResponse::newHttpJsonResponse(json));
     }
 
     Task<> DocsController::page(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string project) const {
@@ -40,7 +38,7 @@ namespace api::v1 {
             }
 
             const auto resolved = co_await BaseProjectController::getProject(project, req->getOptionalParameter<std::string>("version"),
-                                                                             req->getOptionalParameter<std::string>("locale"), callback);
+                                                                             req->getOptionalParameter<std::string>("locale"));
 
             const auto [page, pageError](resolved.readFile(path));
             if (pageError != Error::Ok) {
@@ -57,9 +55,7 @@ namespace api::v1 {
                 root["edit_url"] = page.editUrl;
             }
 
-            const auto resp = HttpResponse::newHttpJsonResponse(root);
-            resp->setStatusCode(k200OK);
-            callback(resp);
+            callback(HttpResponse::newHttpJsonResponse(root));
         } catch (const HttpException &err) {
             const auto resp = HttpResponse::newHttpResponse();
             resp->setBody(err.what());
@@ -72,7 +68,7 @@ namespace api::v1 {
     Task<> DocsController::tree(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                 const std::string project) const {
         const auto resolved = co_await BaseProjectController::getProject(project, req->getOptionalParameter<std::string>("version"),
-                                                                         req->getOptionalParameter<std::string>("locale"), callback);
+                                                                         req->getOptionalParameter<std::string>("locale"));
 
         const auto [tree, treeError](resolved.getDirectoryTree());
         if (treeError != Error::Ok) {
@@ -88,8 +84,7 @@ namespace api::v1 {
 
     Task<> DocsController::asset(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string project) const {
         try {
-            const auto resolved = co_await BaseProjectController::getProject(project, req->getOptionalParameter<std::string>("version"),
-                                                                             std::nullopt, callback);
+            const auto resolved = co_await BaseProjectController::getProject(project, req->getOptionalParameter<std::string>("version"), std::nullopt);
 
             std::string prefix = std::format("/api/v1/docs/{}/asset/", project);
             std::string location = req->getPath().substr(prefix.size());

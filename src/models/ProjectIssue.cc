@@ -20,6 +20,7 @@ const std::string ProjectIssue::Cols::_type = "\"type\"";
 const std::string ProjectIssue::Cols::_subject = "\"subject\"";
 const std::string ProjectIssue::Cols::_details = "\"details\"";
 const std::string ProjectIssue::Cols::_file = "\"file\"";
+const std::string ProjectIssue::Cols::_version_name = "\"version_name\"";
 const std::string ProjectIssue::Cols::_created_at = "\"created_at\"";
 const std::string ProjectIssue::primaryKeyName = "id";
 const bool ProjectIssue::hasPrimaryKey = true;
@@ -33,6 +34,7 @@ const std::vector<typename ProjectIssue::MetaData> ProjectIssue::metaData_={
 {"subject","std::string","character varying",255,0,0,1},
 {"details","std::string","text",0,0,0,0},
 {"file","std::string","text",0,0,0,0},
+{"version_name","std::string","character varying",255,0,0,0},
 {"created_at","::trantor::Date","timestamp without time zone",0,0,0,1}
 };
 const std::string &ProjectIssue::getColumnName(size_t index) noexcept(false)
@@ -72,6 +74,10 @@ ProjectIssue::ProjectIssue(const Row &r, const ssize_t indexOffset) noexcept
         {
             file_=std::make_shared<std::string>(r["file"].as<std::string>());
         }
+        if(!r["version_name"].isNull())
+        {
+            versionName_=std::make_shared<std::string>(r["version_name"].as<std::string>());
+        }
         if(!r["created_at"].isNull())
         {
             auto timeStr = r["created_at"].as<std::string>();
@@ -98,7 +104,7 @@ ProjectIssue::ProjectIssue(const Row &r, const ssize_t indexOffset) noexcept
     else
     {
         size_t offset = (size_t)indexOffset;
-        if(offset + 8 > r.size())
+        if(offset + 9 > r.size())
         {
             LOG_FATAL << "Invalid SQL result for this model";
             return;
@@ -142,6 +148,11 @@ ProjectIssue::ProjectIssue(const Row &r, const ssize_t indexOffset) noexcept
         index = offset + 7;
         if(!r[index].isNull())
         {
+            versionName_=std::make_shared<std::string>(r[index].as<std::string>());
+        }
+        index = offset + 8;
+        if(!r[index].isNull())
+        {
             auto timeStr = r[index].as<std::string>();
             struct tm stm;
             memset(&stm,0,sizeof(stm));
@@ -168,7 +179,7 @@ ProjectIssue::ProjectIssue(const Row &r, const ssize_t indexOffset) noexcept
 
 ProjectIssue::ProjectIssue(const Json::Value &pJson, const std::vector<std::string> &pMasqueradingVector) noexcept(false)
 {
-    if(pMasqueradingVector.size() != 8)
+    if(pMasqueradingVector.size() != 9)
     {
         LOG_ERROR << "Bad masquerading vector";
         return;
@@ -234,7 +245,15 @@ ProjectIssue::ProjectIssue(const Json::Value &pJson, const std::vector<std::stri
         dirtyFlag_[7] = true;
         if(!pJson[pMasqueradingVector[7]].isNull())
         {
-            auto timeStr = pJson[pMasqueradingVector[7]].asString();
+            versionName_=std::make_shared<std::string>(pJson[pMasqueradingVector[7]].asString());
+        }
+    }
+    if(!pMasqueradingVector[8].empty() && pJson.isMember(pMasqueradingVector[8]))
+    {
+        dirtyFlag_[8] = true;
+        if(!pJson[pMasqueradingVector[8]].isNull())
+        {
+            auto timeStr = pJson[pMasqueradingVector[8]].asString();
             struct tm stm;
             memset(&stm,0,sizeof(stm));
             auto p = strptime(timeStr.c_str(),"%Y-%m-%d %H:%M:%S",&stm);
@@ -315,9 +334,17 @@ ProjectIssue::ProjectIssue(const Json::Value &pJson) noexcept(false)
             file_=std::make_shared<std::string>(pJson["file"].asString());
         }
     }
-    if(pJson.isMember("created_at"))
+    if(pJson.isMember("version_name"))
     {
         dirtyFlag_[7]=true;
+        if(!pJson["version_name"].isNull())
+        {
+            versionName_=std::make_shared<std::string>(pJson["version_name"].asString());
+        }
+    }
+    if(pJson.isMember("created_at"))
+    {
+        dirtyFlag_[8]=true;
         if(!pJson["created_at"].isNull())
         {
             auto timeStr = pJson["created_at"].asString();
@@ -346,7 +373,7 @@ ProjectIssue::ProjectIssue(const Json::Value &pJson) noexcept(false)
 void ProjectIssue::updateByMasqueradedJson(const Json::Value &pJson,
                                             const std::vector<std::string> &pMasqueradingVector) noexcept(false)
 {
-    if(pMasqueradingVector.size() != 8)
+    if(pMasqueradingVector.size() != 9)
     {
         LOG_ERROR << "Bad masquerading vector";
         return;
@@ -411,7 +438,15 @@ void ProjectIssue::updateByMasqueradedJson(const Json::Value &pJson,
         dirtyFlag_[7] = true;
         if(!pJson[pMasqueradingVector[7]].isNull())
         {
-            auto timeStr = pJson[pMasqueradingVector[7]].asString();
+            versionName_=std::make_shared<std::string>(pJson[pMasqueradingVector[7]].asString());
+        }
+    }
+    if(!pMasqueradingVector[8].empty() && pJson.isMember(pMasqueradingVector[8]))
+    {
+        dirtyFlag_[8] = true;
+        if(!pJson[pMasqueradingVector[8]].isNull())
+        {
+            auto timeStr = pJson[pMasqueradingVector[8]].asString();
             struct tm stm;
             memset(&stm,0,sizeof(stm));
             auto p = strptime(timeStr.c_str(),"%Y-%m-%d %H:%M:%S",&stm);
@@ -491,9 +526,17 @@ void ProjectIssue::updateByJson(const Json::Value &pJson) noexcept(false)
             file_=std::make_shared<std::string>(pJson["file"].asString());
         }
     }
-    if(pJson.isMember("created_at"))
+    if(pJson.isMember("version_name"))
     {
         dirtyFlag_[7] = true;
+        if(!pJson["version_name"].isNull())
+        {
+            versionName_=std::make_shared<std::string>(pJson["version_name"].asString());
+        }
+    }
+    if(pJson.isMember("created_at"))
+    {
+        dirtyFlag_[8] = true;
         if(!pJson["created_at"].isNull())
         {
             auto timeStr = pJson["created_at"].asString();
@@ -688,6 +731,33 @@ void ProjectIssue::setFileToNull() noexcept
     dirtyFlag_[6] = true;
 }
 
+const std::string &ProjectIssue::getValueOfVersionName() const noexcept
+{
+    static const std::string defaultValue = std::string();
+    if(versionName_)
+        return *versionName_;
+    return defaultValue;
+}
+const std::shared_ptr<std::string> &ProjectIssue::getVersionName() const noexcept
+{
+    return versionName_;
+}
+void ProjectIssue::setVersionName(const std::string &pVersionName) noexcept
+{
+    versionName_ = std::make_shared<std::string>(pVersionName);
+    dirtyFlag_[7] = true;
+}
+void ProjectIssue::setVersionName(std::string &&pVersionName) noexcept
+{
+    versionName_ = std::make_shared<std::string>(std::move(pVersionName));
+    dirtyFlag_[7] = true;
+}
+void ProjectIssue::setVersionNameToNull() noexcept
+{
+    versionName_.reset();
+    dirtyFlag_[7] = true;
+}
+
 const ::trantor::Date &ProjectIssue::getValueOfCreatedAt() const noexcept
 {
     static const ::trantor::Date defaultValue = ::trantor::Date();
@@ -702,7 +772,7 @@ const std::shared_ptr<::trantor::Date> &ProjectIssue::getCreatedAt() const noexc
 void ProjectIssue::setCreatedAt(const ::trantor::Date &pCreatedAt) noexcept
 {
     createdAt_ = std::make_shared<::trantor::Date>(pCreatedAt);
-    dirtyFlag_[7] = true;
+    dirtyFlag_[8] = true;
 }
 
 void ProjectIssue::updateId(const uint64_t id)
@@ -719,6 +789,7 @@ const std::vector<std::string> &ProjectIssue::insertColumns() noexcept
         "subject",
         "details",
         "file",
+        "version_name",
         "created_at"
     };
     return inCols;
@@ -805,6 +876,17 @@ void ProjectIssue::outputArgs(drogon::orm::internal::SqlBinder &binder) const
     }
     if(dirtyFlag_[7])
     {
+        if(getVersionName())
+        {
+            binder << getValueOfVersionName();
+        }
+        else
+        {
+            binder << nullptr;
+        }
+    }
+    if(dirtyFlag_[8])
+    {
         if(getCreatedAt())
         {
             binder << getValueOfCreatedAt();
@@ -850,6 +932,10 @@ const std::vector<std::string> ProjectIssue::updateColumns() const
     if(dirtyFlag_[7])
     {
         ret.push_back(getColumnName(7));
+    }
+    if(dirtyFlag_[8])
+    {
+        ret.push_back(getColumnName(8));
     }
     return ret;
 }
@@ -935,6 +1021,17 @@ void ProjectIssue::updateArgs(drogon::orm::internal::SqlBinder &binder) const
     }
     if(dirtyFlag_[7])
     {
+        if(getVersionName())
+        {
+            binder << getValueOfVersionName();
+        }
+        else
+        {
+            binder << nullptr;
+        }
+    }
+    if(dirtyFlag_[8])
+    {
         if(getCreatedAt())
         {
             binder << getValueOfCreatedAt();
@@ -1004,6 +1101,14 @@ Json::Value ProjectIssue::toJson() const
     {
         ret["file"]=Json::Value();
     }
+    if(getVersionName())
+    {
+        ret["version_name"]=getValueOfVersionName();
+    }
+    else
+    {
+        ret["version_name"]=Json::Value();
+    }
     if(getCreatedAt())
     {
         ret["created_at"]=getCreatedAt()->toDbStringLocal();
@@ -1019,7 +1124,7 @@ Json::Value ProjectIssue::toMasqueradedJson(
     const std::vector<std::string> &pMasqueradingVector) const
 {
     Json::Value ret;
-    if(pMasqueradingVector.size() == 8)
+    if(pMasqueradingVector.size() == 9)
     {
         if(!pMasqueradingVector[0].empty())
         {
@@ -1100,13 +1205,24 @@ Json::Value ProjectIssue::toMasqueradedJson(
         }
         if(!pMasqueradingVector[7].empty())
         {
-            if(getCreatedAt())
+            if(getVersionName())
             {
-                ret[pMasqueradingVector[7]]=getCreatedAt()->toDbStringLocal();
+                ret[pMasqueradingVector[7]]=getValueOfVersionName();
             }
             else
             {
                 ret[pMasqueradingVector[7]]=Json::Value();
+            }
+        }
+        if(!pMasqueradingVector[8].empty())
+        {
+            if(getCreatedAt())
+            {
+                ret[pMasqueradingVector[8]]=getCreatedAt()->toDbStringLocal();
+            }
+            else
+            {
+                ret[pMasqueradingVector[8]]=Json::Value();
             }
         }
         return ret;
@@ -1167,6 +1283,14 @@ Json::Value ProjectIssue::toMasqueradedJson(
     else
     {
         ret["file"]=Json::Value();
+    }
+    if(getVersionName())
+    {
+        ret["version_name"]=getValueOfVersionName();
+    }
+    else
+    {
+        ret["version_name"]=Json::Value();
     }
     if(getCreatedAt())
     {
@@ -1241,9 +1365,14 @@ bool ProjectIssue::validateJsonForCreation(const Json::Value &pJson, std::string
         if(!validJsonOfField(6, "file", pJson["file"], err, true))
             return false;
     }
+    if(pJson.isMember("version_name"))
+    {
+        if(!validJsonOfField(7, "version_name", pJson["version_name"], err, true))
+            return false;
+    }
     if(pJson.isMember("created_at"))
     {
-        if(!validJsonOfField(7, "created_at", pJson["created_at"], err, true))
+        if(!validJsonOfField(8, "created_at", pJson["created_at"], err, true))
             return false;
     }
     return true;
@@ -1252,7 +1381,7 @@ bool ProjectIssue::validateMasqueradedJsonForCreation(const Json::Value &pJson,
                                                       const std::vector<std::string> &pMasqueradingVector,
                                                       std::string &err)
 {
-    if(pMasqueradingVector.size() != 8)
+    if(pMasqueradingVector.size() != 9)
     {
         err = "Bad masquerading vector";
         return false;
@@ -1347,6 +1476,14 @@ bool ProjectIssue::validateMasqueradedJsonForCreation(const Json::Value &pJson,
                   return false;
           }
       }
+      if(!pMasqueradingVector[8].empty())
+      {
+          if(pJson.isMember(pMasqueradingVector[8]))
+          {
+              if(!validJsonOfField(8, pMasqueradingVector[8], pJson[pMasqueradingVector[8]], err, true))
+                  return false;
+          }
+      }
     }
     catch(const Json::LogicError &e)
     {
@@ -1397,9 +1534,14 @@ bool ProjectIssue::validateJsonForUpdate(const Json::Value &pJson, std::string &
         if(!validJsonOfField(6, "file", pJson["file"], err, false))
             return false;
     }
+    if(pJson.isMember("version_name"))
+    {
+        if(!validJsonOfField(7, "version_name", pJson["version_name"], err, false))
+            return false;
+    }
     if(pJson.isMember("created_at"))
     {
-        if(!validJsonOfField(7, "created_at", pJson["created_at"], err, false))
+        if(!validJsonOfField(8, "created_at", pJson["created_at"], err, false))
             return false;
     }
     return true;
@@ -1408,7 +1550,7 @@ bool ProjectIssue::validateMasqueradedJsonForUpdate(const Json::Value &pJson,
                                                     const std::vector<std::string> &pMasqueradingVector,
                                                     std::string &err)
 {
-    if(pMasqueradingVector.size() != 8)
+    if(pMasqueradingVector.size() != 9)
     {
         err = "Bad masquerading vector";
         return false;
@@ -1457,6 +1599,11 @@ bool ProjectIssue::validateMasqueradedJsonForUpdate(const Json::Value &pJson,
       if(!pMasqueradingVector[7].empty() && pJson.isMember(pMasqueradingVector[7]))
       {
           if(!validJsonOfField(7, pMasqueradingVector[7], pJson[pMasqueradingVector[7]], err, false))
+              return false;
+      }
+      if(!pMasqueradingVector[8].empty() && pJson.isMember(pMasqueradingVector[8]))
+      {
+          if(!validJsonOfField(8, pMasqueradingVector[8], pJson[pMasqueradingVector[8]], err, false))
               return false;
       }
     }
@@ -1598,6 +1745,25 @@ bool ProjectIssue::validJsonOfField(size_t index,
             }
             break;
         case 7:
+            if(pJson.isNull())
+            {
+                return true;
+            }
+            if(!pJson.isString())
+            {
+                err="Type error in the "+fieldName+" field";
+                return false;
+            }
+            if(pJson.isString() && std::strlen(pJson.asCString()) > 255)
+            {
+                err="String length exceeds limit for the " +
+                    fieldName +
+                    " field (the maximum value is 255)";
+                return false;
+            }
+
+            break;
+        case 8:
             if(pJson.isNull())
             {
                 err="The " + fieldName + " column cannot be null";

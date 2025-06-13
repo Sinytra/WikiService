@@ -1,5 +1,4 @@
 #include "browse.h"
-#include "error.h"
 
 #include <string>
 
@@ -36,9 +35,7 @@ namespace api::v1 {
         root["total"] = searchResults.total;
         root["data"] = data;
 
-        const auto resp = HttpResponse::newHttpJsonResponse(root);
-        resp->setStatusCode(k200OK);
-        callback(resp);
+        callback(HttpResponse::newHttpJsonResponse(root));
 
         co_return;
     }

@@ -222,8 +222,13 @@ namespace service {
         { ProjectError::REPO_TOO_LARGE, "repo_too_large" },
         { ProjectError::NO_BRANCH, "no_branch" },
         { ProjectError::NO_PATH, "no_path" },
-        { ProjectError::DUPLICATE_PAGE, "duplicate_page" },
         { ProjectError::INVALID_META, "invalid_meta" },
+        { ProjectError::INVALID_PAGE, "invalid_page" },
+        { ProjectError::DUPLICATE_PAGE, "duplicate_page" },
+        { ProjectError::UNKNOWN_RECIPE_TYPE, "unknown_recipe_type" },
+        { ProjectError::INVALID_INGREDIENT, "invalid_ingredient" },
+        { ProjectError::INVALID_FILE, "invalid_file" },
+        { ProjectError::INVALID_FORMAT, "invalid_format" }
     )
     // clang-format on
 
@@ -255,9 +260,9 @@ namespace service {
         return removeTrailingSlash(project.getValueOfSourceRepo()) + "/" + result;
     }
 
-    ResolvedProject::ResolvedProject(const Project &p, const std::filesystem::path &r, const std::filesystem::path &d,
+    ResolvedProject::ResolvedProject(const Project &p, const std::filesystem::path &d,
                                      const ProjectVersion &v) :
-        project_(p), defaultVersion_(nullptr), rootDir_(r), docsDir_(d), version_(v),
+        project_(p), defaultVersion_(nullptr), docsDir_(d), version_(v),
         projectDb_(std::make_shared<ProjectDatabaseAccess>(*this)) {}
 
     void ResolvedProject::setDefaultVersion(const ResolvedProject &defaultVersion) {
@@ -317,8 +322,16 @@ namespace service {
         return rootDir / removeLeadingSlash(path);
     }
 
+    std::optional<std::string> ResolvedProject::getPagePath(const std::string &path) const {
+        const auto filePath = getFilePath(docsDir_, removeLeadingSlash(path) + DOCS_FILE_EXT, locale_);
+        if (!exists(filePath))
+            return std::nullopt;
+
+        return relative(filePath, docsDir_).string();
+    }
+
     std::tuple<ProjectPage, Error> ResolvedProject::readFile(std::string path) const {
-        const auto filePath = getFilePath(docsDir_, removeLeadingSlash(path), locale_);
+        const auto filePath = getFilePath(docsDir_, removeLeadingSlash(path) + DOCS_FILE_EXT, locale_);
 
         std::ifstream file(filePath);
 

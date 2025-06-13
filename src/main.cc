@@ -47,9 +47,7 @@ void globalExceptionHandler(const std::exception& e, const HttpRequestPtr& req, 
     }
 
     logger.error("Unhandled exception: {}", e.what());
-    const auto fallbackResp = HttpResponse::newHttpResponse();
-    fallbackResp->setStatusCode(k500InternalServerError);
-    callback(fallbackResp);
+    callback(statusResponse(k500InternalServerError));
 }
 
 int main() {

@@ -53,6 +53,8 @@ namespace service {
         drogon::Task<std::tuple<std::optional<nlohmann::json>, ProjectError, std::string>> setupValidateTempProject(const Project &project) const;
 
         drogon::Task<std::tuple<std::optional<Deployment>, Error>> deployProject(const Project &project, std::string userId);
+
+        drogon::Task<Error> addPageIssue(const ResolvedProject &resolved, std::string level, std::string details, std::string path);
     private:
         drogon::Task<ProjectError> setupProject(const Project &project, Deployment& deployment, std::filesystem::path clonePath) const;
         drogon::Task<std::tuple<std::optional<Deployment>, ProjectError>> setupProjectCached(const Project &project, std::string userId);

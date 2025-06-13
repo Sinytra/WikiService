@@ -29,6 +29,12 @@ HttpResponsePtr simpleResponse(const std::string &msg) {
     return resp;
 }
 
+HttpResponsePtr statusResponse(const HttpStatusCode code) {
+    const auto resp = HttpResponse::newHttpResponse();
+    resp->setStatusCode(code);
+    return resp;
+}
+
 std::string removeLeadingSlash(const std::string &s) { return s.starts_with('/') ? s.substr(1) : s; }
 
 std::string removeTrailingSlash(const std::string &s) { return s.ends_with('/') ? s.substr(0, s.size() - 1) : s; }

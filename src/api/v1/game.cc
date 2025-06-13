@@ -17,7 +17,7 @@ using namespace drogon_model::postgres;
 namespace api::v1 {
     Task<> GameController::contents(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                     const std::string project) const {
-        const auto resolved = co_await BaseProjectController::getProjectWithParams(req, callback, project);
+        const auto resolved = co_await BaseProjectController::getProjectWithParams(req, project);
         const auto [contents, contentsErr] = co_await resolved.getProjectContents();
         if (!contents) {
             throw ApiException(contentsErr, "Contents directory not found");
@@ -32,7 +32,7 @@ namespace api::v1 {
             throw ApiException(Error::ErrBadRequest, "Insufficient parameters");
         }
 
-        const auto resolved = co_await BaseProjectController::getProjectWithParams(req, callback, project);
+        const auto resolved = co_await BaseProjectController::getProjectWithParams(req, project);
 
         const auto [page, pageErr] = co_await resolved.readContentPage(id);
         if (pageErr != Error::Ok) {
@@ -55,7 +55,7 @@ namespace api::v1 {
             throw ApiException(Error::ErrBadRequest, "Insufficient parameters");
         }
 
-        const auto resolved = co_await BaseProjectController::getProjectWithParams(req, callback, project);
+        const auto resolved = co_await BaseProjectController::getProjectWithParams(req, project);
         const auto recipeIds = co_await resolved.getProjectDatabase().getItemRecipes(item);
         Json::Value root(Json::arrayValue);
         for (const auto &id : recipeIds) {
@@ -74,7 +74,7 @@ namespace api::v1 {
             throw ApiException(Error::ErrBadRequest, "Insufficient parameters");
         }
 
-        const auto resolved = co_await BaseProjectController::getProjectWithParams(req, callback, project);
+        const auto resolved = co_await BaseProjectController::getProjectWithParams(req, project);
         const auto obtainable = co_await global::database->getObtainableItemsBy(item);
         Json::Value root(Json::arrayValue);
         for (const auto &[id, loc, project, path]: obtainable) {
@@ -100,7 +100,7 @@ namespace api::v1 {
             throw ApiException(Error::ErrBadRequest, "Insufficient parameters");
         }
 
-        const auto resolved = co_await BaseProjectController::getVersionedProject(req, callback, project);
+        const auto resolved = co_await BaseProjectController::getVersionedProject(req, project);
         const auto projectRecipe = co_await resolved.getRecipe(recipe);
         if (!projectRecipe) {
             throw ApiException(Error::ErrNotFound, "Recipe not found");

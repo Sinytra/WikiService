@@ -144,8 +144,7 @@ namespace api::v1 {
 
         const auto [resolved, err, details] = co_await global::storage->setupValidateTempProject(tempProject);
         if (err != ProjectError::OK) {
-            throw ApiException(Error::ErrBadRequest, enumToStr(err),
-                               [&details](Json::Value &root) { root["details"] = details; });
+            throw ApiException(Error::ErrBadRequest, enumToStr(err), [&details](Json::Value &root) { root["details"] = details; });
         }
 
         const std::string id = (*resolved)["id"];
@@ -197,9 +196,7 @@ namespace api::v1 {
             root.append(id);
         }
 
-        const auto resp = HttpResponse::newHttpJsonResponse(root);
-        resp->setStatusCode(k200OK);
-        callback(resp);
+        callback(HttpResponse::newHttpJsonResponse(root));
     }
 
     Task<> ProjectsController::listUserProjects(const HttpRequestPtr req,
@@ -218,9 +215,7 @@ namespace api::v1 {
         root["profile"] = session.profile;
         root["projects"] = projectsJson;
 
-        const auto resp = HttpResponse::newHttpJsonResponse(root);
-        resp->setStatusCode(k200OK);
-        callback(resp);
+        callback(HttpResponse::newHttpJsonResponse(root));
         co_return;
     }
 
@@ -237,9 +232,7 @@ namespace api::v1 {
         root["status"] = enumToStr(co_await global::storage->getProjectStatus(project));
         root["has_active_deployment"] = (co_await global::database->getActiveDeployment(id)).has_value();
 
-        const auto resp = HttpResponse::newHttpJsonResponse(root);
-        resp->setStatusCode(k200OK);
-        callback(resp);
+        callback(HttpResponse::newHttpJsonResponse(root));
     }
 
     Task<> ProjectsController::getProjectLog(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback,
@@ -253,9 +246,7 @@ namespace api::v1 {
         Json::Value root;
         root["content"] = *log;
 
-        const auto resp = HttpResponse::newHttpJsonResponse(root);
-        resp->setStatusCode(k200OK);
-        callback(resp);
+        callback(HttpResponse::newHttpJsonResponse(root));
     }
 
     Task<> ProjectsController::listPopularProjects(HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
@@ -266,9 +257,7 @@ namespace api::v1 {
                 root.append(projectToJson(*project));
             }
         }
-        const auto resp = HttpResponse::newHttpJsonResponse(root);
-        resp->setStatusCode(k200OK);
-        callback(resp);
+        callback(HttpResponse::newHttpJsonResponse(root));
     }
 
     Task<> ProjectsController::create(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback) const {
@@ -321,9 +310,7 @@ namespace api::v1 {
         Json::Value root;
         root["project"] = projectToJson(*result, true);
         root["message"] = "Project registered successfully";
-        const auto resp = HttpResponse::newHttpJsonResponse(root);
-        resp->setStatusCode(k200OK);
-        callback(resp);
+        callback(HttpResponse::newHttpJsonResponse(root));
 
         enqueueDeploy(*result, session.username);
     }
@@ -353,9 +340,7 @@ namespace api::v1 {
         Json::Value root;
         root["message"] = "Project updated successfully";
         root["project"] = projectToJson(project, true);
-        const auto resp = HttpResponse::newHttpJsonResponse(root);
-        resp->setStatusCode(k200OK);
-        callback(resp);
+        callback(HttpResponse::newHttpJsonResponse(root));
 
         enqueueDeploy(project, session.username);
     }
@@ -401,9 +386,7 @@ namespace api::v1 {
 
         Json::Value root;
         root["message"] = "Project deploy started successfully";
-        const auto resp = HttpResponse::newHttpJsonResponse(root);
-        resp->setStatusCode(k200OK);
-        callback(resp);
+        callback(HttpResponse::newHttpJsonResponse(root));
     }
 
     void ProjectsController::enqueueDeploy(const Project &project, const std::string userId) const {
@@ -422,7 +405,7 @@ namespace api::v1 {
     Task<> ProjectsController::getContentPages(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                                const std::string id) const {
         const auto version = req->getOptionalParameter<std::string>("version");
-        const auto resolved = co_await BaseProjectController::getUserProject(req, id, version, std::nullopt, callback);
+        const auto resolved = co_await BaseProjectController::getUserProject(req, id, version, std::nullopt);
         const auto items{co_await resolved.getItems(getTableQueryParams(req))};
         callback(jsonResponse(items));
     }
@@ -430,7 +413,7 @@ namespace api::v1 {
     Task<> ProjectsController::getContentTags(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                               const std::string id) const {
         const auto version = req->getOptionalParameter<std::string>("version");
-        const auto resolved = co_await BaseProjectController::getUserProject(req, id, version, std::nullopt, callback);
+        const auto resolved = co_await BaseProjectController::getUserProject(req, id, version, std::nullopt);
         const auto tags{co_await resolved.getTags(getTableQueryParams(req))};
         callback(jsonResponse(tags));
     }
@@ -444,7 +427,7 @@ namespace api::v1 {
         }
 
         const auto version = req->getOptionalParameter<std::string>("version");
-        const auto resolved = co_await BaseProjectController::getUserProject(req, id, version, std::nullopt, callback);
+        const auto resolved = co_await BaseProjectController::getUserProject(req, id, version, std::nullopt);
         const auto items{co_await resolved.getTagItems(tag, getTableQueryParams(req))};
         callback(jsonResponse(items));
     }
@@ -452,14 +435,14 @@ namespace api::v1 {
     Task<> ProjectsController::getRecipes(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                           const std::string id) const {
         const auto version = req->getOptionalParameter<std::string>("version");
-        const auto resolved = co_await BaseProjectController::getUserProject(req, id, version, std::nullopt, callback);
+        const auto resolved = co_await BaseProjectController::getUserProject(req, id, version, std::nullopt);
         const auto recipes{co_await resolved.getRecipes(getTableQueryParams(req))};
         callback(jsonResponse(recipes));
     }
 
     Task<> ProjectsController::getVersions(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                            const std::string id) const {
-        const auto resolved = co_await BaseProjectController::getUserProject(req, id, std::nullopt, std::nullopt, callback);
+        const auto resolved = co_await BaseProjectController::getUserProject(req, id, std::nullopt, std::nullopt);
         const auto versions{co_await resolved.getVersions(getTableQueryParams(req))};
         callback(jsonResponse(versions));
     }
@@ -529,5 +512,30 @@ namespace api::v1 {
             deployment ? co_await global::database->getDeploymentIssues(deployment->getValueOfId()) : std::vector<ProjectIssue>();
 
         callback(HttpResponse::newHttpJsonResponse(toJson(issues)));
+    }
+
+    Task<> ProjectsController::addIssue(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+                                        const std::string id) const {
+        const auto json(req->getJsonObject());
+        if (!json) {
+            throw ApiException(Error::ErrBadRequest, req->getJsonError());
+        }
+        if (const auto error = validateJson(schemas::projectIssue, *json)) {
+            throw ApiException(Error::ErrBadRequest, error->msg);
+        }
+
+        const auto resolved(co_await BaseProjectController::getProject(id, req->getOptionalParameter<std::string>("version"),
+                                                                       req->getOptionalParameter<std::string>("locale")));
+
+        const auto level = (*json)["level"].asString();
+        const auto details = (*json)["details"].asString();
+        const auto path = (*json)["path"].asString();
+        const auto res = co_await global::storage->addPageIssue(resolved, level, details, path);
+
+        if (res == Error::ErrNotFound) {
+            throw ApiException(Error::ErrBadRequest, "not_found");
+        }
+
+        callback(statusResponse(res == Error::Ok ? k201Created : k409Conflict));
     }
 }

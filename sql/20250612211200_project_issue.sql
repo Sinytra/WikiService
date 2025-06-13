@@ -8,6 +8,7 @@ CREATE TABLE project_issue
     subject       varchar(255)                           NOT NULL,
     details       text,
     file          text,
+    version_name  varchar(255),
 
     created_at    timestamp(3) default CURRENT_TIMESTAMP not null
 );

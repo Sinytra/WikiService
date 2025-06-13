@@ -43,6 +43,7 @@ namespace api::v1 {
         ADD_METHOD_TO(ProjectsController::deleteDeployment, "/api/v1/dev/deployments/{1:id}",                   drogon::Delete, "AuthFilter");
         // Project issues
         ADD_METHOD_TO(ProjectsController::getIssues,        "/api/v1/dev/projects/{1:id}/issues",               drogon::Get,    "AuthFilter");
+        ADD_METHOD_TO(ProjectsController::addIssue,         "/api/v1/dev/projects/{1:id}/issues",               drogon::Post,   "AuthFilter");
         METHOD_LIST_END
         // clang-format on
 
@@ -96,6 +97,9 @@ namespace api::v1 {
 
         drogon::Task<> getIssues(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
                                  std::string id) const;
+
+        drogon::Task<> addIssue(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
+                                std::string id) const;
 
     private:
         nlohmann::json processPlatforms(const nlohmann::json &metadata) const;

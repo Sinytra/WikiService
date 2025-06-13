@@ -110,25 +110,29 @@ Error copyProjectFiles(const Project &project, const fs::path &src, const fs::pa
 
     logger->info("Copying project files for version '{}'", dest.filename().string());
 
-    create_directories(dest);
+    try {
+        create_directories(dest);
 
-    for (const auto &entry: fs::recursive_directory_iterator(src)) {
-        if (const auto isGitSubdir = isSubpath(entry.path(), gitPath);
-            entry.is_regular_file() && (isSubpath(entry.path(), docsPath) || isGitSubdir))
-        {
-            fs::path relative_path = relative(entry.path(), src);
+        for (const auto &entry: fs::recursive_directory_iterator(src)) {
+            if (!isSubpath(entry.path(), gitPath) && entry.is_regular_file() && isSubpath(entry.path(), docsPath))
+            {
+                fs::path relative_path = relative(entry.path(), src);
 
-            if (const auto extension = entry.path().extension().string(); !isGitSubdir && !allowedFileExtensions.contains(extension)) {
-                logger->warn("Ignoring file {}", relative_path.string());
-                continue;
+                if (const auto extension = entry.path().extension().string(); !allowedFileExtensions.contains(extension)) {
+                    logger->warn("Ignoring file {}", relative_path.string());
+                    continue;
+                }
+
+                if (fs::path destination_path = dest / relative_path.parent_path(); !exists(destination_path)) {
+                    create_directories(destination_path);
+                }
+
+                copy(entry, dest / relative_path, fs::copy_options::overwrite_existing);
             }
-
-            if (fs::path destination_path = dest / relative_path.parent_path(); !exists(destination_path)) {
-                create_directories(destination_path);
-            }
-
-            copy(entry, dest / relative_path, fs::copy_options::overwrite_existing);
         }
+    } catch (std::exception e) {
+        logger->error("FS copy error: {}", e.what());
+        return Error::ErrInternal;
     }
 
     logger->info("Done copying files");
@@ -554,7 +558,7 @@ namespace service {
         deployment.setRevision(nlohmann::json(*revision).dump());
         co_await global::database->updateDeployment(deployment);
 
-        ResolvedProject resolved{project, clonePath, clonePath / removeLeadingSlash(project.getValueOfSourcePath()), *defaultVersion};
+        ResolvedProject resolved{project, clonePath / removeLeadingSlash(project.getValueOfSourcePath()), *defaultVersion};
 
         // TODO Ingest from other versions?
         content::Ingestor ingestor{resolved, logger, issues};
@@ -668,6 +672,7 @@ namespace service {
             co_return {std::nullopt, Error::ErrNotFound};
         }
 
+        // TODO Copy to version root, dont rely on source path
         const auto docsDir = rootDir / removeLeadingSlash(project.getValueOfSourcePath());
 
         if (version) {
@@ -676,7 +681,7 @@ namespace service {
                 co_return {std::nullopt, Error::ErrNotFound};
             }
 
-            ResolvedProject resolved{project, rootDir, docsDir, *resolvedVersion};
+            ResolvedProject resolved{project, docsDir, *resolvedVersion};
             resolved.setLocale(locale);
             co_return {resolved, Error::Ok};
         }
@@ -686,7 +691,7 @@ namespace service {
             co_return {std::nullopt, Error::ErrNotFound};
         }
 
-        ResolvedProject resolved{project, rootDir, docsDir, *defaultVersion};
+        ResolvedProject resolved{project, docsDir, *defaultVersion};
         resolved.setLocale(locale);
         co_return {resolved, Error::Ok};
     }
@@ -792,7 +797,7 @@ namespace service {
             co_return {std::nullopt, ProjectError::NO_PATH, ""};
         }
 
-        const ResolvedProject resolved{project, clonePath, docsPath, ProjectVersion{}};
+        const ResolvedProject resolved{project, docsPath, ProjectVersion{}};
 
         // Validate metadata
         const auto [json, error, details] = resolved.validateProjectMetadata();
@@ -815,5 +820,44 @@ namespace service {
             co_return {std::nullopt, Error::ErrInternal};
         }
         co_return {deployment, Error::Ok};
+    }
+
+    Task<Error> Storage::addPageIssue(const ResolvedProject &resolved, const std::string level, const std::string details, const std::string path) {
+        const auto projectId = resolved.getProject().getValueOfId();
+
+        const auto deployment(co_await global::database->getActiveDeployment(projectId));
+        if (!deployment) {
+            co_return Error::ErrNotFound;
+        }
+
+        const auto filePath = resolved.getPagePath(path);
+        if (!filePath) {
+            co_return Error::ErrNotFound;
+        }
+
+        const auto taskKey = "page_error:" + projectId + ":" + path;
+
+        if (const auto pending = co_await getOrStartTask<Error>(taskKey)) {
+            co_return co_await patientlyAwaitTaskResult(*pending);
+        }
+
+        if (const auto existing = co_await global::database->getPageIssue(deployment->getValueOfId(), *filePath)) {
+            co_return Error::ErrBadRequest;
+        }
+
+        ProjectIssue issue;
+        issue.setDeploymentId(deployment->getValueOfId());
+        issue.setLevel(level);
+        issue.setType(enumToStr(ProjectIssueType::PAGE_RENDER));
+        issue.setSubject(enumToStr(ProjectError::INVALID_PAGE));
+        issue.setDetails(details);
+        issue.setFile(*filePath);
+        if (const auto versionName = resolved.getProjectVersion().getName()) {
+            issue.setVersionName(*versionName);
+        }
+
+        co_await global::database->addProjectIssue(issue);
+
+        co_return co_await completeTask<Error>(taskKey, Error::Ok);
     }
 }

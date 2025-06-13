@@ -10,11 +10,31 @@
 #include <optional>
 #include <string>
 
+template<typename K, typename V>
+static std::unordered_map<V, K> reverse_map(const std::unordered_map<K, V> &m) {
+    std::unordered_map<V, K> r;
+    for (const auto &kv: m)
+        r[kv.second] = kv.first;
+    return r;
+}
+
 #define ENUM_TO_STR(name, ...)                                                                                                             \
-    std::string enumToStr(const name cls) {                                                                                                \
+    std::string enumToStr(const name value) {                                                                                              \
         const static std::unordered_map<name, std::string> map{__VA_ARGS__};                                                               \
-        const auto val = map.find(cls);                                                                                                    \
+        const auto val = map.find(value);                                                                                                  \
         return val == map.end() ? "unknown" : val->second;                                                                                 \
+    }
+
+#define ENUM_FROM_TO_STR(name, ...)                                                                                                        \
+    const static std::unordered_map<name, std::string> _##name##_map{__VA_ARGS__};                                                         \
+    const static std::unordered_map _##name##_map_rev{reverse_map(_##name##_map)};                                                         \
+    std::string enumToStr(const name value) {                                                                                              \
+        const auto str = _##name##_map.find(value);                                                                                        \
+        return str == _##name##_map.end() ? "unknown" : str->second;                                                                       \
+    }                                                                                                                                      \
+    name parse##name##(const std::string &str) {                                                                                           \
+        const auto value = _##name##_map_rev.find(str);                                                                                    \
+        return value == _##name##_map_rev.end() ? name::UNKNOWN : value->second;                                                           \
     }
 
 template<typename T>
@@ -34,6 +54,8 @@ TableQueryParams getTableQueryParams(const drogon::HttpRequestPtr &req);
 drogon::HttpResponsePtr jsonResponse(const nlohmann::json &json);
 
 drogon::HttpResponsePtr simpleResponse(const std::string &msg);
+
+drogon::HttpResponsePtr statusResponse(drogon::HttpStatusCode code);
 
 struct ApiException final : std::runtime_error {
     using std::runtime_error::runtime_error;

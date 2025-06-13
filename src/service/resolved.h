@@ -27,7 +27,7 @@ namespace service {
     enum class ProjectError {
         OK,
         REQUIRES_AUTH, NO_REPOSITORY, REPO_TOO_LARGE, NO_BRANCH, NO_PATH,
-        INVALID_META,
+        INVALID_META, INVALID_PAGE,
         DUPLICATE_PAGE, UNKNOWN_RECIPE_TYPE, INVALID_INGREDIENT,
         INVALID_FILE, INVALID_FORMAT,
         UNKNOWN
@@ -96,7 +96,7 @@ namespace service {
 
     class ResolvedProject {
     public:
-        explicit ResolvedProject(const Project &, const std::filesystem::path &, const std::filesystem::path &, const ProjectVersion &);
+        explicit ResolvedProject(const Project &, const std::filesystem::path &, const ProjectVersion &);
 
         void setDefaultVersion(const ResolvedProject &defaultVersion);
         bool setLocale(const std::optional<std::string> &locale);
@@ -108,6 +108,7 @@ namespace service {
         drogon::Task<bool> hasVersion(std::string version) const;
 
         std::tuple<ProjectPage, Error> readFile(std::string path) const;
+        std::optional<std::string> getPagePath(const std::string &path) const;
         drogon::Task<std::tuple<ProjectPage, Error>> readContentPage(std::string id) const;
         std::optional<std::string> readPageAttribute(std::string path, std::string prop) const;
         std::optional<std::string> readLangKey(const std::string &locale, const std::string &key) const;
@@ -149,7 +150,6 @@ namespace service {
         Project project_;
         std::shared_ptr<ResolvedProject> defaultVersion_;
 
-        std::filesystem::path rootDir_;
         std::filesystem::path docsDir_;
 
         std::string locale_;

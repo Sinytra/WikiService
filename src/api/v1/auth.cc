@@ -35,9 +35,7 @@ namespace api::v1 {
         if (const auto token = co_await global::auth->requestUserAccessToken(code)) {
             const auto [profile, err] = co_await global::github->getAuthenticatedUser(*token);
             if (!profile) {
-                const auto resp = HttpResponse::newHttpResponse();
-                resp->setStatusCode(k400BadRequest);
-                callback(resp);
+                callback(statusResponse(k400BadRequest));
             }
 
             const auto username = (*profile)["login"].asString();
@@ -121,9 +119,7 @@ namespace api::v1 {
             co_return;
         }
 
-        const auto resp = HttpResponse::newHttpResponse();
-        resp->setStatusCode(k400BadRequest);
-        callback(resp);
+        callback(statusResponse(k400BadRequest));
     }
 
     Task<> AuthController::unlinkModrinth(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
@@ -133,7 +129,7 @@ namespace api::v1 {
             throw ApiException(result, "Failed to unlink Modrinth account");
         }
 
-        callback(HttpResponse::newHttpResponse());
+        callback(statusResponse(k200OK));
     }
 
     Task<> AuthController::userProfile(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
@@ -141,9 +137,7 @@ namespace api::v1 {
         Json::Value root = session.profile;
         root["created_at"] = session.user.getValueOfCreatedAt().toCustomFormattedString("%Y-%m-%d");
 
-        const auto resp = HttpResponse::newHttpJsonResponse(root);
-        resp->setStatusCode(k200OK);
-        callback(resp);
+        callback(HttpResponse::newHttpJsonResponse(root));
     }
 
     Task<> AuthController::deleteAccount(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {

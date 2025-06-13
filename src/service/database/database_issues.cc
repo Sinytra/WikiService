@@ -1,5 +1,6 @@
 #include "database.h"
-#include "service/deployment.h"
+#include <service/project_issue.h>
+#include <service/deployment.h>
 
 using namespace logging;
 using namespace drogon;
@@ -10,6 +11,20 @@ namespace service {
         const auto [res, err] = co_await handleDatabaseOperation<ProjectIssue>([&issue](const DbClientPtr &client) -> Task<ProjectIssue> {
             CoroMapper<ProjectIssue> mapper(client);
             co_return co_await mapper.insert(issue);
+        });
+        co_return res;
+    }
+
+    Task<std::optional<ProjectIssue>> Database::getPageIssue(const std::string deploymentId, const std::string path) const {
+        const auto [res, err] = co_await handleDatabaseOperation<ProjectIssue>([deploymentId, path](const DbClientPtr &client) -> Task<ProjectIssue> {
+            CoroMapper<ProjectIssue> mapper(client);
+            mapper.limit(1);
+            co_return co_await mapper.findOne(
+                Criteria(ProjectIssue::Cols::_deployment_id, CompareOperator::EQ, deploymentId)
+                && Criteria(ProjectIssue::Cols::_level, CompareOperator::EQ, enumToStr(ProjectIssueLevel::ERROR))
+                && Criteria(ProjectIssue::Cols::_file, CompareOperator::EQ, path)
+                && Criteria(ProjectIssue::Cols::_type, CompareOperator::EQ, enumToStr(ProjectIssueType::PAGE_RENDER))
+            );
         });
         co_return res;
     }

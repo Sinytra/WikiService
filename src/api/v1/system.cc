@@ -71,9 +71,7 @@ namespace api::v1 {
         constexpr sys::SystemDataImporter importer;
         const auto result = co_await importer.importData(parsed);
 
-        const auto resp = HttpResponse::newHttpResponse();
-        resp->setStatusCode(result == Error::Ok ? k200OK : k500InternalServerError);
-        callback(resp);
+        callback(statusResponse(result == Error::Ok ? k200OK : k500InternalServerError));
 
         co_return;
     }

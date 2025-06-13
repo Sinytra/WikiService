@@ -51,6 +51,7 @@ class ProjectIssue
         static const std::string _subject;
         static const std::string _details;
         static const std::string _file;
+        static const std::string _version_name;
         static const std::string _created_at;
     };
 
@@ -168,6 +169,16 @@ class ProjectIssue
     void setFile(std::string &&pFile) noexcept;
     void setFileToNull() noexcept;
 
+    /**  For column version_name  */
+    ///Get the value of the column version_name, returns the default value if the column is null
+    const std::string &getValueOfVersionName() const noexcept;
+    ///Return a shared_ptr object pointing to the column const value, or an empty shared_ptr object if the column is null
+    const std::shared_ptr<std::string> &getVersionName() const noexcept;
+    ///Set the value of the column version_name
+    void setVersionName(const std::string &pVersionName) noexcept;
+    void setVersionName(std::string &&pVersionName) noexcept;
+    void setVersionNameToNull() noexcept;
+
     /**  For column created_at  */
     ///Get the value of the column created_at, returns the default value if the column is null
     const ::trantor::Date &getValueOfCreatedAt() const noexcept;
@@ -177,7 +188,7 @@ class ProjectIssue
     void setCreatedAt(const ::trantor::Date &pCreatedAt) noexcept;
 
 
-    static size_t getColumnNumber() noexcept {  return 8;  }
+    static size_t getColumnNumber() noexcept {  return 9;  }
     static const std::string &getColumnName(size_t index) noexcept(false);
 
     Json::Value toJson() const;
@@ -205,6 +216,7 @@ class ProjectIssue
     std::shared_ptr<std::string> subject_;
     std::shared_ptr<std::string> details_;
     std::shared_ptr<std::string> file_;
+    std::shared_ptr<std::string> versionName_;
     std::shared_ptr<::trantor::Date> createdAt_;
     struct MetaData
     {
@@ -217,7 +229,7 @@ class ProjectIssue
         const bool notNull_;
     };
     static const std::vector<MetaData> metaData_;
-    bool dirtyFlag_[8]={ false };
+    bool dirtyFlag_[9]={ false };
   public:
     static const std::string &sqlForFindingByPrimaryKey()
     {
@@ -270,9 +282,14 @@ class ProjectIssue
             sql += "file,";
             ++parametersCount;
         }
+        if(dirtyFlag_[7])
+        {
+            sql += "version_name,";
+            ++parametersCount;
+        }
         sql += "created_at,";
         ++parametersCount;
-        if(!dirtyFlag_[7])
+        if(!dirtyFlag_[8])
         {
             needSelection=true;
         }
@@ -323,6 +340,11 @@ class ProjectIssue
             sql.append(placeholderStr, n);
         }
         if(dirtyFlag_[7])
+        {
+            n = snprintf(placeholderStr,sizeof(placeholderStr),"$%d,",placeholder++);
+            sql.append(placeholderStr, n);
+        }
+        if(dirtyFlag_[8])
         {
             n = snprintf(placeholderStr,sizeof(placeholderStr),"$%d,",placeholder++);
             sql.append(placeholderStr, n);

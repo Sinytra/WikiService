@@ -115,6 +115,7 @@ namespace service {
         drogon::Task<bool> hasFailingDeployment(std::string projectId) const;
 
         drogon::Task<std::optional<ProjectIssue>> addProjectIssue(ProjectIssue issue) const;
+        drogon::Task<std::optional<ProjectIssue>> getPageIssue(std::string deploymentId, std::string path) const;
         drogon::Task<std::vector<ProjectIssue>> getDeploymentIssues(std::string deploymentId) const;
         drogon::Task<std::unordered_map<std::string, int64_t>> getActiveProjectIssueStats(std::string projectId) const;
     private:
