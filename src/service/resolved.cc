@@ -333,7 +333,7 @@ namespace service {
     }
 
     std::tuple<ProjectPage, Error> ResolvedProject::readFile(std::string path) const {
-        const auto filePath = getFilePath(docsDir_, removeLeadingSlash(path) + DOCS_FILE_EXT, locale_);
+        const auto filePath = getFilePath(docsDir_, removeLeadingSlash(path), locale_);
 
         std::ifstream file(filePath);
 

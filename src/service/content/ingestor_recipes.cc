@@ -142,7 +142,7 @@ namespace content {
         }
 
         for (const auto &entry: fs::recursive_directory_iterator(recipesRoot)) {
-            if (!entry.is_regular_file()) {
+            if (!entry.is_regular_file() || entry.path().extension() != EXT_JSON) {
                 continue;
             }
 

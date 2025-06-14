@@ -5,7 +5,6 @@
 #include <drogon/drogon.h>
 #include <fstream>
 
-#define EXT_JSON ".json"
 #define CONTENT_DIR ".content/"
 
 using namespace drogon;

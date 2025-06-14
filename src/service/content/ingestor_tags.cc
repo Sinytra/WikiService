@@ -7,7 +7,6 @@
 #include <drogon/drogon.h>
 #include <schemas.h>
 
-#define EXT_JSON ".json"
 #define CONTENT_DIR ".content/"
 
 using namespace drogon;

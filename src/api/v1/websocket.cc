@@ -36,19 +36,20 @@ namespace api::v1 {
             // Handle unauthenticated user
             const auto session = co_await global::auth->getSession(token);
             if (!session) {
-                wsConnPtr->shutdown(CloseCode::kViolation);
+                if (wsConnPtr) wsConnPtr->shutdown(CloseCode::kViolation);
+                co_return;
             }
 
             const auto project = co_await global::database->getUserProject(session->username, projectId);
             if (!project) {
-                wsConnPtr->shutdown(CloseCode::kViolation);
+                if (wsConnPtr) wsConnPtr->shutdown(CloseCode::kViolation);
                 co_return;
             }
 
             // Handle already loaded project
             const auto loadingDeployment = co_await global::database->getLoadingDeployment(projectId);
             if (!loadingDeployment) {
-                wsConnPtr->shutdown();
+                if (wsConnPtr) wsConnPtr->shutdown();
                 co_return;
             }
 

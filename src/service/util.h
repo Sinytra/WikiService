@@ -10,6 +10,8 @@
 #include <optional>
 #include <string>
 
+#define EXT_JSON ".json"
+
 template<typename K, typename V>
 static std::unordered_map<V, K> reverse_map(const std::unordered_map<K, V> &m) {
     std::unordered_map<V, K> r;
@@ -83,6 +85,7 @@ struct ResourceLocation {
 };
 
 struct JsonValidationError {
+    const nlohmann::json value;
     const nlohmann::json_pointer<std::basic_string<char>> pointer;
     const std::string msg;
 

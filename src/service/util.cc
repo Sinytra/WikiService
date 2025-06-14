@@ -62,7 +62,9 @@ std::optional<ResourceLocation> ResourceLocation::parse(const std::string &str) 
 }
 
 std::string JsonValidationError::format() const {
-    return pointer.to_string() + " : " + msg;
+    auto field = pointer.to_string();
+    if (field.starts_with("/")) field = field.substr(1);
+    return field + ": " + msg + "\n> " + value.dump(2);
 }
 
 void replaceAll(std::string &s, std::string const &toReplace, std::string const &replaceWith) {
@@ -216,7 +218,7 @@ std::optional<JsonValidationError> validateJson(const nlohmann::json &schema, co
     public:
         void error(const nlohmann::json_pointer<std::basic_string<char>> &pointer, const nlohmann::json &json1,
                    const std::string &string1) override {
-            error_ = std::make_unique<JsonValidationError>(pointer, string1);
+            error_ = std::make_unique<JsonValidationError>(json1, pointer, string1);
         }
 
         const std::unique_ptr<JsonValidationError> &getError() { return error_; }
@@ -235,7 +237,7 @@ std::optional<JsonValidationError> validateJson(const nlohmann::json &schema, co
         }
         return std::nullopt;
     } catch ([[maybe_unused]] const std::exception &e) {
-        return JsonValidationError{nlohmann::json::json_pointer{"/"}, e.what()};
+        return JsonValidationError{nlohmann::json(), nlohmann::json::json_pointer{"/"}, e.what()};
     }
 }
 
