@@ -11,10 +11,12 @@
 #include <service/schemas.h>
 // ReSharper disable once CppUnusedIncludeDirective
 #include <service/serializers.h>
-#include <service/storage.h>
+#include <service/storage/gitops.h>
+#include <service/storage/storage.h>
 #include <service/util.h>
 
 #include "base.h"
+#include "deployment.h"
 #include "error.h"
 
 #define MODID_MINECRAFT "minecraft"
@@ -235,8 +237,8 @@ namespace api::v1 {
         callback(HttpResponse::newHttpJsonResponse(root));
     }
 
-    Task<> ProjectsController::getProjectLog(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback,
-                                             std::string id) const {
+    Task<> ProjectsController::getProjectLog(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+                                             const std::string id) const {
         const auto project{co_await BaseProjectController::getUserProject(req, id)};
         const auto log{global::storage->getProjectLog(project)};
         if (!log) {
@@ -249,7 +251,8 @@ namespace api::v1 {
         callback(HttpResponse::newHttpJsonResponse(root));
     }
 
-    Task<> ProjectsController::listPopularProjects(HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
+    Task<> ProjectsController::listPopularProjects(const HttpRequestPtr req,
+                                                   const std::function<void(const HttpResponsePtr &)> callback) const {
         const std::vector<std::string> ids = co_await global::cloudFlare->getMostVisitedProjectIDs();
         Json::Value root(Json::arrayValue);
         for (const auto &id: ids) {
@@ -260,7 +263,7 @@ namespace api::v1 {
         callback(HttpResponse::newHttpJsonResponse(root));
     }
 
-    Task<> ProjectsController::create(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback) const {
+    Task<> ProjectsController::create(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
         const auto session{co_await global::auth->getSession(req)};
         auto json(req->getJsonObject());
         if (!json) {
@@ -315,7 +318,7 @@ namespace api::v1 {
         enqueueDeploy(*result, session.username);
     }
 
-    Task<> ProjectsController::update(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback) const {
+    Task<> ProjectsController::update(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
         const auto session{co_await global::auth->getSession(req)};
 
         const auto json(req->getJsonObject());
@@ -468,7 +471,7 @@ namespace api::v1 {
         if (const auto revisionStr(deployment->getRevision()); revisionStr) {
             root["revision"] = parseJsonOrThrow(*revisionStr);
 
-            const GitRevision revision = nlohmann::json::parse(*revisionStr);
+            const git::GitRevision revision = nlohmann::json::parse(*revisionStr);
             if (const auto url = formatCommitUrl(project, revision.fullHash); !url.empty()) {
                 root["revision"]["url"] = url;
             }
@@ -488,6 +491,12 @@ namespace api::v1 {
         if (!deployment) {
             throw ApiException(Error::ErrBadRequest, "not_found");
         }
+
+        // Prevent deletion of loading deployments
+        if (deployment->getValueOfStatus() == enumToStr(DeploymentStatus::LOADING)) {
+            throw ApiException(Error::ErrBadRequest, "deployment_loading");
+        }
+
         const auto project(co_await BaseProjectController::getUserProject(req, deployment->getValueOfProjectId()));
 
         if (const auto error = co_await global::database->deleteDeployment(id); error != Error::Ok) {

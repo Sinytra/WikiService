@@ -35,6 +35,9 @@ add_library(service STATIC
         database/database_deployments.cc
         database/database_issues.cc
         database/resolved_db.cc
+        storage/storage.cc
+        storage/gitops.cc
+        storage/realtime.cc
         system_data/system_data_import.cc
         auth.cc
         cache.cc
@@ -46,7 +49,6 @@ add_library(service STATIC
         project_issue.cc
         resolved.cc
         schemas.cc
-        storage.cc
         util.cc
         ${CMAKE_CURRENT_BINARY_DIR}/schemas.cc
 )

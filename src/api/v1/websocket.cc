@@ -1,5 +1,6 @@
 #include "websocket.h"
 #include "error.h"
+#include "auth.h"
 
 #include <database/database.h>
 #include <log/log.h>

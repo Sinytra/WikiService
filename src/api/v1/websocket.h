@@ -1,8 +1,7 @@
 #pragma once
 
+#include <service/storage/storage.h>
 #include <drogon/WebSocketController.h>
-#include <service/storage.h>
-#include <service/auth.h>
 
 namespace api::v1 {
     class ProjectWebSocketController final : public drogon::WebSocketController<ProjectWebSocketController, false> {

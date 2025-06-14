@@ -8,6 +8,7 @@
 using namespace drogon;
 using namespace logging;
 using namespace service;
+namespace fs = std::filesystem;
 
 TableQueryParams getTableQueryParams(const HttpRequestPtr& req) {
     const auto query = req->getOptionalParameter<std::string>("query").value_or("");
@@ -255,4 +256,9 @@ Json::Value projectToJson(const drogon_model::postgres::Project &project, const 
 std::string strToLower(std::string copy) {
     std::ranges::transform(copy, copy.begin(), [](const unsigned char c) { return std::tolower(c); });
     return copy;
+}
+
+bool isSubpath(const fs::path &path, const fs::path &base) {
+    const auto [fst, snd] = std::mismatch(path.begin(), path.end(), base.begin(), base.end());
+    return snd == base.end();
 }

@@ -1,29 +1,17 @@
 #include "storage.h"
 
-#include <database/database.h>
-
-#include "util.h"
-
 #include <filesystem>
 #include <fstream>
-
-#include <database/resolved_db.h>
-#include <git2.h>
-#include <include/uri.h>
-#include <models/ProjectVersion.h>
+#include <git2/repository.h>
+#include <service/database/resolved_db.h>
+#include <service/deployment.h>
+#include <service/storage/gitops.h>
+#include <service/util.h>
 #include <spdlog/sinks/basic_file_sink.h>
-#include <spdlog/sinks/callback_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
-
-#include "deployment.h"
-#include "project_issue.h"
 
 #define TEMP_DIR ".temp"
 #define LATEST_VERSION "latest"
-#define BYTE_RECEIVE_LIMIT 2.5e+8
-
-#define WS_SUCCESS "<<success"
-#define WS_ERROR "<<error"
 
 using namespace logging;
 using namespace drogon;
@@ -31,78 +19,6 @@ using namespace service;
 namespace fs = std::filesystem;
 
 const std::set<std::string> allowedFileExtensions = {".mdx", ".json", ".png", ".jpg", ".jpeg", ".webp", ".gif"};
-
-struct progress_data {
-    size_t tick;
-    std::string error;
-    std::shared_ptr<spdlog::logger> logger;
-};
-
-int fetch_progress(const git_indexer_progress *stats, void *payload) {
-    const auto pd = static_cast<progress_data *>(payload);
-
-    if (stats->received_bytes > BYTE_RECEIVE_LIMIT) {
-        if (pd->tick != -1) {
-            pd->tick = -1;
-            pd->error = "size";
-            pd->logger->error("Terminating fetch as it exceeded maximum size limit of 250MB");
-        }
-        return 1;
-    }
-
-    const auto progress = stats->received_objects / static_cast<double>(stats->total_objects) * 100;
-    const auto done = stats->received_objects == stats->total_objects;
-
-    if (const auto mark = static_cast<long>(progress); pd->tick != -1 && (done || mark % 5 == 0 && mark > pd->tick)) {
-        if (done) {
-            pd->tick = -1;
-        } else {
-            pd->tick = mark;
-        }
-
-        pd->logger->trace("Fetch progress: {0:.2f}%", progress);
-    }
-    return 0;
-}
-
-void checkout_progress(const char *path, const size_t cur, const size_t tot, void *payload) {
-    auto pd = static_cast<progress_data *>(payload);
-    if (cur == tot || pd->tick++ % 1000 == 0) {
-        const auto progress = cur / static_cast<double>(tot);
-        pd->logger->trace("Checkout progress: {0:.2f}%", progress * 100);
-    }
-}
-
-bool isSubpath(const fs::path &path, const fs::path &base) {
-    const auto [fst, snd] = std::mismatch(path.begin(), path.end(), base.begin(), base.end());
-    return snd == base.end();
-}
-
-Error checkoutGitBranch(git_repository *repo, const std::string &branch, const std::shared_ptr<spdlog::logger> &logger) {
-    git_object *treeish = nullptr;
-
-    progress_data d = {.tick = 0, .logger = logger};
-    git_checkout_options opts = GIT_CHECKOUT_OPTIONS_INIT;
-    opts.checkout_strategy = GIT_CHECKOUT_FORCE;
-    opts.progress_cb = checkout_progress;
-    opts.progress_payload = &d;
-
-    if (git_revparse_single(&treeish, repo, branch.c_str()) != 0) {
-        logger->error("Failed to parse tree '{}'", branch);
-        return Error::ErrInternal;
-    }
-    if (git_checkout_tree(repo, treeish, &opts) != 0) {
-        logger->error("Failed to checkout tree '{}'", branch);
-        return Error::ErrInternal;
-    }
-
-    const auto head = "refs/heads/" + branch;
-    git_repository_set_head(repo, head.c_str());
-
-    git_object_free(treeish);
-
-    return Error::Ok;
-}
 
 Error copyProjectFiles(const Project &project, const fs::path &src, const fs::path &dest, const std::shared_ptr<spdlog::logger> &logger) {
     const auto docsPath = src / removeLeadingSlash(project.getValueOfSourcePath());
@@ -114,8 +30,7 @@ Error copyProjectFiles(const Project &project, const fs::path &src, const fs::pa
         create_directories(dest);
 
         for (const auto &entry: fs::recursive_directory_iterator(src)) {
-            if (!isSubpath(entry.path(), gitPath) && entry.is_regular_file() && isSubpath(entry.path(), docsPath))
-            {
+            if (!isSubpath(entry.path(), gitPath) && entry.is_regular_file() && isSubpath(entry.path(), docsPath)) {
                 fs::path relative_path = relative(entry.path(), src);
 
                 if (const auto extension = entry.path().extension().string(); !allowedFileExtensions.contains(extension)) {
@@ -140,192 +55,20 @@ Error copyProjectFiles(const Project &project, const fs::path &src, const fs::pa
     return Error::Ok;
 }
 
-std::unordered_map<std::string, std::string> listRepoBranches(git_repository *repo) {
-    std::unordered_map<std::string, std::string> branches;
-
-    git_branch_iterator *it;
-    if (!git_branch_iterator_new(&it, repo, GIT_BRANCH_ALL)) {
-        git_reference *ref;
-        git_branch_t type;
-        while (!git_branch_next(&ref, &type, it)) {
-            const char *branch_name = nullptr;
-            if (!git_reference_symbolic_target(ref) && !git_branch_name(&branch_name, ref) && branch_name) {
-                const auto refName = git_reference_name(ref);
-                if (const auto str = std::string(branch_name); !branches.contains(str)) {
-                    const auto shortName = str.substr(str.find('/') + 1);
-                    branches.try_emplace(shortName, refName);
-                }
-            }
-            git_reference_free(ref);
-        }
-        git_branch_iterator_free(it);
-    }
-
-    return branches;
+inline std::string createProjectSetupKey(const Project &project) { return "setup:" + project.getValueOfId(); }
+inline std::string createPageErrorKey(const std::string &project, const std::string &path) {
+    return "page_error:" + project + ":" + path;
 }
-
-std::string formatISOTime(const git_time_t &time, const int offset) {
-    // time += offset * 60;
-
-    const std::time_t utc_time = time;
-    const std::tm *tm_ptr = std::gmtime(&utc_time);
-
-    std::ostringstream oss;
-    oss << std::put_time(tm_ptr, "%Y-%m-%dT%H:%M:%SZ");
-    return oss.str();
-}
-
-std::optional<GitRevision> getLatestCommitInfo(git_repository *repo) {
-    git_oid oid;
-    if (git_reference_name_to_id(&oid, repo, "HEAD") != 0) {
-        logger.error("Failed to get HEAD commit ID");
-        return std::nullopt;
-    }
-
-    git_commit *commit = nullptr;
-    if (git_commit_lookup(&commit, repo, &oid) != 0) {
-        logger.error("Failed to lookup commit");
-        return std::nullopt;
-    }
-
-    // Get full commit hash
-    char full_hash[GIT_OID_HEXSZ + 1] = {};
-    git_oid_fmt(full_hash, &oid);
-
-    // Get short commit hash
-    char short_hash[8] = {};
-    git_oid_tostr(short_hash, sizeof(short_hash), &oid);
-
-    // Get commit message
-    const char *message = git_commit_summary(commit);
-
-    // Get author details
-    const git_signature *author = git_commit_author(commit);
-    const char *author_name = author->name;
-    const char *author_email = author->email;
-
-    // Get commit date
-    const git_time_t commit_time = git_commit_time(commit);
-    const int offset = git_commit_time_offset(commit);
-    const auto commitDate = formatISOTime(commit_time, offset);
-
-    git_commit_free(commit);
-
-    return GitRevision{.hash = short_hash,
-                       .fullHash = full_hash,
-                       .message = message,
-                       .authorName = author_name,
-                       .authorEmail = author_email,
-                       .date = commitDate};
-}
-
-std::optional<GitRevision> getLatestCommitInfo(const fs::path &path) {
-    git_repository *repo = nullptr;
-    if (git_repository_open(&repo, absolute(path).c_str()) != 0) {
-        logger.error("Failed to open repository: {}", path.string());
-        return std::nullopt;
-    }
-    return getLatestCommitInfo(repo);
-}
-
-bool is_local_url(const std::string &str) {
-    try {
-        const uri url{str};
-        const auto scheme = url.get_scheme();
-        return scheme == "file";
-    } catch (std::exception e) {
-        return false;
-    }
-}
-
-class FormattedCallbackSink final : public spdlog::sinks::base_sink<std::mutex> {
-public:
-    explicit FormattedCallbackSink(const std::function<void(const std::string &msg)> &callback) : callback_(callback) {}
-
-protected:
-    void sink_it_(const spdlog::details::log_msg &msg) override {
-        spdlog::memory_buf_t formatted;
-        formatter_->format(msg, formatted);
-        callback_(fmt::to_string(formatted));
-    }
-    void flush_() override {}
-
-private:
-    const std::function<void(const std::string &msg)> callback_;
-};
-
-std::string createProjectSetupKey(const Project &project) { return "setup:" + project.getValueOfId(); }
 
 namespace service {
-    std::string enumToStr(const ProjectStatus status) {
-        switch (status) {
-            case ProjectStatus::LOADING:
-                return "loading";
-            case ProjectStatus::HEALTHY:
-                return "healthy";
-            case ProjectStatus::AT_RISK:
-                return "at_risk";
-            case ProjectStatus::ERROR:
-                return "error";
-            default:
-                return "unknown";
-        }
-    }
-
-    void RealtimeConnectionStorage::connect(const std::string &project, const WebSocketConnectionPtr &connection) {
-        std::unique_lock lock(mutex_);
-
-        connections_[project].push_back(connection);
-        if (const auto messages = pending_.find(project); messages != pending_.end()) {
-            for (const auto &message: messages->second) {
-                connection->send(message);
-            }
-        }
-    }
-
-    void RealtimeConnectionStorage::disconnect(const WebSocketConnectionPtr &connection) {
-        std::unique_lock lock(mutex_);
-
-        for (auto it = connections_.begin(); it != connections_.end();) {
-            auto &vec = it->second;
-
-            std::erase(vec, connection);
-
-            if (vec.empty()) {
-                it = connections_.erase(it);
-            } else {
-                ++it;
-            }
-        }
-    }
-
-    void RealtimeConnectionStorage::broadcast(const std::string &project, const std::string &message) {
-        {
-            std::shared_lock lock(mutex_);
-
-            if (const auto conns = connections_.find(project); conns != connections_.end()) {
-                for (const WebSocketConnectionPtr &conn: conns->second) {
-                    conn->send(message);
-                }
-                return;
-            }
-        }
-
-        std::unique_lock lock(mutex_);
-        pending_[project].push_back(message);
-    }
-
-    void RealtimeConnectionStorage::shutdown(const std::string &project) {
-        std::unique_lock lock(mutex_);
-
-        if (const auto it = connections_.find(project); it != connections_.end()) {
-            for (const std::vector<WebSocketConnectionPtr> copy = it->second; const WebSocketConnectionPtr &conn: copy) {
-                conn->shutdown();
-            }
-        }
-        connections_.erase(project);
-        pending_.erase(project);
-    }
+    // clang-format off
+    ENUM_TO_STR(ProjectStatus,
+        {ProjectStatus::LOADING, "loading"},
+        {ProjectStatus::HEALTHY, "healthy"},
+        {ProjectStatus::AT_RISK, "at_risk"},
+        {ProjectStatus::ERROR, "error"}
+    )
+    // clang-format on
 
     Storage::Storage(const std::string &basePath) : basePath_(basePath) {
         if (!fs::exists(basePath_)) {
@@ -376,9 +119,7 @@ namespace service {
 
         std::vector<spdlog::sink_ptr> sinks;
 
-        const auto callbackSink =
-            std::make_shared<FormattedCallbackSink>([&, id](const std::string &msg) { global::connections->broadcast(id, msg); });
-        callbackSink->set_pattern("[%^%L%$] [%Y-%m-%d %T] [%n] %v");
+        const auto callbackSink = global::connections->createBroadcastSink(id);
         sinks.push_back(callbackSink);
 
         const auto consoleSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
@@ -398,56 +139,6 @@ namespace service {
         projectLog->set_level(spdlog::level::trace);
 
         return projectLog;
-    }
-
-    Task<std::tuple<git_repository *, ProjectErrorInstance>> gitCloneProject(const Project &project, const fs::path &projectPath,
-                                                                             const std::string &branch,
-                                                                             const std::shared_ptr<spdlog::logger> logger) {
-        const auto url = project.getValueOfSourceRepo();
-        const auto path = absolute(projectPath);
-
-        logger->info("Cloning git repository at {}", url);
-
-        progress_data d = {.tick = 0, .error = "", .logger = logger};
-        git_clone_options clone_opts = GIT_CLONE_OPTIONS_INIT;
-        clone_opts.checkout_opts.checkout_strategy = GIT_CHECKOUT_SAFE;
-        clone_opts.checkout_opts.progress_cb = checkout_progress;
-        clone_opts.checkout_opts.progress_payload = &d;
-        clone_opts.fetch_opts.callbacks.transfer_progress = fetch_progress;
-        clone_opts.fetch_opts.callbacks.payload = &d;
-        clone_opts.checkout_branch = branch.c_str();
-        if (!is_local_url(url)) {
-            clone_opts.fetch_opts.depth = 1;
-        }
-
-        git_repository *repo = nullptr;
-        const int error = co_await supplyAsync<int>(
-            [&repo, &url, &path, &clone_opts]() -> int { return git_clone(&repo, url.c_str(), path.c_str(), &clone_opts); });
-
-        if (error < 0) {
-            const git_error *e = git_error_last();
-            logger->error("Git clone error: {}/{}: {}", error, e->klass, e->message);
-
-            git_repository_free(repo);
-
-            if (error == GIT_EAUTH) {
-                logger->error("Authentication required but none was provided", project.getValueOfSourceBranch());
-                co_return {nullptr, {ProjectError::REQUIRES_AUTH, e->message}};
-            }
-            if (e->klass == GIT_ERROR_REFERENCE) {
-                logger->error("Docs branch '{}' does not exist!", project.getValueOfSourceBranch());
-                co_return {nullptr, {ProjectError::NO_BRANCH, e->message}};
-            }
-            if (d.error == "size") {
-                co_return {nullptr, {ProjectError::REPO_TOO_LARGE, e->message}};
-            }
-
-            co_return {nullptr, {ProjectError::UNKNOWN, e->message}};
-        }
-
-        logger->info("Git clone successful");
-
-        co_return {repo, {ProjectError::OK}};
     }
 
     std::unordered_map<std::string, std::string> readVersionsFromMetadata(const nlohmann::json &metadata,
@@ -496,6 +187,7 @@ namespace service {
 
     Task<std::optional<ProjectVersion>> createDefaultVersion(const Project &project) {
         logger.debug("Adding default version for project {}", project.getValueOfId());
+
         ProjectVersion defaultVersion;
         defaultVersion.setProjectId(project.getValueOfId());
         defaultVersion.setBranch(project.getValueOfSourceBranch());
@@ -535,11 +227,14 @@ namespace service {
 
         ProjectIssueCallback issues{deployment.getValueOfId(), logger};
 
-        const auto [repo, cloneError] = co_await gitCloneProject(project, clonePath, project.getValueOfSourceBranch(), logger);
+        const auto [repo, cloneError] =
+            co_await git::cloneRepository(project.getValueOfSourceRepo(), clonePath, project.getValueOfSourceBranch(), logger);
         if (!repo || cloneError.error != ProjectError::OK) {
             co_await issues.addIssue(ProjectIssueLevel::ERROR, ProjectIssueType::GIT_CLONE, cloneError.error, cloneError.message);
             co_return cloneError.error;
         }
+
+        // TODO Validate metadata
 
         auto defaultVersion = co_await getOrCreateDefaultVersion(project);
         if (!defaultVersion) {
@@ -548,7 +243,7 @@ namespace service {
             co_return ProjectError::UNKNOWN;
         }
 
-        const auto revision = getLatestCommitInfo(repo);
+        const auto revision = git::getLatestRevision(repo);
         if (!revision) {
             logger->error("Error getting commit information");
             co_await issues.addIssue(ProjectIssueLevel::ERROR, ProjectIssueType::GIT_INFO, ProjectError::UNKNOWN);
@@ -572,7 +267,7 @@ namespace service {
             co_return ProjectError::UNKNOWN;
         }
 
-        const auto branches = listRepoBranches(repo);
+        const auto branches = git::listBranches(repo);
         auto versions = co_await resolved.getProjectDatabase().getVersions();
         if (versions.empty()) {
             versions = co_await setupProjectVersions(resolved, branches, logger);
@@ -587,7 +282,7 @@ namespace service {
             logger->info("Setting up version '{}' on branch '{}'", name, branch);
 
             const auto branchRef = branches.at(branch);
-            if (const auto err = checkoutGitBranch(repo, branchRef, logger); err != Error::Ok) {
+            if (const auto err = git::checkoutBranch(repo, branchRef, logger); err != Error::Ok) {
                 continue;
             }
 
@@ -648,7 +343,7 @@ namespace service {
             projectLogger->info("==     Project setup complete     ==");
             projectLogger->info("====================================");
 
-            global::connections->broadcast(projectId, WS_SUCCESS);
+            global::connections->complete(projectId, true);
 
             deployment.setStatus(enumToStr(DeploymentStatus::SUCCESS));
         } else {
@@ -656,15 +351,13 @@ namespace service {
             projectLogger->error("!!      Project setup failed      !!");
             projectLogger->error("!!================================!!");
 
-            global::connections->broadcast(projectId, WS_ERROR);
+            global::connections->complete(projectId, false);
 
             deployment.setStatus(enumToStr(DeploymentStatus::ERROR));
         }
 
         remove_all(clonePath);
-
         co_await global::database->updateDeployment(deployment);
-        global::connections->shutdown(projectId);
 
         co_return co_await completeTask<std::tuple<std::optional<Deployment>, ProjectError>>(taskKey, {deployment, result});
     }
@@ -747,7 +440,6 @@ namespace service {
             if (const auto filePath = getProjectLogPath(project); exists(filePath)) {
                 co_return ProjectStatus::ERROR;
             }
-
             co_return ProjectStatus::UNKNOWN;
         }
 
@@ -790,7 +482,8 @@ namespace service {
         const auto logger = getProjectLogger(project, false);
 
         // Clone project - validates repo and branch
-        if (const auto [repo, cloneError] = co_await gitCloneProject(project, clonePath, project.getValueOfSourceBranch(), logger);
+        if (const auto [repo, cloneError] =
+                co_await git::cloneRepository(project.getValueOfSourceRepo(), clonePath, project.getValueOfSourceBranch(), logger);
             !repo || cloneError.error != ProjectError::OK)
         {
             remove_all(clonePath);
@@ -829,7 +522,8 @@ namespace service {
         co_return {deployment, Error::Ok};
     }
 
-    Task<Error> Storage::addPageIssue(const ResolvedProject &resolved, const std::string level, const std::string details, const std::string path) {
+    Task<Error> Storage::addPageIssue(const ResolvedProject &resolved, const std::string level, const std::string details,
+                                      const std::string path) {
         const auto projectId = resolved.getProject().getValueOfId();
 
         const auto deployment(co_await global::database->getActiveDeployment(projectId));
@@ -842,7 +536,7 @@ namespace service {
             co_return Error::ErrNotFound;
         }
 
-        const auto taskKey = "page_error:" + projectId + ":" + path;
+        const auto taskKey = createPageErrorKey(projectId, path);
 
         if (const auto pending = co_await getOrStartTask<Error>(taskKey)) {
             co_return co_await patientlyAwaitTaskResult(*pending);

@@ -8,6 +8,7 @@
 
 #include <service/cloudflare.h>
 #include <service/database/database.h>
+#include <service/storage/realtime.h>
 #include <service/github.h>
 #include "config.h"
 #include "version.h"
@@ -29,7 +30,7 @@ namespace global {
     std::shared_ptr<Database> database;
     std::shared_ptr<MemoryCache> cache;
     std::shared_ptr<GitHub> github;
-    std::shared_ptr<RealtimeConnectionStorage> connections;
+    std::shared_ptr<realtime::ConnectionManager> connections;
     std::shared_ptr<Storage> storage;
     std::shared_ptr<CloudFlare> cloudFlare;
     std::shared_ptr<Auth> auth;
@@ -64,7 +65,7 @@ int main() {
         global::database = std::make_shared<Database>();
         global::cache = std::make_shared<MemoryCache>();
         global::github = std::make_shared<GitHub>();
-        global::connections = std::make_shared<RealtimeConnectionStorage>();
+        global::connections = std::make_shared<realtime::ConnectionManager>();
         global::storage = std::make_shared<Storage>(storagePath);
         global::cloudFlare = std::make_shared<CloudFlare>(cloudFlareConfig);
         global::auth = std::make_shared<Auth>(appUrl, OAuthApp{githubAppConfig.clientId, githubAppConfig.clientSecret},

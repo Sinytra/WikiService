@@ -1,8 +1,10 @@
 #include "resolved.h"
-#include "database/database.h"
-#include "database/resolved_db.h"
-#include "schemas.h"
-#include "util.h"
+
+#include <service/database/database.h>
+#include <service/database/resolved_db.h>
+#include <service/storage/gitops.h>
+#include <service/schemas.h>
+#include <service/util.h>
 
 #include <filesystem>
 #include <fstream>
@@ -484,7 +486,7 @@ namespace service {
                 if (const auto revisionStr = latestDeployment->getRevision()) {
                     projectJson["revision"] = parseJsonOrThrow(*revisionStr);
 
-                    const GitRevision revision = nlohmann::json::parse(*revisionStr);
+                    const git::GitRevision revision = nlohmann::json::parse(*revisionStr);
                     if (const auto url = formatCommitUrl(project_, revision.fullHash); !url.empty()) {
                         projectJson["revision"]["url"] = url;
                     }

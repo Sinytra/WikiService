@@ -78,17 +78,6 @@ namespace service {
         }
     };
 
-    struct GitRevision {
-        std::string hash;
-        std::string fullHash;
-        std::string message;
-        std::string authorName;
-        std::string authorEmail;
-        std::string date;
-
-        NLOHMANN_DEFINE_TYPE_INTRUSIVE(GitRevision, hash, fullHash, message, authorName, authorEmail, date)
-    };
-
     // See resolved_db.h
     class ProjectDatabaseAccess;
 

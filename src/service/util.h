@@ -143,3 +143,5 @@ std::optional<JsonValidationError> validateJson(const nlohmann::json &schema, co
 Json::Value projectToJson(const drogon_model::postgres::Project &project, bool verbose = false);
 
 std::string strToLower(std::string copy);
+
+bool isSubpath(const std::filesystem::path &path, const std::filesystem::path &base);

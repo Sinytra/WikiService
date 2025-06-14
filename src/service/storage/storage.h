@@ -1,12 +1,11 @@
 #pragma once
 
-#include "cache.h"
-#include "content/game_content.h"
-#include "error.h"
-#include "models/Project.h"
-#include "resolved.h"
-
-#include <drogon/WebSocketConnection.h>
+#include <service/cache.h>
+#include <service/content/game_content.h>
+#include <service/error.h>
+#include <service/resolved.h>
+#include <models/Project.h>
+#include <service/storage/realtime.h>
 #include <nlohmann/json_fwd.hpp>
 
 using namespace drogon_model::postgres;
@@ -20,21 +19,6 @@ namespace service {
         ERROR
     };
     std::string enumToStr(ProjectStatus status);
-
-    class RealtimeConnectionStorage {
-    public:
-        void connect(const std::string &project, const drogon::WebSocketConnectionPtr &connection);
-
-        void disconnect(const drogon::WebSocketConnectionPtr &connection);
-
-        void broadcast(const std::string &project, const std::string &message);
-
-        void shutdown(const std::string &project);
-    private:
-        mutable std::shared_mutex mutex_;
-        std::unordered_map<std::string, std::vector<std::string>> pending_;
-        std::unordered_map<std::string, std::vector<drogon::WebSocketConnectionPtr>> connections_;
-    };
 
     class Storage : public CacheableServiceBase {
     public:
@@ -70,5 +54,5 @@ namespace service {
 
 namespace global {
     extern std::shared_ptr<service::Storage> storage;
-    extern std::shared_ptr<service::RealtimeConnectionStorage> connections;
+    extern std::shared_ptr<realtime::ConnectionManager> connections;
 }
