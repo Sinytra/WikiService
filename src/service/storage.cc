@@ -635,7 +635,14 @@ namespace service {
         remove_all(clonePath);
 
         const auto projectLogger = getProjectLogger(project);
-        auto result = co_await setupProject(project, deployment, clonePath);
+        ProjectError result;
+        try {
+            result = co_await setupProject(project, deployment, clonePath);
+        } catch (std::exception e) {
+            result = ProjectError::UNKNOWN;
+            logger.error("Unexpected error during deployment: {}", e.what());
+        }
+
         if (result == ProjectError::OK) {
             projectLogger->info("====================================");
             projectLogger->info("==     Project setup complete     ==");
