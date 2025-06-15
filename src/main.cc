@@ -51,6 +51,10 @@ void globalExceptionHandler(const std::exception& e, const HttpRequestPtr& req, 
     callback(statusResponse(k500InternalServerError));
 }
 
+Task<> runStartupTaks() {
+    co_await global::database->failLoadingDeployments();
+}
+
 int main() {
     constexpr auto port(8080);
     logger.info("Starting wiki service version {} on port {}", PROJECT_VERSION, port);
@@ -93,6 +97,8 @@ int main() {
 
         cacheAwaiterThreadPool.start();
         git_libgit2_init();
+
+        app().getLoop()->queueInLoop(async_func([]() -> Task<> { co_await runStartupTaks(); }));
 
         app().run();
 

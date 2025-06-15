@@ -56,10 +56,9 @@ namespace service {
             CoroMapper<Deployment> mapper(client);
             mapper.limit(1);
             co_return co_await mapper.findOne(
-                Criteria(Deployment::Cols::_project_id, CompareOperator::EQ, projectId)
-                && Criteria(Deployment::Cols::_status, CompareOperator::In,
-                    std::vector{enumToStr(DeploymentStatus::CREATED), enumToStr(DeploymentStatus::LOADING)}
-                ));
+                Criteria(Deployment::Cols::_project_id, CompareOperator::EQ, projectId) &&
+                Criteria(Deployment::Cols::_status, CompareOperator::In,
+                         std::vector{enumToStr(DeploymentStatus::CREATED), enumToStr(DeploymentStatus::LOADING)}));
         });
         co_return res;
     }
@@ -113,5 +112,17 @@ namespace service {
             co_return rows.size() > 0;
         });
         co_return res.value_or(false);
+    }
+
+    Task<Error> Database::failLoadingDeployments() const {
+        const auto [res, err] = co_await handleDatabaseOperation<Error>([](const DbClientPtr &client) -> Task<Error> {
+            CoroMapper<Deployment> mapper(client);
+            co_await mapper.updateBy({Deployment::Cols::_status},
+                                     Criteria(Deployment::Cols::_status, CompareOperator::In,
+                                              std::vector{enumToStr(DeploymentStatus::CREATED), enumToStr(DeploymentStatus::LOADING)}),
+                                     enumToStr(DeploymentStatus::ERROR));
+            co_return Error::Ok;
+        });
+        co_return res.value_or(err);
     }
 }

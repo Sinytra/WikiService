@@ -113,6 +113,7 @@ namespace service {
         drogon::Task<Error> deactivateDeployments(std::string projectId) const;
         drogon::Task<Error> deleteDeployment(std::string id) const;
         drogon::Task<bool> hasFailingDeployment(std::string projectId) const;
+        drogon::Task<Error> failLoadingDeployments() const;
 
         drogon::Task<std::optional<ProjectIssue>> addProjectIssue(ProjectIssue issue) const;
         drogon::Task<std::optional<ProjectIssue>> getPageIssue(std::string deploymentId, std::string path) const;
