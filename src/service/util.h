@@ -11,6 +11,7 @@
 #include <string>
 
 #define EXT_JSON ".json"
+#define DOCS_FILE_EXT ".mdx"
 
 template<typename K, typename V>
 static std::unordered_map<V, K> reverse_map(const std::unordered_map<K, V> &m) {

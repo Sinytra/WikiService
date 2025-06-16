@@ -40,7 +40,7 @@ namespace api::v1 {
             const auto resolved = co_await BaseProjectController::getProject(project, req->getOptionalParameter<std::string>("version"),
                                                                              req->getOptionalParameter<std::string>("locale"));
 
-            const auto [page, pageError](resolved.readFile(path));
+            const auto [page, pageError](resolved.readFile(path + DOCS_FILE_EXT));
             if (pageError != Error::Ok) {
                 const auto optionalParam = req->getOptionalParameter<std::string>("optional");
                 const auto optional = optionalParam.has_value() && optionalParam == "true";

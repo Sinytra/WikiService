@@ -19,7 +19,6 @@
 
 #define DOCS_META_FILE "sinytra-wiki.json"
 #define FOLDER_META_FILE "_meta.json"
-#define DOCS_FILE_EXT ".mdx"
 #define I18N_DIR_PATH ".translated"
 #define NO_ICON "_none"
 #define DEFAULT_LOCALE "en_en"
@@ -338,7 +337,7 @@ namespace service {
         std::ifstream file(filePath);
 
         if (!file) {
-            return {{"", ""}, Error::ErrInternal};
+            return {{"", ""}, Error::ErrNotFound};
         }
 
         std::stringstream buffer;
@@ -354,7 +353,7 @@ namespace service {
     Task<std::tuple<ProjectPage, Error>> ResolvedProject::readContentPage(const std::string id) const {
         const auto contentPath = co_await projectDb_->getProjectContentPath(id);
         if (!contentPath) {
-            co_return {{"", ""}, Error::ErrInternal};
+            co_return {{"", ""}, Error::ErrNotFound};
         }
         co_return readFile(*contentPath);
     }
