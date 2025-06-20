@@ -23,18 +23,6 @@ namespace service {
         Json::Value platforms;
     };
 
-    // clang-format off
-    enum class ProjectError {
-        OK,
-        REQUIRES_AUTH, NO_REPOSITORY, REPO_TOO_LARGE, NO_BRANCH, NO_PATH,
-        INVALID_META, INVALID_PAGE,
-        DUPLICATE_PAGE, UNKNOWN_RECIPE_TYPE, INVALID_INGREDIENT,
-        INVALID_FILE, INVALID_FORMAT,
-        UNKNOWN
-    };
-    // clang-format on
-    std::string enumToStr(ProjectError status);
-
     struct ProjectErrorInstance {
         ProjectError error;
         std::string message;

@@ -1,6 +1,5 @@
-#include "database.h"
 #include <service/project_issue.h>
-#include <service/deployment.h>
+#include "database.h"
 
 using namespace logging;
 using namespace drogon;
@@ -15,17 +14,24 @@ namespace service {
         co_return res;
     }
 
-    Task<std::optional<ProjectIssue>> Database::getPageIssue(const std::string deploymentId, const std::string path) const {
-        const auto [res, err] = co_await handleDatabaseOperation<ProjectIssue>([deploymentId, path](const DbClientPtr &client) -> Task<ProjectIssue> {
-            CoroMapper<ProjectIssue> mapper(client);
-            mapper.limit(1);
-            co_return co_await mapper.findOne(
-                Criteria(ProjectIssue::Cols::_deployment_id, CompareOperator::EQ, deploymentId)
-                && Criteria(ProjectIssue::Cols::_level, CompareOperator::EQ, enumToStr(ProjectIssueLevel::ERROR))
-                && Criteria(ProjectIssue::Cols::_file, CompareOperator::EQ, path)
-                && Criteria(ProjectIssue::Cols::_type, CompareOperator::EQ, enumToStr(ProjectIssueType::PAGE_RENDER))
-            );
-        });
+    Task<std::optional<ProjectIssue>> Database::getProjectIssue(const std::string deploymentId, const ProjectIssueLevel level,
+                                                                const ProjectIssueType type, const std::string path) const {
+        const auto [res, err] = co_await handleDatabaseOperation<ProjectIssue>(
+            [deploymentId, path, level, type](const DbClientPtr &client) -> Task<ProjectIssue> {
+                CoroMapper<ProjectIssue> mapper(client);
+                mapper.limit(1);
+
+                auto criteria{
+                    Criteria(ProjectIssue::Cols::_deployment_id, CompareOperator::EQ, deploymentId)
+                    && Criteria(ProjectIssue::Cols::_level, CompareOperator::EQ, enumToStr(level))
+                    && Criteria(ProjectIssue::Cols::_type, CompareOperator::EQ, enumToStr(type))
+                };
+                if (!path.empty()) {
+                    criteria = criteria && Criteria(ProjectIssue::Cols::_file, CompareOperator::EQ, path);
+                }
+
+                co_return co_await mapper.findOne(criteria);
+            });
         co_return res;
     }
 

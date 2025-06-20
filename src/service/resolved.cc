@@ -215,24 +215,6 @@ std::map<int, std::vector<RecipeIngredientItem>> groupIngredients(const std::vec
 }
 
 namespace service {
-    // clang-format off
-    ENUM_TO_STR(ProjectError,
-        { ProjectError::OK, "ok" },
-        { ProjectError::REQUIRES_AUTH, "required_auth" },
-        { ProjectError::NO_REPOSITORY, "no_repository" },
-        { ProjectError::REPO_TOO_LARGE, "repo_too_large" },
-        { ProjectError::NO_BRANCH, "no_branch" },
-        { ProjectError::NO_PATH, "no_path" },
-        { ProjectError::INVALID_META, "invalid_meta" },
-        { ProjectError::INVALID_PAGE, "invalid_page" },
-        { ProjectError::DUPLICATE_PAGE, "duplicate_page" },
-        { ProjectError::UNKNOWN_RECIPE_TYPE, "unknown_recipe_type" },
-        { ProjectError::INVALID_INGREDIENT, "invalid_ingredient" },
-        { ProjectError::INVALID_FILE, "invalid_file" },
-        { ProjectError::INVALID_FORMAT, "invalid_format" }
-    )
-    // clang-format on
-
     std::string formatEditUrl(const Project &project, const std::string &filePath) {
         const auto provider = getGitProvider(project.getValueOfSourceRepo());
         if (!provider) {

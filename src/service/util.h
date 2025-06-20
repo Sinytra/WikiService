@@ -35,7 +35,7 @@ static std::unordered_map<V, K> reverse_map(const std::unordered_map<K, V> &m) {
         const auto str = _##name##_map.find(value);                                                                                        \
         return str == _##name##_map.end() ? "unknown" : str->second;                                                                       \
     }                                                                                                                                      \
-    name parse##name##(const std::string &str) {                                                                                           \
+    name parse##name(const std::string &str) {                                                                                             \
         const auto value = _##name##_map_rev.find(str);                                                                                    \
         return value == _##name##_map_rev.end() ? name::UNKNOWN : value->second;                                                           \
     }

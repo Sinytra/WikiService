@@ -1,30 +1,25 @@
 #pragma once
 
+#include <models/Project.h>
+#include <nlohmann/json_fwd.hpp>
 #include <service/cache.h>
 #include <service/content/game_content.h>
 #include <service/error.h>
 #include <service/resolved.h>
-#include <models/Project.h>
 #include <service/storage/realtime.h>
-#include <nlohmann/json_fwd.hpp>
 
 using namespace drogon_model::postgres;
 
 namespace service {
-    enum class ProjectStatus {
-        UNKNOWN,
-        LOADING,
-        HEALTHY,
-        AT_RISK,
-        ERROR
-    };
+    enum class ProjectStatus { UNKNOWN, LOADING, HEALTHY, AT_RISK, ERROR };
     std::string enumToStr(ProjectStatus status);
 
     class Storage : public CacheableServiceBase {
     public:
         explicit Storage(const std::string &);
 
-        drogon::Task<std::tuple<std::optional<ResolvedProject>, Error>> getProject(const Project &project, const std::optional<std::string> &version, const std::optional<std::string> &locale) const;
+        drogon::Task<std::tuple<std::optional<ResolvedProject>, Error>>
+        getProject(const Project &project, const std::optional<std::string> &version, const std::optional<std::string> &locale) const;
 
         drogon::Task<Error> invalidateProject(const Project &project) const;
 
@@ -34,18 +29,22 @@ namespace service {
 
         std::optional<std::string> getProjectLog(const Project &project) const;
 
-        drogon::Task<std::tuple<std::optional<nlohmann::json>, ProjectError, std::string>> setupValidateTempProject(const Project &project) const;
+        drogon::Task<std::tuple<std::optional<nlohmann::json>, ProjectError, std::string>>
+        setupValidateTempProject(const Project &project) const;
 
         drogon::Task<std::tuple<std::optional<Deployment>, Error>> deployProject(const Project &project, std::string userId);
 
-        drogon::Task<Error> addPageIssue(const ResolvedProject &resolved, std::string level, std::string details, std::string path);
+        drogon::Task<Error> addProjectIssue(const ResolvedProject &resolved, ProjectIssueLevel level, ProjectIssueType type,
+                                            ProjectError subject, std::string details, std::string path);
+
     private:
-        drogon::Task<ProjectError> setupProject(const Project &project, Deployment& deployment, std::filesystem::path clonePath) const;
+        drogon::Task<ProjectError> setupProject(const Project &project, Deployment &deployment, std::filesystem::path clonePath) const;
         drogon::Task<std::tuple<std::optional<Deployment>, ProjectError>> setupProjectCached(const Project &project, std::string userId);
         std::filesystem::directory_entry getBaseDir() const;
         std::filesystem::path getProjectLogPath(const Project &project) const;
         std::filesystem::path getProjectDirPath(const Project &project, const std::string &version) const;
-        drogon::Task<std::tuple<std::optional<ResolvedProject>, Error>> findProject(const Project &project, const std::optional<std::string> &version, const std::optional<std::string> &locale) const;
+        drogon::Task<std::tuple<std::optional<ResolvedProject>, Error>>
+        findProject(const Project &project, const std::optional<std::string> &version, const std::optional<std::string> &locale) const;
         std::shared_ptr<spdlog::logger> getProjectLogger(const Project &project, bool file = true) const;
 
         const std::string &basePath_;

@@ -56,8 +56,9 @@ Error copyProjectFiles(const Project &project, const fs::path &src, const fs::pa
 }
 
 inline std::string createProjectSetupKey(const Project &project) { return "setup:" + project.getValueOfId(); }
-inline std::string createPageErrorKey(const std::string &project, const std::string &path) {
-    return "page_error:" + project + ":" + path;
+inline std::string createProjectIssueKey(const std::string &project, const std::string &level, const std::string &type,
+                                         const std::string &subject, const std::string &path) {
+    return std::format("page_error:{}:{}:{}:{}:[{}]", project, level, type, subject, path);
 }
 
 namespace service {
@@ -522,8 +523,8 @@ namespace service {
         co_return {deployment, Error::Ok};
     }
 
-    Task<Error> Storage::addPageIssue(const ResolvedProject &resolved, const std::string level, const std::string details,
-                                      const std::string path) {
+    Task<Error> Storage::addProjectIssue(const ResolvedProject &resolved, const ProjectIssueLevel level, const ProjectIssueType type,
+                                         const ProjectError subject, const std::string details, const std::string path) {
         const auto projectId = resolved.getProject().getValueOfId();
 
         const auto deployment(co_await global::database->getActiveDeployment(projectId));
@@ -531,28 +532,34 @@ namespace service {
             co_return Error::ErrNotFound;
         }
 
-        const auto filePath = resolved.getPagePath(path);
-        if (!filePath) {
-            co_return Error::ErrNotFound;
+        auto resolvedPath = path;
+        if (!path.empty()) {
+            const auto filePath = resolved.getPagePath(path);
+            if (!filePath) {
+                co_return Error::ErrNotFound;
+            }
+            resolvedPath = *filePath;
         }
 
-        const auto taskKey = createPageErrorKey(projectId, path);
+        const auto taskKey = createProjectIssueKey(projectId, enumToStr(level), enumToStr(type), enumToStr(subject), path);
 
         if (const auto pending = co_await getOrStartTask<Error>(taskKey)) {
             co_return co_await patientlyAwaitTaskResult(*pending);
         }
 
-        if (const auto existing = co_await global::database->getPageIssue(deployment->getValueOfId(), *filePath)) {
-            co_return Error::ErrBadRequest;
+        if (const auto existing = co_await global::database->getProjectIssue(deployment->getValueOfId(), level, type, resolvedPath)) {
+            co_return co_await completeTask<Error>(taskKey, Error::ErrBadRequest);
         }
 
         ProjectIssue issue;
         issue.setDeploymentId(deployment->getValueOfId());
-        issue.setLevel(level);
-        issue.setType(enumToStr(ProjectIssueType::PAGE_RENDER));
-        issue.setSubject(enumToStr(ProjectError::INVALID_PAGE));
+        issue.setLevel(enumToStr(level));
+        issue.setType(enumToStr(type));
+        issue.setSubject(enumToStr(subject));
         issue.setDetails(details);
-        issue.setFile(*filePath);
+        if (!resolvedPath.empty()) {
+            issue.setFile(resolvedPath);
+        }
         if (const auto versionName = resolved.getProjectVersion().getName()) {
             issue.setVersionName(*versionName);
         }

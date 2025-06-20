@@ -29,7 +29,7 @@ namespace api::v1 {
         ADD_METHOD_TO(ProjectsController::create,           "/api/v1/dev/projects",                             drogon::Post,   "AuthFilter");
         ADD_METHOD_TO(ProjectsController::update,           "/api/v1/dev/projects",                             drogon::Put,    "AuthFilter");
         ADD_METHOD_TO(ProjectsController::remove,           "/api/v1/dev/projects/{1:id}",                      drogon::Delete, "AuthFilter");
-        ADD_METHOD_TO(ProjectsController::redeployProject,  "/api/v1/dev/projects/{1:id}/invalidate",           drogon::Post,   "AuthFilter");
+        ADD_METHOD_TO(ProjectsController::deployProject,    "/api/v1/dev/projects/{1:id}/deploy",               drogon::Post,   "AuthFilter");
         // Content
         ADD_METHOD_TO(ProjectsController::getContentPages,  "/api/v1/dev/projects/{1:id}/content/pages",        drogon::Get,    "AuthFilter");
         ADD_METHOD_TO(ProjectsController::getContentTags,   "/api/v1/dev/projects/{1:id}/content/tags",         drogon::Get,    "AuthFilter");
@@ -68,7 +68,7 @@ namespace api::v1 {
         drogon::Task<> remove(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
                               std::string id) const;
 
-        drogon::Task<> redeployProject(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
+        drogon::Task<> deployProject(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
                                        std::string id) const;
 
         drogon::Task<> getContentPages(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,

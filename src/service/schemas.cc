@@ -38,11 +38,13 @@ nlohmann::json schemas::projectIssue = R"(
     "title": "Project page issue",
     "type": "object",
     "properties": {
-        "level": { "type": "string", "enum": [ "warning", "error" ] },
+        "level": { "type": "string" },
+        "type": { "type": "string" },
+        "subject": { "type": "string" },
         "path": { "type": "string" },
         "details": { "type": "string" }
     },
-    "required": ["level", "path", "details"]
+    "required": ["level", "type", "subject", "details"]
 }
 )"_json;
 

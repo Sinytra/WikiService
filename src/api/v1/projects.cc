@@ -362,8 +362,8 @@ namespace api::v1 {
         callback(simpleResponse("Project deleted successfully"));
     }
 
-    Task<> ProjectsController::redeployProject(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
-                                               const std::string id) const {
+    Task<> ProjectsController::deployProject(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+                                             const std::string id) const {
         std::string username = "";
 
         const auto token = req->getParameter("token");
@@ -536,10 +536,24 @@ namespace api::v1 {
         const auto resolved(co_await BaseProjectController::getProject(id, req->getOptionalParameter<std::string>("version"),
                                                                        req->getOptionalParameter<std::string>("locale")));
 
-        const auto level = (*json)["level"].asString();
+        const auto parsedLevel = parseProjectIssueLevel((*json)["level"].asString());
+        if (parsedLevel == ProjectIssueLevel::UNKNOWN) {
+            throw ApiException(Error::ErrBadRequest, "invalid_level");
+        }
+
+        const auto parsedType = parseProjectIssueType((*json)["type"].asString());
+        if (parsedType == ProjectIssueType::UNKNOWN) {
+            throw ApiException(Error::ErrBadRequest, "invalid_type");
+        }
+
+        const auto parsedSubject = parseProjectError((*json)["subject"].asString());
+        if (parsedSubject == ProjectError::UNKNOWN) {
+            throw ApiException(Error::ErrBadRequest, "invalid_subject");
+        }
+
         const auto details = (*json)["details"].asString();
         const auto path = (*json)["path"].asString();
-        const auto res = co_await global::storage->addPageIssue(resolved, level, details, path);
+        const auto res = co_await global::storage->addProjectIssue(resolved, parsedLevel, parsedType, parsedSubject, details, path);
 
         if (res == Error::ErrNotFound) {
             throw ApiException(Error::ErrBadRequest, "not_found");

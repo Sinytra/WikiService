@@ -15,6 +15,7 @@
 #include "models/DataImport.h"
 #include "models/Deployment.h"
 #include "models/ProjectIssue.h"
+#include <service/project_issue.h>
 
 using namespace drogon_model::postgres;
 
@@ -116,9 +117,11 @@ namespace service {
         drogon::Task<Error> failLoadingDeployments() const;
 
         drogon::Task<std::optional<ProjectIssue>> addProjectIssue(ProjectIssue issue) const;
-        drogon::Task<std::optional<ProjectIssue>> getPageIssue(std::string deploymentId, std::string path) const;
+        drogon::Task<std::optional<ProjectIssue>> getProjectIssue(std::string deploymentId, ProjectIssueLevel level,
+                                                                  ProjectIssueType type, std::string path) const;
         drogon::Task<std::vector<ProjectIssue>> getDeploymentIssues(std::string deploymentId) const;
         drogon::Task<std::unordered_map<std::string, int64_t>> getActiveProjectIssueStats(std::string projectId) const;
+
     private:
         drogon::orm::DbClientPtr clientPtr_;
     };

@@ -1,14 +1,29 @@
 #pragma once
 
 #include <models/Deployment.h>
-#include "resolved.h"
 
 namespace service {
     enum class ProjectIssueLevel { WARNING, ERROR, UNKNOWN };
     std::string enumToStr(ProjectIssueLevel level);
+    ProjectIssueLevel parseProjectIssueLevel(const std::string &level);
 
-    enum class ProjectIssueType { GIT_CLONE, GIT_INFO, PAGE_RENDER, INGESTOR, INTERNAL, UNKNOWN };
+    enum class ProjectIssueType { META, GIT_CLONE, GIT_INFO, PAGE_RENDER, INGESTOR, INTERNAL, UNKNOWN };
     std::string enumToStr(ProjectIssueType type);
+    ProjectIssueType parseProjectIssueType(const std::string &level);
+
+    // clang-format off
+    enum class ProjectError {
+        OK,
+        REQUIRES_AUTH, NO_REPOSITORY, REPO_TOO_LARGE, NO_BRANCH, NO_PATH,
+        INVALID_META, INVALID_PAGE,
+        DUPLICATE_PAGE, UNKNOWN_RECIPE_TYPE, INVALID_INGREDIENT,
+        INVALID_FILE, INVALID_FORMAT,
+        MISSING_PLATFORM_PROJECT,
+        UNKNOWN
+    };
+    // clang-format on
+    std::string enumToStr(ProjectError status);
+    ProjectError parseProjectError(const std::string &str);
 
     class ProjectIssueCallback {
     public:
