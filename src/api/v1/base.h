@@ -16,7 +16,7 @@ namespace api::v1 {
         static drogon::Task<service::ResolvedProject> getProject(const std::string &project, const std::optional<std::string> &version,
                                                                  const std::optional<std::string> &locale);
 
-        static drogon::Task<Project> getUserProject(drogon::HttpRequestPtr req, const std::string id);
+        static drogon::Task<Project> getUserProject(drogon::HttpRequestPtr req, std::string id);
 
         static drogon::Task<service::ResolvedProject> getUserProject(drogon::HttpRequestPtr req, const std::string &project,
                                                                      const std::optional<std::string> &version,

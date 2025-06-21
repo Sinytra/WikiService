@@ -48,6 +48,36 @@ nlohmann::json schemas::projectIssue = R"(
 }
 )"_json;
 
+nlohmann::json schemas::report = R"(
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Project report",
+    "type": "object",
+    "properties": {
+        "project_id": { "type": "string" },
+        "path": { "type": "string" },
+        "reason": { "type": "string" },
+        "body": { "type": "string" },
+        "locale": { "type": "string" },
+        "version": { "type": "string" },
+        "type": { "type": "string" }
+    },
+    "required": ["project_id", "reason", "body", "type"]
+}
+)"_json;
+
+nlohmann::json schemas::ruleReport = R"(
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Project report",
+    "type": "object",
+    "properties": {
+        "resolution": { "type": "string", "enum": [ "accept", "dismiss" ] }
+    },
+    "required": ["resolution"]
+}
+)"_json;
+
 nlohmann::json schemas::projectMetadata = R"(@PROJECT_META_SCHEMA@)"_json;
 
 nlohmann::json schemas::folderMetadata = R"(@FOLDER_META_SCHEMA@)"_json;

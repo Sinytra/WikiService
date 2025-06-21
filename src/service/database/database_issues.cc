@@ -6,14 +6,6 @@ using namespace drogon;
 using namespace drogon::orm;
 
 namespace service {
-    Task<std::optional<ProjectIssue>> Database::addProjectIssue(ProjectIssue issue) const {
-        const auto [res, err] = co_await handleDatabaseOperation<ProjectIssue>([&issue](const DbClientPtr &client) -> Task<ProjectIssue> {
-            CoroMapper<ProjectIssue> mapper(client);
-            co_return co_await mapper.insert(issue);
-        });
-        co_return res;
-    }
-
     Task<std::optional<ProjectIssue>> Database::getProjectIssue(const std::string deploymentId, const ProjectIssueLevel level,
                                                                 const ProjectIssueType type, const std::string path) const {
         const auto [res, err] = co_await handleDatabaseOperation<ProjectIssue>(

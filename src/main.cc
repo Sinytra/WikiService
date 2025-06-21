@@ -17,6 +17,8 @@
 #include <git2.h>
 #include <log/log.h>
 
+#include "api/v1/moderation.h"
+
 using namespace std;
 using namespace drogon;
 using namespace logging;
@@ -85,6 +87,7 @@ int main() {
         auto projectWSController(make_shared<api::v1::ProjectWebSocketController>());
         auto gameController(make_shared<api::v1::GameController>());
         auto systemController(make_shared<api::v1::SystemController>());
+        auto moderationController(make_shared<api::v1::ModerationController>());
 
         app().registerController(authController);
         app().registerController(controller);
@@ -93,6 +96,7 @@ int main() {
         app().registerController(projectWSController);
         app().registerController(gameController);
         app().registerController(systemController);
+        app().registerController(moderationController);
         app().setExceptionHandler(globalExceptionHandler);
 
         cacheAwaiterThreadPool.start();

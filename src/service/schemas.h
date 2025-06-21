@@ -9,6 +9,8 @@ namespace schemas {
     extern nlohmann::json projectMetadata;
     extern nlohmann::json folderMetadata;
     extern nlohmann::json projectIssue;
+    extern nlohmann::json report;
+    extern nlohmann::json ruleReport;
 
     extern nlohmann::json gameRecipe;
     extern nlohmann::json gameTag;

@@ -211,7 +211,7 @@ namespace service {
             }
 
             deployment.setActive(true);
-            co_await client.updateDeployment(deployment);
+            co_await client.updateModel(deployment);
 
             co_return Error::Ok;
         });
@@ -224,7 +224,7 @@ namespace service {
         logger->info("Setting up project");
 
         deployment.setStatus(enumToStr(DeploymentStatus::LOADING));
-        co_await global::database->updateDeployment(deployment);
+        co_await global::database->updateModel(deployment);
 
         ProjectIssueCallback issues{deployment.getValueOfId(), logger};
 
@@ -252,7 +252,7 @@ namespace service {
         }
 
         deployment.setRevision(nlohmann::json(*revision).dump());
-        co_await global::database->updateDeployment(deployment);
+        co_await global::database->updateModel(deployment);
 
         ResolvedProject resolved{project, clonePath / removeLeadingSlash(project.getValueOfSourcePath()), *defaultVersion};
 
@@ -318,7 +318,7 @@ namespace service {
         tmpDep.setSourcePath(project.getValueOfSourcePath());
         if (!userId.empty())
             tmpDep.setUserId(userId);
-        const auto dbResult = co_await global::database->addDeployment(tmpDep);
+        const auto dbResult = co_await global::database->addModel(tmpDep);
         if (!dbResult) {
             co_return {std::nullopt, ProjectError::UNKNOWN};
         }
@@ -358,7 +358,7 @@ namespace service {
         }
 
         remove_all(clonePath);
-        co_await global::database->updateDeployment(deployment);
+        co_await global::database->updateModel(deployment);
 
         co_return co_await completeTask<std::tuple<std::optional<Deployment>, ProjectError>>(taskKey, {deployment, result});
     }
@@ -564,7 +564,7 @@ namespace service {
             issue.setVersionName(*versionName);
         }
 
-        co_await global::database->addProjectIssue(issue);
+        co_await global::database->addModel(issue);
 
         co_return co_await completeTask<Error>(taskKey, Error::Ok);
     }

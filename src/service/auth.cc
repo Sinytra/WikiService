@@ -18,6 +18,7 @@
 #define MR_OAUTH_TOKEN_PATH "/_internal/oauth/token"
 
 #define SESSION_ID_LEN 64
+#define ROLE_ADMIN "admin"
 
 using namespace logging;
 using namespace drogon;
@@ -88,6 +89,14 @@ namespace service {
         co_return *session;
     }
 
+    Task<> Auth::ensurePrivilegedAccess(const HttpRequestPtr req) const {
+        const auto session(co_await getSession(req));
+
+        if (const auto role = session.user.getValueOfRole(); role != ROLE_ADMIN) {
+            throw ApiException(Error::ErrForbidden, "forbidden");
+        }
+    }
+
     Task<std::optional<UserSession>> Auth::getSession(const std::string id) const {
         if (id.empty()) {
             co_return std::nullopt;
@@ -107,7 +116,7 @@ namespace service {
             co_return std::nullopt;
         }
 
-        const auto user = co_await global::database->getUser(*username);
+        const auto user = co_await global::database->getModel<User>(*username);
         if (!user) {
             co_return std::nullopt;
         }
@@ -171,7 +180,7 @@ namespace service {
     Task<std::optional<User>> Auth::getGitHubTokenUser(const std::string token) const {
         if (const auto [ghProfile, ghErr](co_await global::github->getAuthenticatedUser(token)); ghProfile) {
             const auto username = (*ghProfile)["login"].asString();
-            const auto user = co_await global::database->getUser(strToLower(username));
+            const auto user = co_await global::database->getModel<User>(strToLower(username));
             co_return user;
         }
         co_return std::nullopt;

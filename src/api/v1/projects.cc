@@ -332,10 +332,10 @@ namespace api::v1 {
         auto [project, platforms] = co_await validateProjectData(*json, session.user, callback, true);
 
         if (const auto [proj, projErr] = co_await global::database->getProjectSource(project.getValueOfId()); !proj) {
-            throw ApiException(Error::ErrBadRequest, "not_found");
+            throw ApiException(Error::ErrNotFound, "not_found");
         }
 
-        if (const auto error = co_await global::database->updateProject(project); error != Error::Ok) {
+        if (const auto res = co_await global::database->updateModel(project); !res) {
             logger.error("Failed to update project {} in database", project.getValueOfId());
             throw ApiException(Error::ErrInternal, "internal");
         }
@@ -378,7 +378,7 @@ namespace api::v1 {
 
         const auto project = co_await global::database->getUserProject(username, id);
         if (!project) {
-            throw ApiException(Error::ErrBadRequest, "not_found");
+            throw ApiException(Error::ErrNotFound, "not_found");
         }
 
         if (co_await global::storage->getProjectStatus(*project) == ProjectStatus::LOADING) {
@@ -460,9 +460,9 @@ namespace api::v1 {
 
     Task<> ProjectsController::getDeployment(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                              const std::string id) const {
-        const auto deployment(co_await global::database->getDeployment(id));
+        const auto deployment(co_await global::database->getModel<Deployment>(id));
         if (!deployment) {
-            throw ApiException(Error::ErrBadRequest, "not_found");
+            throw ApiException(Error::ErrNotFound, "not_found");
         }
         const auto project(co_await BaseProjectController::getUserProject(req, deployment->getValueOfProjectId()));
 
@@ -487,9 +487,9 @@ namespace api::v1 {
 
     Task<> ProjectsController::deleteDeployment(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                                 const std::string id) const {
-        const auto deployment(co_await global::database->getDeployment(id));
+        const auto deployment(co_await global::database->getModel<Deployment>(id));
         if (!deployment) {
-            throw ApiException(Error::ErrBadRequest, "not_found");
+            throw ApiException(Error::ErrNotFound, "not_found");
         }
 
         // Prevent deletion of loading deployments
@@ -556,7 +556,7 @@ namespace api::v1 {
         const auto res = co_await global::storage->addProjectIssue(resolved, parsedLevel, parsedType, parsedSubject, details, path);
 
         if (res == Error::ErrNotFound) {
-            throw ApiException(Error::ErrBadRequest, "not_found");
+            throw ApiException(Error::ErrNotFound, "not_found");
         }
 
         callback(statusResponse(res == Error::Ok ? k201Created : k409Conflict));

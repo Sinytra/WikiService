@@ -70,15 +70,6 @@ namespace service {
         });
     }
 
-    Task<Error> Database::updateProject(const Project &project) const {
-        const auto [res, err] = co_await handleDatabaseOperation<Error>([project](const DbClientPtr &client) -> Task<Error> {
-            CoroMapper<Project> mapper(client);
-            co_await mapper.update(project);
-            co_return Error::Ok;
-        });
-        co_return res.value_or(err);
-    }
-
     Task<Error> Database::removeProject(const std::string &id) const {
         const auto [res, err] = co_await handleDatabaseOperation<Error>([id](const DbClientPtr &client) -> Task<Error> {
             CoroMapper<Project> mapper(client);
@@ -270,15 +261,6 @@ namespace service {
             co_return Error::Ok;
         });
         co_return res.value_or(err);
-    }
-
-    Task<std::optional<User>> Database::getUser(const std::string username) const {
-        const auto [res, err] = co_await handleDatabaseOperation<User>([username](const DbClientPtr &client) -> Task<User> {
-            CoroMapper<User> mapper(client);
-            const auto result = co_await mapper.findByPrimaryKey(username);
-            co_return result;
-        });
-        co_return res;
     }
 
     Task<std::vector<Project>> Database::getUserProjects(std::string username) const {

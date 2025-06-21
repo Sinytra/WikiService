@@ -5,6 +5,7 @@ add_library(api STATIC
         docs.cc
         game.cc
         error.cc
+        moderation.cc
         projects.cc
         websocket.cc
         system.cc

@@ -87,6 +87,6 @@ namespace service {
         issue.setDetails(details);
         issue.setFile(file);
 
-        co_await global::database->addProjectIssue(issue);
+        co_await global::database->addModel(issue);
     }
 }

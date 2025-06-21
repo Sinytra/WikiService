@@ -260,6 +260,10 @@ namespace service {
         return false;
     }
 
+    std::string ResolvedProject::getLocale() const {
+        return locale_;
+    }
+
     bool ResolvedProject::hasLocale(const std::string &locale) const {
         const auto locales = getLocales();
         return locales.contains(locale);

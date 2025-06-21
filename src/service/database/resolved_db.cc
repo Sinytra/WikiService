@@ -200,7 +200,7 @@ namespace service {
                                        AND recipe.loc ILIKE '%' || $2 || '%' \
                                        ORDER BY recipe.loc";
 
-        co_return co_await handlePaginatedQuery<Recipe>(query, searchQuery, page, [](const Row &row) { return Recipe(row); });
+        co_return co_await handlePaginatedQuery<Recipe>(query, searchQuery, page);
     }
 
     Task<std::vector<ProjectContent>> ProjectDatabaseAccess::getProjectItemPages() const {

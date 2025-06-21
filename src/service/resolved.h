@@ -78,6 +78,7 @@ namespace service {
         void setDefaultVersion(const ResolvedProject &defaultVersion);
         bool setLocale(const std::optional<std::string> &locale);
 
+        std::string getLocale() const;
         bool hasLocale(const std::string &locale) const;
         std::set<std::string> getLocales() const;
 

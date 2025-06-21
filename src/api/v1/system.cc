@@ -10,8 +10,6 @@
 #include "service/auth.h"
 #include "service/system_data/system_data_import.h"
 
-#define ROLE_ADMIN "admin"
-
 using namespace std;
 using namespace drogon;
 using namespace service;
@@ -21,16 +19,8 @@ using namespace drogon::orm;
 using namespace drogon_model::postgres;
 
 namespace api::v1 {
-    Task<> ensurePrivilegedAccess(const HttpRequestPtr req) {
-        const auto session(co_await global::auth->getSession(req));
-
-        if (const auto role = session.user.getValueOfRole(); role != ROLE_ADMIN) {
-            throw ApiException(Error::ErrForbidden, "forbidden");
-        }
-    }
-
     Task<> SystemController::getSystemInformation(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
-        co_await ensurePrivilegedAccess(req);
+        co_await global::auth->ensurePrivilegedAccess(req);
 
         const auto imports{co_await global::database->getDataImports("", 1)};
         const auto latestImport = imports.size > 0 ? imports.data.front() : nlohmann::json{nullptr};
@@ -52,7 +42,7 @@ namespace api::v1 {
     }
 
     Task<> SystemController::getDataImports(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
-        co_await ensurePrivilegedAccess(req);
+        co_await global::auth->ensurePrivilegedAccess(req);
 
         const auto [query, page] = getTableQueryParams(req);
         const auto imports{co_await global::database->getDataImports(query, page)};
@@ -60,7 +50,7 @@ namespace api::v1 {
     }
 
     Task<> SystemController::importData(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
-        co_await ensurePrivilegedAccess(req);
+        co_await global::auth->ensurePrivilegedAccess(req);
 
         const auto json(req->getJsonObject());
         if (!json) {

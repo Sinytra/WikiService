@@ -82,6 +82,38 @@ namespace service {
 
     public:
         template<typename T>
+        drogon::Task<std::optional<T>> addModel(T entity) const {
+            const auto [res, err] =
+                co_await handleDatabaseOperation<T>([&entity](const drogon::orm::DbClientPtr &client) -> drogon::Task<T> {
+                    drogon::orm::CoroMapper<T> mapper(client);
+                    co_return co_await mapper.insert(entity);
+                });
+            co_return res;
+        }
+
+        template<typename T>
+        drogon::Task<std::optional<T>> updateModel(const T deployment) const {
+            const auto [res, err] =
+                co_await handleDatabaseOperation<T>([&deployment](const drogon::orm::DbClientPtr &client) -> drogon::Task<T> {
+                    drogon::orm::CoroMapper<T> mapper(client);
+                    if (const auto rows = co_await mapper.update(deployment); rows < 1) {
+                        throw drogon::orm::DrogonDbException();
+                    }
+                    co_return deployment;
+                });
+            co_return res;
+        }
+
+        template<typename T>
+        drogon::Task<std::optional<T>> getModel(typename drogon::orm::Mapper<T>::TraitsPKType id) const {
+            const auto [res, err] = co_await handleDatabaseOperation<T>([id](const drogon::orm::DbClientPtr &client) -> drogon::Task<T> {
+                drogon::orm::CoroMapper<T> mapper(client);
+                co_return co_await mapper.findByPrimaryKey(id);
+            });
+            co_return res;
+        }
+
+        template<typename T>
         drogon::Task<size_t> getTotalModelCount() const {
             const auto [res, err] =
                 co_await handleDatabaseOperation<size_t>([](const drogon::orm::DbClientPtr &client) -> drogon::Task<size_t> {

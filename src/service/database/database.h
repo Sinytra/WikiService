@@ -12,10 +12,12 @@
 
 #include <models/ProjectVersion.h>
 
+#include <service/project_issue.h>
 #include "models/DataImport.h"
 #include "models/Deployment.h"
 #include "models/ProjectIssue.h"
-#include <service/project_issue.h>
+
+#include "models/Report.h"
 
 using namespace drogon_model::postgres;
 
@@ -62,7 +64,6 @@ namespace service {
 
         drogon::Task<std::vector<std::string>> getProjectIDs() const;
         drogon::Task<std::tuple<std::optional<Project>, Error>> createProject(const Project &project) const;
-        drogon::Task<Error> updateProject(const Project &project) const;
         drogon::Task<Error> removeProject(const std::string &id) const;
         drogon::Task<std::tuple<std::optional<ProjectVersion>, Error>> createProjectVersion(ProjectVersion version) const;
         drogon::Task<std::optional<ProjectVersion>> getProjectVersion(std::string project, std::string name) const;
@@ -84,7 +85,6 @@ namespace service {
 
         drogon::Task<Error> linkUserModrinthAccount(std::string username, std::string mrAccountId) const;
         drogon::Task<Error> unlinkUserModrinthAccount(std::string username) const;
-        drogon::Task<std::optional<User>> getUser(std::string username) const;
         drogon::Task<std::vector<Project>> getUserProjects(std::string username) const;
         drogon::Task<std::optional<Project>> getUserProject(std::string username, std::string id) const;
         drogon::Task<Error> assignUserProject(std::string username, std::string id, std::string role) const;
@@ -106,22 +106,19 @@ namespace service {
         drogon::Task<PaginatedData<DataImport>> getDataImports(std::string searchQuery, int page) const;
 
         drogon::Task<PaginatedData<DeploymentData>> getDeployments(std::string projectId, int page) const;
-        drogon::Task<std::optional<Deployment>> getDeployment(std::string id) const;
         drogon::Task<std::optional<Deployment>> getActiveDeployment(std::string projectId) const;
         drogon::Task<std::optional<Deployment>> getLoadingDeployment(std::string projectId) const;
-        drogon::Task<std::optional<Deployment>> addDeployment(Deployment deployment) const;
-        drogon::Task<std::optional<Deployment>> updateDeployment(Deployment deployment) const;
         drogon::Task<Error> deactivateDeployments(std::string projectId) const;
         drogon::Task<Error> deleteDeployment(std::string id) const;
         drogon::Task<bool> hasFailingDeployment(std::string projectId) const;
         drogon::Task<Error> failLoadingDeployments() const;
 
-        drogon::Task<std::optional<ProjectIssue>> addProjectIssue(ProjectIssue issue) const;
         drogon::Task<std::optional<ProjectIssue>> getProjectIssue(std::string deploymentId, ProjectIssueLevel level,
                                                                   ProjectIssueType type, std::string path) const;
         drogon::Task<std::vector<ProjectIssue>> getDeploymentIssues(std::string deploymentId) const;
         drogon::Task<std::unordered_map<std::string, int64_t>> getActiveProjectIssueStats(std::string projectId) const;
 
+        drogon::Task<PaginatedData<Report>> getReports(int page) const;
     private:
         drogon::orm::DbClientPtr clientPtr_;
     };

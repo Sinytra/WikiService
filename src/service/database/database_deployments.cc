@@ -31,14 +31,6 @@ namespace service {
             projectId);
     }
 
-    Task<std::optional<Deployment>> Database::getDeployment(const std::string id) const {
-        const auto [res, err] = co_await handleDatabaseOperation<Deployment>([id](const DbClientPtr &client) -> Task<Deployment> {
-            CoroMapper<Deployment> mapper(client);
-            co_return co_await mapper.findByPrimaryKey(id);
-        });
-        co_return res;
-    }
-
     Task<std::optional<Deployment>> Database::getActiveDeployment(const std::string projectId) const {
         const auto [res, err] = co_await handleDatabaseOperation<Deployment>([projectId](const DbClientPtr &client) -> Task<Deployment> {
             CoroMapper<Deployment> mapper(client);
@@ -59,25 +51,6 @@ namespace service {
                 Criteria(Deployment::Cols::_project_id, CompareOperator::EQ, projectId) &&
                 Criteria(Deployment::Cols::_status, CompareOperator::In,
                          std::vector{enumToStr(DeploymentStatus::CREATED), enumToStr(DeploymentStatus::LOADING)}));
-        });
-        co_return res;
-    }
-
-    Task<std::optional<Deployment>> Database::addDeployment(const Deployment deployment) const {
-        const auto [res, err] = co_await handleDatabaseOperation<Deployment>([&deployment](const DbClientPtr &client) -> Task<Deployment> {
-            CoroMapper<Deployment> mapper(client);
-            co_return co_await mapper.insert(deployment);
-        });
-        co_return res;
-    }
-
-    Task<std::optional<Deployment>> Database::updateDeployment(const Deployment deployment) const {
-        const auto [res, err] = co_await handleDatabaseOperation<Deployment>([&deployment](const DbClientPtr &client) -> Task<Deployment> {
-            CoroMapper<Deployment> mapper(client);
-            if (const auto rows = co_await mapper.update(deployment); rows < 1) {
-                throw DrogonDbException();
-            }
-            co_return deployment;
         });
         co_return res;
     }

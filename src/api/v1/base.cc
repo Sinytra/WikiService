@@ -41,7 +41,7 @@ namespace api::v1 {
         const auto session{co_await global::auth->getSession(req)};
         const auto project{co_await global::database->getUserProject(session.username, id)};
         if (!project) {
-            throw ApiException(Error::ErrBadRequest, "not_found");
+            throw ApiException(Error::ErrNotFound, "not_found");
         }
         co_return *project;
     }
@@ -52,12 +52,12 @@ namespace api::v1 {
         const auto session{co_await global::auth->getSession(req)};
         const auto project{co_await global::database->getUserProject(session.username, id)};
         if (!project) {
-            throw ApiException(Error::ErrBadRequest, "not_found");
+            throw ApiException(Error::ErrNotFound, "not_found");
         }
 
         const auto [resolved, resErr](co_await global::storage->getProject(*project, version, locale));
         if (!resolved) {
-            throw ApiException(Error::ErrBadRequest, "not_found");
+            throw ApiException(Error::ErrNotFound, "not_found");
         }
 
         co_return *resolved;
