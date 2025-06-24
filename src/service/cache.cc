@@ -24,7 +24,11 @@ namespace service {
     Task<> MemoryCache::updateCache(std::string key, std::string value, std::chrono::duration<long> expire) const {
         const auto client = app().getFastRedisClient();
         const auto expireSeconds = std::chrono::seconds(expire).count();
-        co_await client->execCommandCoro("SET %s %s EX %ld", key.data(), value.data(), expireSeconds);
+        if (expireSeconds > 0) {
+            co_await client->execCommandCoro("SET %s %s EX %ld", key.data(), value.data(), expireSeconds);
+        } else {
+            co_await client->execCommandCoro("SET %s %s", key.data(), value.data());
+        }
     }
 
     Task<> MemoryCache::updateCacheHash(std::string key, std::unordered_map<std::string, std::string> values,

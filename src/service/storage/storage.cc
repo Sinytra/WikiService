@@ -397,6 +397,16 @@ namespace service {
         co_return {resolved, Error::Ok};
     }
 
+    // TODO Cache
+    Task<std::tuple<std::optional<ResolvedProject>, Error>>
+    Storage::getProject(const std::string projectId, const std::optional<std::string> &version, const std::optional<std::string> &locale) const {
+        const auto [proj, projErr] = co_await global::database->getProjectSource(projectId);
+        if (!proj) {
+            co_return {std::nullopt, Error::ErrNotFound};
+        }
+        co_return co_await getProject(*proj, version, locale);
+    }
+
     Task<std::tuple<std::optional<ResolvedProject>, Error>>
     Storage::getProject(const Project &project, const std::optional<std::string> &version, const std::optional<std::string> &locale) const {
         const auto [defaultProject, error] = co_await findProject(project, std::nullopt, locale);

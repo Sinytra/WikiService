@@ -3,13 +3,14 @@
 #include "api/v1/docs.h"
 #include "api/v1/game.h"
 #include "api/v1/projects.h"
-#include "api/v1/websocket.h"
 #include "api/v1/system.h"
+#include "api/v1/websocket.h"
 
 #include <service/cloudflare.h>
 #include <service/database/database.h>
-#include <service/storage/realtime.h>
 #include <service/github.h>
+#include <service/lang/lang.h>
+#include <service/storage/realtime.h>
 #include "config.h"
 #include "version.h"
 
@@ -18,6 +19,8 @@
 #include <log/log.h>
 
 #include "api/v1/moderation.h"
+#include "service/content/game_data.h"
+#include "service/lang/crowdin.h"
 
 using namespace std;
 using namespace drogon;
@@ -36,11 +39,14 @@ namespace global {
     std::shared_ptr<Storage> storage;
     std::shared_ptr<CloudFlare> cloudFlare;
     std::shared_ptr<Auth> auth;
+    std::shared_ptr<LangService> lang;
+    std::shared_ptr<GameDataService> gameData;
+    std::shared_ptr<Crowdin> crowdin;
 
     std::shared_ptr<Platforms> platforms;
 }
 
-void globalExceptionHandler(const std::exception& e, const HttpRequestPtr& req, std::function<void (const HttpResponsePtr &)>&& callback) {
+void globalExceptionHandler(const std::exception &e, const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&callback) {
     if (const auto cast = dynamic_cast<const ApiException *>(&e); cast != nullptr) {
         const auto resp = HttpResponse::newHttpJsonResponse(std::move(cast->data));
         resp->setStatusCode(api::v1::mapError(cast->error));
@@ -55,6 +61,8 @@ void globalExceptionHandler(const std::exception& e, const HttpRequestPtr& req, 
 
 Task<> runStartupTaks() {
     co_await global::database->failLoadingDeployments();
+    co_await global::gameData->setupGameData();
+    co_await global::crowdin->getAvailableLocales(); // TODO Reload in production
 }
 
 int main() {
@@ -66,7 +74,8 @@ int main() {
         app().setLogLevel(level).addListener("0.0.0.0", port).setThreadNum(16);
         configureLoggingLevel();
 
-        const auto [authConfig, githubAppConfig, mrApp, cloudFlareConfig, appUrl, curseForgeKey, storagePath] = config::configure();
+        const auto [authConfig, githubAppConfig, mrApp, cloudFlareConfig, crowdinConfig, appUrl, curseForgeKey, storagePath] =
+            config::configure();
 
         global::database = std::make_shared<Database>();
         global::cache = std::make_shared<MemoryCache>();
@@ -76,6 +85,9 @@ int main() {
         global::cloudFlare = std::make_shared<CloudFlare>(cloudFlareConfig);
         global::auth = std::make_shared<Auth>(appUrl, OAuthApp{githubAppConfig.clientId, githubAppConfig.clientSecret},
                                               OAuthApp{mrApp.clientId, mrApp.clientSecret});
+        global::lang = std::make_shared<LangService>();
+        global::gameData = std::make_shared<GameDataService>(storagePath);
+        global::crowdin = std::make_shared<Crowdin>(crowdinConfig);
         auto curseForge(CurseForgePlatform{curseForgeKey});
         auto modrinth(ModrinthPlatform{});
         global::platforms = std::make_shared<Platforms>(curseForge, modrinth);
@@ -101,6 +113,8 @@ int main() {
 
         cacheAwaiterThreadPool.start();
         git_libgit2_init();
+
+        content::loadRecipeTypes();
 
         app().getLoop()->queueInLoop(async_func([]() -> Task<> { co_await runStartupTaks(); }));
 

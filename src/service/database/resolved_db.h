@@ -13,7 +13,6 @@ namespace service {
         std::string id;
         std::string path;
     };
-
     struct ProjectTag {
         int64_t id;
         std::string loc;

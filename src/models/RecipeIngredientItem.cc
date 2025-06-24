@@ -25,7 +25,7 @@ const std::string RecipeIngredientItem::tableName = "\"recipe_ingredient_item\""
 const std::vector<typename RecipeIngredientItem::MetaData> RecipeIngredientItem::metaData_={
 {"recipe_id","int64_t","bigint",8,1,1,1},
 {"item_id","int64_t","bigint",8,0,1,1},
-{"slot","int32_t","integer",4,0,1,1},
+{"slot","std::string","character varying",255,0,1,1},
 {"count","int32_t","integer",4,0,0,1},
 {"input","bool","boolean",1,0,1,1}
 };
@@ -48,7 +48,7 @@ RecipeIngredientItem::RecipeIngredientItem(const Row &r, const ssize_t indexOffs
         }
         if(!r["slot"].isNull())
         {
-            slot_=std::make_shared<int32_t>(r["slot"].as<int32_t>());
+            slot_=std::make_shared<std::string>(r["slot"].as<std::string>());
         }
         if(!r["count"].isNull())
         {
@@ -81,7 +81,7 @@ RecipeIngredientItem::RecipeIngredientItem(const Row &r, const ssize_t indexOffs
         index = offset + 2;
         if(!r[index].isNull())
         {
-            slot_=std::make_shared<int32_t>(r[index].as<int32_t>());
+            slot_=std::make_shared<std::string>(r[index].as<std::string>());
         }
         index = offset + 3;
         if(!r[index].isNull())
@@ -125,7 +125,7 @@ RecipeIngredientItem::RecipeIngredientItem(const Json::Value &pJson, const std::
         dirtyFlag_[2] = true;
         if(!pJson[pMasqueradingVector[2]].isNull())
         {
-            slot_=std::make_shared<int32_t>((int32_t)pJson[pMasqueradingVector[2]].asInt64());
+            slot_=std::make_shared<std::string>(pJson[pMasqueradingVector[2]].asString());
         }
     }
     if(!pMasqueradingVector[3].empty() && pJson.isMember(pMasqueradingVector[3]))
@@ -169,7 +169,7 @@ RecipeIngredientItem::RecipeIngredientItem(const Json::Value &pJson) noexcept(fa
         dirtyFlag_[2]=true;
         if(!pJson["slot"].isNull())
         {
-            slot_=std::make_shared<int32_t>((int32_t)pJson["slot"].asInt64());
+            slot_=std::make_shared<std::string>(pJson["slot"].asString());
         }
     }
     if(pJson.isMember("count"))
@@ -216,7 +216,7 @@ void RecipeIngredientItem::updateByMasqueradedJson(const Json::Value &pJson,
     {
         if(!pJson[pMasqueradingVector[2]].isNull())
         {
-            slot_=std::make_shared<int32_t>((int32_t)pJson[pMasqueradingVector[2]].asInt64());
+            slot_=std::make_shared<std::string>(pJson[pMasqueradingVector[2]].asString());
         }
     }
     if(!pMasqueradingVector[3].empty() && pJson.isMember(pMasqueradingVector[3]))
@@ -256,7 +256,7 @@ void RecipeIngredientItem::updateByJson(const Json::Value &pJson) noexcept(false
     {
         if(!pJson["slot"].isNull())
         {
-            slot_=std::make_shared<int32_t>((int32_t)pJson["slot"].asInt64());
+            slot_=std::make_shared<std::string>(pJson["slot"].asString());
         }
     }
     if(pJson.isMember("count"))
@@ -310,20 +310,25 @@ void RecipeIngredientItem::setItemId(const int64_t &pItemId) noexcept
     dirtyFlag_[1] = true;
 }
 
-const int32_t &RecipeIngredientItem::getValueOfSlot() const noexcept
+const std::string &RecipeIngredientItem::getValueOfSlot() const noexcept
 {
-    static const int32_t defaultValue = int32_t();
+    static const std::string defaultValue = std::string();
     if(slot_)
         return *slot_;
     return defaultValue;
 }
-const std::shared_ptr<int32_t> &RecipeIngredientItem::getSlot() const noexcept
+const std::shared_ptr<std::string> &RecipeIngredientItem::getSlot() const noexcept
 {
     return slot_;
 }
-void RecipeIngredientItem::setSlot(const int32_t &pSlot) noexcept
+void RecipeIngredientItem::setSlot(const std::string &pSlot) noexcept
 {
-    slot_ = std::make_shared<int32_t>(pSlot);
+    slot_ = std::make_shared<std::string>(pSlot);
+    dirtyFlag_[2] = true;
+}
+void RecipeIngredientItem::setSlot(std::string &&pSlot) noexcept
+{
+    slot_ = std::make_shared<std::string>(std::move(pSlot));
     dirtyFlag_[2] = true;
 }
 
@@ -932,11 +937,19 @@ bool RecipeIngredientItem::validJsonOfField(size_t index,
                 err="The " + fieldName + " column cannot be null";
                 return false;
             }
-            if(!pJson.isInt())
+            if(!pJson.isString())
             {
                 err="Type error in the "+fieldName+" field";
                 return false;
             }
+            if(pJson.isString() && std::strlen(pJson.asCString()) > 255)
+            {
+                err="String length exceeds limit for the " +
+                    fieldName +
+                    " field (the maximum value is 255)";
+                return false;
+            }
+
             break;
         case 3:
             if(pJson.isNull())

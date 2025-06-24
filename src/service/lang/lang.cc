@@ -1,0 +1,75 @@
+#include "lang.h"
+
+#include <chrono>
+#include "content/game_data.h"
+#include "util.h"
+
+using namespace drogon;
+using namespace std::chrono;
+using namespace std::chrono_literals;
+
+namespace service {
+    const static std::unordered_map<std::string, std::string> mojangLanguages = {
+        {"ms_arab", "zlm_arab"}
+    };
+
+    LangService::LangService() {}
+
+    Task<std::string> LangService::getItemName(const std::optional<std::string> lang, const std::string location) {
+        const std::string mcLang = lang && mojangLanguages.contains(*lang) ? mojangLanguages.at(*lang) : lang.value_or("en_us");
+
+        if (const auto err = co_await loadItemLanguageKeys(mcLang); err != Error::Ok) {
+            if (err == Error::ErrNotFound) {
+                co_return co_await getItemName(std::nullopt, location);
+            }
+            co_return "";
+        }
+
+        const auto loc = ResourceLocation::parse(location);
+        if (!loc || loc->namespace_ != ResourceLocation::DEFAULT_NAMESPACE) {
+            co_return "";
+        }
+
+        const auto langCacheKey = std::format("lang:{}:minecraft:{}", mcLang, loc->path_);
+        const auto cached = co_await global::cache->getFromCache(langCacheKey);
+
+        co_return cached.value_or("");
+    }
+
+    Task<Error> LangService::loadItemLanguageKeys(const std::string lang) {
+        const auto cacheKey = "lang:" + lang;
+        static const auto itemKeyBase = "item.minecraft.";
+
+        if (const auto cached = co_await global::cache->getFromCache(cacheKey)) {
+            co_return Error::Ok;
+        }
+
+        if (const auto pending = co_await getOrStartTask<Error>(cacheKey)) {
+            co_return co_await patientlyAwaitTaskResult(*pending);
+        }
+
+        try {
+            const auto langFile = global::gameData->getLang(lang);
+            if (!langFile) {
+                co_return co_await completeTask<Error>(cacheKey, Error::ErrNotFound);
+            }
+
+            for (const auto &[key, val]: langFile->items()) {
+                if (key.starts_with(itemKeyBase)) {
+                    if (const auto subKey = key.substr(strlen(itemKeyBase)); subKey.find(".") == std::string::npos) {
+                        const auto langCacheKey = std::format("lang:{}:minecraft:{}", lang, subKey);
+                        co_await global::cache->updateCache(langCacheKey, val.get<std::string>(), 0s);
+                    }
+                }
+            }
+
+            co_await global::cache->updateCache(cacheKey, "_", 0s);
+
+            co_return co_await completeTask<Error>(cacheKey, Error::Ok);
+        } catch (std::exception e) {
+            logging::logger.error("Error loading langues keys for {}: {}", lang, e.what());
+        }
+
+        co_return co_await completeTask<Error>(cacheKey, Error::ErrInternal);
+    }
+}

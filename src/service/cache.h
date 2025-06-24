@@ -88,7 +88,7 @@ namespace service {
         }
 
         template<class T>
-        drogon::Task<T> completeTask(const std::string &key, T &&value) {
+        drogon::Task<T> completeTask(const std::string &key, T value) {
             if (!pendingTasks_.contains(key)) {
                 throw std::invalid_argument("No task for key " + key);
             }

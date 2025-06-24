@@ -3,10 +3,11 @@
 
 #include <log/log.h>
 #include <models/Project.h>
-#include <service/util.h>
 #include <service/serializers.h>
+#include <service/util.h>
 #include <version.h>
 
+#include "lang/crowdin.h"
 #include "service/auth.h"
 #include "service/system_data/system_data_import.h"
 
@@ -19,6 +20,11 @@ using namespace drogon::orm;
 using namespace drogon_model::postgres;
 
 namespace api::v1 {
+    Task<> SystemController::getLocales(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
+        const auto locales = co_await global::crowdin->getAvailableLocales();
+        callback(jsonResponse(locales));
+    }
+
     Task<> SystemController::getSystemInformation(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
         co_await global::auth->ensurePrivilegedAccess(req);
 

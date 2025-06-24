@@ -115,14 +115,29 @@ std::optional<ModRecipe> readShapelessCraftingRecipe(const std::string &id, cons
     return recipe;
 }
 
-std::unordered_map<std::string, RecipeType> recipeTypes{
-    {"minecraft:crafting_shaped", {recipe_type::builtin::shapedCrafting, readShapedCraftingRecipe}},
-    {"minecraft:crafting_shapeless", {recipe_type::builtin::shapedCrafting, readShapelessCraftingRecipe}}};
+RecipeType loadRecipeType(const nlohmann::json &json, const RecipeProcessor &processor) {
+    if (const auto error = validateJson(schemas::gameRecipeType, json)) {
+        logging::logger.error("Invalid recipe type format.");
+        logging::logger.error(error->format());
+        throw std::runtime_error("Failed to load recipe type");
+    }
+    const content::GameRecipeType gameRecipeType = json;
+    return { .displaySchema = json, .processor = processor };
+}
 
 namespace content {
-    std::optional<Json::Value> getRecipeType(const std::string &type) {
+    std::unordered_map<std::string, RecipeType> recipeTypes;
+
+    void loadRecipeTypes() {
+        recipeTypes = {
+            {"minecraft:crafting_shaped", loadRecipeType(recipe_type::builtin::shapedCrafting, readShapedCraftingRecipe)},
+            {"minecraft:crafting_shapeless", loadRecipeType(recipe_type::builtin::shapedCrafting, readShapelessCraftingRecipe)}
+        };
+    }
+
+    std::optional<GameRecipeType> getRecipeType(const std::string &type) {
         if (const auto knownType = recipeTypes.find(type); knownType != recipeTypes.end()) {
-            return unparkourJson(knownType->second.displaySchema);
+            return knownType->second.displaySchema;
         }
         return std::nullopt;
     }

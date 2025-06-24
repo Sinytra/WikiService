@@ -45,6 +45,10 @@
       "error_callback_url": "",
       "token_secret": ""
     },
+    "crowdin": {
+      "project_id": "",
+      "token": ""
+    },
     "github_app": {
       "client_id": "",
       "client_secret": ""

@@ -62,6 +62,7 @@ namespace service {
         co_return res.value_or(err);
     }
 
+    // TODO How does this differ from getProjectTagItemsFlat? ptag.version_id = $2 makes it do the same
     Task<std::vector<Item>> ProjectDatabaseAccess::getTagItemsFlat(const int64_t tag) const {
         // language=postgresql
         static constexpr auto query = "SELECT item.* FROM tag_item_flat \

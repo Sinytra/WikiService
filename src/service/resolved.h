@@ -3,10 +3,9 @@
 #include <models/Item.h>
 #include <models/Project.h>
 #include <models/ProjectVersion.h>
-#include <models/RecipeIngredientItem.h>
-#include <models/RecipeIngredientTag.h>
 #include <nlohmann/json_fwd.hpp>
 #include "cache.h"
+#include "content/game_recipes.h"
 #include "database/database.h"
 #include "error.h"
 #include "util.h"
@@ -58,11 +57,10 @@ namespace service {
 
     struct FullRecipeData {
         std::string id;
-        std::string type;
         nlohmann::json data;
 
         friend void to_json(nlohmann::json &j, const FullRecipeData &obj) {
-            j = nlohmann::json{{"id", obj.id}, {"type", obj.type}, {"data", obj.data}};
+            j = nlohmann::json{{"id", obj.id}, {"data", obj.data}};
         }
     };
 
@@ -96,7 +94,7 @@ namespace service {
         drogon::Task<std::tuple<std::optional<nlohmann::ordered_json>, Error>> getProjectContents() const;
 
         std::optional<std::filesystem::path> getAsset(const ResourceLocation &location) const;
-        drogon::Task<std::optional<Json::Value>> getRecipe(std::string id) const;
+        drogon::Task<std::optional<content::ResolvedGameRecipe>> getRecipe(std::string id) const;
 
         std::tuple<std::optional<nlohmann::json>, ProjectError, std::string> validateProjectMetadata() const;
 
@@ -122,9 +120,6 @@ namespace service {
         drogon::Task<ItemData> getItemName(std::string loc) const;
 
     private:
-        drogon::Task<Json::Value> ingredientToJson(int slot, std::vector<RecipeIngredientItem> ingredients) const;
-        drogon::Task<Json::Value> ingredientToJson(const RecipeIngredientTag &tag) const;
-
         Project project_;
         std::shared_ptr<ResolvedProject> defaultVersion_;
 

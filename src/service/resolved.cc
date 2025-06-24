@@ -15,7 +15,6 @@
 #include <include/uri.h>
 #include <models/Item.h>
 #include <models/ProjectItem.h>
-#include <models/Tag.h>
 
 #define DOCS_META_FILE "sinytra-wiki.json"
 #define FOLDER_META_FILE "_meta.json"
@@ -193,25 +192,6 @@ Task<> addPageIDs(const std::unordered_map<std::string, std::string> &ids, nlohm
         }
         ++it;
     }
-}
-
-Task<Json::Value> appendItemSources(const int64_t item) {
-    const auto items = co_await global::database->getItemSourceProjects(item);
-    Json::Value root(Json::arrayValue);
-    for (const auto &res: items) {
-        root.append(res);
-    }
-    co_return root;
-}
-
-std::map<int, std::vector<RecipeIngredientItem>> groupIngredients(const std::vector<RecipeIngredientItem> &ingredients, const bool input) {
-    std::map<int, std::vector<RecipeIngredientItem>> slots;
-    for (auto &ingredient: ingredients) {
-        if (ingredient.getValueOfInput() == input) {
-            slots[ingredient.getValueOfSlot()].emplace_back(ingredient);
-        }
-    }
-    return slots;
 }
 
 namespace service {
@@ -585,8 +565,8 @@ namespace service {
         const auto [pages, total, size, data] = co_await projectDb_->getProjectRecipesDev(params.query, params.page);
         std::vector<FullRecipeData> recipeDate;
         for (const auto &recipe: data) {
-            const auto resolved = co_await getRecipe(recipe.getValueOfLoc());
-            recipeDate.emplace_back(recipe.getValueOfLoc(), recipe.getValueOfType(), resolved ? parkourJson(*resolved) : nlohmann::json{});
+            const auto resolved = co_await content::resolveRecipe(recipe, std::nullopt, std::nullopt); // TODO
+            recipeDate.emplace_back(recipe.getValueOfLoc(), resolved ? nlohmann::json(*resolved) : nlohmann::json{});
         }
         co_return PaginatedData{.total = total, .pages = pages, .size = size, .data = recipeDate};
     }
@@ -611,100 +591,11 @@ namespace service {
         co_return ItemData{.name = localized.value_or(""), .path = ""};
     }
 
-    Task<Json::Value> ResolvedProject::ingredientToJson(const int slot, const std::vector<RecipeIngredientItem> ingredients) const {
-        Json::Value root;
-        root["slot"] = slot;
-        Json::Value itemsJson(Json::arrayValue);
-        for (const auto &ingredient: ingredients) {
-            const auto item = co_await global::database->getByPrimaryKey<Item>(ingredient.getValueOfItemId());
-            const auto [name, path] = co_await getItemName(item);
-
-            Json::Value itemJson;
-            itemJson["id"] = item.getValueOfLoc();
-            if (!name.empty()) {
-                itemJson["name"] = name;
-            }
-            itemJson["has_page"] = !path.empty();
-            itemJson["count"] = ingredient.getValueOfCount();
-            itemJson["sources"] = co_await appendItemSources(ingredient.getValueOfItemId());
-            itemsJson.append(itemJson);
-        }
-        root["items"] = itemsJson;
-        co_return root;
-    }
-
-    Task<Json::Value> ResolvedProject::ingredientToJson(const RecipeIngredientTag &tag) const {
-        const auto dbTag = co_await global::database->getByPrimaryKey<Tag>(tag.getValueOfTagId());
-
-        Json::Value root;
-        {
-            Json::Value tagJson;
-            tagJson["id"] = dbTag.getValueOfLoc();
-            {
-                Json::Value itemsJson(Json::arrayValue);
-                for (const auto tagItems = co_await projectDb_->getTagItemsFlat(tag.getValueOfTagId()); const auto &item: tagItems) {
-                    const auto [name, path] = co_await getItemName(item);
-
-                    Json::Value itemJson;
-                    itemJson["id"] = item.getValueOfLoc();
-                    if (!name.empty()) {
-                        itemJson["name"] = name;
-                    }
-                    itemJson["has_page"] = !path.empty();
-                    itemJson["sources"] = co_await appendItemSources(item.getValueOfId());
-                    itemsJson.append(itemJson);
-                }
-                tagJson["items"] = itemsJson;
-            }
-            root["tag"] = tagJson;
-        }
-        root["count"] = tag.getValueOfCount();
-        root["slot"] = tag.getValueOfSlot();
-        co_return root;
-    }
-
-    Task<std::optional<Json::Value>> ResolvedProject::getRecipe(std::string id) const {
-        const auto result = co_await projectDb_->getProjectRecipe(id);
-        if (!result) {
+    Task<std::optional<content::ResolvedGameRecipe>> ResolvedProject::getRecipe(const std::string id) const {
+        const auto recipe = co_await projectDb_->getProjectRecipe(id);
+        if (!recipe) {
             co_return std::nullopt;
         }
-        const auto type = result->getValueOfType();
-        const auto displaySchema = content::getRecipeType(type);
-        if (!displaySchema) {
-            co_return std::nullopt;
-        }
-
-        const auto itemIngredients =
-            co_await global::database->getRelated<RecipeIngredientItem>(RecipeIngredientItem::Cols::_recipe_id, result->getValueOfId());
-        const auto tagIngredients =
-            co_await global::database->getRelated<RecipeIngredientTag>(RecipeIngredientTag::Cols::_recipe_id, result->getValueOfId());
-
-        Json::Value json;
-        json["id"] = result->getValueOfLoc();
-        json["type"] = *displaySchema;
-        json["type"]["id"] = type;
-        {
-            Json::Value inputs;
-            Json::Value outputs;
-            std::map<int, std::vector<RecipeIngredientItem>> itemInputSlots = groupIngredients(itemIngredients, true);
-            std::map<int, std::vector<RecipeIngredientItem>> itemOutputSlots = groupIngredients(itemIngredients, false);
-
-            for (const auto &[slot, items]: itemInputSlots) {
-                const auto itemJson = co_await ingredientToJson(slot, items);
-                inputs.append(itemJson);
-            }
-            for (const auto &tag: tagIngredients) {
-                const auto tagJson = co_await ingredientToJson(tag);
-                inputs.append(tagJson);
-            }
-            for (const auto &[slot, items]: itemOutputSlots) {
-                const auto itemJson = co_await ingredientToJson(slot, items);
-                outputs.append(itemJson);
-            }
-            json["inputs"] = inputs;
-            json["outputs"] = outputs;
-        }
-
-        co_return json;
+        co_return co_await content::resolveRecipe(*recipe, std::nullopt, std::nullopt); // TODO
     }
 }

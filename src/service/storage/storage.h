@@ -19,6 +19,9 @@ namespace service {
         explicit Storage(const std::string &);
 
         drogon::Task<std::tuple<std::optional<ResolvedProject>, Error>>
+        getProject(std::string projectId, const std::optional<std::string> &version, const std::optional<std::string> &locale) const;
+
+        drogon::Task<std::tuple<std::optional<ResolvedProject>, Error>>
         getProject(const Project &project, const std::optional<std::string> &version, const std::optional<std::string> &locale) const;
 
         drogon::Task<Error> invalidateProject(const Project &project) const;

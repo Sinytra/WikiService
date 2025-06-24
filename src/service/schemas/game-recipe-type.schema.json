@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Sinytra Wiki Game Recipe Type",
+  "description": "Describes the visual preview layout of a recipe",
+  "type": "object",
+  "properties": {
+    "background": {
+      "type": "string"
+    },
+    "inputSlots": {
+      "$ref": "#/definitions/slots"
+    },
+    "outputSlots": {
+      "$ref": "#/definitions/slots"
+    }
+  },
+  "definitions": {
+    "slots": {
+      "title": "slots",
+      "description": "Recipe ingredient slot mapping.",
+      "type": "object",
+      "patternProperties": {
+        "^.{1,255}$": {
+          "type": "object",
+          "properties": {
+            "x": {
+              "type": "integer"
+            },
+            "y": {
+              "type": "integer"
+            }
+          },
+          "required": ["x", "y"]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "background",
+    "inputSlots",
+    "outputSlots"
+  ]
+}

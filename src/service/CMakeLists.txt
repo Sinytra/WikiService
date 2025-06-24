@@ -10,6 +10,7 @@ read_and_escape_schema("schemas/config.schema.json" SYSTEM_CONFIG_SCHEMA)
 read_and_escape_schema("schemas/game-recipe.schema.json" GAME_RECIPE_SCHEMA)
 read_and_escape_schema("schemas/game-tag.schema.json" GAME_TAG_SCHEMA)
 read_and_escape_schema("schemas/game-data.schema.json" GAME_DATA_EXPORT_SCHEMA)
+read_and_escape_schema("schemas/game-recipe-type.schema.json" GAME_RECIPE_TYPE_SCHEMA)
 
 read_and_escape_schema("../../builtin/minecraft/recipe_type/crafting_shaped.json" SHAPED_CRAFTING)
 
@@ -26,6 +27,8 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/content/builtin_recipe_type.h.in
 
 add_library(service STATIC
         content/game_content.cc
+        content/game_data.cc
+        content/game_recipes.cc
         content/ingestor_content_paths.cc
         content/ingestor_tags.cc
         content/ingestor_recipes.cc
@@ -36,6 +39,8 @@ add_library(service STATIC
         database/database_issues.cc
         database/database_reports.cc
         database/resolved_db.cc
+        lang/crowdin.cc
+        lang/lang.cc
         storage/storage.cc
         storage/gitops.cc
         storage/realtime.cc
@@ -62,6 +67,7 @@ target_link_libraries(service PRIVATE
         libgit2
         libgit2package
         OpenSSL::Crypto
+        libzip::zip
 )
 
 target_include_directories(service PUBLIC

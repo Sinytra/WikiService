@@ -110,6 +110,9 @@ std::optional<Json::Value> parseJsonString(const std::string &str) {
 }
 
 std::optional<nlohmann::json> parseJsonFile(const std::filesystem::path &path) {
+    if (!exists(path)) {
+        return std::nullopt;
+    }
     std::ifstream ifs(path);
     try {
         nlohmann::json jf = nlohmann::json::parse(ifs);

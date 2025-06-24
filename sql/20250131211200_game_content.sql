@@ -1,9 +1,9 @@
 CREATE TABLE project_version
 (
-    id bigserial PRIMARY KEY,
-    project_id text NOT NULL REFERENCES project (id) ON DELETE CASCADE,
-    name varchar(255),
-    branch varchar(255) NOT NULL,
+    id         bigserial PRIMARY KEY,
+    project_id text         NOT NULL REFERENCES project (id) ON DELETE CASCADE,
+    name       varchar(255),
+    branch     varchar(255) NOT NULL,
 --    game_version varchar(255) NOT NULL
 
     UNIQUE (project_id, name, branch)
@@ -32,8 +32,8 @@ CREATE UNIQUE INDEX unique_item_no_project
 
 CREATE TABLE project_item_page
 (
-    item_id   bigint NOT NULL REFERENCES project_item (id) ON DELETE CASCADE,
-    path text NOT NULL
+    item_id bigint NOT NULL REFERENCES project_item (id) ON DELETE CASCADE,
+    path    text   NOT NULL
 );
 
 CREATE TABLE tag
@@ -109,8 +109,8 @@ CREATE TABLE recipe
 (
     id         bigserial PRIMARY KEY,
     version_id bigint REFERENCES project_version (id) ON DELETE CASCADE,
-    loc        varchar(255)                                   NOT NULL,
-    type       varchar(255)                                   NOT NULL,
+    loc        varchar(255) NOT NULL,
+    type       varchar(255) NOT NULL,
 
     UNIQUE (version_id, loc)
 );
@@ -121,22 +121,22 @@ CREATE UNIQUE INDEX unique_recipe_no_project
 
 CREATE TABLE recipe_ingredient_tag
 (
-    recipe_id bigserial NOT NULL REFERENCES recipe (id) ON DELETE CASCADE,
-    tag_id    bigint NOT NULL REFERENCES tag (id) ON DELETE CASCADE,
-    slot      int  NOT NULL,
-    count     int  NOT NULL,
-    input     bool NOT NULL,
+    recipe_id bigserial    NOT NULL REFERENCES recipe (id) ON DELETE CASCADE,
+    tag_id    bigint       NOT NULL REFERENCES tag (id) ON DELETE CASCADE,
+    slot      varchar(255) NOT NULL,
+    count     int          NOT NULL,
+    input     bool         NOT NULL,
 
     PRIMARY KEY (recipe_id, tag_id, slot, input)
 );
 
 CREATE TABLE recipe_ingredient_item
 (
-    recipe_id bigserial NOT NULL REFERENCES recipe (id) ON DELETE CASCADE,
-    item_id   bigint NOT NULL REFERENCES item (id) ON DELETE CASCADE,
-    slot      int  not null,
-    count     int  not null,
-    input     bool not null,
+    recipe_id bigserial    NOT NULL REFERENCES recipe (id) ON DELETE CASCADE,
+    item_id   bigint       NOT NULL REFERENCES item (id) ON DELETE CASCADE,
+    slot      varchar(255) not null,
+    count     int          not null,
+    input     bool         not null,
 
     PRIMARY KEY (recipe_id, item_id, slot, input)
 );

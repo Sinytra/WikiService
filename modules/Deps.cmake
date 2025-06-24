@@ -71,3 +71,14 @@ CPMAddPackage(
         "BUILD_TESTS OFF"
         "BUILD_SHARED_LIBS OFF"
 )
+
+CPMAddPackage(
+        NAME lizip
+        GITHUB_REPOSITORY nih-at/libzip
+        GIT_TAG v1.11.4
+        OPTIONS
+        "BUILD_DOC OFF"
+        "BUILD_EXAMPLES OFF"
+        "BUILD_TOOLS OFF"
+        "BUILD_SHARED_LIBS OFF"
+)

@@ -27,6 +27,14 @@ namespace service {
         int total;
         std::vector<Project> data;
     };
+    struct GlobalItem {
+        int64_t version_id;
+        std::string version_name;
+        std::string project_id;
+        std::string loc;
+
+        NLOHMANN_DEFINE_TYPE_INTRUSIVE(GlobalItem, project_id, loc, version_id, version_name)
+    };
     struct ContentUsage {
         int64_t id;
         std::string loc;
@@ -49,7 +57,7 @@ namespace service {
                                {"commit_hash", d.commit_hash},
                                {"commit_message", d.commit_message},
                                {"status", d.status},
-                               {"user_id", d.user_id.empty() ? nullptr : d.user_id},
+                               {"user_id", d.user_id.empty() ? nlohmann::json(nullptr) : nlohmann::json(d.user_id)},
                                {"created_at", d.created_at},
                                {"current", d.current}};
         }
@@ -98,7 +106,7 @@ namespace service {
         drogon::Task<Error> addRecipeIngredientTag(int64_t recipe_id, std::string tag, int slot, int count, bool input) const;
 
         drogon::Task<std::vector<std::string>> getItemSourceProjects(int64_t item) const;
-
+        drogon::Task<std::vector<GlobalItem>> getGlobalTagItems(int64_t tagId) const;
         drogon::Task<std::vector<Recipe>> getItemUsageInRecipes(std::string item) const;
         drogon::Task<std::vector<ContentUsage>> getObtainableItemsBy(std::string item) const;
 

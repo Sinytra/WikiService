@@ -24,12 +24,7 @@ namespace api::v1 {
             throw ApiException(Error::ErrBadRequest, "Missing project parameter");
         }
 
-        const auto [proj, projErr] = co_await global::database->getProjectSource(project);
-        if (!proj) {
-            throw ApiException(projErr, "Project not found");
-        }
-
-        const auto [resolved, resErr](co_await global::storage->getProject(*proj, version, locale));
+        const auto [resolved, resErr](co_await global::storage->getProject(project, version, locale));
         if (!resolved) {
             throw ApiException(resErr, "Resolution failure");
         }

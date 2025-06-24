@@ -19,6 +19,9 @@ endif ()
 
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+# libzip build fix
+check_include_files(stdbool.h HAVE_STDBOOL_H)
+add_compile_definitions(HAVE_STDBOOL_H)
 
 add_executable(${PROJECT_NAME}
         config.cc
@@ -44,6 +47,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
         libgit2
         libgit2package
         OpenSSL::Crypto
+        libzip::zip
 )
 
 # ##############################################################################
