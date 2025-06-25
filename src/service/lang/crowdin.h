@@ -20,6 +20,7 @@ namespace service {
         explicit Crowdin(const config::Crowdin &);
 
         drogon::Task<std::vector<Locale>> getAvailableLocales();
+        drogon::Task<bool> hasLocaleKey(std::string locale);
         drogon::Task<> reloadAvailableLocales();
     private:
         drogon::Task<std::vector<Locale>> computeLanguages() const;

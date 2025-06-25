@@ -2,6 +2,8 @@
 
 #include <auth.h>
 
+#include "lang/lang.h"
+
 using namespace drogon;
 using namespace service;
 
@@ -10,7 +12,8 @@ namespace api::v1 {
     BaseProjectController::getProjectWithParams(const HttpRequestPtr req, const std::string project) {
         const auto version = req->getOptionalParameter<std::string>("version");
         const auto locale = req->getOptionalParameter<std::string>("locale");
-        co_return co_await getProject(project, version, locale);
+        const auto validatedLocale = co_await validateLocale(locale);
+        co_return co_await getProject(project, version, validatedLocale);
     }
 
     Task<ResolvedProject> BaseProjectController::getVersionedProject(const HttpRequestPtr req, const std::string project) {

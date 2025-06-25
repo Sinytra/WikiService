@@ -8,6 +8,7 @@
 #include <version.h>
 
 #include "lang/crowdin.h"
+#include "lang/lang.h"
 #include "service/auth.h"
 #include "service/system_data/system_data_import.h"
 
@@ -21,7 +22,9 @@ using namespace drogon_model::postgres;
 
 namespace api::v1 {
     Task<> SystemController::getLocales(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
-        const auto locales = co_await global::crowdin->getAvailableLocales();
+        auto locales = co_await global::crowdin->getAvailableLocales();
+        std::ranges::sort(locales, [](const Locale &a, const Locale &b) { return a.id < b.id; });
+        locales.insert(locales.begin(), {"en", "English", DEFAULT_LOCALE});
         callback(jsonResponse(locales));
     }
 

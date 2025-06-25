@@ -533,8 +533,7 @@ namespace api::v1 {
             throw ApiException(Error::ErrBadRequest, error->msg);
         }
 
-        const auto resolved(co_await BaseProjectController::getProject(id, req->getOptionalParameter<std::string>("version"),
-                                                                       req->getOptionalParameter<std::string>("locale")));
+        const auto resolved(co_await BaseProjectController::getProjectWithParams(req, id));
 
         const auto parsedLevel = parseProjectIssueLevel((*json)["level"].asString());
         if (parsedLevel == ProjectIssueLevel::UNKNOWN) {

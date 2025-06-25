@@ -1,5 +1,6 @@
 #include "resolved.h"
 
+#include <service/lang/lang.h>
 #include <service/database/database.h>
 #include <service/database/resolved_db.h>
 #include <service/storage/gitops.h>
@@ -20,7 +21,6 @@
 #define FOLDER_META_FILE "_meta.json"
 #define I18N_DIR_PATH ".translated"
 #define NO_ICON "_none"
-#define DEFAULT_LOCALE "en_en"
 
 using namespace logging;
 using namespace drogon;
@@ -232,16 +232,12 @@ namespace service {
         defaultVersion_ = std::make_shared<ResolvedProject>(defaultVersion);
     }
 
-    bool ResolvedProject::setLocale(const std::optional<std::string> &locale) {
-        if (!locale || hasLocale(*locale)) {
-            locale_ = locale.value_or("");
-            return true;
-        }
-        return false;
+    void ResolvedProject::setLocale(const std::optional<std::string> &locale) {
+        locale_ = locale.value_or("");
     }
 
     std::string ResolvedProject::getLocale() const {
-        return locale_;
+        return locale_.empty() ? DEFAULT_LOCALE : locale_;
     }
 
     bool ResolvedProject::hasLocale(const std::string &locale) const {
@@ -357,9 +353,8 @@ namespace service {
         return std::nullopt;
     }
 
-    std::optional<std::string> ResolvedProject::readLangKey(const std::string &locale, const std::string &key) const {
-        // TODO use namespace instead of project id
-        const auto path = docsDir_ / ".assets" / project_.getValueOfId() / "lang" / (locale + ".json");
+    std::optional<std::string> ResolvedProject::readLangKey(const std::string &key) const {
+        const auto path = docsDir_ / ".assets" / project_.getValueOfModid() / "lang" / (getLocale() + ".json");
         const auto json = parseJsonFile(path);
         if (!json || !json->is_object() || !json->contains(key)) {
             return std::nullopt;
@@ -586,8 +581,7 @@ namespace service {
 
         const auto projectId = project_.getValueOfId();
         const auto parsed = ResourceLocation::parse(loc);
-        const auto localeKey = locale_.empty() ? DEFAULT_LOCALE : locale_;
-        const auto localized = readLangKey(localeKey, "item." + projectId + "." + parsed->path_);
+        const auto localized = readLangKey("item." + projectId + "." + parsed->path_);
 
         co_return ItemData{.name = localized.value_or(""), .path = ""};
     }

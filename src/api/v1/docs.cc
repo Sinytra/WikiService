@@ -37,8 +37,7 @@ namespace api::v1 {
                 throw ApiException(Error::ErrBadRequest, "Missing path parameter");
             }
 
-            const auto resolved = co_await BaseProjectController::getProject(project, req->getOptionalParameter<std::string>("version"),
-                                                                             req->getOptionalParameter<std::string>("locale"));
+            const auto resolved = co_await BaseProjectController::getProjectWithParams(req, project);
 
             const auto [page, pageError](resolved.readFile(path + DOCS_FILE_EXT));
             if (pageError != Error::Ok) {
@@ -67,8 +66,7 @@ namespace api::v1 {
 
     Task<> DocsController::tree(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                 const std::string project) const {
-        const auto resolved = co_await BaseProjectController::getProject(project, req->getOptionalParameter<std::string>("version"),
-                                                                         req->getOptionalParameter<std::string>("locale"));
+        const auto resolved = co_await BaseProjectController::getProjectWithParams(req, project);
 
         const auto [tree, treeError](resolved.getDirectoryTree());
         if (treeError != Error::Ok) {

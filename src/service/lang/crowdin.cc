@@ -12,8 +12,16 @@ using namespace std::chrono_literals;
 
 namespace service {
     const static std::string localesCacheKey = "crowdin:languages";
+    const static std::string langKeysCacheKey = "crowdin:languages:keys";
 
     Crowdin::Crowdin(const config::Crowdin &config) : config_(config) {}
+
+    Task<bool> Crowdin::hasLocaleKey(const std::string locale) {
+        if (!co_await global::cache->exists(langKeysCacheKey)) {
+            co_await getAvailableLocales();
+        }
+        co_return co_await global::cache->isSetMember(langKeysCacheKey, locale);
+    }
 
     Task<std::vector<Locale>> Crowdin::getAvailableLocales() {
         if (const auto cached = co_await global::cache->getFromCache(localesCacheKey)) {
@@ -36,6 +44,11 @@ namespace service {
         }
 
         co_await global::cache->updateCache(localesCacheKey, nlohmann::json(locales).dump(), 7 * 24h);
+
+        std::vector<std::string> keys;
+        for (const auto &locale : locales)
+            keys.push_back(locale.code);
+        co_await global::cache->updateCacheSet(langKeysCacheKey, keys, 7 * 24h);
 
         co_return co_await completeTask<std::vector<Locale>>(localesCacheKey, locales);
     }

@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include "content/game_data.h"
+#include "crowdin.h"
 #include "util.h"
 
 using namespace drogon;
@@ -15,8 +16,18 @@ namespace service {
 
     LangService::LangService() {}
 
+    Task<std::optional<std::string>> validateLocale(std::optional<std::string> locale) {
+        if (!locale || *locale == DEFAULT_LOCALE) {
+            co_return std::nullopt;
+        }
+        if (!co_await global::crowdin->hasLocaleKey(*locale)) {
+            throw ApiException(Error::ErrBadRequest, "Invalid locale " + *locale);
+        }
+        co_return mojangLanguages.contains(*locale) ? mojangLanguages.at(*locale) : *locale;
+    }
+
     Task<std::string> LangService::getItemName(const std::optional<std::string> lang, const std::string location) {
-        const std::string mcLang = lang && mojangLanguages.contains(*lang) ? mojangLanguages.at(*lang) : lang.value_or("en_us");
+        const std::string mcLang = lang.value_or(DEFAULT_LOCALE);
 
         if (const auto err = co_await loadItemLanguageKeys(mcLang); err != Error::Ok) {
             if (err == Error::ErrNotFound) {

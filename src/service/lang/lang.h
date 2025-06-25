@@ -2,10 +2,13 @@
 
 #include <service/cache.h>
 #include <drogon/utils/coroutine.h>
-
 #include <service/error.h>
 
+#define DEFAULT_LOCALE "en_us"
+
 namespace service {
+    drogon::Task<std::optional<std::string>> validateLocale(std::optional<std::string> locale);
+
     class LangService : public CacheableServiceBase {
     public:
         explicit LangService();

@@ -102,10 +102,7 @@ namespace api::v1 {
         if (recipe.empty()) {
             throw ApiException(Error::ErrBadRequest, "Insufficient parameters");
         }
-
-        const auto resolved = co_await BaseProjectController::getVersionedProject(req, project);
-
-        const auto locale = req->getOptionalParameter<std::string>("locale");
+        const auto resolved = co_await BaseProjectController::getProjectWithParams(req, project);
         const auto resolvedResult = co_await resolved.getRecipe(recipe);
         if (!resolvedResult) {
             throw ApiException(Error::ErrNotFound, "not_found");
@@ -120,7 +117,7 @@ namespace api::v1 {
             throw ApiException(Error::ErrBadRequest, "Insufficient parameters");
         }
 
-        const auto resolved = co_await BaseProjectController::getVersionedProject(req, project);
+        const auto resolved = co_await BaseProjectController::getProjectWithParams(req, project);
         const auto recipeType = co_await resolved.getProjectDatabase().getRecipeType(type);
         if (!recipeType) {
             throw ApiException(Error::ErrNotFound, "not_found");
