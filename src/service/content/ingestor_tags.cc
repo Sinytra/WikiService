@@ -113,8 +113,7 @@ namespace content {
         projectLog.debug("Registering {} tags", tagIds_.size());
 
         for (const auto &tag: tagIds_) {
-            const auto resloc = ResourceLocation::parse(tag);
-            if (!resloc) {
+            if (const auto resloc = ResourceLocation::parse(tag); !resloc) {
                 continue;
             }
 

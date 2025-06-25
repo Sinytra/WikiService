@@ -34,3 +34,6 @@ CREATE TRIGGER set_search_vector
     ON project
     FOR EACH ROW
 EXECUTE FUNCTION update_search_vector();
+
+CREATE DOMAIN resource_location AS varchar(255)
+    CHECK ( VALUE ~* '^([a-z0-9_.-]+:)?[a-z0-9_.-]+$' );

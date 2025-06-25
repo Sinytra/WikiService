@@ -12,7 +12,7 @@ CREATE TABLE project_version
 CREATE TABLE item
 (
     id  bigserial PRIMARY KEY,
-    loc varchar(255) NOT NULL CHECK (loc <> ''),
+    loc resource_location NOT NULL CHECK (loc <> ''),
 
     UNIQUE (loc)
 );
@@ -39,7 +39,7 @@ CREATE TABLE project_item_page
 CREATE TABLE tag
 (
     id  bigserial PRIMARY KEY,
-    loc varchar(255),
+    loc resource_location,
 
     UNIQUE (loc)
 );
@@ -105,12 +105,25 @@ CREATE TRIGGER before_insert_tag_tag_trg
     FOR EACH ROW
 EXECUTE PROCEDURE tags_insert_trigger_func();
 
+CREATE TABLE recipe_type
+(
+    id         bigserial PRIMARY KEY,
+    loc        resource_location,
+    version_id bigint REFERENCES project_version (id) ON DELETE CASCADE,
+
+    UNIQUE (id, version_id)
+);
+
+CREATE UNIQUE INDEX unique_recipe_type_no_project
+    ON recipe_type (loc)
+    WHERE version_id IS NULL;
+
 CREATE TABLE recipe
 (
     id         bigserial PRIMARY KEY,
     version_id bigint REFERENCES project_version (id) ON DELETE CASCADE,
-    loc        varchar(255) NOT NULL,
-    type       varchar(255) NOT NULL,
+    loc        resource_location                                    NOT NULL,
+    type_id    bigint REFERENCES recipe_type (id) ON DELETE CASCADE NOT NULL,
 
     UNIQUE (version_id, loc)
 );
@@ -139,6 +152,14 @@ CREATE TABLE recipe_ingredient_item
     input     bool         not null,
 
     PRIMARY KEY (recipe_id, item_id, slot, input)
+);
+
+CREATE TABLE recipe_workbench
+(
+    type_id bigint REFERENCES recipe_type (id) ON DELETE CASCADE  NOT NULL,
+    item_id bigint REFERENCES project_item (id) ON DELETE CASCADE NOT NULL,
+
+    PRIMARY KEY (type_id, item_id)
 );
 
 CREATE MATERIALIZED VIEW tag_item_flat AS

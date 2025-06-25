@@ -4,6 +4,7 @@
 #include <drogon/utils/coroutine.h>
 #include <log/log.h>
 #include <models/Recipe.h>
+#include <models/RecipeType.h>
 #include <models/User.h>
 #include <nlohmann/json.hpp>
 #include <optional>
@@ -109,6 +110,7 @@ namespace service {
         drogon::Task<std::vector<GlobalItem>> getGlobalTagItems(int64_t tagId) const;
         drogon::Task<std::vector<Recipe>> getItemUsageInRecipes(std::string item) const;
         drogon::Task<std::vector<ContentUsage>> getObtainableItemsBy(std::string item) const;
+        drogon::Task<std::vector<ContentUsage>> getRecipeTypeWorkbenches(int64_t id) const;
 
         drogon::Task<std::optional<DataImport>> addDataImportRecord(DataImport data) const;
         drogon::Task<PaginatedData<DataImport>> getDataImports(std::string searchQuery, int page) const;

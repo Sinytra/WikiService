@@ -40,20 +40,57 @@ namespace content {
             }
         }
 
+        const auto recipeTypesRoot = docsRoot / ".data" / modid / "recipe_type";
+
+        for (const auto &entry: fs::recursive_directory_iterator(recipeTypesRoot)) {
+            if (!entry.is_regular_file() || entry.path().extension() != EXT_JSON) {
+                continue;
+            }
+
+            if (const auto recipe = readRecipeType(modid, recipeTypesRoot, entry.path())) {
+                recipeTypes_.push_back(*recipe);
+            } else {
+                logger_->warn("Skipping recipe type file: '{}'", entry.path().filename().string());
+            }
+        }
+
         co_return result;
     }
 
-    Task<Error> RecipesSubIngestor::addRecipe(const ModRecipe recipe) const {
+    Task<Error> RecipesSubIngestor::addRecipeType(const StubRecipeType type) const {
+        const auto clientPtr = project_.getProjectDatabase().getDbClientPtr();
+        const auto versionId = project_.getProjectVersion().getValueOfId();
+        CoroMapper<RecipeType> recipeTypeMapper(clientPtr);
+
+        RecipeType dbType;
+        dbType.setVersionId(versionId);
+        dbType.setLoc(type.id);
+        co_await recipeTypeMapper.insert(dbType);
+
+        co_return Error::Ok;
+    }
+
+    Task<Error> RecipesSubIngestor::addRecipe(const StubRecipe recipe) const {
         const auto clientPtr = project_.getProjectDatabase().getDbClientPtr();
         CoroMapper<Recipe> recipeMapper(clientPtr);
+        CoroMapper<RecipeType> recipeTypeMapper(clientPtr);
 
         const auto [id, type, ingredients] = recipe;
         const auto versionId = project_.getProjectVersion().getValueOfId();
 
-        // language=postgresql
-        const auto row =
-            co_await clientPtr->execSqlCoro("INSERT INTO recipe VALUES (DEFAULT, $1, $2, $3) RETURNING id", versionId, id, type);
-        const auto recipeId = row.front().at("id").as<int64_t>();
+        const auto recipeType = co_await project_.getProjectDatabase().getRecipeType(type);
+        if (!recipeType) {
+            logger_->warn("Skipping recipe '{}' due to unknown recipe type '{}'", id, type);
+            // TODO Add deployment issue
+            co_return Error::ErrNotFound;
+        }
+
+        Recipe dbRecipe;
+        dbRecipe.setVersionId(versionId);
+        dbRecipe.setLoc(id);
+        dbRecipe.setTypeId(recipeType->getValueOfId());
+        const auto insertedRecipe = co_await recipeMapper.insert(dbRecipe);
+        const auto recipeId = insertedRecipe.getValueOfId();
 
         for (auto &[ingredientId, slot, count, input, isTag]: ingredients) {
             try {
@@ -85,6 +122,13 @@ namespace content {
     }
 
     Task<Error> RecipesSubIngestor::execute() {
+        logger_->info("Adding {} recipes types", recipeTypes_.size());
+
+        for (const auto &type: recipeTypes_) {
+            logger_->trace("Registering recipe type '{}'", type.id);
+            co_await addRecipeType(type);
+        }
+
         logger_->info("Adding {} recipes", recipes_.size());
 
         for (const auto &recipe: recipes_) {

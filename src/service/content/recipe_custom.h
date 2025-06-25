@@ -8,7 +8,7 @@ namespace content {
 
         std::optional<GameRecipeType> getType(const service::ResolvedProject &project, ResourceLocation type) override;
 
-        std::optional<ModRecipe> parseRecipe(const std::string &id, const std::string &type, const nlohmann::json &data,
+        std::optional<StubRecipe> parseRecipe(const std::string &id, const std::string &type, const nlohmann::json &data,
                                              const service::ProjectFileIssueCallback &issues) override;
     };
 }

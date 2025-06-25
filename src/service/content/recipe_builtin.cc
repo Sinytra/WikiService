@@ -11,7 +11,7 @@ using namespace drogon::orm;
 using namespace service;
 
 namespace content {
-    using RecipeProcessor = std::function<std::optional<ModRecipe>(const std::string &id, const std::string &type,
+    using RecipeProcessor = std::function<std::optional<StubRecipe>(const std::string &id, const std::string &type,
                                                                    const nlohmann::json &json, const ProjectFileIssueCallback &issues)>;
 
     struct RecipeType {
@@ -19,7 +19,7 @@ namespace content {
         RecipeProcessor processor;
     };
 
-    std::optional<RecipeIngredient> readRecipeIngredient(const nlohmann::json &json, const std::string &slot) {
+    std::optional<StubRecipeIngredient> readRecipeIngredient(const nlohmann::json &json, const std::string &slot) {
         std::string itemId;
         bool isTag;
         if (json.is_string()) {
@@ -41,10 +41,10 @@ namespace content {
         } else {
             return std::nullopt;
         }
-        return RecipeIngredient{itemId, slot, 1, true, isTag};
+        return StubRecipeIngredient{itemId, slot, 1, true, isTag};
     }
 
-    std::optional<RecipeIngredient> parseRecipeIngredient(const nlohmann::json &json, const std::string &slot,
+    std::optional<StubRecipeIngredient> parseRecipeIngredient(const nlohmann::json &json, const std::string &slot,
                                                           const ProjectFileIssueCallback &issues) {
         const auto ingredient = readRecipeIngredient(json, slot);
         if (!ingredient) {
@@ -54,7 +54,7 @@ namespace content {
         return ingredient;
     }
 
-    std::optional<ModRecipe> readShapedCraftingRecipe(const std::string &id, const std::string &type, const nlohmann::json &json,
+    std::optional<StubRecipe> readShapedCraftingRecipe(const std::string &id, const std::string &type, const nlohmann::json &json,
                                                       const ProjectFileIssueCallback &issues) {
         const auto keys = json.at("key");
         const auto pattern = json.at("pattern");
@@ -62,7 +62,7 @@ namespace content {
         for (auto &row: pattern) {
             concat += row;
         }
-        ModRecipe recipe{.id = id, .type = type};
+        StubRecipe recipe{.id = id, .type = type};
 
         for (int i = 0; i < concat.size(); ++i) {
             std::string key{concat[i]};
@@ -95,9 +95,9 @@ namespace content {
         return recipe;
     }
 
-    std::optional<ModRecipe> readShapelessCraftingRecipe(const std::string &id, const std::string &type, const nlohmann::json &json,
+    std::optional<StubRecipe> readShapelessCraftingRecipe(const std::string &id, const std::string &type, const nlohmann::json &json,
                                                          const ProjectFileIssueCallback &issues) {
-        ModRecipe recipe{.id = id, .type = type};
+        StubRecipe recipe{.id = id, .type = type};
 
         const auto ingredients = json["ingredients"];
         for (int i = 0; i < ingredients.size(); ++i) {
@@ -144,7 +144,7 @@ namespace content {
         return it == builtinRecipeTypes.end() ? std::nullopt : std::make_optional(it->second.displaySchema);
     }
 
-    std::optional<ModRecipe> VanillaRecipeParser::parseRecipe(const std::string &id, const std::string &type, const nlohmann::json &data,
+    std::optional<StubRecipe> VanillaRecipeParser::parseRecipe(const std::string &id, const std::string &type, const nlohmann::json &data,
                                                               const ProjectFileIssueCallback &issues) {
         if (const auto error = validateJson(schemas::gameRecipe, data)) {
             issues.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::INVALID_FORMAT, error->format());

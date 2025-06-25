@@ -9,7 +9,7 @@
 namespace content {
     std::optional<GameRecipeType> getRecipeType(const service::ResolvedProject &project, const ResourceLocation &type);
 
-    std::optional<ModRecipe> parseRecipe(const std::string &type, const nlohmann::json &data,
+    std::optional<StubRecipe> parseRecipe(const std::string &type, const nlohmann::json &data,
                                          const service::ProjectFileIssueCallback &issues);
 
     class RecipeParser {
@@ -20,7 +20,7 @@ namespace content {
 
         virtual std::optional<GameRecipeType> getType(const service::ResolvedProject &project, ResourceLocation type) = 0;
 
-        virtual std::optional<ModRecipe> parseRecipe(const std::string &id, const std::string &type, const nlohmann::json &data,
+        virtual std::optional<StubRecipe> parseRecipe(const std::string &id, const std::string &type, const nlohmann::json &data,
                                                      const service::ProjectFileIssueCallback &issues) = 0;
     };
 }

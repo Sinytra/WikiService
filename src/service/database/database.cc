@@ -380,6 +380,31 @@ namespace service {
         co_return res.value_or(std::vector<ContentUsage>{});
     }
 
+    Task<std::vector<ContentUsage>> Database::getRecipeTypeWorkbenches(const int64_t id) const {
+        // language=postgresql
+        static constexpr auto query = "SELECT ver.project_id, item.id, item.loc, pip.path FROM recipe_workbench \
+                                       JOIN project_item pitem ON recipe_workbench.item_id = pitem.id \
+                                       JOIN item ON pitem.item_id = item.id \
+                                       LEFT JOIN project_version ver ON pitem.version_id = ver.id \
+                                       LEFT JOIN project_item_page pip ON pitem.id = pip.item_id \
+                                       WHERE type_id = $1";
+
+        const auto [res, err] = co_await handleDatabaseOperation<std::vector<ContentUsage>>(
+            [id](const DbClientPtr &client) -> Task<std::vector<ContentUsage>> {
+                const auto results = co_await client->execSqlCoro(query, id);
+                std::vector<ContentUsage> usages;
+                for (const auto &row: results) {
+                    const auto projectId = row[0].as<std::string>();
+                    const auto itemId = row[1].as<int64_t>();
+                    const auto loc = row[2].as<std::string>();
+                    const auto path = row[3].isNull() ? "" : row[3].as<std::string>();
+                    usages.emplace_back(itemId, loc, projectId, path);
+                }
+                co_return usages;
+            });
+        co_return res.value_or(std::vector<ContentUsage>{});
+    }
+
     Task<std::optional<DataImport>> Database::addDataImportRecord(const DataImport data) const {
         const auto [res, err] = co_await handleDatabaseOperation<DataImport>([&data](const DbClientPtr &client) -> Task<DataImport> {
             CoroMapper<DataImport> mapper(client);

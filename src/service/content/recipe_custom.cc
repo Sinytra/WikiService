@@ -8,7 +8,7 @@ using namespace drogon::orm;
 using namespace service;
 
 namespace content {
-    std::optional<RecipeIngredient> readCustomIngredient(const std::string &slot, const bool input, const nlohmann::json &data) {
+    std::optional<StubRecipeIngredient> readCustomIngredient(const std::string &slot, const bool input, const nlohmann::json &data) {
         std::string rawId;
         int count;
 
@@ -25,10 +25,10 @@ namespace content {
         const auto isTag = rawId.starts_with("#");
         const auto id = isTag ? rawId.substr(1) : rawId;
 
-        return RecipeIngredient{id, slot, count, input, isTag};
+        return StubRecipeIngredient{id, slot, count, input, isTag};
     }
 
-    std::optional<RecipeIngredient> parseCustomIngredient(const std::string &slot, const bool input, const nlohmann::json &data,
+    std::optional<StubRecipeIngredient> parseCustomIngredient(const std::string &slot, const bool input, const nlohmann::json &data,
                                                           const ProjectFileIssueCallback &issues) {
         const auto ingredient = readCustomIngredient(slot, input, data);
         if (!ingredient) {
@@ -52,7 +52,7 @@ namespace content {
         return std::nullopt;
     }
 
-    std::optional<ModRecipe> CustomRecipeParser::parseRecipe(const std::string &id, const std::string &type, const nlohmann::json &data,
+    std::optional<StubRecipe> CustomRecipeParser::parseRecipe(const std::string &id, const std::string &type, const nlohmann::json &data,
                                                              const ProjectFileIssueCallback &issues) {
         static const std::vector<std::string> slots{"input", "output"};
 
@@ -61,7 +61,7 @@ namespace content {
             return std::nullopt;
         }
 
-        ModRecipe recipe{.id = id, .type = type};
+        StubRecipe recipe{.id = id, .type = type};
 
         for (const auto &slot: slots) {
             for (const auto &[key, val]: data[slot].items()) {

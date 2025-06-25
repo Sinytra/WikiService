@@ -39,6 +39,9 @@ namespace content {
                                         id);
         // language=postgresql
         co_await clientPtr->execSqlCoro(
+            "DELETE FROM recipe_type WHERE version_id IN (SELECT id FROM project_version WHERE project_id = $1)", id);
+        // language=postgresql
+        co_await clientPtr->execSqlCoro(
             "DELETE FROM project_item WHERE version_id IN (SELECT id FROM project_version WHERE project_id = $1)", id);
         // language=postgresql
         co_await clientPtr->execSqlCoro(

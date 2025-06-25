@@ -124,18 +124,13 @@ namespace content {
     };
 
     // TODO Cache in redis
+    // TODO Standalone recipe type route
     Task<std::optional<ResolvedGameRecipe>> resolveRecipe(const ResolvedProject &project, const Recipe recipe,
                                                           const std::optional<std::string> &locale) {
         const auto recipeId = recipe.getValueOfId();
-        const auto recipeType = recipe.getValueOfType();
-        const auto recipeTypeLoc = ResourceLocation::parse(recipeType);
-        if (!recipeTypeLoc) {
-            co_return std::nullopt;
-        }
-        const auto type = getRecipeType(project, *recipeTypeLoc);
-        if (!type) {
-            co_return std::nullopt;
-        }
+        const auto recipeType = unwrap(co_await global::database->getModel<RecipeType>(recipe.getValueOfTypeId()));
+        const auto recipeTypeLoc = unwrap(ResourceLocation::parse(recipeType.getValueOfLoc()));
+        const auto type = unwrap(getRecipeType(project, recipeTypeLoc));
 
         const auto itemIngredients =
             co_await global::database->getRelated<RecipeIngredientItem>(RecipeIngredientItem::Cols::_recipe_id, recipeId);
@@ -158,6 +153,6 @@ namespace content {
         const RecipeSummary summary{.inputs = getIngredientSummary(mergedInput), .outputs = getIngredientSummary(mergedOutput)};
 
         co_return ResolvedGameRecipe{
-            .id = recipe.getValueOfLoc(), .type = *type, .inputs = mergedInput, .outputs = mergedOutput, .summary = summary};
+            .id = recipe.getValueOfLoc(), .type = type, .inputs = mergedInput, .outputs = mergedOutput, .summary = summary};
     }
 }

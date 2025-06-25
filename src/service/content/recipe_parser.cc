@@ -13,10 +13,8 @@ using namespace service;
 namespace fs = std::filesystem;
 
 namespace content {
-    std::vector<std::shared_ptr<RecipeParser>> knownParsers = {
-        std::make_shared<VanillaRecipeParser>(),
-        std::make_shared<CustomRecipeParser>()
-    };
+    std::vector<std::shared_ptr<RecipeParser>> knownParsers = {std::make_shared<VanillaRecipeParser>(),
+                                                               std::make_shared<CustomRecipeParser>()};
 
     std::shared_ptr<RecipeParser> getRecipeParser(const ResourceLocation &type) {
         for (auto &parser: knownParsers) {
@@ -32,8 +30,30 @@ namespace content {
         return !parser ? std::nullopt : parser->getType(project, type);
     }
 
-    std::optional<ModRecipe> RecipesSubIngestor::readRecipe(const std::string &namespace_, const std::filesystem::path &root,
-                                                            const std::filesystem::path &path) const {
+    std::optional<StubRecipeType> RecipesSubIngestor::readRecipeType(const std::string &namespace_, const std::filesystem::path &root,
+                                                                     const std::filesystem::path &path) const {
+        const fs::path relativePath = relative(path, root);
+        const auto fileName = relativePath.string();
+        // TODO Check resource location validity everywhere
+        const auto id = namespace_ + ":" + fileName.substr(0, fileName.find_last_of('.'));
+        const ProjectFileIssueCallback fileIssues{issues_, fileName};
+
+        const auto json = parseJsonFile(path);
+        if (!json) {
+            fileIssues.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::INVALID_FILE);
+            return std::nullopt;
+        }
+
+        if (const auto error = validateJson(schemas::gameRecipeType, *json)) {
+            fileIssues.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::INVALID_FORMAT, error->format());
+            return std::nullopt;
+        }
+
+        return StubRecipeType{ .id = id };
+    }
+
+    std::optional<StubRecipe> RecipesSubIngestor::readRecipe(const std::string &namespace_, const std::filesystem::path &root,
+                                                             const std::filesystem::path &path) const {
         const fs::path relativePath = relative(path, root);
         const auto fileName = relativePath.string();
         const auto id = namespace_ + ":" + fileName.substr(0, fileName.find_last_of('.'));
@@ -53,7 +73,8 @@ namespace content {
         const std::string type = (*json)["type"];
         const auto loc = ResourceLocation::parse(type);
         if (!loc) {
-            fileIssues.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::INVALID_FORMAT, "Not a ResourceLocation: " + type);
+            fileIssues.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::INVALID_FORMAT,
+                                     "Not a ResourceLocation: " + type);
         }
 
         const auto parser = getRecipeParser(*loc);

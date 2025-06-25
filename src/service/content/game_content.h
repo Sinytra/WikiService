@@ -2,8 +2,8 @@
 
 #include <drogon/utils/coroutine.h>
 #include <service/error.h>
-#include <service/resolved.h>
 #include <service/project_issue.h>
+#include <service/resolved.h>
 #include "ingestor_recipes.h"
 
 namespace content {
@@ -13,8 +13,7 @@ namespace content {
 
     class SubIngestor {
     public:
-        explicit SubIngestor(const service::ResolvedProject &, const std::shared_ptr<spdlog::logger> &,
-                             service::ProjectIssueCallback &);
+        explicit SubIngestor(const service::ResolvedProject &, const std::shared_ptr<spdlog::logger> &, service::ProjectIssueCallback &);
         virtual ~SubIngestor() = default;
 
         virtual drogon::Task<PreparationResult> prepare() = 0;
@@ -82,10 +81,15 @@ namespace content {
         drogon::Task<service::Error> execute() override;
 
     private:
-        std::optional<ModRecipe> readRecipe(const std::string &namespace_, const std::filesystem::path &root,
-                                            const std::filesystem::path &path) const;
-        drogon::Task<service::Error> addRecipe(ModRecipe recipe) const;
+        std::optional<StubRecipeType> readRecipeType(const std::string &namespace_, const std::filesystem::path &root,
+                                                     const std::filesystem::path &path) const;
+        drogon::Task<service::Error> addRecipeType(StubRecipeType type) const;
 
-        std::vector<ModRecipe> recipes_;
+        std::optional<StubRecipe> readRecipe(const std::string &namespace_, const std::filesystem::path &root,
+                                             const std::filesystem::path &path) const;
+        drogon::Task<service::Error> addRecipe(StubRecipe recipe) const;
+
+        std::vector<StubRecipeType> recipeTypes_;
+        std::vector<StubRecipe> recipes_;
     };
 }

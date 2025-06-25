@@ -4,7 +4,11 @@
 #include <vector>
 
 namespace content {
-    struct RecipeIngredient {
+    struct StubRecipeType {
+        std::string id;
+    };
+
+    struct StubRecipeIngredient {
         std::string itemId;
         std::string slot;
         int count;
@@ -12,9 +16,9 @@ namespace content {
         bool isTag;
     };
 
-    struct ModRecipe {
+    struct StubRecipe {
         std::string id;
         std::string type;
-        std::vector<RecipeIngredient> ingredients;
+        std::vector<StubRecipeIngredient> ingredients;
     };
 }

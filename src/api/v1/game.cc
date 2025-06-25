@@ -3,6 +3,7 @@
 #include <string>
 
 #include <database/resolved_db.h>
+#include "content/recipe_parser.h"
 #include "error.h"
 
 using namespace std;
@@ -76,22 +77,24 @@ namespace api::v1 {
 
         const auto resolved = co_await BaseProjectController::getProjectWithParams(req, project);
         const auto obtainable = co_await global::database->getObtainableItemsBy(item);
-        Json::Value root(Json::arrayValue);
+
+        // TODO Deduplicate with recipeType
+        nlohmann::json root(nlohmann::json::value_t::array);
         for (const auto &[id, loc, project, path]: obtainable) {
             const auto dbItem = co_await global::database->getByPrimaryKey<Item>(id);
             const auto [name, _] = co_await resolved.getItemName(dbItem);
 
-            Json::Value itemJson;
-            itemJson["project"] = project;
+            nlohmann::json itemJson;
+            itemJson["project"] = project.empty() ? nlohmann::json(nullptr) : nlohmann::json(project);
             itemJson["id"] = loc;
             if (!name.empty()) {
                 itemJson["name"] = name;
             }
             itemJson["has_page"] = !path.empty();
-            root.append(itemJson);
+            root.push_back(itemJson);
         }
 
-        callback(HttpResponse::newHttpJsonResponse(root));
+        callback(jsonResponse(root));
     }
 
     Task<> GameController::recipe(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
@@ -109,5 +112,44 @@ namespace api::v1 {
         }
 
         callback(jsonResponse(*resolvedResult));
+    }
+
+    Task<> GameController::recipeType(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+                                      const std::string project, const std::string type) const {
+        if (type.empty()) {
+            throw ApiException(Error::ErrBadRequest, "Insufficient parameters");
+        }
+
+        const auto resolved = co_await BaseProjectController::getVersionedProject(req, project);
+        const auto recipeType = co_await resolved.getProjectDatabase().getRecipeType(type);
+        if (!recipeType) {
+            throw ApiException(Error::ErrNotFound, "not_found");
+        }
+        const auto layout = content::getRecipeType(resolved, unwrap(ResourceLocation::parse(type)));
+        if (!layout) {
+            throw ApiException(Error::ErrNotFound, "not_found");
+        }
+        const auto workbenches = co_await global::database->getRecipeTypeWorkbenches(recipeType->getValueOfId());
+
+        nlohmann::json workbenchItems(nlohmann::json::value_t::array);
+        for (const auto &[id, loc, project, path]: workbenches) {
+            const auto dbItem = co_await global::database->getByPrimaryKey<Item>(id);
+            const auto [name, _] = co_await resolved.getItemName(dbItem);
+
+            nlohmann::json itemJson;
+            itemJson["project"] = project.empty() ? nlohmann::json(nullptr) : nlohmann::json(project);
+            itemJson["id"] = loc;
+            if (!name.empty()) {
+                itemJson["name"] = name;
+            }
+            itemJson["has_page"] = !path.empty();
+            workbenchItems.push_back(itemJson);
+        }
+
+        nlohmann::json root;
+        root["type"] = *layout;
+        root["workbenches"] = workbenchItems;
+
+        callback(jsonResponse(root));
     }
 }

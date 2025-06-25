@@ -287,6 +287,22 @@ namespace service {
         co_return res;
     }
 
+    Task<std::optional<RecipeType>> ProjectDatabaseAccess::getRecipeType(std::string type) const {
+        const auto [res, err] = co_await handleDatabaseOperation<RecipeType>([&, type](const DbClientPtr &client) -> Task<RecipeType> {
+            CoroMapper<RecipeType> mapper(client);
+            const auto results = co_await mapper.findBy(
+                Criteria(Recipe::Cols::_loc, CompareOperator::EQ, type)
+                && (Criteria(Recipe::Cols::_version_id, CompareOperator::IsNull)
+                    || Criteria(Recipe::Cols::_version_id, CompareOperator::EQ, versionId_))
+                );
+            if (results.size() != 1) {
+                throw DrogonDbException{};
+            }
+            co_return results.front();
+        });
+        co_return res;
+    }
+
     Task<std::vector<std::string>> ProjectDatabaseAccess::getItemRecipes(std::string item) const {
         // language=postgresql
         static constexpr auto query = "SELECT recipe.loc FROM recipe \

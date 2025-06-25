@@ -1,7 +1,6 @@
 #pragma once
 
 #include "error.h"
-
 #include <drogon/HttpClient.h>
 #include <drogon/HttpTypes.h>
 #include <log/log.h>
@@ -153,3 +152,11 @@ Json::Value projectToJson(const drogon_model::postgres::Project &project, bool v
 std::string strToLower(std::string copy);
 
 bool isSubpath(const std::filesystem::path &path, const std::filesystem::path &base);
+
+template <typename T>
+T unwrap(std::optional<T> opt) {
+    if (!opt) {
+        throw ApiException(service::Error::ErrInternal, "Internal server error");
+    }
+    return opt.value();
+}
