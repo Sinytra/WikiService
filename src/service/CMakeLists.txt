@@ -11,6 +11,8 @@ read_and_escape_schema("schemas/game-recipe.schema.json" GAME_RECIPE_SCHEMA)
 read_and_escape_schema("schemas/game-tag.schema.json" GAME_TAG_SCHEMA)
 read_and_escape_schema("schemas/game-data.schema.json" GAME_DATA_EXPORT_SCHEMA)
 read_and_escape_schema("schemas/game-recipe-type.schema.json" GAME_RECIPE_TYPE_SCHEMA)
+read_and_escape_schema("schemas/game-recipe-base.schema.json" BASE_GAME_RECIPE_SCHEMA)
+read_and_escape_schema("schemas/game-recipe-custom.schema.json" CUSTOM_GAME_RECIPE_SCHEMA)
 
 read_and_escape_schema("../../builtin/minecraft/recipe_type/crafting_shaped.json" SHAPED_CRAFTING)
 
@@ -28,10 +30,13 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/content/builtin_recipe_type.h.in
 add_library(service STATIC
         content/game_content.cc
         content/game_data.cc
-        content/game_recipes.cc
         content/ingestor_content_paths.cc
         content/ingestor_tags.cc
         content/ingestor_recipes.cc
+        content/recipe_builtin.cc
+        content/recipe_custom.cc
+        content/recipe_parser.cc
+        content/recipe_resolver.cc
         database/database.cc
         database/database_content.cc
         database/database_system.cc

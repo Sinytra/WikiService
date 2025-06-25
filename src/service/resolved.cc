@@ -10,7 +10,7 @@
 #include <fstream>
 #include <unordered_map>
 
-#include <content/game_recipes.h>
+#include <content/recipe_resolver.h>
 #include <fmt/args.h>
 #include <include/uri.h>
 #include <models/Item.h>
@@ -358,6 +358,7 @@ namespace service {
     }
 
     std::optional<std::string> ResolvedProject::readLangKey(const std::string &locale, const std::string &key) const {
+        // TODO use namespace instead of project id
         const auto path = docsDir_ / ".assets" / project_.getValueOfId() / "lang" / (locale + ".json");
         const auto json = parseJsonFile(path);
         if (!json || !json->is_object() || !json->contains(key)) {
@@ -565,7 +566,7 @@ namespace service {
         const auto [pages, total, size, data] = co_await projectDb_->getProjectRecipesDev(params.query, params.page);
         std::vector<FullRecipeData> recipeDate;
         for (const auto &recipe: data) {
-            const auto resolved = co_await content::resolveRecipe(recipe, std::nullopt, std::nullopt); // TODO
+            const auto resolved = co_await content::resolveRecipe(*this, recipe, locale_);
             recipeDate.emplace_back(recipe.getValueOfLoc(), resolved ? nlohmann::json(*resolved) : nlohmann::json{});
         }
         co_return PaginatedData{.total = total, .pages = pages, .size = size, .data = recipeDate};
@@ -591,11 +592,27 @@ namespace service {
         co_return ItemData{.name = localized.value_or(""), .path = ""};
     }
 
+    // TODO Cache
+    std::optional<content::GameRecipeType> ResolvedProject::getRecipeType(const ResourceLocation &location) const {
+        const auto path = docsDir_ / ".data" / location.namespace_ / "recipe_type" / (location.path_ + ".json");
+        const auto json = parseJsonFile(path);
+        if (!json) {
+            return std::nullopt;
+        }
+        // TODO Validate during import
+        if (const auto error = validateJson(schemas::gameRecipeType, *json)) {
+            logger.error("Invalid recipe type {} in project {}: {}", std::string(location), project_.getValueOfId(), error->format());
+            return std::nullopt;
+        }
+
+        return std::make_optional<content::GameRecipeType>(*json);
+    }
+
     Task<std::optional<content::ResolvedGameRecipe>> ResolvedProject::getRecipe(const std::string id) const {
         const auto recipe = co_await projectDb_->getProjectRecipe(id);
         if (!recipe) {
             co_return std::nullopt;
         }
-        co_return co_await content::resolveRecipe(*recipe, std::nullopt, std::nullopt); // TODO
+        co_return co_await content::resolveRecipe(*this, *recipe, locale_);
     }
 }

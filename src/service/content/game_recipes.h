@@ -1,12 +1,6 @@
 #pragma once
 
-#include <drogon/utils/coroutine.h>
-#include <json/json.h>
-#include <models/Recipe.h>
 #include <nlohmann/json.hpp>
-#include <optional>
-
-using namespace drogon_model::postgres;
 
 namespace content {
     struct ItemSlot {
@@ -68,15 +62,49 @@ namespace content {
         std::string slot;
         int32_t count;
         std::vector<ResolvedItem> items;
+        std::string tag;
 
-        NLOHMANN_DEFINE_TYPE_INTRUSIVE(ResolvedSlot, input, slot, count, items)
+        friend void to_json(nlohmann::json &j, const ResolvedSlot &obj) {
+            j = nlohmann::json{
+                    {"input", obj.input},
+                    {"slot", obj.slot},
+                    {"count", obj.count},
+                    {"items", obj.items},
+                    {"tag", obj.tag.empty() ? nlohmann::json(nullptr) : nlohmann::json(obj.tag)}
+            };
+        }
+
+        friend void from_json(const nlohmann::json &j, ResolvedSlot &obj) {
+            j.at("input").get_to(obj.input);
+            j.at("slot").get_to(obj.slot);
+            j.at("count").get_to(obj.count);
+            j.at("items").get_to(obj.items);
+            if (j.contains("tag") && j["tag"].is_string()) {
+                j.at("tag").get_to(obj.tag);
+            }
+        }
     };
 
     struct RecipeIngredientSummary {
         int32_t count;
         ResolvedItem item;
+        std::string tag;
 
-        NLOHMANN_DEFINE_TYPE_INTRUSIVE(RecipeIngredientSummary, count, item)
+        friend void to_json(nlohmann::json &j, const RecipeIngredientSummary &obj) {
+            j = nlohmann::json{
+                {"count", obj.count},
+                {"item", obj.item},
+                {"tag", obj.tag.empty() ? nlohmann::json(nullptr) : nlohmann::json(obj.tag)}
+            };
+        }
+
+        friend void from_json(const nlohmann::json &j, RecipeIngredientSummary &obj) {
+            j.at("count").get_to(obj.count);
+            if (j.contains("tag") && j["tag"].is_string()) {
+                j.at("tag").get_to(obj.tag);
+            }
+            j.at("item").get_to(obj.item);
+        }
     };
 
     struct RecipeSummary {
@@ -95,14 +123,4 @@ namespace content {
 
         NLOHMANN_DEFINE_TYPE_INTRUSIVE(ResolvedGameRecipe, id, type, inputs, outputs, summary)
     };
-
-    void loadRecipeTypes();
-
-    std::optional<GameRecipeType> getRecipeType(const std::string &type);
-
-    drogon::Task<std::optional<ResolvedGameRecipe>> getRecipe(std::string id, const std::optional<std::string> &version,
-                                                              const std::optional<std::string> &locale);
-
-    drogon::Task<std::optional<ResolvedGameRecipe>> resolveRecipe(Recipe recipe, const std::optional<std::string> &version,
-                                                                  const std::optional<std::string> &locale);
 }

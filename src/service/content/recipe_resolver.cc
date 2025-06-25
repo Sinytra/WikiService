@@ -1,14 +1,13 @@
-#include "game_recipes.h"
+#include "recipe_resolver.h"
 
 #include <models/Item.h>
 #include <models/RecipeIngredientItem.h>
 #include <models/RecipeIngredientTag.h>
 #include <models/Tag.h>
+#include <service/content/recipe_parser.h>
 #include <service/database/database.h>
 #include <service/lang/lang.h>
 #include <service/storage/storage.h>
-
-#include "database/resolved_db.h"
 
 using namespace drogon;
 using namespace service;
@@ -42,15 +41,20 @@ namespace content {
         for (const auto &slot: slots) {
             if (!slot.items.empty()) {
                 const auto item = slot.items.front();
-                if (count[item.id]++ == 0) {
-                    items[item.id] = item;
+                const auto id = slot.tag.empty() ? item.id : "#" + slot.tag;
+                if (!count.contains(id)) {
+                    items[id] = item;
                 }
+                count[id] += slot.count;
             }
         }
 
         for (const auto &[key, val]: count) {
-            const auto item = items[key];
-            summary.emplace_back(val, item);
+            if (key.starts_with("#")) {
+                summary.emplace_back(val, items[key], key.substr(1));
+            } else {
+                summary.emplace_back(val, items[key], "");
+            }
         }
 
         return summary;
@@ -58,7 +62,7 @@ namespace content {
 
     class RecipeResolver {
     public:
-        RecipeResolver(const std::optional<std::string> &version, const std::optional<std::string> &locale) : version_(version), locale_(locale) {}
+        explicit RecipeResolver(const std::optional<std::string> &locale) : locale_(locale) {}
 
         Task<ResolvedItem> resolveItem(const ResolvableItem item) const {
             // Vanilla
@@ -68,7 +72,7 @@ namespace content {
             }
 
             // Modded
-            if (const auto [resolved, resolveErr] = co_await global::storage->getProject(item.project_id, version_, locale_); resolved)
+            if (const auto [resolved, resolveErr] = co_await global::storage->getProject(item.project_id, std::nullopt, locale_); resolved)
             {
                 const auto [name, path] = co_await resolved->getItemName(item.loc);
                 co_return ResolvedItem{.id = item.loc, .name = name, .project = item.project_id, !path.empty()};
@@ -77,7 +81,7 @@ namespace content {
             co_return ResolvedItem{.id = item.loc, .name = "", .project = item.project_id, false};
         }
 
-        Task<std::vector<ResolvedItem>> resolveIngredient(const RecipeIngredientItem ingredient) const {
+        Task<ResolvedSlot> resolveIngredient(const RecipeIngredientItem ingredient) const {
             const auto item = co_await global::database->getModel<Item>(ingredient.getValueOfItemId());
             std::vector<ResolvedItem> result;
             if (item) {
@@ -92,11 +96,13 @@ namespace content {
                     result.emplace_back(co_await resolveItem({.project_id = source, .loc = loc}));
                 }
             }
-            co_return result;
+            co_return ResolvedSlot{.input = ingredient.getValueOfInput(),
+                                   .slot = ingredient.getValueOfSlot(),
+                                   .count = ingredient.getValueOfCount(),
+                                   .items = result};
         }
 
-        // TODO Preserve tag info
-        Task<std::vector<ResolvedItem>> resolveIngredient(const RecipeIngredientTag ingredient) const {
+        Task<ResolvedSlot> resolveIngredient(const RecipeIngredientTag ingredient) const {
             const auto dbTag = co_await global::database->getByPrimaryKey<Tag>(ingredient.getValueOfTagId());
 
             std::vector<ResolvedItem> result;
@@ -105,61 +111,45 @@ namespace content {
             {
                 result.emplace_back(co_await resolveItem({.project_id = item.project_id, .loc = item.loc}));
             }
-            co_return result;
-        }
 
-        template<typename T>
-        Task<ResolvedSlot> resolveSlot(const T ingredient) const {
             co_return ResolvedSlot{.input = ingredient.getValueOfInput(),
                                    .slot = ingredient.getValueOfSlot(),
                                    .count = ingredient.getValueOfCount(),
-                                   .items = co_await resolveIngredient(ingredient)};
+                                   .items = result,
+                                   .tag = dbTag.getValueOfLoc()};
         }
 
     private:
-        const std::optional<std::string> version_;
         const std::optional<std::string> locale_;
     };
 
-    Task<std::optional<ResolvedGameRecipe>> getRecipe(const std::string id, const std::optional<std::string> &version,
-                                                      const std::optional<std::string> &locale) {
-        const auto [resolved, resErr](co_await global::storage->getProject(id, version, locale));
-        if (!resolved) {
-            co_return std::nullopt;
-        }
-
-        const auto recipe = co_await resolved->getProjectDatabase().getProjectRecipe(id);
-        if (!recipe) {
-            co_return std::nullopt;
-        }
-
-        co_return co_await resolveRecipe(*recipe, version, locale);
-    }
-
     // TODO Cache in redis
-    Task<std::optional<ResolvedGameRecipe>> resolveRecipe(const Recipe recipe, const std::optional<std::string> &version,
+    Task<std::optional<ResolvedGameRecipe>> resolveRecipe(const ResolvedProject &project, const Recipe recipe,
                                                           const std::optional<std::string> &locale) {
         const auto recipeId = recipe.getValueOfId();
         const auto recipeType = recipe.getValueOfType();
-        auto type = getRecipeType(recipeType);
+        const auto recipeTypeLoc = ResourceLocation::parse(recipeType);
+        if (!recipeTypeLoc) {
+            co_return std::nullopt;
+        }
+        const auto type = getRecipeType(project, *recipeTypeLoc);
         if (!type) {
             co_return std::nullopt;
         }
-        type->id = recipeType;
 
         const auto itemIngredients =
             co_await global::database->getRelated<RecipeIngredientItem>(RecipeIngredientItem::Cols::_recipe_id, recipeId);
         const auto tagIngredients =
             co_await global::database->getRelated<RecipeIngredientTag>(RecipeIngredientTag::Cols::_recipe_id, recipeId);
 
-        const RecipeResolver resolver{version, locale};
+        const RecipeResolver resolver{locale};
 
         std::vector<ResolvedSlot> resolvedSlots;
         for (const auto &ingredient: itemIngredients) {
-            resolvedSlots.emplace_back(co_await resolver.resolveSlot(ingredient));
+            resolvedSlots.emplace_back(co_await resolver.resolveIngredient(ingredient));
         }
         for (const auto &ingredient: tagIngredients) {
-            resolvedSlots.emplace_back(co_await resolver.resolveSlot(ingredient));
+            resolvedSlots.emplace_back(co_await resolver.resolveIngredient(ingredient));
         }
 
         const auto mergedInput = mergeSlots(resolvedSlots, true);

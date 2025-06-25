@@ -94,6 +94,7 @@ namespace service {
         drogon::Task<std::tuple<std::optional<nlohmann::ordered_json>, Error>> getProjectContents() const;
 
         std::optional<std::filesystem::path> getAsset(const ResourceLocation &location) const;
+        std::optional<content::GameRecipeType> getRecipeType(const ResourceLocation &location) const;
         drogon::Task<std::optional<content::ResolvedGameRecipe>> getRecipe(std::string id) const;
 
         std::tuple<std::optional<nlohmann::json>, ProjectError, std::string> validateProjectMetadata() const;

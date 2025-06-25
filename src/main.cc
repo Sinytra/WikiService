@@ -18,6 +18,7 @@
 #include <git2.h>
 #include <log/log.h>
 
+#include <service/content/recipe_builtin.h>
 #include "api/v1/moderation.h"
 #include "service/content/game_data.h"
 #include "service/lang/crowdin.h"
@@ -114,7 +115,7 @@ int main() {
         cacheAwaiterThreadPool.start();
         git_libgit2_init();
 
-        content::loadRecipeTypes();
+        content::loadBuiltinRecipeTypes();
 
         app().getLoop()->queueInLoop(async_func([]() -> Task<> { co_await runStartupTaks(); }));
 

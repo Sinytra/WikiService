@@ -3,7 +3,6 @@
 #include <string>
 
 #include <database/resolved_db.h>
-#include "content/game_recipes.h"
 #include "error.h"
 
 using namespace std;
@@ -58,9 +57,9 @@ namespace api::v1 {
 
         const auto resolved = co_await BaseProjectController::getProjectWithParams(req, project);
         const auto recipeIds = co_await resolved.getProjectDatabase().getItemRecipes(item);
-        nlohmann::json root;
-        for (const auto &id : recipeIds) {
-            if (const auto recipe = co_await resolved.getRecipe(id)) { // TODO
+        nlohmann::json root(nlohmann::json::value_t::array);
+        for (const auto &id: recipeIds) {
+            if (const auto recipe = co_await resolved.getRecipe(id)) {
                 root.emplace_back(*recipe);
             } else {
                 logger.error("Missing recipe {} for item {} / {}", id, project, item);
@@ -102,16 +101,11 @@ namespace api::v1 {
         }
 
         const auto resolved = co_await BaseProjectController::getVersionedProject(req, project);
-        const auto result = co_await resolved.getProjectDatabase().getProjectRecipe(recipe);
-        if (!result) {
-            throw ApiException(Error::ErrNotFound, "not_found");
-        }
 
         const auto locale = req->getOptionalParameter<std::string>("locale");
-        const auto version = req->getOptionalParameter<std::string>("version");
-        const auto resolvedResult = co_await content::resolveRecipe(*result, version, locale);
+        const auto resolvedResult = co_await resolved.getRecipe(recipe);
         if (!resolvedResult) {
-            throw ApiException(Error::ErrBadRequest, "resolution");
+            throw ApiException(Error::ErrNotFound, "not_found");
         }
 
         callback(jsonResponse(*resolvedResult));

@@ -83,6 +83,10 @@ struct ResourceLocation {
     const std::string path_;
 
     static std::optional<ResourceLocation> parse(const std::string &str);
+
+    operator std::string() const {
+        return namespace_ + ":" + path_;
+    }
 };
 
 struct JsonValidationError {

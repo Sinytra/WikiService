@@ -14,6 +14,8 @@ namespace schemas {
 
     extern nlohmann::json gameRecipe;
     extern nlohmann::json gameRecipeType;
+    extern nlohmann::json gameRecipeBase;
+    extern nlohmann::json gameRecipeCustom;
     extern nlohmann::json gameTag;
 
     extern nlohmann::json gameDataExport;
