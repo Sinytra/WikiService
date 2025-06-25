@@ -11,6 +11,12 @@ namespace content {
         std::set<std::string> items;
     };
 
+    template<typename T>
+    struct PreparedData {
+        T data;
+        service::ProjectFileIssueCallback issues;
+    };
+
     class SubIngestor {
     public:
         explicit SubIngestor(const service::ResolvedProject &, const std::shared_ptr<spdlog::logger> &, service::ProjectIssueCallback &);
@@ -23,9 +29,6 @@ namespace content {
     protected:
         drogon::Task<> addIssue(service::ProjectIssueLevel level, service::ProjectIssueType type, service::ProjectError subject,
                                 const std::string &details = "", const std::string &file = "") const;
-
-        void addIssueAsync(service::ProjectIssueLevel level, service::ProjectIssueType type, service::ProjectError subject,
-                           const std::string &details = "", const std::string &file = "") const;
 
         const service::ResolvedProject &project_;
         const std::shared_ptr<spdlog::logger> &logger_;
@@ -81,15 +84,15 @@ namespace content {
         drogon::Task<service::Error> execute() override;
 
     private:
-        std::optional<StubRecipeType> readRecipeType(const std::string &namespace_, const std::filesystem::path &root,
+        std::optional<PreparedData<StubRecipeType>> readRecipeType(const std::string &namespace_, const std::filesystem::path &root,
                                                      const std::filesystem::path &path) const;
-        drogon::Task<service::Error> addRecipeType(StubRecipeType type) const;
+        drogon::Task<service::Error> addRecipeType(PreparedData<StubRecipeType> type) const;
 
-        std::optional<StubRecipe> readRecipe(const std::string &namespace_, const std::filesystem::path &root,
+        std::optional<PreparedData<StubRecipe>> readRecipe(const std::string &namespace_, const std::filesystem::path &root,
                                              const std::filesystem::path &path) const;
-        drogon::Task<service::Error> addRecipe(StubRecipe recipe) const;
+        drogon::Task<service::Error> addRecipe(PreparedData<StubRecipe> recipe) const;
 
-        std::vector<StubRecipeType> recipeTypes_;
-        std::vector<StubRecipe> recipes_;
+        std::vector<PreparedData<StubRecipeType>> recipeTypes_;
+        std::vector<PreparedData<StubRecipe>> recipes_;
     };
 }

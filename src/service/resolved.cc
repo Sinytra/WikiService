@@ -599,12 +599,10 @@ namespace service {
         if (!json) {
             return std::nullopt;
         }
-        // TODO Validate during import
         if (const auto error = validateJson(schemas::gameRecipeType, *json)) {
             logger.error("Invalid recipe type {} in project {}: {}", std::string(location), project_.getValueOfId(), error->format());
             return std::nullopt;
         }
-
         return std::make_optional<content::GameRecipeType>(*json);
     }
 

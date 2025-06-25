@@ -30,59 +30,64 @@ namespace content {
         return !parser ? std::nullopt : parser->getType(project, type);
     }
 
-    std::optional<StubRecipeType> RecipesSubIngestor::readRecipeType(const std::string &namespace_, const std::filesystem::path &root,
-                                                                     const std::filesystem::path &path) const {
+    std::optional<PreparedData<StubRecipeType>> RecipesSubIngestor::readRecipeType(const std::string &namespace_,
+                                                                                   const std::filesystem::path &root,
+                                                                                   const std::filesystem::path &path) const {
         const fs::path relativePath = relative(path, root);
         const auto fileName = relativePath.string();
         // TODO Check resource location validity everywhere
         const auto id = namespace_ + ":" + fileName.substr(0, fileName.find_last_of('.'));
-        const ProjectFileIssueCallback fileIssues{issues_, fileName};
+        const ProjectFileIssueCallback issues{issues_, fileName};
 
         const auto json = parseJsonFile(path);
         if (!json) {
-            fileIssues.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::INVALID_FILE);
+            issues.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::INVALID_FILE);
             return std::nullopt;
         }
 
         if (const auto error = validateJson(schemas::gameRecipeType, *json)) {
-            fileIssues.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::INVALID_FORMAT, error->format());
+            issues.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::INVALID_FORMAT, error->format());
             return std::nullopt;
         }
 
-        return StubRecipeType{ .id = id };
+        return PreparedData{.data = StubRecipeType{.id = id}, .issues = issues};
     }
 
-    std::optional<StubRecipe> RecipesSubIngestor::readRecipe(const std::string &namespace_, const std::filesystem::path &root,
-                                                             const std::filesystem::path &path) const {
+    std::optional<PreparedData<StubRecipe>> RecipesSubIngestor::readRecipe(const std::string &namespace_, const std::filesystem::path &root,
+                                                                           const std::filesystem::path &path) const {
         const fs::path relativePath = relative(path, root);
         const auto fileName = relativePath.string();
         const auto id = namespace_ + ":" + fileName.substr(0, fileName.find_last_of('.'));
-        const ProjectFileIssueCallback fileIssues{issues_, fileName};
+        const ProjectFileIssueCallback issues{issues_, fileName};
 
         const auto json = parseJsonFile(path);
         if (!json) {
-            fileIssues.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::INVALID_FILE);
+            issues.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::INVALID_FILE);
             return std::nullopt;
         }
 
         if (const auto error = validateJson(schemas::gameRecipeBase, *json)) {
-            fileIssues.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::INVALID_FORMAT, error->format());
+            issues.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::INVALID_FORMAT, error->format());
             return std::nullopt;
         }
 
         const std::string type = (*json)["type"];
         const auto loc = ResourceLocation::parse(type);
         if (!loc) {
-            fileIssues.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::INVALID_FORMAT,
+            issues.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::INVALID_FORMAT,
                                      "Not a ResourceLocation: " + type);
         }
 
         const auto parser = getRecipeParser(*loc);
         if (!parser) {
-            fileIssues.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::UNKNOWN_RECIPE_TYPE, type);
+            issues.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::UNKNOWN_RECIPE_TYPE, type);
             return std::nullopt;
         }
 
-        return parser->parseRecipe(id, type, *json, fileIssues);
+        if (const auto recipe = parser->parseRecipe(id, type, *json, issues)) {
+            return PreparedData{.data = *recipe, .issues = issues};
+        }
+
+        return std::nullopt;
     }
 }

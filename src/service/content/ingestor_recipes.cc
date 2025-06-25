@@ -18,70 +18,66 @@ namespace content {
 
         const auto docsRoot = project_.getDocsDirectoryPath();
         const auto modid = project_.getProject().getValueOfModid();
-        const auto recipesRoot = docsRoot / ".data" / modid / "recipe";
 
-        if (!exists(recipesRoot)) {
-            co_return result;
-        }
-
-        for (const auto &entry: fs::recursive_directory_iterator(recipesRoot)) {
-            if (!entry.is_regular_file() || entry.path().extension() != EXT_JSON) {
-                continue;
-            }
-
-            if (const auto recipe = readRecipe(modid, recipesRoot, entry.path())) {
-                recipes_.push_back(*recipe);
-
-                for (const auto &item: recipe->ingredients) {
-                    result.items.insert(item.itemId);
+        if (const auto recipesRoot = docsRoot / ".data" / modid / "recipe"; exists(recipesRoot)) {
+            for (const auto &entry: fs::recursive_directory_iterator(recipesRoot)) {
+                if (!entry.is_regular_file() || entry.path().extension() != EXT_JSON) {
+                    continue;
                 }
-            } else {
-                logger_->warn("Skipping recipe file: '{}'", entry.path().filename().string());
+
+                if (const auto recipe = readRecipe(modid, recipesRoot, entry.path())) {
+                    recipes_.push_back(*recipe);
+
+                    for (const auto &item: recipe->data.ingredients) {
+                        result.items.insert(item.itemId);
+                    }
+                } else {
+                    logger_->warn("Skipping recipe file: '{}'", entry.path().filename().string());
+                }
             }
         }
 
-        const auto recipeTypesRoot = docsRoot / ".data" / modid / "recipe_type";
+        if (const auto recipeTypesRoot = docsRoot / ".data" / modid / "recipe_type"; exists(recipeTypesRoot)) {
+            for (const auto &entry: fs::recursive_directory_iterator(recipeTypesRoot)) {
+                if (!entry.is_regular_file() || entry.path().extension() != EXT_JSON) {
+                    continue;
+                }
 
-        for (const auto &entry: fs::recursive_directory_iterator(recipeTypesRoot)) {
-            if (!entry.is_regular_file() || entry.path().extension() != EXT_JSON) {
-                continue;
-            }
-
-            if (const auto recipe = readRecipeType(modid, recipeTypesRoot, entry.path())) {
-                recipeTypes_.push_back(*recipe);
-            } else {
-                logger_->warn("Skipping recipe type file: '{}'", entry.path().filename().string());
+                if (const auto recipe = readRecipeType(modid, recipeTypesRoot, entry.path())) {
+                    recipeTypes_.push_back(*recipe);
+                } else {
+                    logger_->warn("Skipping recipe type file: '{}'", entry.path().filename().string());
+                }
             }
         }
 
         co_return result;
     }
 
-    Task<Error> RecipesSubIngestor::addRecipeType(const StubRecipeType type) const {
+    Task<Error> RecipesSubIngestor::addRecipeType(const PreparedData<StubRecipeType> type) const {
         const auto clientPtr = project_.getProjectDatabase().getDbClientPtr();
         const auto versionId = project_.getProjectVersion().getValueOfId();
         CoroMapper<RecipeType> recipeTypeMapper(clientPtr);
 
         RecipeType dbType;
         dbType.setVersionId(versionId);
-        dbType.setLoc(type.id);
+        dbType.setLoc(type.data.id);
         co_await recipeTypeMapper.insert(dbType);
 
         co_return Error::Ok;
     }
 
-    Task<Error> RecipesSubIngestor::addRecipe(const StubRecipe recipe) const {
+    Task<Error> RecipesSubIngestor::addRecipe(const PreparedData<StubRecipe> recipe) const {
         const auto clientPtr = project_.getProjectDatabase().getDbClientPtr();
         CoroMapper<Recipe> recipeMapper(clientPtr);
         CoroMapper<RecipeType> recipeTypeMapper(clientPtr);
 
-        const auto [id, type, ingredients] = recipe;
+        const auto [id, type, ingredients] = recipe.data;
         const auto versionId = project_.getProjectVersion().getValueOfId();
 
         const auto recipeType = co_await project_.getProjectDatabase().getRecipeType(type);
         if (!recipeType) {
-            logger_->warn("Skipping recipe '{}' due to unknown recipe type '{}'", id, type);
-            // TODO Add deployment issue
+            recipe.issues.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::UNKNOWN_RECIPE_TYPE, type);
             co_return Error::ErrNotFound;
         }
 
@@ -113,6 +109,7 @@ namespace content {
             } catch ([[maybe_unused]] const std::exception &e) {
                 const auto ingredientName = isTag ? "#" + ingredientId : ingredientId;
                 logger_->warn("Skipping recipe '{}' due to missing ingredient '{}'", id, ingredientName);
+                recipe.issues.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::INVALID_INGREDIENT, ingredientName);
             }
             co_await recipeMapper.deleteByPrimaryKey(recipeId);
             co_return Error::ErrNotFound;
@@ -125,14 +122,14 @@ namespace content {
         logger_->info("Adding {} recipes types", recipeTypes_.size());
 
         for (const auto &type: recipeTypes_) {
-            logger_->trace("Registering recipe type '{}'", type.id);
+            logger_->trace("Registering recipe type '{}'", type.data.id);
             co_await addRecipeType(type);
         }
 
         logger_->info("Adding {} recipes", recipes_.size());
 
         for (const auto &recipe: recipes_) {
-            logger_->trace("Registering recipe '{}'", recipe.id);
+            logger_->trace("Registering recipe '{}'", recipe.data.id);
             co_await addRecipe(recipe);
         }
 

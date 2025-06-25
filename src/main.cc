@@ -23,13 +23,12 @@
 #include "service/content/game_data.h"
 #include "service/lang/crowdin.h"
 
-using namespace std;
 using namespace drogon;
 using namespace logging;
 using namespace service;
 
 namespace service {
-    trantor::EventLoopThreadPool cacheAwaiterThreadPool{1};
+    trantor::EventLoopThreadPool cacheAwaiterThreadPool{10};
 }
 
 namespace global {
@@ -93,14 +92,14 @@ int main() {
         auto modrinth(ModrinthPlatform{});
         global::platforms = std::make_shared<Platforms>(curseForge, modrinth);
 
-        auto authController(make_shared<api::v1::AuthController>(authConfig));
-        auto controller(make_shared<api::v1::DocsController>());
-        auto browseController(make_shared<api::v1::BrowseController>());
-        auto projectsController(make_shared<api::v1::ProjectsController>());
-        auto projectWSController(make_shared<api::v1::ProjectWebSocketController>());
-        auto gameController(make_shared<api::v1::GameController>());
-        auto systemController(make_shared<api::v1::SystemController>());
-        auto moderationController(make_shared<api::v1::ModerationController>());
+        auto authController(std::make_shared<api::v1::AuthController>(authConfig));
+        auto controller(std::make_shared<api::v1::DocsController>());
+        auto browseController(std::make_shared<api::v1::BrowseController>());
+        auto projectsController(std::make_shared<api::v1::ProjectsController>());
+        auto projectWSController(std::make_shared<api::v1::ProjectWebSocketController>());
+        auto gameController(std::make_shared<api::v1::GameController>());
+        auto systemController(std::make_shared<api::v1::SystemController>());
+        auto moderationController(std::make_shared<api::v1::ModerationController>());
 
         app().registerController(authController);
         app().registerController(controller);
@@ -122,7 +121,9 @@ int main() {
         app().run();
 
         git_libgit2_shutdown();
-        cacheAwaiterThreadPool.getLoop(0)->quit();
+        for (auto &loop : cacheAwaiterThreadPool.getLoops()) {
+            loop->quit();
+        }
         cacheAwaiterThreadPool.wait();
     } catch (const std::exception &e) {
         logger.critical("Error running app: {}", e.what());

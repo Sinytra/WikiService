@@ -5,8 +5,6 @@
 #include <service/util.h>
 #include <zip.h>
 
-#include "zipint.h"
-
 #define LAUNCHER_MANIFEST_URL "https://launchermeta.mojang.com/mc/game/version_manifest_v2.json"
 #define RESOURCES_URL "https://resources.download.minecraft.net"
 

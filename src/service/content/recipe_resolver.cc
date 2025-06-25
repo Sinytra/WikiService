@@ -124,7 +124,6 @@ namespace content {
     };
 
     // TODO Cache in redis
-    // TODO Standalone recipe type route
     Task<std::optional<ResolvedGameRecipe>> resolveRecipe(const ResolvedProject &project, const Recipe recipe,
                                                           const std::optional<std::string> &locale) {
         const auto recipeId = recipe.getValueOfId();

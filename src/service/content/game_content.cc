@@ -24,11 +24,6 @@ namespace content {
         co_await issues_.addIssue(level, type, subject, details, file);
     }
 
-    void SubIngestor::addIssueAsync(const ProjectIssueLevel level, const ProjectIssueType type, const ProjectError subject,
-                                    const std::string &details, const std::string &file) const {
-        issues_.addIssueAsync(level, type, subject, details, file);
-    }
-
     Ingestor::Ingestor(ResolvedProject &proj, const std::shared_ptr<spdlog::logger> &log, ProjectIssueCallback &issues) :
         project_(proj), logger_(log), issues_(issues) {}
 

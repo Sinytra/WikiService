@@ -5,13 +5,11 @@
 
 #include <any>
 #include <optional>
-#include <set>
 #include <shared_mutex>
 #include <string>
 #include "log/log.h"
 
 namespace service {
-    // TODO Per-task pool
     extern trantor::EventLoopThreadPool cacheAwaiterThreadPool;
 
     template<class T>
