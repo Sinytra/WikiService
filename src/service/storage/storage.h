@@ -3,7 +3,6 @@
 #include <models/Project.h>
 #include <nlohmann/json_fwd.hpp>
 #include <service/cache.h>
-#include <service/content/game_content.h>
 #include <service/error.h>
 #include <service/resolved.h>
 #include <service/storage/realtime.h>

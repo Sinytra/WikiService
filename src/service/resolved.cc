@@ -561,7 +561,7 @@ namespace service {
         const auto [pages, total, size, data] = co_await projectDb_->getProjectRecipesDev(params.query, params.page);
         std::vector<FullRecipeData> recipeDate;
         for (const auto &recipe: data) {
-            const auto resolved = co_await content::resolveRecipe(*this, recipe, locale_);
+            const auto resolved = co_await content::resolveRecipe(recipe, locale_);
             recipeDate.emplace_back(recipe.getValueOfLoc(), resolved ? nlohmann::json(*resolved) : nlohmann::json{});
         }
         co_return PaginatedData{.total = total, .pages = pages, .size = size, .data = recipeDate};
@@ -581,7 +581,11 @@ namespace service {
 
         const auto projectId = project_.getValueOfId();
         const auto parsed = ResourceLocation::parse(loc);
-        const auto localized = readLangKey("item." + projectId + "." + parsed->path_);
+        // TODO Preprocess locales
+        auto localized = readLangKey("item." + projectId + "." + parsed->path_);
+        if (!localized) {
+            localized = readLangKey("block." + projectId + "." + parsed->path_);
+        }
 
         co_return ItemData{.name = localized.value_or(""), .path = ""};
     }
@@ -605,6 +609,6 @@ namespace service {
         if (!recipe) {
             co_return std::nullopt;
         }
-        co_return co_await content::resolveRecipe(*this, *recipe, locale_);
+        co_return co_await content::resolveRecipe(*recipe, locale_);
     }
 }

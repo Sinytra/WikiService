@@ -49,7 +49,7 @@ namespace service {
 
     Task<Error> LangService::loadItemLanguageKeys(const std::string lang) {
         const auto cacheKey = "lang:" + lang;
-        static const auto itemKeyBase = "item.minecraft.";
+        static const std::vector<std::string> prefixes = {"item.minecraft.", "block.minecraft."};
 
         if (const auto cached = co_await global::cache->getFromCache(cacheKey)) {
             co_return Error::Ok;
@@ -66,10 +66,13 @@ namespace service {
             }
 
             for (const auto &[key, val]: langFile->items()) {
-                if (key.starts_with(itemKeyBase)) {
-                    if (const auto subKey = key.substr(strlen(itemKeyBase)); subKey.find(".") == std::string::npos) {
-                        const auto langCacheKey = std::format("lang:{}:minecraft:{}", lang, subKey);
-                        co_await global::cache->updateCache(langCacheKey, val.get<std::string>(), 0s);
+                for (const auto &prefix : prefixes) {
+                    if (key.starts_with(prefix)) {
+                        if (const auto subKey = key.substr(prefix.size()); subKey.find(".") == std::string::npos) {
+                            const auto langCacheKey = std::format("lang:{}:minecraft:{}", lang, subKey);
+                            co_await global::cache->updateCache(langCacheKey, val.get<std::string>(), 0s);
+                        }
+                        break;
                     }
                 }
             }

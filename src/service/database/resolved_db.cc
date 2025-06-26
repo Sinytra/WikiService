@@ -274,6 +274,22 @@ namespace service {
         co_return res.value_or(err);
     }
 
+    Task<size_t> ProjectDatabaseAccess::addRecipeWorkbenches(const std::string recipeType, const std::vector<std::string> items) const {
+        // language=postgresql
+        static constexpr auto query = "INSERT INTO recipe_workbench (type_id, item_id) \
+                                       SELECT r.id, pitem.id \
+                                       FROM recipe_type r \
+                                       JOIN project_item pitem \
+                                           ON pitem.item_id IN (SELECT id FROM item i WHERE $1::jsonb ? i.loc) \
+                                       WHERE r.loc = $2 \
+                                       AND r.version_id = $3 AND (pitem.version_id IS NULL OR pitem.version_id = $3)";
+        const auto [res, err] = co_await handleDatabaseOperation<size_t>([&, recipeType, items](const DbClientPtr &client) -> Task<size_t> {
+            const auto results = co_await client->execSqlCoro(query, unparkourJson(items), recipeType, versionId_);
+            co_return results.affectedRows();
+        });
+        co_return res.value_or(0);
+    }
+
     Task<std::optional<Recipe>> ProjectDatabaseAccess::getProjectRecipe(std::string recipe) const {
         const auto [res, err] = co_await handleDatabaseOperation<Recipe>([&, recipe](const DbClientPtr &client) -> Task<Recipe> {
             CoroMapper<Recipe> mapper(client);

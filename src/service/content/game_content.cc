@@ -82,10 +82,11 @@ namespace content {
 
         co_await wipeExistingData(project_.getProjectDatabase().getDbClientPtr(), projectId);
 
-        std::map<std::string, std::unique_ptr<SubIngestor>> ingestors;
-        ingestors.emplace("Content paths", std::make_unique<ContentPathsSubIngestor>(project_, logger_, issues_));
-        ingestors.emplace("Tags", std::make_unique<TagsSubIngestor>(project_, logger_, issues_));
-        ingestors.emplace("Recipes", std::make_unique<RecipesSubIngestor>(project_, logger_, issues_));
+        std::vector<std::pair<std::string, std::unique_ptr<SubIngestor>>> ingestors;
+        ingestors.emplace_back("Content paths", std::make_unique<ContentPathsSubIngestor>(project_, logger_, issues_));
+        ingestors.emplace_back("Tags", std::make_unique<TagsSubIngestor>(project_, logger_, issues_));
+        ingestors.emplace_back("Recipes", std::make_unique<RecipesSubIngestor>(project_, logger_, issues_));
+        ingestors.emplace_back("Metadata", std::make_unique<MetadataSubIngestor>(project_, logger_, issues_));
 
         // Prepare ingestors
         PreparationResult allResults;
@@ -113,7 +114,10 @@ namespace content {
 
             for (const auto &item: candidateItems) {
                 projectLog.trace("Registering item '{}'", item);
-                co_await project_.getProjectDatabase().addProjectItem(item);
+                if (const auto error = co_await project_.getProjectDatabase().addProjectItem(item); error != Error::Ok) {
+                    // TODO add issue
+                    co_return Error::ErrBadRequest;
+                }
             }
 
             projectLog.debug("Done registering items");

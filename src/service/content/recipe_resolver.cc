@@ -124,12 +124,9 @@ namespace content {
     };
 
     // TODO Cache in redis
-    Task<std::optional<ResolvedGameRecipe>> resolveRecipe(const ResolvedProject &project, const Recipe recipe,
-                                                          const std::optional<std::string> &locale) {
+    Task<std::optional<ResolvedGameRecipe>> resolveRecipe(const Recipe recipe, const std::optional<std::string> &locale) {
         const auto recipeId = recipe.getValueOfId();
         const auto recipeType = unwrap(co_await global::database->getModel<RecipeType>(recipe.getValueOfTypeId()));
-        const auto recipeTypeLoc = unwrap(ResourceLocation::parse(recipeType.getValueOfLoc()));
-        const auto type = unwrap(getRecipeType(project, recipeTypeLoc));
 
         const auto itemIngredients =
             co_await global::database->getRelated<RecipeIngredientItem>(RecipeIngredientItem::Cols::_recipe_id, recipeId);
@@ -151,7 +148,10 @@ namespace content {
 
         const RecipeSummary summary{.inputs = getIngredientSummary(mergedInput), .outputs = getIngredientSummary(mergedOutput)};
 
-        co_return ResolvedGameRecipe{
-            .id = recipe.getValueOfLoc(), .type = type, .inputs = mergedInput, .outputs = mergedOutput, .summary = summary};
+        co_return ResolvedGameRecipe{.id = recipe.getValueOfLoc(),
+                                     .type = recipeType.getValueOfLoc(),
+                                     .inputs = mergedInput,
+                                     .outputs = mergedOutput,
+                                     .summary = summary};
     }
 }

@@ -9,6 +9,5 @@
 using namespace drogon_model::postgres;
 
 namespace content {
-    drogon::Task<std::optional<ResolvedGameRecipe>> resolveRecipe(const service::ResolvedProject &project, Recipe recipe,
-                                                                  const std::optional<std::string> &locale);
+    drogon::Task<std::optional<ResolvedGameRecipe>> resolveRecipe(Recipe recipe, const std::optional<std::string> &locale);
 }

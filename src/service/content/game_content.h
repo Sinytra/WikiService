@@ -5,6 +5,7 @@
 #include <service/project_issue.h>
 #include <service/resolved.h>
 #include "ingestor_recipes.h"
+#include "ingestor_metadata.h"
 
 namespace content {
     struct PreparationResult {
@@ -85,14 +86,27 @@ namespace content {
 
     private:
         std::optional<PreparedData<StubRecipeType>> readRecipeType(const std::string &namespace_, const std::filesystem::path &root,
-                                                     const std::filesystem::path &path) const;
+                                                                   const std::filesystem::path &path) const;
         drogon::Task<service::Error> addRecipeType(PreparedData<StubRecipeType> type) const;
 
         std::optional<PreparedData<StubRecipe>> readRecipe(const std::string &namespace_, const std::filesystem::path &root,
-                                             const std::filesystem::path &path) const;
+                                                           const std::filesystem::path &path) const;
         drogon::Task<service::Error> addRecipe(PreparedData<StubRecipe> recipe) const;
 
         std::vector<PreparedData<StubRecipeType>> recipeTypes_;
         std::vector<PreparedData<StubRecipe>> recipes_;
+    };
+
+    class MetadataSubIngestor final : public SubIngestor {
+    public:
+        explicit MetadataSubIngestor(const service::ResolvedProject &, const std::shared_ptr<spdlog::logger> &,
+                                     service::ProjectIssueCallback &);
+
+        drogon::Task<PreparationResult> prepare() override;
+        drogon::Task<service::Error> execute() override;
+    private:
+        drogon::Task<service::Error> addWorkbenches(PreparedData<StubWorkbenches> workbenches) const;
+
+        std::vector<PreparedData<StubWorkbenches>> workbenches_;
     };
 }

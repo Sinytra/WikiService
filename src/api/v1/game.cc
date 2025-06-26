@@ -5,6 +5,7 @@
 #include <database/resolved_db.h>
 #include "content/recipe_parser.h"
 #include "error.h"
+#include "lang/lang.h"
 
 using namespace std;
 using namespace drogon;
@@ -69,20 +70,13 @@ namespace api::v1 {
         callback(jsonResponse(root));
     }
 
-    Task<> GameController::contentItemUsage(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
-                                            const std::string project, const std::string item) const {
-        if (item.empty()) {
-            throw ApiException(Error::ErrBadRequest, "Insufficient parameters");
-        }
-
-        const auto resolved = co_await BaseProjectController::getProjectWithParams(req, project);
-        const auto obtainable = co_await global::database->getObtainableItemsBy(item);
-
-        // TODO Deduplicate with recipeType
+    Task<nlohmann::json> resolveContentUsage(const ResolvedProject &resolved, std::vector<ContentUsage> items) {
         nlohmann::json root(nlohmann::json::value_t::array);
-        for (const auto &[id, loc, project, path]: obtainable) {
+        for (const auto &[id, loc, project, path]: items) {
             const auto dbItem = co_await global::database->getByPrimaryKey<Item>(id);
-            const auto [name, _] = co_await resolved.getItemName(dbItem);
+            // TODO Universal locale service
+            const auto name = project.empty() ? co_await global::lang->getItemName(resolved.getLocale(), loc)
+                : (co_await resolved.getItemName(dbItem)).name;
 
             nlohmann::json itemJson;
             itemJson["project"] = project.empty() ? nlohmann::json(nullptr) : nlohmann::json(project);
@@ -93,8 +87,20 @@ namespace api::v1 {
             itemJson["has_page"] = !path.empty();
             root.push_back(itemJson);
         }
+        co_return root;
+    }
 
-        callback(jsonResponse(root));
+    Task<> GameController::contentItemUsage(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+                                            const std::string project, const std::string item) const {
+        if (item.empty()) {
+            throw ApiException(Error::ErrBadRequest, "Insufficient parameters");
+        }
+
+        const auto resolved = co_await BaseProjectController::getProjectWithParams(req, project);
+        const auto obtainable = co_await global::database->getObtainableItemsBy(item);
+
+        const auto json = co_await resolveContentUsage(resolved, obtainable);
+        callback(jsonResponse(json));
     }
 
     Task<> GameController::recipe(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
@@ -128,20 +134,7 @@ namespace api::v1 {
         }
         const auto workbenches = co_await global::database->getRecipeTypeWorkbenches(recipeType->getValueOfId());
 
-        nlohmann::json workbenchItems(nlohmann::json::value_t::array);
-        for (const auto &[id, loc, project, path]: workbenches) {
-            const auto dbItem = co_await global::database->getByPrimaryKey<Item>(id);
-            const auto [name, _] = co_await resolved.getItemName(dbItem);
-
-            nlohmann::json itemJson;
-            itemJson["project"] = project.empty() ? nlohmann::json(nullptr) : nlohmann::json(project);
-            itemJson["id"] = loc;
-            if (!name.empty()) {
-                itemJson["name"] = name;
-            }
-            itemJson["has_page"] = !path.empty();
-            workbenchItems.push_back(itemJson);
-        }
+        const auto workbenchItems = co_await resolveContentUsage(resolved, workbenches);
 
         nlohmann::json root;
         root["type"] = *layout;

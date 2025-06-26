@@ -58,8 +58,13 @@ namespace service {
 
     void ProjectIssueCallback::addIssueAsync(const ProjectIssueLevel level, const ProjectIssueType type, const ProjectError subject,
                                              const std::string &details, const std::string &file) {
+        if (level == ProjectIssueLevel::ERROR)
+            hasErrors_ = true;
+
         app().getLoop()->queueInLoop(async_func(
-            [this, level, type, subject, details, file]() -> Task<> { co_await addIssue(level, type, subject, details, file); }));
+            [*this, level, type, subject, details, file]() mutable -> Task<> {
+                co_await addIssue(level, type, subject, details, file);
+            }));
     }
 
     bool ProjectIssueCallback::hasErrors() const { return hasErrors_; }

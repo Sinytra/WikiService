@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <fstream>
 #include <git2/repository.h>
+#include <service/content/game_content.h>
 #include <service/database/resolved_db.h>
 #include <service/deployment.h>
 #include <service/storage/gitops.h>

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Sinytra Wiki Recipe Workbenches",
+  "description": "Describes which blocks can handle each recipe type",
+  "type": "object",
+  "patternProperties": {
+    "^.{1,255}$": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "uniqueItems": true
+      }
+    }
+  },
+  "additionalProperties": false
+}

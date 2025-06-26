@@ -116,7 +116,7 @@ namespace content {
 
     struct ResolvedGameRecipe {
         std::string id;
-        GameRecipeType type;
+        std::string type;
         std::vector<ResolvedSlot> inputs;
         std::vector<ResolvedSlot> outputs;
         RecipeSummary summary;

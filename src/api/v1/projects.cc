@@ -437,8 +437,7 @@ namespace api::v1 {
 
     Task<> ProjectsController::getRecipes(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                           const std::string id) const {
-        const auto version = req->getOptionalParameter<std::string>("version");
-        const auto resolved = co_await BaseProjectController::getUserProject(req, id, version, std::nullopt);
+        const auto resolved = co_await BaseProjectController::getProjectWithParams(req, id);
         const auto recipes{co_await resolved.getRecipes(getTableQueryParams(req))};
         callback(jsonResponse(recipes));
     }

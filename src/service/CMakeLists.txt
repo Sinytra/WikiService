@@ -13,6 +13,7 @@ read_and_escape_schema("schemas/game-data.schema.json" GAME_DATA_EXPORT_SCHEMA)
 read_and_escape_schema("schemas/game-recipe-type.schema.json" GAME_RECIPE_TYPE_SCHEMA)
 read_and_escape_schema("schemas/game-recipe-base.schema.json" BASE_GAME_RECIPE_SCHEMA)
 read_and_escape_schema("schemas/game-recipe-custom.schema.json" CUSTOM_GAME_RECIPE_SCHEMA)
+read_and_escape_schema("schemas/workbenches.schema.json" RECIPE_WORKBENCHES)
 
 read_and_escape_schema("../../builtin/minecraft/recipe_type/crafting_shaped.json" SHAPED_CRAFTING)
 
@@ -31,6 +32,7 @@ add_library(service STATIC
         content/game_content.cc
         content/game_data.cc
         content/ingestor_content_paths.cc
+        content/ingestor_metadata.cc
         content/ingestor_tags.cc
         content/ingestor_recipes.cc
         content/recipe_builtin.cc

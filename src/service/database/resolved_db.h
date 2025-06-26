@@ -72,6 +72,7 @@ namespace service {
         drogon::Task<int> getProjectContentCount() const;
         drogon::Task<std::optional<std::string>> getProjectContentPath(std::string id) const;
         drogon::Task<Error> addProjectContentPage(std::string id, std::string path) const;
+        drogon::Task<size_t> addRecipeWorkbenches(std::string recipeType, std::vector<std::string> items) const;
 
         drogon::Task<std::optional<Recipe>> getProjectRecipe(std::string recipe) const;
         drogon::Task<std::optional<RecipeType>> getRecipeType(std::string type) const;

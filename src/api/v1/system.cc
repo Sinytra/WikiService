@@ -71,7 +71,5 @@ namespace api::v1 {
         const auto result = co_await importer.importData(parsed);
 
         callback(statusResponse(result == Error::Ok ? k200OK : k500InternalServerError));
-
-        co_return;
     }
 }
