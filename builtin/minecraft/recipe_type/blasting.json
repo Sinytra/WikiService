@@ -1,0 +1,10 @@
+{
+  "background": "gui/recipe/blasting",
+  "inputSlots": {
+    "1": {"x": 14, "y": 14},
+    "2": {"x": 14, "y": 86}
+  },
+  "outputSlots": {
+    "1": {"x": 143, "y": 50}
+  }
+}

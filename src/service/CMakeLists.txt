@@ -17,6 +17,7 @@ read_and_escape_schema("schemas/workbenches.schema.json" RECIPE_WORKBENCHES)
 
 read_and_escape_schema("../../builtin/minecraft/recipe_type/crafting.json" CRAFTING)
 read_and_escape_schema("../../builtin/minecraft/recipe_type/smelting.json" SMELTING)
+read_and_escape_schema("../../builtin/minecraft/recipe_type/blasting.json" BLASTING)
 
 configure_file(
         ${CMAKE_CURRENT_SOURCE_DIR}/schemas.cc

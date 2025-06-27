@@ -140,6 +140,29 @@
           }
         ]
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "minecraft:blasting"
+          }
+        }
+      },
+      "then": {
+        "description": "Represents a recipe in a blast furnace.",
+        "anyOf": [
+          {
+            "$ref": "#/definitions/tagsCommonToAllRecipes"
+          },
+          {
+            "$ref": "#/definitions/tagsCommonToAllCookingRecipes"
+          },
+          {
+            "$ref": "#/definitions/cookingRecipeCategory"
+          }
+        ]
+      }
     }
   ],
   "definitions": {
@@ -252,7 +275,8 @@
       "enum": [
         "minecraft:crafting_shaped",
         "minecraft:crafting_shapeless",
-        "minecraft:smelting"
+        "minecraft:smelting",
+        "minecraft:blasting"
       ]
     }
   }
