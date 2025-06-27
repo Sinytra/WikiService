@@ -117,6 +117,29 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "minecraft:smelting"
+          }
+        }
+      },
+      "then": {
+        "description": "Represents a recipe in a furnace.",
+        "anyOf": [
+          {
+            "$ref": "#/definitions/tagsCommonToAllRecipes"
+          },
+          {
+            "$ref": "#/definitions/tagsCommonToAllCookingRecipes"
+          },
+          {
+            "$ref": "#/definitions/cookingRecipeCategory"
+          }
+        ]
+      }
     }
   ],
   "definitions": {
@@ -193,6 +216,17 @@
         }
       }
     },
+    "cookingRecipeCategory": {
+      "title": "category",
+      "description": "Category of cooking recipes (in recipe book).",
+      "type": "object",
+      "properties": {
+        "category": {
+          "type": "string",
+          "enum": ["food", "blocks", "misc "]
+        }
+      }
+    },
     "result": {
       "title": "result",
       "description": "The output item of the recipe.",
@@ -217,7 +251,8 @@
       "type": "string",
       "enum": [
         "minecraft:crafting_shaped",
-        "minecraft:crafting_shapeless"
+        "minecraft:crafting_shapeless",
+        "minecraft:smelting"
       ]
     }
   }

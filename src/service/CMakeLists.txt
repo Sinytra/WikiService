@@ -15,7 +15,8 @@ read_and_escape_schema("schemas/game-recipe-base.schema.json" BASE_GAME_RECIPE_S
 read_and_escape_schema("schemas/game-recipe-custom.schema.json" CUSTOM_GAME_RECIPE_SCHEMA)
 read_and_escape_schema("schemas/workbenches.schema.json" RECIPE_WORKBENCHES)
 
-read_and_escape_schema("../../builtin/minecraft/recipe_type/crafting_shaped.json" SHAPED_CRAFTING)
+read_and_escape_schema("../../builtin/minecraft/recipe_type/crafting.json" CRAFTING)
+read_and_escape_schema("../../builtin/minecraft/recipe_type/smelting.json" SMELTING)
 
 configure_file(
         ${CMAKE_CURRENT_SOURCE_DIR}/schemas.cc

@@ -1,0 +1,10 @@
+{
+  "background": "gui/recipe/smelting",
+  "inputSlots": {
+    "1": {"x": 14, "y": 14},
+    "2": {"x": 14, "y": 86}
+  },
+  "outputSlots": {
+    "1": {"x": 134, "y": 50}
+  }
+}

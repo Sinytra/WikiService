@@ -3,5 +3,6 @@
 #include <nlohmann/json.hpp>
 
 namespace recipe_type::builtin {
-    nlohmann::json shapedCrafting = R"(@SHAPED_CRAFTING@)"_json;
+    nlohmann::json crafting = R"(@CRAFTING@)"_json;
+    nlohmann::json smelting = R"(@SMELTING@)"_json;
 }

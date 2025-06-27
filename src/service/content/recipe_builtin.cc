@@ -1,10 +1,10 @@
+#include "recipe_builtin.h"
 #include <content/builtin_recipe_type.h>
 #include <database/database.h>
 #include <drogon/drogon.h>
 #include <schemas.h>
 #include "game_content.h"
 #include "ingestor_recipes.h"
-#include "recipe_builtin.h"
 
 using namespace drogon;
 using namespace drogon::orm;
@@ -12,7 +12,7 @@ using namespace service;
 
 namespace content {
     using RecipeProcessor = std::function<std::optional<StubRecipe>(const std::string &id, const std::string &type,
-                                                                   const nlohmann::json &json, const ProjectFileIssueCallback &issues)>;
+                                                                    const nlohmann::json &json, const ProjectFileIssueCallback &issues)>;
 
     struct RecipeType {
         GameRecipeType displaySchema;
@@ -45,7 +45,7 @@ namespace content {
     }
 
     std::optional<StubRecipeIngredient> parseRecipeIngredient(const nlohmann::json &json, const std::string &slot,
-                                                          const ProjectFileIssueCallback &issues) {
+                                                              const ProjectFileIssueCallback &issues) {
         const auto ingredient = readRecipeIngredient(json, slot);
         if (!ingredient) {
             issues.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::INVALID_INGREDIENT, json.dump());
@@ -54,8 +54,29 @@ namespace content {
         return ingredient;
     }
 
+    std::vector<StubRecipeIngredient> parseArrayIngredient(const nlohmann::json &json, const std::string &slot,
+                                                           const ProjectFileIssueCallback &issues) {
+        std::vector<StubRecipeIngredient> result;
+
+        for (const auto items = json.is_array() ? json : nlohmann::json{json}; const auto &item: items) {
+            const auto parsed = parseRecipeIngredient(item, slot, issues);
+            if (!parsed) {
+                return {};
+            }
+            result.push_back(*parsed);
+        }
+
+        return result;
+    }
+
+    StubRecipeIngredient parseResult(nlohmann::json json, const std::string &slot) {
+        const auto resultId = json["id"].get<std::string>();
+        const auto count = json["count"].get<int>();
+        return {resultId, slot, count, false, false};
+    }
+
     std::optional<StubRecipe> readShapedCraftingRecipe(const std::string &id, const std::string &type, const nlohmann::json &json,
-                                                      const ProjectFileIssueCallback &issues) {
+                                                       const ProjectFileIssueCallback &issues) {
         const auto keys = json.at("key");
         const auto pattern = json.at("pattern");
         std::string concat = "";
@@ -87,16 +108,13 @@ namespace content {
             }
         }
 
-        const auto result = json.at("result");
-        const auto resultId = result["id"].get<std::string>();
-        const auto count = result["count"].get<int>();
-        recipe.ingredients.emplace_back(resultId, "1", count, false, false);
+        recipe.ingredients.push_back(parseResult(json["result"], "1"));
 
         return recipe;
     }
 
     std::optional<StubRecipe> readShapelessCraftingRecipe(const std::string &id, const std::string &type, const nlohmann::json &json,
-                                                         const ProjectFileIssueCallback &issues) {
+                                                          const ProjectFileIssueCallback &issues) {
         StubRecipe recipe{.id = id, .type = type};
 
         const auto ingredients = json["ingredients"];
@@ -108,10 +126,23 @@ namespace content {
             recipe.ingredients.push_back(*ingredient);
         }
 
-        const auto result = json["result"];
-        const auto resultId = result["id"].get<std::string>();
-        const auto count = result["count"].get<int>();
-        recipe.ingredients.emplace_back(resultId, "1", count, false, false);
+        recipe.ingredients.push_back(parseResult(json["result"], "1"));
+
+        return recipe;
+    }
+
+    std::optional<StubRecipe> readSmeltingRecipe(const std::string &id, const std::string &type, const nlohmann::json &json,
+                                                 const ProjectFileIssueCallback &issues) {
+        StubRecipe recipe{.id = id, .type = type};
+
+        const auto ingredientsJson = json["ingredient"];
+        const auto ingredients = parseArrayIngredient(ingredientsJson, "1", issues);
+        if (ingredients.empty()) {
+            return std::nullopt;
+        }
+        recipe.ingredients = ingredients;
+
+        recipe.ingredients.push_back(parseResult(json["result"], "1"));
 
         return recipe;
     }
@@ -131,13 +162,12 @@ namespace content {
     }
 
     void loadBuiltinRecipeTypes() {
-        loadRecipeType("minecraft:crafting_shaped", recipe_type::builtin::shapedCrafting, readShapedCraftingRecipe);
-        loadRecipeType("minecraft:crafting_shapeless", recipe_type::builtin::shapedCrafting, readShapelessCraftingRecipe);
+        loadRecipeType("minecraft:crafting_shaped", recipe_type::builtin::crafting, readShapedCraftingRecipe);
+        loadRecipeType("minecraft:crafting_shapeless", recipe_type::builtin::crafting, readShapelessCraftingRecipe);
+        loadRecipeType("minecraft:smelting", recipe_type::builtin::smelting, readSmeltingRecipe);
     }
 
-    bool VanillaRecipeParser::handlesType(const ResourceLocation type) {
-        return type.namespace_ == ResourceLocation::DEFAULT_NAMESPACE;
-    }
+    bool VanillaRecipeParser::handlesType(const ResourceLocation type) { return type.namespace_ == ResourceLocation::DEFAULT_NAMESPACE; }
 
     std::optional<GameRecipeType> VanillaRecipeParser::getType(const ResolvedProject &project, const ResourceLocation type) {
         const auto it = builtinRecipeTypes.find(type);
@@ -145,7 +175,7 @@ namespace content {
     }
 
     std::optional<StubRecipe> VanillaRecipeParser::parseRecipe(const std::string &id, const std::string &type, const nlohmann::json &data,
-                                                              const ProjectFileIssueCallback &issues) {
+                                                               const ProjectFileIssueCallback &issues) {
         if (const auto error = validateJson(schemas::gameRecipe, data)) {
             issues.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::INVALID_FORMAT, error->format());
             return std::nullopt;
