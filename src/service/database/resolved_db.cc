@@ -336,13 +336,4 @@ namespace service {
         });
         co_return res.value_or(std::vector<std::string>{});
     }
-
-    Task<Error> ProjectDatabaseAccess::refreshFlatTagItemView() const {
-        const auto [res, err] = co_await handleDatabaseOperation<Error>([](const DbClientPtr &client) -> Task<Error> {
-            // language=postgresql
-            co_await client->execSqlCoro("REFRESH MATERIALIZED VIEW tag_item_flat;");
-            co_return Error::Ok;
-        });
-        co_return res.value_or(err);
-    }
 }

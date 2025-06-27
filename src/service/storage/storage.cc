@@ -21,18 +21,17 @@ namespace fs = std::filesystem;
 
 const std::set<std::string> allowedFileExtensions = {".mdx", ".json", ".png", ".jpg", ".jpeg", ".webp", ".gif"};
 
-Error copyProjectFiles(const Project &project, const fs::path &src, const fs::path &dest, const std::shared_ptr<spdlog::logger> &logger) {
-    const auto docsPath = src / removeLeadingSlash(project.getValueOfSourcePath());
-    const auto gitPath = src / ".git";
+Error copyProjectFiles(const fs::path &root, const fs::path &docsRoot, const fs::path &dest, const std::shared_ptr<spdlog::logger> &logger) {
+    const auto gitPath = root / ".git";
 
     logger->info("Copying project files for version '{}'", dest.filename().string());
 
     try {
         create_directories(dest);
 
-        for (const auto &entry: fs::recursive_directory_iterator(src)) {
-            if (!isSubpath(entry.path(), gitPath) && entry.is_regular_file() && isSubpath(entry.path(), docsPath)) {
-                fs::path relative_path = relative(entry.path(), src);
+        for (const auto &entry: fs::recursive_directory_iterator(root)) {
+            if (!isSubpath(entry.path(), gitPath) && entry.is_regular_file() && isSubpath(entry.path(), docsRoot)) {
+                fs::path relative_path = relative(entry.path(), docsRoot);
 
                 if (const auto extension = entry.path().extension().string(); !allowedFileExtensions.contains(extension)) {
                     logger->warn("Ignoring file {}", relative_path.string());
@@ -221,7 +220,6 @@ namespace service {
 
     Task<ProjectError> Storage::setupProject(const Project &project, Deployment &deployment, const fs::path clonePath) const {
         const auto logger = getProjectLogger(project);
-
         logger->info("Setting up project");
 
         deployment.setStatus(enumToStr(DeploymentStatus::LOADING));
@@ -255,7 +253,8 @@ namespace service {
         deployment.setRevision(nlohmann::json(*revision).dump());
         co_await global::database->updateModel(deployment);
 
-        ResolvedProject resolved{project, clonePath / removeLeadingSlash(project.getValueOfSourcePath()), *defaultVersion};
+        const auto cloneDocsRoot = clonePath / removeLeadingSlash(project.getValueOfSourcePath());
+        ResolvedProject resolved{project, cloneDocsRoot, *defaultVersion};
 
         // TODO Ingest from other versions?
         content::Ingestor ingestor{resolved, logger, issues};
@@ -276,7 +275,7 @@ namespace service {
         }
 
         const auto dest = getProjectDirPath(project);
-        copyProjectFiles(project, clonePath, dest, logger);
+        copyProjectFiles(clonePath, cloneDocsRoot, dest, logger);
 
         for (const auto &version: versions) {
             const auto name = version.getValueOfName();
@@ -289,7 +288,7 @@ namespace service {
             }
 
             const auto versionDest = getProjectDirPath(project, name);
-            copyProjectFiles(project, clonePath, versionDest, logger);
+            copyProjectFiles(clonePath, cloneDocsRoot, versionDest, logger);
         }
 
         git_repository_free(repo);
@@ -374,16 +373,13 @@ namespace service {
             co_return {std::nullopt, Error::ErrNotFound};
         }
 
-        // TODO Copy to version root, dont rely on source path
-        const auto docsDir = rootDir / removeLeadingSlash(project.getValueOfSourcePath());
-
         if (version) {
             const auto resolvedVersion = co_await global::database->getProjectVersion(project.getValueOfId(), *version);
             if (!resolvedVersion) {
                 co_return {std::nullopt, Error::ErrNotFound};
             }
 
-            ResolvedProject resolved{project, docsDir, *resolvedVersion};
+            ResolvedProject resolved{project, rootDir, *resolvedVersion};
             resolved.setLocale(locale);
             co_return {resolved, Error::Ok};
         }
@@ -393,7 +389,7 @@ namespace service {
             co_return {std::nullopt, Error::ErrNotFound};
         }
 
-        ResolvedProject resolved{project, docsDir, *defaultVersion};
+        ResolvedProject resolved{project, rootDir, *defaultVersion};
         resolved.setLocale(locale);
         co_return {resolved, Error::Ok};
     }
@@ -426,10 +422,6 @@ namespace service {
     }
 
     Task<Error> Storage::invalidateProject(const Project &project) const {
-        if (const auto [resolved, error] = co_await findProject(project, std::nullopt, std::nullopt); !resolved) {
-            co_return error;
-        }
-
         logger.debug("Invalidating project '{}'", project.getValueOfId());
 
         const auto basePath = getBaseDir().path() / project.getValueOfId();

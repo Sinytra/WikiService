@@ -5,6 +5,15 @@ using namespace drogon;
 using namespace drogon::orm;
 
 namespace service {
+    Task<Error> Database::refreshFlatTagItemView() const {
+        const auto [res, err] = co_await handleDatabaseOperation<Error>([](const DbClientPtr &client) -> Task<Error> {
+            // language=postgresql
+            co_await client->execSqlCoro("REFRESH MATERIALIZED VIEW tag_item_flat;");
+            co_return Error::Ok;
+        });
+        co_return res.value_or(err);
+    }
+
     Task<Error> Database::addItem(const std::string item) const {
         // language=postgresql
         static constexpr auto query = "INSERT INTO project_item (item_id, version_id) \

@@ -42,6 +42,7 @@ namespace config {
         std::string appUrl;
         std::string curseForgeKey;
         std::string storagePath;
+        bool local;
     };
 
     SystemConfig configure();

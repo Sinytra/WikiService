@@ -78,8 +78,6 @@ namespace service {
         drogon::Task<std::optional<RecipeType>> getRecipeType(std::string type) const;
         drogon::Task<std::vector<std::string>> getItemRecipes(std::string item) const;
 
-        drogon::Task<Error> refreshFlatTagItemView() const;
-
     private:
         const ResolvedProject &project_;
         const std::string projectId_;

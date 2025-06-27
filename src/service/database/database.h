@@ -98,6 +98,7 @@ namespace service {
         drogon::Task<std::optional<Project>> getUserProject(std::string username, std::string id) const;
         drogon::Task<Error> assignUserProject(std::string username, std::string id, std::string role) const;
 
+        drogon::Task<Error> refreshFlatTagItemView() const;
         drogon::Task<Error> addItem(std::string item) const;
         drogon::Task<Error> addTag(std::string tag) const;
         drogon::Task<Error> addTagItemEntry(std::string tag, std::string item) const;

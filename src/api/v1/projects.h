@@ -15,6 +15,8 @@ namespace api::v1 {
 
     class ProjectsController final : public drogon::HttpController<ProjectsController, false> {
     public:
+        explicit ProjectsController(bool localEnv);
+
         // clang-format off
         METHOD_LIST_BEGIN
         // Public
@@ -113,5 +115,7 @@ namespace api::v1 {
                                                                bool checkExisting) const;
 
         void enqueueDeploy(const Project &project, std::string userId) const;
+
+        bool localEnv_;
     };
 }

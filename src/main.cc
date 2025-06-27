@@ -74,7 +74,7 @@ int main() {
         app().setLogLevel(level).addListener("0.0.0.0", port).setThreadNum(16);
         configureLoggingLevel();
 
-        const auto [authConfig, githubAppConfig, mrApp, cloudFlareConfig, crowdinConfig, appUrl, curseForgeKey, storagePath] =
+        const auto [authConfig, githubAppConfig, mrApp, cloudFlareConfig, crowdinConfig, appUrl, curseForgeKey, storagePath, local] =
             config::configure();
 
         global::database = std::make_shared<Database>();
@@ -95,7 +95,7 @@ int main() {
         auto authController(std::make_shared<api::v1::AuthController>(authConfig));
         auto controller(std::make_shared<api::v1::DocsController>());
         auto browseController(std::make_shared<api::v1::BrowseController>());
-        auto projectsController(std::make_shared<api::v1::ProjectsController>());
+        auto projectsController(std::make_shared<api::v1::ProjectsController>(local));
         auto projectWSController(std::make_shared<api::v1::ProjectWebSocketController>());
         auto gameController(std::make_shared<api::v1::GameController>());
         auto systemController(std::make_shared<api::v1::SystemController>());

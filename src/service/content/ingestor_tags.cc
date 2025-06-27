@@ -143,7 +143,8 @@ namespace content {
     Task<Error> TagsSubIngestor::finish() {
         if (tagIds_.size() > 0) {
             logger.debug("Refreshing flat tag->item view after data ingestion");
-            co_await project_.getProjectDatabase().refreshFlatTagItemView();
+            const Database transDb{project_.getProjectDatabase().getDbClientPtr()};
+            co_await transDb.refreshFlatTagItemView();
         }
         co_return Error::Ok;
     }

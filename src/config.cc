@@ -83,7 +83,8 @@ SystemConfig configureFromEnvironment() {
 
             .appUrl = std::getenv("APP_URL"),
             .curseForgeKey = std::getenv("CURSEFORGE_KEY"),
-            .storagePath = std::getenv("STORAGE_PATH")};
+            .storagePath = std::getenv("STORAGE_PATH"),
+            .local = std::string(std::getenv("LOCAL")) == "true"};
 }
 
 SystemConfig config::configure() {
@@ -123,7 +124,8 @@ SystemConfig config::configure() {
                            .crowdin = crowdin,
                            .appUrl = customConfig["app_url"].asString(),
                            .curseForgeKey = customConfig["curseforge_key"].asString(),
-                           .storagePath = customConfig["storage_path"].asString()};
+                           .storagePath = customConfig["storage_path"].asString(),
+                           .local = customConfig.isMember("local") && customConfig["local"].asBool()};
 
     if (!customConfig.isMember("api_key") || customConfig["api_key"].asString().empty()) {
         logger.warn("No API key configured, allowing public API access.");

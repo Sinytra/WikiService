@@ -19,8 +19,6 @@
 #include "deployment.h"
 #include "error.h"
 
-#define MODID_MINECRAFT "minecraft"
-
 using namespace std;
 using namespace drogon;
 using namespace service;
@@ -45,6 +43,8 @@ namespace api::v1 {
             co_return false;
         }
     }
+
+    ProjectsController::ProjectsController(const bool localEnv) : localEnv_(localEnv) {}
 
     nlohmann::json ProjectsController::processPlatforms(const nlohmann::json &metadata) const {
         const std::vector<std::string> &valid = global::platforms->getAvailablePlatforms();
@@ -84,8 +84,8 @@ namespace api::v1 {
                                [&](Json::Value &root) { root["details"] = "Platform: " + platform; });
         }
 
-        bool skipCheck = false;
-        if (checkExisting) {
+        bool skipCheck = localEnv_;
+        if (!skipCheck && checkExisting) {
             if (const auto [proj, projErr] = co_await global::database->getProjectSource(id); proj) {
                 if (const auto platforms = parseJsonString(proj->getValueOfPlatforms());
                     platforms && platforms->isMember(platform) && (*platforms)[platform] == slug)
@@ -126,6 +126,8 @@ namespace api::v1 {
     Task<ValidatedProjectData> ProjectsController::validateProjectData(const Json::Value &json, const User user,
                                                                        std::function<void(const HttpResponsePtr &)> callback,
                                                                        const bool checkExisting) const {
+        static const std::set<std::string> allowedProtocols = {"http", "https"};
+
         // Required
         const auto branch = json["branch"].asString();
         const auto repo = json["repo"].asString();
@@ -133,6 +135,10 @@ namespace api::v1 {
 
         try {
             const uri repoUri(repo);
+
+            if (!localEnv_ && !allowedProtocols.contains(repoUri.get_scheme())) {
+                throw ApiException(Error::ErrBadRequest, "no_repository");
+            }
         } catch (const std::exception &e) {
             logger.error("Invalid repository URL provided: {} Error: {}", repo, e.what());
             throw ApiException(Error::ErrBadRequest, "no_repository");
@@ -150,8 +156,13 @@ namespace api::v1 {
         }
 
         const std::string id = (*resolved)["id"];
-        if (id == MODID_MINECRAFT || id.size() < 2) {
+        if (id == ResourceLocation::DEFAULT_NAMESPACE || id.size() < 2) {
             throw ApiException(Error::ErrBadRequest, "illegal_id");
+        }
+
+        const std::string modid = (*resolved)["modid"];
+        if (modid == ResourceLocation::DEFAULT_NAMESPACE || modid == ResourceLocation::COMMON_NAMESPACE) {
+            throw ApiException(Error::ErrBadRequest, "illegal_modid");
         }
 
         const auto platforms = processPlatforms(*resolved);
@@ -178,6 +189,7 @@ namespace api::v1 {
         project.setType(projectTypeToString(preferredProj.type));
         project.setPlatforms(platforms.dump());
         project.setIsPublic(isPublic);
+        project.setModid(modid);
 
         co_return ValidatedProjectData{.project = project, .platforms = platforms};
     }
@@ -358,6 +370,7 @@ namespace api::v1 {
         }
 
         co_await global::storage->invalidateProject(project);
+        co_await global::database->refreshFlatTagItemView();
 
         callback(simpleResponse("Project deleted successfully"));
     }
