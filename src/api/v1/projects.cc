@@ -44,6 +44,16 @@ namespace api::v1 {
         }
     }
 
+    bool isOwner(const nlohmann::json &owners, const std::string &username) {
+        const auto lowerUsername = strToLower(username);
+        for (const auto &owner : owners) {
+            if (strToLower(owner.get<std::string>()) == lowerUsername) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     ProjectsController::ProjectsController(const bool localEnv) : localEnv_(localEnv) {}
 
     nlohmann::json ProjectsController::processPlatforms(const nlohmann::json &metadata) const {
@@ -66,8 +76,7 @@ namespace api::v1 {
     }
 
     Task<PlatformProject> ProjectsController::validatePlatform(const std::string &id, const std::string &repo, const std::string &platform,
-                                                               const std::string &slug, const bool checkExisting, const User user,
-                                                               std::function<void(const HttpResponsePtr &)> callback) const {
+                                                               const std::string &slug, const bool checkExisting, const User user) const {
         if (platform == PLATFORM_CURSEFORGE && !global::platforms->curseforge_.isAvailable()) {
             throw ApiException(Error::ErrBadRequest, "cf_unavailable");
         }
@@ -110,6 +119,7 @@ namespace api::v1 {
      * Resolution errors:
      * - internal: Internal server error
      * - unknown: Internal server error
+     * - not_owner: Unauthorized to register project
      * Platform errors:
      * - no_platforms: No defined platform projects
      * - no_project: Platform project not found
@@ -124,7 +134,6 @@ namespace api::v1 {
      * - invalid_meta: Metadata file format is invalid
      */
     Task<ValidatedProjectData> ProjectsController::validateProjectData(const Json::Value &json, const User user,
-                                                                       std::function<void(const HttpResponsePtr &)> callback,
                                                                        const bool checkExisting) const {
         static const std::set<std::string> allowedProtocols = {"http", "https"};
 
@@ -155,6 +164,10 @@ namespace api::v1 {
             throw ApiException(Error::ErrBadRequest, enumToStr(err), [&details](Json::Value &root) { root["details"] = details; });
         }
 
+        if (!checkExisting && resolved->contains("owners") && !isOwner((*resolved)["owners"], user.getValueOfId())) {
+            throw ApiException(Error::ErrBadRequest, "not_owner");
+        }
+
         const std::string id = (*resolved)["id"];
         if (id == ResourceLocation::DEFAULT_NAMESPACE || id.size() < 2) {
             throw ApiException(Error::ErrBadRequest, "illegal_id");
@@ -172,7 +185,7 @@ namespace api::v1 {
 
         std::unordered_map<std::string, PlatformProject> platformProjects;
         for (const auto &[key, val]: platforms.items()) {
-            const auto platformProj = co_await validatePlatform(id, repo, key, val, checkExisting, user, callback);
+            const auto platformProj = co_await validatePlatform(id, repo, key, val, checkExisting, user);
             platformProjects.emplace(key, platformProj);
         }
         const auto &preferredProj =
@@ -300,7 +313,7 @@ namespace api::v1 {
             throw ApiException(Error::ErrBadRequest, "exists");
         }
 
-        auto validated = co_await validateProjectData(*json, session.user, callback, false);
+        auto validated = co_await validateProjectData(*json, session.user, false);
         auto [project, platforms] = validated;
         project.setIsCommunity(isCommunity);
 
@@ -341,7 +354,7 @@ namespace api::v1 {
             throw ApiException(Error::ErrBadRequest, error->msg);
         }
 
-        auto [project, platforms] = co_await validateProjectData(*json, session.user, callback, true);
+        auto [project, platforms] = co_await validateProjectData(*json, session.user, true);
 
         if (const auto [proj, projErr] = co_await global::database->getProjectSource(project.getValueOfId()); !proj) {
             throw ApiException(Error::ErrNotFound, "not_found");
