@@ -6,4 +6,5 @@ namespace recipe_type::builtin {
     nlohmann::json crafting = R"(@CRAFTING@)"_json;
     nlohmann::json smelting = R"(@SMELTING@)"_json;
     nlohmann::json blasting = R"(@BLASTING@)"_json;
+    nlohmann::json campfireCooking = R"(@CAMPFIRE_COOKING@)"_json;
 }
