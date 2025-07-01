@@ -167,6 +167,7 @@ namespace content {
         loadRecipeType("minecraft:smelting", recipe_type::builtin::smelting, readSmeltingRecipe);
         loadRecipeType("minecraft:blasting", recipe_type::builtin::blasting, readSmeltingRecipe);
         loadRecipeType("minecraft:campfire_cooking", recipe_type::builtin::campfireCooking, readSmeltingRecipe);
+        loadRecipeType("minecraft:smoking", recipe_type::builtin::smoking, readSmeltingRecipe);
     }
 
     bool VanillaRecipeParser::handlesType(const ResourceLocation type) { return type.namespace_ == ResourceLocation::DEFAULT_NAMESPACE; }

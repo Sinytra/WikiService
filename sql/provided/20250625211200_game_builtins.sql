@@ -4,7 +4,8 @@ VALUES ('minecraft:crafting_shaped'),
        ('minecraft:crafting_shapeless'),
        ('minecraft:smelting'),
        ('minecraft:blasting'),
-       ('minecraft:campfire_cooking');
+       ('minecraft:campfire_cooking'),
+       ('minecraft:smoking');
 
 -- Vanilla recipe workbenches
 INSERT INTO recipe_workbench (type_id, item_id)
@@ -49,10 +50,19 @@ FROM recipe_type r
                                      FROM item i
                                      WHERE i.loc IN
                                            (
-                                               'minecraft:campfire',
-                                               'minecraft:soul_campfire'
+                                            'minecraft:campfire',
+                                            'minecraft:soul_campfire'
                                                ))
 WHERE r.loc IN (
     'minecraft:campfire_cooking'
+    )
+  AND r.version_id IS NULL;
+
+INSERT INTO recipe_workbench (type_id, item_id)
+SELECT r.id, pitem.id
+FROM recipe_type r
+         JOIN project_item pitem ON pitem.item_id = (SELECT id FROM item i WHERE i.loc = 'minecraft:smoker')
+WHERE r.loc IN (
+    'minecraft:smoking'
     )
   AND r.version_id IS NULL;

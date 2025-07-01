@@ -19,6 +19,7 @@ read_and_escape_schema("../../builtin/minecraft/recipe_type/crafting.json" CRAFT
 read_and_escape_schema("../../builtin/minecraft/recipe_type/smelting.json" SMELTING)
 read_and_escape_schema("../../builtin/minecraft/recipe_type/blasting.json" BLASTING)
 read_and_escape_schema("../../builtin/minecraft/recipe_type/campfire_cooking.json" CAMPFIRE_COOKING)
+read_and_escape_schema("../../builtin/minecraft/recipe_type/smoking.json" SMOKING)
 
 configure_file(
         ${CMAKE_CURRENT_SOURCE_DIR}/schemas.cc
