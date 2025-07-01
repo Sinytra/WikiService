@@ -20,6 +20,8 @@ read_and_escape_schema("../../builtin/minecraft/recipe_type/smelting.json" SMELT
 read_and_escape_schema("../../builtin/minecraft/recipe_type/blasting.json" BLASTING)
 read_and_escape_schema("../../builtin/minecraft/recipe_type/campfire_cooking.json" CAMPFIRE_COOKING)
 read_and_escape_schema("../../builtin/minecraft/recipe_type/smoking.json" SMOKING)
+read_and_escape_schema("../../builtin/minecraft/recipe_type/stonecutting.json" STONECUTTING)
+read_and_escape_schema("../../builtin/minecraft/recipe_type/smithing_transform.json" SMITHING_TRANSFORM)
 
 configure_file(
         ${CMAKE_CURRENT_SOURCE_DIR}/schemas.cc

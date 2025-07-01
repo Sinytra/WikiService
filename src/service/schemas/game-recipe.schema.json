@@ -9,6 +9,29 @@
       "if": {
         "properties": {
           "type": {
+            "const": "minecraft:campfire_cooking"
+          }
+        }
+      },
+      "then": {
+        "description": "Represents a recipe in a campfire.",
+        "anyOf": [
+          {
+            "$ref": "#/definitions/tagsCommonToAllRecipes"
+          },
+          {
+            "$ref": "#/definitions/tagsCommonToAllCookingRecipes"
+          },
+          {
+            "$ref": "#/definitions/cookingRecipeCategory"
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
             "const": "minecraft:crafting_shaped"
           }
         }
@@ -163,6 +186,97 @@
           }
         ]
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "minecraft:smithing_transform"
+          }
+        }
+      },
+      "then": {
+        "$ref": "#/definitions/tagsCommonToAllRecipes",
+        "description": "Represents a recipe in a smithing table.",
+        "properties": {
+          "base": {
+            "$ref": "#/definitions/item",
+            "title": "base",
+            "description": "Ingredient specifying an item to be upgraded."
+          },
+          "addition": {
+            "$ref": "#/definitions/item",
+            "title": "addition"
+          },
+          "template": {
+            "$ref": "#/definitions/item",
+            "title": "template"
+          },
+          "result": {
+            "title": "result",
+            "$ref": "#/definitions/result"
+          }
+        },
+        "required": ["base", "addition", "template", "result"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "minecraft:smoking"
+          }
+        }
+      },
+      "then": {
+        "description": "Represents a recipe in a smoker.",
+        "anyOf": [
+          {
+            "$ref": "#/definitions/tagsCommonToAllRecipes"
+          },
+          {
+            "$ref": "#/definitions/tagsCommonToAllCookingRecipes"
+          },
+          {
+            "$ref": "#/definitions/cookingRecipeCategory"
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "minecraft:stonecutting"
+          }
+        }
+      },
+      "then": {
+        "$ref": "#/definitions/tagsCommonToAllRecipes",
+        "description": "Represents a recipe in a stonecutter.",
+        "oneOf": [
+          {
+            "$ref": "#/definitions/item",
+            "title": "ingredient",
+            "description": "The ingredient for the recipe."
+          },
+          {
+            "title": "ingredient",
+            "description": "The list of ingredients for the recipe.",
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/item",
+              "title": "ingredient"
+            }
+          }
+        ],
+        "properties": {
+          "result": {
+            "title": "result",
+            "$ref": "#/definitions/result"
+          }
+        }
+      }
     }
   ],
   "definitions": {
@@ -273,10 +387,14 @@
       "description": "The type of recipe.",
       "type": "string",
       "enum": [
+        "minecraft:blasting",
+        "minecraft:campfire_cooking",
         "minecraft:crafting_shaped",
         "minecraft:crafting_shapeless",
         "minecraft:smelting",
-        "minecraft:blasting"
+        "minecraft:smithing_transform",
+        "minecraft:smoking",
+        "minecraft:stonecutting"
       ]
     }
   }

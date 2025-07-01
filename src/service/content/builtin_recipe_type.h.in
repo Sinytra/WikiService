@@ -8,4 +8,6 @@ namespace recipe_type::builtin {
     nlohmann::json blasting = R"(@BLASTING@)"_json;
     nlohmann::json campfireCooking = R"(@CAMPFIRE_COOKING@)"_json;
     nlohmann::json smoking = R"(@SMOKING@)"_json;
+    nlohmann::json stonecutting = R"(@STONECUTTING@)"_json;
+    nlohmann::json smithingTransform = R"(@SMITHING_TRANSFORM@)"_json;
 }

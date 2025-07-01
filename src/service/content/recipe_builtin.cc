@@ -147,6 +147,41 @@ namespace content {
         return recipe;
     }
 
+    std::optional<StubRecipe> readStonecuttingRecipe(const std::string &id, const std::string &type, const nlohmann::json &json,
+                                                 const ProjectFileIssueCallback &issues) {
+        StubRecipe recipe{.id = id, .type = type};
+
+        const auto ingredientsJson = json["ingredient"];
+        const auto ingredients = parseArrayIngredient(ingredientsJson, "1", issues);
+        if (ingredients.empty()) {
+            return std::nullopt;
+        }
+        recipe.ingredients = ingredients;
+
+        recipe.ingredients.push_back(parseResult(json["result"], "1"));
+
+        return recipe;
+    }
+
+    std::optional<StubRecipe> readSmithingTransformRecipe(const std::string &id, const std::string &type, const nlohmann::json &json,
+                                                 const ProjectFileIssueCallback &issues) {
+        StubRecipe recipe{.id = id, .type = type};
+        static const std::vector<std::string> ingredientNames{ "template", "base", "addition" };
+
+        for (int i = 0; i < ingredientNames.size(); ++i) {
+            const auto key = ingredientNames[i];
+            const auto ingredients = parseArrayIngredient(json[key], std::to_string(i), issues);
+            if (ingredients.empty()) {
+                return std::nullopt;
+            }
+            recipe.ingredients.insert(recipe.ingredients.end(), ingredients.begin(), ingredients.end());
+        }
+
+        recipe.ingredients.push_back(parseResult(json["result"], "1"));
+
+        return recipe;
+    }
+
     std::unordered_map<std::string, RecipeType> builtinRecipeTypes;
 
     void loadRecipeType(const std::string &id, const nlohmann::json &json, const RecipeProcessor &processor) {
@@ -168,6 +203,8 @@ namespace content {
         loadRecipeType("minecraft:blasting", recipe_type::builtin::blasting, readSmeltingRecipe);
         loadRecipeType("minecraft:campfire_cooking", recipe_type::builtin::campfireCooking, readSmeltingRecipe);
         loadRecipeType("minecraft:smoking", recipe_type::builtin::smoking, readSmeltingRecipe);
+        loadRecipeType("minecraft:stonecutting", recipe_type::builtin::stonecutting, readStonecuttingRecipe);
+        loadRecipeType("minecraft:smithing_transform", recipe_type::builtin::smithingTransform, readSmithingTransformRecipe);
     }
 
     bool VanillaRecipeParser::handlesType(const ResourceLocation type) { return type.namespace_ == ResourceLocation::DEFAULT_NAMESPACE; }
