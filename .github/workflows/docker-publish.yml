@@ -3,7 +3,7 @@ name: Docker
 on:
   workflow_dispatch:
   push:
-    branches: [ "master", "next" ]
+    branches: [ "master", "next", "deploy/staging" ]
     tags: [ 'v*.*.*' ]
   pull_request:
     branches: [ "master" ]
