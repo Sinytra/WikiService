@@ -68,17 +68,17 @@ namespace content {
             // Vanilla
             if (item.project_id.empty()) {
                 const auto name = co_await global::lang->getItemName(locale_, item.loc);
-                co_return ResolvedItem{.id = item.loc, .name = name, .project = "", false};
+                co_return ResolvedItem{.id = item.loc, .name = name, .project = "", .has_page = false};
             }
 
             // Modded
             if (const auto [resolved, resolveErr] = co_await global::storage->getProject(item.project_id, std::nullopt, locale_); resolved)
             {
                 const auto [name, path] = co_await resolved->getItemName(item.loc);
-                co_return ResolvedItem{.id = item.loc, .name = name, .project = item.project_id, !path.empty()};
+                co_return ResolvedItem{.id = item.loc, .name = name, .project = item.project_id, .has_page = !path.empty()};
             }
 
-            co_return ResolvedItem{.id = item.loc, .name = "", .project = item.project_id, false};
+            co_return ResolvedItem{.id = item.loc, .name = "", .project = item.project_id, .has_page = false};
         }
 
         Task<ResolvedSlot> resolveIngredient(const RecipeIngredientItem ingredient) const {

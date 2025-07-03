@@ -6,7 +6,7 @@ WORKDIR /build
 RUN apt-get update && apt-get install -y \
     cmake git gcc g++ ninja-build \
     uuid-dev zlib1g-dev libc-ares-dev libbrotli-dev \
-    postgresql-all libhiredis-dev libspdlog-dev
+    postgresql-all libhiredis-dev libspdlog-dev libzip-dev
 
 # Build and install jsoncpp
 RUN git clone https://github.com/open-source-parsers/jsoncpp && cd jsoncpp && git checkout 1.9.6 \

@@ -10,8 +10,8 @@
 namespace service {
     template<class T>
     struct PaginatedData {
-        int pages;
         int total;
+        int pages;
         int size;
         std::vector<T> data;
 

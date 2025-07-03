@@ -19,9 +19,6 @@ endif ()
 
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-# libzip build fix
-check_include_files(stdbool.h HAVE_STDBOOL_H)
-add_compile_definitions(HAVE_STDBOOL_H)
 
 add_executable(${PROJECT_NAME}
         config.cc
@@ -38,6 +35,7 @@ if (NOT USE_LOCAL_DEPS)
     find_package(Drogon CONFIG REQUIRED)
     find_package(spdlog CONFIG REQUIRED)
     find_package(OpenSSL CONFIG REQUIRED)
+    find_package(libzip CONFIG REQUIRED)
 endif ()
 target_link_libraries(${PROJECT_NAME} PRIVATE
         api

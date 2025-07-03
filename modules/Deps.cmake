@@ -19,15 +19,15 @@ IF (WIN32 AND USE_LOCAL_DEPS)
 
         file(MAKE_DIRECTORY ${hiredis_SOURCE_DIR}/include/hiredis)
         file(GLOB HIREDIS_HEADERS "${hiredis_SOURCE_DIR}/*.h")
-        foreach(header ${HIREDIS_HEADERS})
+        foreach (header ${HIREDIS_HEADERS})
             configure_file(${header} ${hiredis_SOURCE_DIR}/include/hiredis COPYONLY)
-        endforeach()
+        endforeach ()
 
         target_include_directories(hiredis PUBLIC
                 $<BUILD_INTERFACE:${hiredis_SOURCE_DIR}/include>
                 $<INSTALL_INTERFACE:include>
         )
-    endif()
+    endif ()
 
     CPMAddPackage(
             NAME jsoncpp
@@ -36,7 +36,7 @@ IF (WIN32 AND USE_LOCAL_DEPS)
     )
     if (jsoncpp_ADDED)
         add_library(Jsoncpp_lib ALIAS jsoncpp_static)
-    endif()
+    endif ()
 
     CPMAddPackage(
             NAME drogon
@@ -49,8 +49,8 @@ IF (WIN32 AND USE_LOCAL_DEPS)
     )
     if (drogon_ADDED)
         add_library(Drogon::Drogon ALIAS drogon)
-    endif()
-ENDIF()
+    endif ()
+ENDIF ()
 
 CPMAddPackage(
         NAME nlohmann_json_schema_validator
@@ -69,16 +69,5 @@ CPMAddPackage(
         GIT_TAG v1.9.0
         OPTIONS
         "BUILD_TESTS OFF"
-        "BUILD_SHARED_LIBS OFF"
-)
-
-CPMAddPackage(
-        NAME lizip
-        GITHUB_REPOSITORY nih-at/libzip
-        GIT_TAG v1.11.4
-        OPTIONS
-        "BUILD_DOC OFF"
-        "BUILD_EXAMPLES OFF"
-        "BUILD_TOOLS OFF"
         "BUILD_SHARED_LIBS OFF"
 )
