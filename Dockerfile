@@ -34,7 +34,8 @@ FROM debian:sid-slim AS main
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y ca-certificates libspdlog-dev libc-ares-dev libfmt10 libbrotli-dev libhiredis-dev libpq5
+RUN apt-get update && apt-get install -y ca-certificates libspdlog-dev libc-ares-dev libfmt10 libbrotli-dev \
+    libhiredis-dev libpq5 libzip
 
 COPY --from=build /build/src/build/bin/wiki_service /app
 
