@@ -1,4 +1,4 @@
-#include "game_content.h"
+#include "ingestor.h"
 
 #include <database/resolved_db.h>
 #include <drogon/drogon.h>
@@ -14,7 +14,7 @@ namespace fs = std::filesystem;
 
 namespace content {
     ContentPathsSubIngestor::ContentPathsSubIngestor(const ResolvedProject &proj, const std::shared_ptr<spdlog::logger> &log,
-                                                     ProjectIssueCallback &issues) : SubIngestor(proj, log, issues) {}
+                                                     ProjectFileIssueCallback &issues) : SubIngestor(proj, log, issues) {}
 
     Task<PreparationResult> ContentPathsSubIngestor::prepare() {
         PreparationResult result;
@@ -25,12 +25,17 @@ namespace content {
             {
                 continue;
             }
-            fs::path relative_path = relative(entry.path(), docsRoot);
+            const auto relative_path = relative(entry.path(), docsRoot);
+            ProjectFileIssueCallback fileIssues{issues_, entry.path()};
+
             if (const auto id = project_.readPageAttribute(relative_path.string(), "id")) {
                 if (pagePaths_.contains(*id)) {
                     logger_->warn("Skipping duplicate page for item {} at {}", *id, relative_path.string());
-                    co_await addIssue(ProjectIssueLevel::WARNING, ProjectIssueType::INGESTOR, ProjectError::DUPLICATE_PAGE, *id,
-                                      relative_path.string());
+                    co_await fileIssues.addIssue(ProjectIssueLevel::WARNING, ProjectIssueType::INGESTOR, ProjectError::DUPLICATE_PAGE, *id);
+                    continue;
+                }
+
+                if (!fileIssues.validateResourceLocation(*id)) {
                     continue;
                 }
 

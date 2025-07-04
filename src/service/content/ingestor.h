@@ -20,7 +20,7 @@ namespace content {
 
     class SubIngestor {
     public:
-        explicit SubIngestor(const service::ResolvedProject &, const std::shared_ptr<spdlog::logger> &, service::ProjectIssueCallback &);
+        explicit SubIngestor(const service::ResolvedProject &, const std::shared_ptr<spdlog::logger> &, service::ProjectFileIssueCallback &);
         virtual ~SubIngestor() = default;
 
         virtual drogon::Task<PreparationResult> prepare() = 0;
@@ -28,12 +28,9 @@ namespace content {
         virtual drogon::Task<service::Error> finish();
 
     protected:
-        drogon::Task<> addIssue(service::ProjectIssueLevel level, service::ProjectIssueType type, service::ProjectError subject,
-                                const std::string &details = "", const std::string &file = "") const;
-
         const service::ResolvedProject &project_;
         const std::shared_ptr<spdlog::logger> &logger_;
-        service::ProjectIssueCallback &issues_;
+        service::ProjectFileIssueCallback &issues_;
     };
 
     class Ingestor {
@@ -53,7 +50,7 @@ namespace content {
     class ContentPathsSubIngestor final : public SubIngestor {
     public:
         explicit ContentPathsSubIngestor(const service::ResolvedProject &, const std::shared_ptr<spdlog::logger> &,
-                                         service::ProjectIssueCallback &);
+                                         service::ProjectFileIssueCallback &);
 
         drogon::Task<PreparationResult> prepare() override;
         drogon::Task<service::Error> execute() override;
@@ -65,7 +62,7 @@ namespace content {
     class TagsSubIngestor final : public SubIngestor {
     public:
         explicit TagsSubIngestor(const service::ResolvedProject &, const std::shared_ptr<spdlog::logger> &,
-                                 service::ProjectIssueCallback &);
+                                 service::ProjectFileIssueCallback &);
 
         drogon::Task<PreparationResult> prepare() override;
         drogon::Task<service::Error> execute() override;
@@ -79,7 +76,7 @@ namespace content {
     class RecipesSubIngestor final : public SubIngestor {
     public:
         explicit RecipesSubIngestor(const service::ResolvedProject &, const std::shared_ptr<spdlog::logger> &,
-                                    service::ProjectIssueCallback &);
+                                    service::ProjectFileIssueCallback &);
 
         drogon::Task<PreparationResult> prepare() override;
         drogon::Task<service::Error> execute() override;
@@ -100,7 +97,7 @@ namespace content {
     class MetadataSubIngestor final : public SubIngestor {
     public:
         explicit MetadataSubIngestor(const service::ResolvedProject &, const std::shared_ptr<spdlog::logger> &,
-                                     service::ProjectIssueCallback &);
+                                     service::ProjectFileIssueCallback &);
 
         drogon::Task<PreparationResult> prepare() override;
         drogon::Task<service::Error> execute() override;

@@ -2,7 +2,7 @@
 #include <database/database.h>
 #include <database/resolved_db.h>
 #include <drogon/drogon.h>
-#include "game_content.h"
+#include "ingestor.h"
 
 using namespace drogon;
 using namespace drogon::orm;
@@ -11,7 +11,7 @@ namespace fs = std::filesystem;
 
 namespace content {
     RecipesSubIngestor::RecipesSubIngestor(const ResolvedProject &proj, const std::shared_ptr<spdlog::logger> &log,
-                                           ProjectIssueCallback &issues) : SubIngestor(proj, log, issues) {}
+                                           ProjectFileIssueCallback &issues) : SubIngestor(proj, log, issues) {}
 
     Task<PreparationResult> RecipesSubIngestor::prepare() {
         PreparationResult result;

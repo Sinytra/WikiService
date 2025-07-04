@@ -36,6 +36,7 @@ namespace service {
         {ProjectError::INVALID_INGREDIENT, "invalid_ingredient"},
         {ProjectError::INVALID_FILE, "invalid_file"},
         {ProjectError::INVALID_FORMAT, "invalid_format"},
+        {ProjectError::INVALID_RESLOC, "invalid_resloc"},
         {ProjectError::MISSING_PLATFORM_PROJECT, "missing_platform_project"}
     )
     // clang-format on
@@ -62,24 +63,48 @@ namespace service {
             hasErrors_ = true;
 
         app().getLoop()->queueInLoop(async_func(
-            [*this, level, type, subject, details, file]() mutable -> Task<> {
-                co_await addIssue(level, type, subject, details, file);
-            }));
+            [*this, level, type, subject, details, file]() mutable -> Task<> { co_await addIssue(level, type, subject, details, file); }));
     }
 
     bool ProjectIssueCallback::hasErrors() const { return hasErrors_; }
 
-    ProjectFileIssueCallback::ProjectFileIssueCallback(ProjectIssueCallback &issues, const std::string &file) :
-        issues_(issues), file_(file) {}
+    ProjectFileIssueCallback::ProjectFileIssueCallback(ProjectIssueCallback &issues, const std::filesystem::path &path) :
+        issues_(issues), absolutePath_(path), path_(path) {}
+
+    ProjectFileIssueCallback::ProjectFileIssueCallback(const ProjectFileIssueCallback &issues, const std::filesystem::path &path) :
+        issues_(issues.issues_), absolutePath_(path), path_(relative(path, issues.path_)) {}
 
     Task<> ProjectFileIssueCallback::addIssue(const ProjectIssueLevel level, const ProjectIssueType type, const ProjectError subject,
                                               const std::string &details) const {
-        co_await issues_.addIssue(level, type, subject, details, file_);
+        co_await issues_.addIssue(level, type, subject, details, path_.string());
     }
 
     void ProjectFileIssueCallback::addIssueAsync(const ProjectIssueLevel level, const ProjectIssueType type, const ProjectError subject,
                                                  const std::string &details) const {
-        issues_.addIssueAsync(level, type, subject, details, file_);
+        issues_.addIssueAsync(level, type, subject, details, path_.string());
+    }
+
+    std::optional<ResourceLocation> ProjectFileIssueCallback::validateResourceLocation(const std::string &str) const {
+        const auto parsed = ResourceLocation::parse(str);
+        if (!parsed) {
+            addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::INVALID_RESLOC, str);
+        }
+        return parsed;
+    }
+
+    std::optional<nlohmann::json> ProjectFileIssueCallback::readAndValidateJson(const nlohmann::json &schema) const {
+        const auto json = parseJsonFile(absolutePath_);
+        if (!json) {
+            addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::INVALID_FILE);
+            return std::nullopt;
+        }
+
+        if (const auto error = validateJson(schema, *json)) {
+            addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::INVALID_FORMAT, error->format());
+            return std::nullopt;
+        }
+
+        return json;
     }
 
     Task<> addIssue(const std::string &deploymentId, const ProjectIssueLevel level, const ProjectIssueType type, const ProjectError subject,

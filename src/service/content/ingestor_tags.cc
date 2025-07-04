@@ -1,7 +1,7 @@
 #include <database/database.h>
 
 
-#include "game_content.h"
+#include "ingestor.h"
 
 #include <database/resolved_db.h>
 #include <drogon/drogon.h>
@@ -17,7 +17,7 @@ namespace fs = std::filesystem;
 
 namespace content {
     TagsSubIngestor::TagsSubIngestor(const ResolvedProject &proj, const std::shared_ptr<spdlog::logger> &log,
-                                     ProjectIssueCallback &issues) : SubIngestor(proj, log, issues) {}
+                                     ProjectFileIssueCallback &issues) : SubIngestor(proj, log, issues) {}
 
     Task<PreparationResult> TagsSubIngestor::prepare() {
         PreparationResult result;
@@ -71,17 +71,18 @@ namespace content {
                         continue;
                     }
 
+                    const ProjectFileIssueCallback fileIssues{issues_, tagFile};
+
                     const auto relativePath = relative(tagFile, tagTypeDir);
                     const auto fileName = relativePath.string();
                     const auto id = nmspace + ":" + fileName.substr(0, fileName.find_last_of('.'));
 
-                    const auto json = parseJsonFile(tagFile);
-                    if (!json) {
-                        logger.warn("Failed to read tag {}", id);
+                    if (!fileIssues.validateResourceLocation(id)) {
                         continue;
                     }
-                    if (const auto error = validateJson(schemas::gameTag, *json)) {
-                        logger.warn("Skipping invalid tag {}", id);
+
+                    const auto json = fileIssues.readAndValidateJson(schemas::gameTag);
+                    if (!json) {
                         continue;
                     }
 

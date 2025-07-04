@@ -1,4 +1,4 @@
-#include "game_content.h"
+#include "ingestor.h"
 
 #include <database/database.h>
 #include <database/resolved_db.h>
@@ -14,15 +14,10 @@ using namespace service;
 namespace fs = std::filesystem;
 
 namespace content {
-    SubIngestor::SubIngestor(const ResolvedProject &proj, const std::shared_ptr<spdlog::logger> &log, ProjectIssueCallback &issues) :
+    SubIngestor::SubIngestor(const ResolvedProject &proj, const std::shared_ptr<spdlog::logger> &log, ProjectFileIssueCallback &issues) :
         project_(proj), logger_(log), issues_(issues) {}
 
     Task<Error> SubIngestor::finish() { co_return Error::Ok; }
-
-    Task<> SubIngestor::addIssue(const ProjectIssueLevel level, const ProjectIssueType type, const ProjectError subject,
-                                 const std::string &details, const std::string &file) const {
-        co_await issues_.addIssue(level, type, subject, details, file);
-    }
 
     Ingestor::Ingestor(ResolvedProject &proj, const std::shared_ptr<spdlog::logger> &log, ProjectIssueCallback &issues) :
         project_(proj), logger_(log), issues_(issues) {}
@@ -82,11 +77,12 @@ namespace content {
 
         co_await wipeExistingData(project_.getProjectDatabase().getDbClientPtr(), projectId);
 
+        ProjectFileIssueCallback rootFileIssues{issues_, project_.getDocsDirectoryPath()};
         std::vector<std::pair<std::string, std::unique_ptr<SubIngestor>>> ingestors;
-        ingestors.emplace_back("Content paths", std::make_unique<ContentPathsSubIngestor>(project_, logger_, issues_));
-        ingestors.emplace_back("Tags", std::make_unique<TagsSubIngestor>(project_, logger_, issues_));
-        ingestors.emplace_back("Recipes", std::make_unique<RecipesSubIngestor>(project_, logger_, issues_));
-        ingestors.emplace_back("Metadata", std::make_unique<MetadataSubIngestor>(project_, logger_, issues_));
+        ingestors.emplace_back("Content paths", std::make_unique<ContentPathsSubIngestor>(project_, logger_, rootFileIssues));
+        ingestors.emplace_back("Tags", std::make_unique<TagsSubIngestor>(project_, logger_, rootFileIssues));
+        ingestors.emplace_back("Recipes", std::make_unique<RecipesSubIngestor>(project_, logger_, rootFileIssues));
+        ingestors.emplace_back("Metadata", std::make_unique<MetadataSubIngestor>(project_, logger_, rootFileIssues));
 
         // Prepare ingestors
         PreparationResult allResults;

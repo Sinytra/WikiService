@@ -81,6 +81,7 @@ struct ResourceLocation {
     const std::string namespace_;
     const std::string path_;
 
+    static bool validate(const std::string &str);
     static std::optional<ResourceLocation> parse(const std::string &str);
 
     operator std::string() const {

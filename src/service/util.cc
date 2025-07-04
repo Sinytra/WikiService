@@ -4,6 +4,7 @@
 
 #include <fstream>
 #include <ranges>
+#include <regex>
 
 using namespace drogon;
 using namespace logging;
@@ -48,7 +49,16 @@ void rtrim(std::string &s) {
     s.erase(std::find_if(s.rbegin(), s.rend(), [](const unsigned char ch) { return !std::isspace(ch); }).base(), s.end());
 }
 
+bool ResourceLocation::validate(const std::string &str) {
+    static const std::regex resLocRegex("^([a-z0-9_.-]+:)?[a-z0-9_.-/]+$", std::regex_constants::ECMAScript);
+    return std::regex_match(str.data(), resLocRegex);
+}
+
 std::optional<ResourceLocation> ResourceLocation::parse(const std::string &str) {
+    if (!validate(str)) {
+        return std::nullopt;
+    }
+
     const auto delimeter = str.find(':');
     if (delimeter == str.size() - 1) {
         return std::nullopt;
@@ -56,6 +66,7 @@ std::optional<ResourceLocation> ResourceLocation::parse(const std::string &str) 
     if (delimeter == std::string::npos) {
         return ResourceLocation{DEFAULT_NAMESPACE, str};
     }
+
     const auto namespace_ = str.substr(0, delimeter);
     const auto path_ = str.substr(delimeter + 1);
     return ResourceLocation{namespace_, path_};

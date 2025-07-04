@@ -35,8 +35,8 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/content/builtin_recipe_type.h.in
 )
 
 add_library(service STATIC
-        content/game_content.cc
         content/game_data.cc
+        content/ingestor.cc
         content/ingestor_content_paths.cc
         content/ingestor_metadata.cc
         content/ingestor_tags.cc

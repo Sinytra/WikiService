@@ -1,6 +1,6 @@
 #include "ingestor_metadata.h"
 #include "database/resolved_db.h"
-#include "game_content.h"
+#include "ingestor.h"
 #include "schemas.h"
 
 using namespace drogon;
@@ -10,28 +10,22 @@ namespace fs = std::filesystem;
 
 namespace content {
     MetadataSubIngestor::MetadataSubIngestor(const ResolvedProject &proj, const std::shared_ptr<spdlog::logger> &log,
-                                             ProjectIssueCallback &issues) : SubIngestor(proj, log, issues) {}
+                                             ProjectFileIssueCallback &issues) : SubIngestor(proj, log, issues) {}
 
     Task<PreparationResult> MetadataSubIngestor::prepare() {
         const auto docsRoot = project_.getDocsDirectoryPath();
         const auto workbenchesFile = docsRoot / ".data" / "workbenches.json";
-        const ProjectFileIssueCallback issues{issues_, relative(workbenchesFile, docsRoot).string()};
 
         if (exists(workbenchesFile)) {
-            const auto json = parseJsonFile(workbenchesFile);
-            if (!json) {
-                issues.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::INVALID_FILE);
-                co_return {};
-            }
+            const ProjectFileIssueCallback fileIssues{issues_, workbenchesFile};
 
-            if (const auto error = validateJson(schemas::recipeWorkbenches, *json)) {
-                issues.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::INVALID_FORMAT, error->format());
+            const auto json = fileIssues.readAndValidateJson(schemas::recipeWorkbenches);
+            if (!json) {
                 co_return {};
             }
 
             for (const auto &[key, val]: json->items()) {
-                const std::vector<std::string> items = val;
-                workbenches_.emplace_back(StubWorkbenches{key, items}, issues);
+                workbenches_.emplace_back(StubWorkbenches{key, val}, fileIssues);
             }
         }
 
@@ -41,8 +35,14 @@ namespace content {
     Task<Error> MetadataSubIngestor::addWorkbenches(const PreparedData<StubWorkbenches> workbenches) const {
         const auto count = co_await project_.getProjectDatabase().addRecipeWorkbenches(workbenches.data.recipeType, workbenches.data.items);
         logger_->debug("Inserted {} workbenches for type {}", count, workbenches.data.recipeType);
-        // TODO Report errors
-        co_return count == workbenches.data.items.size() ? Error::Ok : Error::ErrInternal;
+
+        if (const auto expected = workbenches.data.items.size(); count != expected) {
+            const auto msg = std::format("Expected to insert {} workbenches, was {}", expected, count);
+            co_await issues_.addIssue(ProjectIssueLevel::WARNING, ProjectIssueType::INGESTOR, ProjectError::UNKNOWN, msg);
+            co_return Error::ErrInternal;
+        }
+
+        co_return Error::Ok;
     }
 
     Task<Error> MetadataSubIngestor::execute() {

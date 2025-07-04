@@ -1,6 +1,9 @@
 #pragma once
 
 #include <models/Deployment.h>
+#include <nlohmann/json.hpp>
+
+#include "util.h"
 
 namespace service {
     enum class ProjectIssueLevel { WARNING, ERROR, UNKNOWN };
@@ -17,7 +20,7 @@ namespace service {
         REQUIRES_AUTH, NO_REPOSITORY, REPO_TOO_LARGE, NO_BRANCH, NO_PATH,
         INVALID_META, INVALID_PAGE,
         DUPLICATE_PAGE, UNKNOWN_RECIPE_TYPE, INVALID_INGREDIENT,
-        INVALID_FILE, INVALID_FORMAT,
+        INVALID_FILE, INVALID_FORMAT, INVALID_RESLOC,
         MISSING_PLATFORM_PROJECT,
         UNKNOWN
     };
@@ -45,14 +48,21 @@ namespace service {
 
     class ProjectFileIssueCallback {
     public:
-        explicit ProjectFileIssueCallback(ProjectIssueCallback &, const std::string &);
+        explicit ProjectFileIssueCallback(ProjectIssueCallback &, const std::filesystem::path &);
+
+        explicit ProjectFileIssueCallback(const ProjectFileIssueCallback &, const std::filesystem::path &);
 
         drogon::Task<> addIssue(ProjectIssueLevel level, ProjectIssueType type, ProjectError subject, const std::string &details = "") const;
 
         void addIssueAsync(ProjectIssueLevel level, ProjectIssueType type, ProjectError subject, const std::string &details = "") const;
+
+        std::optional<ResourceLocation> validateResourceLocation(const std::string &str) const;
+
+        std::optional<nlohmann::json> readAndValidateJson(const nlohmann::json &schema) const;
     private:
         ProjectIssueCallback &issues_;
-        const std::string &file_;
+        const std::filesystem::path absolutePath_;
+        const std::filesystem::path path_;
     };
 
     drogon::Task<> addIssue(const std::string &deploymentId, ProjectIssueLevel level, ProjectIssueType type, ProjectError subject,
