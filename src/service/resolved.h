@@ -86,6 +86,7 @@ namespace service {
         std::tuple<ProjectPage, Error> readFile(std::string path) const;
         std::optional<std::string> getPagePath(const std::string &path) const;
         drogon::Task<std::tuple<ProjectPage, Error>> readContentPage(std::string id) const;
+        drogon::Task<nlohmann::json> readItemProperties(std::string id) const;
         std::optional<std::string> readPageAttribute(std::string path, std::string prop) const;
         std::optional<std::string> readLangKey(const std::string &key) const;
 

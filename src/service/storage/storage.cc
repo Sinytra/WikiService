@@ -274,6 +274,8 @@ namespace service {
             versions = co_await setupProjectVersions(resolved, branches, logger);
         }
 
+        // TODO Remove first
+
         const auto dest = getProjectDirPath(project);
         copyProjectFiles(clonePath, cloneDocsRoot, dest, logger);
 

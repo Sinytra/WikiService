@@ -14,6 +14,7 @@ read_and_escape_schema("schemas/game-recipe-type.schema.json" GAME_RECIPE_TYPE_S
 read_and_escape_schema("schemas/game-recipe-base.schema.json" BASE_GAME_RECIPE_SCHEMA)
 read_and_escape_schema("schemas/game-recipe-custom.schema.json" CUSTOM_GAME_RECIPE_SCHEMA)
 read_and_escape_schema("schemas/workbenches.schema.json" RECIPE_WORKBENCHES)
+read_and_escape_schema("schemas/properties.schema.json" PROPERTIES)
 
 read_and_escape_schema("../../builtin/minecraft/recipe_type/crafting.json" CRAFTING)
 read_and_escape_schema("../../builtin/minecraft/recipe_type/smelting.json" SMELTING)
@@ -54,6 +55,7 @@ add_library(service STATIC
         database/resolved_db.cc
         lang/crowdin.cc
         lang/lang.cc
+        project/properties.cc
         storage/storage.cc
         storage/gitops.cc
         storage/realtime.cc

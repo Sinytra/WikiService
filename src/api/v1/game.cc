@@ -44,6 +44,7 @@ namespace api::v1 {
         Json::Value root;
         root["project"] = co_await resolved.toJson();
         root["content"] = page.content;
+        root["properties"] = unparkourJson(co_await resolved.readItemProperties(id));
         if (resolved.getProject().getValueOfIsPublic() && !page.editUrl.empty()) {
             root["edit_url"] = page.editUrl;
         }

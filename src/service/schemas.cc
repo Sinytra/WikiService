@@ -97,3 +97,5 @@ nlohmann::json schemas::gameRecipeBase = R"(@BASE_GAME_RECIPE_SCHEMA@)"_json;
 nlohmann::json schemas::gameRecipeCustom = R"(@CUSTOM_GAME_RECIPE_SCHEMA@)"_json;
 
 nlohmann::json schemas::recipeWorkbenches = R"(@RECIPE_WORKBENCHES@)"_json;
+
+nlohmann::json schemas::properties = R"(@PROPERTIES@)"_json;

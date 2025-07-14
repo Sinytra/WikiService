@@ -16,11 +16,13 @@
 #include <include/uri.h>
 #include <models/Item.h>
 #include <models/ProjectItem.h>
+#include <project/properties.h>
 
 #define DOCS_META_FILE "sinytra-wiki.json"
 #define FOLDER_META_FILE "_meta.json"
 #define I18N_DIR_PATH ".translated"
 #define NO_ICON "_none"
+#define PROPERTIES_PATH ".data/properties.json"
 
 using namespace logging;
 using namespace drogon;
@@ -318,6 +320,11 @@ namespace service {
             co_return {{"", ""}, Error::ErrNotFound};
         }
         co_return readFile(*contentPath);
+    }
+
+    Task<nlohmann::json> ResolvedProject::readItemProperties(std::string id) const {
+        const auto filePath = getFilePath(docsDir_, PROPERTIES_PATH, "");
+        co_return content::parseItemProperties(filePath, id);
     }
 
     std::optional<std::string> ResolvedProject::readPageAttribute(std::string path, std::string prop) const {
