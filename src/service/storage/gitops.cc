@@ -44,6 +44,7 @@ namespace git {
 
         const auto progress = stats->received_objects / static_cast<double>(stats->total_objects) * 100;
         const auto done = stats->received_objects == stats->total_objects;
+        double megabytes = stats->received_bytes / (1024.0 * 1024.0);
 
         if (const auto mark = static_cast<long>(progress); pd->tick != -1 && (done || mark % 5 == 0 && mark > pd->tick)) {
             if (done) {
@@ -52,7 +53,7 @@ namespace git {
                 pd->tick = mark;
             }
 
-            pd->logger->trace("Fetch progress: {0:.2f}%", progress);
+            pd->logger->trace("Fetch progress: {0:.2f}% ({1:.2f} MB)", progress, megabytes);
         }
         return 0;
     }

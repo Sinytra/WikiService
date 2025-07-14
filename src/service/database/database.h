@@ -123,6 +123,7 @@ namespace service {
         drogon::Task<Error> deleteDeployment(std::string id) const;
         drogon::Task<bool> hasFailingDeployment(std::string projectId) const;
         drogon::Task<Error> failLoadingDeployments() const;
+        drogon::Task<std::vector<std::string>> getUndeployedProjects() const;
 
         drogon::Task<std::optional<ProjectIssue>> getProjectIssue(std::string deploymentId, ProjectIssueLevel level,
                                                                   ProjectIssueType type, std::string path) const;

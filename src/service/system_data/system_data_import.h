@@ -9,4 +9,6 @@ namespace sys {
     public:
         drogon::Task<service::Error> importData(nlohmann::json rawData) const;
     };
+
+    drogon::Task<service::Error> runInitialDeployments();
 }

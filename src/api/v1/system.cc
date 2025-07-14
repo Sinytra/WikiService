@@ -21,6 +21,18 @@ using namespace drogon::orm;
 using namespace drogon_model::postgres;
 
 namespace api::v1 {
+    struct DataMigration {
+        std::string id;
+        std::string title;
+        std::string desc;
+        std::function<Task<Error>()> runner;
+
+        NLOHMANN_DEFINE_TYPE_INTRUSIVE(DataMigration, id, title, desc)
+    };
+
+    std::vector<DataMigration> dataMigrations = {
+        {"deployments", "Project deployments", "Run initial project deployments", sys::runInitialDeployments}};
+
     Task<> SystemController::getLocales(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
         auto locales = co_await global::crowdin->getAvailableLocales();
         std::ranges::sort(locales, [](const Locale &a, const Locale &b) { return a.id < b.id; });
@@ -28,7 +40,8 @@ namespace api::v1 {
         callback(jsonResponse(locales));
     }
 
-    Task<> SystemController::getSystemInformation(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
+    Task<> SystemController::getSystemInformation(const HttpRequestPtr req,
+                                                  const std::function<void(const HttpResponsePtr &)> callback) const {
         co_await global::auth->ensurePrivilegedAccess(req);
 
         const auto imports{co_await global::database->getDataImports("", 1)};
@@ -69,6 +82,39 @@ namespace api::v1 {
 
         constexpr sys::SystemDataImporter importer;
         const auto result = co_await importer.importData(parsed);
+
+        callback(statusResponse(result == Error::Ok ? k200OK : k500InternalServerError));
+    }
+
+    Task<> SystemController::getAvailableMigrations(const HttpRequestPtr req,
+                                                    const std::function<void(const HttpResponsePtr &)> callback) const {
+        co_await global::auth->ensurePrivilegedAccess(req);
+
+        const nlohmann::json root = dataMigrations;
+
+        callback(jsonResponse(root));
+    }
+
+    Task<> SystemController::runDataMigration(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+                                              const std::string id) const {
+        co_await global::auth->ensurePrivilegedAccess(req);
+
+        if (id.empty()) {
+            throw ApiException(Error::ErrBadRequest, "Missing id parameter");
+        }
+
+        const auto migration = ranges::find_if(dataMigrations, [&id](const DataMigration &x) { return x.id == id; });
+        if (migration == dataMigrations.end()) {
+            throw ApiException(Error::ErrNotFound, "not_found");
+        }
+
+        Error result;
+        try {
+            result = co_await migration->runner();
+        } catch (std::exception e) {
+            logger.error("Error running data migration {}: {}", id, e.what());
+            result = Error::ErrInternal;
+        }
 
         callback(statusResponse(result == Error::Ok ? k200OK : k500InternalServerError));
     }

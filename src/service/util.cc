@@ -50,7 +50,7 @@ void rtrim(std::string &s) {
 }
 
 bool ResourceLocation::validate(const std::string &str) {
-    static const std::regex resLocRegex("^([a-z0-9_.-]+:)?[a-z0-9_.-/]+$", std::regex_constants::ECMAScript);
+    static const std::regex resLocRegex("^([a-z0-9_.-]+:)?[a-z0-9_./-]+$", std::regex_constants::ECMAScript);
     return std::regex_match(str.data(), resLocRegex);
 }
 

@@ -98,4 +98,24 @@ namespace service {
         });
         co_return res.value_or(err);
     }
+
+    Task<std::vector<std::string>> Database::getUndeployedProjects() const {
+        // language=postgresql
+        static constexpr auto query = "SELECT project.id FROM project \
+                                       LEFT JOIN deployment d ON d.project_id = project.id \
+                                       WHERE d.id IS NULL";
+
+        const auto [res, err] = co_await handleDatabaseOperation<std::vector<std::string>>([](const DbClientPtr &client) -> Task<std::vector<std::string>> {
+            std::vector<std::string> ids;
+
+            const auto rows = co_await client->execSqlCoro(query);
+            for (auto &row : rows) {
+                const auto id = row[0].as<std::string>();
+                ids.push_back(id);
+            }
+
+            co_return ids;
+        });
+        co_return res.value_or(std::vector<std::string>{});
+    }
 }

@@ -14,6 +14,8 @@ namespace api::v1 {
         ADD_METHOD_TO(SystemController::getSystemInformation, "/api/v1/system/info", drogon::Get, "AuthFilter");
         ADD_METHOD_TO(SystemController::getDataImports, "/api/v1/system/imports", drogon::Get, "AuthFilter");
         ADD_METHOD_TO(SystemController::importData, "/api/v1/system/import", drogon::Post, "AuthFilter");
+        ADD_METHOD_TO(SystemController::getAvailableMigrations, "/api/v1/system/migrations", drogon::Get, "AuthFilter");
+        ADD_METHOD_TO(SystemController::runDataMigration, "/api/v1/system/migrate/{1:id}", drogon::Post, "AuthFilter");
         METHOD_LIST_END
 
         drogon::Task<> getLocales(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback) const;
@@ -22,5 +24,8 @@ namespace api::v1 {
 
         drogon::Task<> getDataImports(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback) const;
         drogon::Task<> importData(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback) const;
+
+        drogon::Task<> getAvailableMigrations(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback) const;
+        drogon::Task<> runDataMigration(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback, std::string id) const;
     };
 }

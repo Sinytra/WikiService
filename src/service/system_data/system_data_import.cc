@@ -4,7 +4,7 @@
 
 #include <database/database.h>
 #include "schemas.h"
-#include "service/auth.h"
+#include "storage/storage.h"
 #include "util.h"
 
 using namespace drogon;
@@ -155,4 +155,30 @@ Task<Error> sys::SystemDataImporter::importData(nlohmann::json rawData) const {
         logger.info("System data ingestion successful");
     }
     co_return res;
+}
+
+Task<Error> sys::runInitialDeployments() {
+    const auto candidateProjects = co_await global::database->getUndeployedProjects();
+    int total = candidateProjects.size();
+    logger.info("Running initial deployments on {} projects", total);
+
+    int i = 0;
+    for (const auto &id : candidateProjects) {
+        logger.info("Deploying project {} [{}/{}]", id, ++i, total);
+
+        const auto [project, err] = co_await global::database->getProjectSource(id);
+        if (!project) {
+            logger.error("Project {} not found, skipping", id);
+            continue;
+        }
+
+        const auto [deployment, dErr] = co_await global::storage->deployProject(*project, "");
+        if (!deployment) {
+            logger.error("Failed to deploy project {}", id);
+        } else {
+            logger.info("Project {} deployment successful", id);
+        }
+    }
+
+    co_return Error::Ok;
 }
