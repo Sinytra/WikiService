@@ -13,6 +13,7 @@ namespace monitoring {
         sentry_options_set_release(options, PROJECT_GIT_HASH_FULL);
 #endif
         sentry_options_set_debug(options, 1);
+        sentry_options_set_crashpad_wait_for_upload(options, true);
         sentry_init(options);
     }
 
