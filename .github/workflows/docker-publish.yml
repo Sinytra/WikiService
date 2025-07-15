@@ -70,6 +70,8 @@ jobs:
 
       - name: Upload to sentry
         env:
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
         run: |
           docker load --input ${{ runner.temp }}/mm_wiki_debug.tar
