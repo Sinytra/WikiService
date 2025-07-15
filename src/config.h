@@ -32,12 +32,17 @@ namespace config {
         std::string projectId;
     };
 
+    struct Sentry {
+        std::string dsn;
+    };
+
     struct SystemConfig {
         AuthConfig auth;
         GitHubConfig githubApp;
         Modrinth modrinth;
         CloudFlare cloudFlare;
         Crowdin crowdin;
+        Sentry sentry;
 
         std::string appUrl;
         std::string curseForgeKey;

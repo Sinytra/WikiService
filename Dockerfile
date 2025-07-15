@@ -6,7 +6,8 @@ WORKDIR /build
 RUN apt-get update && apt-get install -y \
     cmake git gcc g++ ninja-build \
     uuid-dev zlib1g-dev libc-ares-dev libbrotli-dev \
-    postgresql-all libhiredis-dev libspdlog-dev libzip-dev
+    postgresql-all libhiredis-dev libspdlog-dev libzip-dev \
+    libcurl4-openssl-dev
 
 # Build and install jsoncpp
 RUN git clone https://github.com/open-source-parsers/jsoncpp && cd jsoncpp && git checkout 1.9.6 \
@@ -18,15 +19,10 @@ RUN git clone https://github.com/drogonframework/drogon && cd drogon && git subm
     && cmake -S . -B build -G "Ninja" -DBUILD_CTL=OFF -DBUILD_SHARED_LIBS=OFF -DBUILD_EXAMPLES=OFF -DCMAKE_CXX_STANDARD=20 \
     && cmake --build build --config Release --target install
 
-WORKDIR /build
-
 # Build app
 WORKDIR /build/src
 
-COPY $PWD/builtin /build/src/builtin
-COPY $PWD/modules /build/src/modules
-COPY $PWD/src /build/src/src
-COPY $PWD/CMakeLists.txt /build/src/
+COPY $PWD /build/src
 
 RUN cmake -S . -B build -G "Ninja" && cmake --build build --config Release
 
@@ -37,7 +33,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y ca-certificates libspdlog-dev libc-ares-dev libfmt10 libbrotli-dev \
     libhiredis-dev libpq5 libzip-dev
 
-COPY --from=build /build/src/build/bin/wiki_service /app
+COPY --from=build /build/src/build/bin/wiki_service /build/src/build/bin/crashpad_handler /app/
 
 EXPOSE 8080
 

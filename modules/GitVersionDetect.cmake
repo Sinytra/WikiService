@@ -38,7 +38,7 @@ if(GIT_EXECUTABLE)
     # Generate a git-describe version string from Git repository tags
     execute_process(
             COMMAND ${GIT_EXECUTABLE} describe --tags --dirty --match "v*"
-            WORKING_DIRECTORY ..
+            WORKING_DIRECTORY .
             OUTPUT_VARIABLE GIT_DESCRIBE_VERSION
             RESULT_VARIABLE GIT_DESCRIBE_ERROR_CODE
             OUTPUT_STRIP_TRAILING_WHITESPACE
@@ -46,6 +46,18 @@ if(GIT_EXECUTABLE)
     # If no error took place, save the version
     if(NOT GIT_DESCRIBE_ERROR_CODE)
         string(REGEX REPLACE "^v" "" GITVERSIONDETECT_VERSION "${GIT_DESCRIBE_VERSION}")
+    endif()
+
+    # Get git commit hash
+    execute_process(
+            COMMAND ${GIT_EXECUTABLE} rev-parse HEAD
+            WORKING_DIRECTORY .
+            OUTPUT_VARIABLE GIT_HASH_FULL
+            RESULT_VARIABLE GIT_REV_PARSE_ERROR_CODE
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    if (NOT GIT_REV_PARSE_ERROR_CODE)
+        string(SUBSTRING "${GIT_HASH_FULL}" 0 7 GIT_HASH_SHORT)
     endif()
 endif()
 
@@ -63,3 +75,7 @@ set(GITVERSIONDETECT_VERSION_MINOR ${CMAKE_MATCH_2})
 set(GITVERSIONDETECT_VERSION_PATCH ${CMAKE_MATCH_3})
 set(GITVERSIONDETECT_VERSION_COMMIT_NUM ${CMAKE_MATCH_5})
 set(GITVERSIONDETECT_VERSION_COMMIT_SHA ${CMAKE_MATCH_6})
+
+# Add commit hash info
+set(GITVERSIONDETECT_VERSION_COMMIT_HASH_FULL ${GIT_HASH_FULL})
+set(GITVERSIONDETECT_VERSION_COMMIT_HASH_SHORT ${GIT_HASH_SHORT})

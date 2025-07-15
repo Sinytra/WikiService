@@ -75,11 +75,13 @@ SystemConfig configureFromEnvironment() {
                              .accountTag = std::getenv("CLOUDFLARE_ACCOUNT_TAG"),
                              .siteTag = std::getenv("CLOUDFLARE_SITE_TAG")};
     Crowdin crowdin = {.token = std::getenv("CROWDIN_TOKEN"), .projectId = std::getenv("CROWDIN_PROJECT_ID")};
+    Sentry sentry = {.dsn = std::getenv("SENTRY_DSN")};
     return {.auth = auth,
             .githubApp = githubApp,
             .modrinth = modrinth,
             .cloudFlare = cloudFlare,
             .crowdin = crowdin,
+            .sentry = sentry,
 
             .appUrl = std::getenv("APP_URL"),
             .curseForgeKey = std::getenv("CURSEFORGE_KEY"),
@@ -106,22 +108,31 @@ SystemConfig config::configure() {
                        .settingsCallbackUrl = authConfig["settings_callback_url"].asString(),
                        .errorCallbackUrl = authConfig["error_callback_url"].asString(),
                        .tokenSecret = authConfig["token_secret"].asString()};
+
     const Json::Value &githubAppConfig = customConfig["github_app"];
     GitHubConfig githubApp = {.clientId = githubAppConfig["client_id"].asString(),
                               .clientSecret = githubAppConfig["client_secret"].asString()};
+
     const Json::Value &mrApp = customConfig["modrinth_app"];
     Modrinth modrinth = {.clientId = mrApp["client_id"].asString(), .clientSecret = mrApp["client_secret"].asString()};
+
     const Json::Value &cloudFlareConfig = customConfig["cloudflare"];
     CloudFlare cloudFlare = {.token = cloudFlareConfig["token"].asString(),
                              .accountTag = cloudFlareConfig["account_tag"].asString(),
                              .siteTag = cloudFlareConfig["site_tag"].asString()};
+
     const Json::Value &crowdinConfig = customConfig["crowdin"];
     Crowdin crowdin = {.token = crowdinConfig["token"].asString(), .projectId = crowdinConfig["project_id"].asString()};
+
+    const Json::Value &sentryConfig = customConfig["sentry"];
+    Sentry sentry = {.dsn = sentryConfig["dsn"].asString()};
+
     SystemConfig config = {.auth = auth,
                            .githubApp = githubApp,
                            .modrinth = modrinth,
                            .cloudFlare = cloudFlare,
                            .crowdin = crowdin,
+                           .sentry = sentry,
                            .appUrl = customConfig["app_url"].asString(),
                            .curseForgeKey = customConfig["curseforge_key"].asString(),
                            .storagePath = customConfig["storage_path"].asString(),

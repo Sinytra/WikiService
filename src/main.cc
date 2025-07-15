@@ -12,6 +12,7 @@
 #include <service/lang/lang.h>
 #include <service/storage/realtime.h>
 #include "config.h"
+#include "monitoring.h"
 #include "version.h"
 
 #include <api/v1/error.h>
@@ -74,8 +75,12 @@ int main() {
         app().setLogLevel(level).addListener("0.0.0.0", port).setThreadNum(16);
         configureLoggingLevel();
 
-        const auto [authConfig, githubAppConfig, mrApp, cloudFlareConfig, crowdinConfig, appUrl, curseForgeKey, storagePath, local] =
-            config::configure();
+        const auto [authConfig, githubAppConfig, mrApp, cloudFlareConfig, crowdinConfig, sentryConfig, appUrl, curseForgeKey, storagePath,
+                    local] = config::configure();
+
+        if (!sentryConfig.dsn.empty()) {
+            monitoring::initSentry(sentryConfig.dsn);
+        }
 
         global::database = std::make_shared<Database>();
         global::cache = std::make_shared<MemoryCache>();
@@ -121,13 +126,15 @@ int main() {
         app().run();
 
         git_libgit2_shutdown();
-        for (auto &loop : cacheAwaiterThreadPool.getLoops()) {
+        for (auto &loop: cacheAwaiterThreadPool.getLoops()) {
             loop->quit();
         }
         cacheAwaiterThreadPool.wait();
     } catch (const std::exception &e) {
         logger.critical("Error running app: {}", e.what());
     }
+
+    monitoring::closeSentry();
 
     return 0;
 }

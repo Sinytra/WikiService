@@ -1,0 +1,6 @@
+.cache
+.sentry-native
+cmake-build-*
+logs
+run
+config.json

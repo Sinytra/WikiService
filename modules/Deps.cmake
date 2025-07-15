@@ -71,3 +71,16 @@ CPMAddPackage(
         "BUILD_TESTS OFF"
         "BUILD_SHARED_LIBS OFF"
 )
+
+CPMAddPackage(
+        NAME sentry
+        VERSION 0.9.1
+        URL https://github.com/getsentry/sentry-native/releases/download/0.9.1/sentry-native.zip
+        URL_HASH SHA256=e5349b1a233ac52291e54cba3a6d028781d8173e8b3cd759f17cd27769f02eab
+        OPTIONS
+        "SENTRY_BACKEND crashpad"
+)
+
+if (sentry_ADDED)
+    set_target_properties(sentry PROPERTIES C_STANDARD 11 C_EXTENSIONS ON)
+endif()

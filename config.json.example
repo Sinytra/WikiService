@@ -62,6 +62,9 @@
       "account_tag": "",
       "site_tag": ""
     },
+    "sentry": {
+      "dsn": ""
+    },
     "curseforge_key": "",
     "storage_path": "",
     "api_key": ""

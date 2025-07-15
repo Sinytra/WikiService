@@ -22,6 +22,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_executable(${PROJECT_NAME}
         config.cc
+        monitoring.cc
         main.cc
 )
 
@@ -46,6 +47,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
         libgit2package
         OpenSSL::Crypto
         libzip::zip
+        sentry::sentry
 )
 
 # ##############################################################################
@@ -99,4 +101,10 @@ set_target_properties(${PROJECT_NAME}
         ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
         LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
         RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+)
+
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy
+        $<TARGET_FILE:crashpad::handler>
+        $<TARGET_FILE_DIR:${PROJECT_NAME}>/crashpad_handler
 )

@@ -566,3 +566,4 @@ config.json
 build
 compile_commands.json
 .zed
+.sentry-native
