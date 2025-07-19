@@ -97,7 +97,7 @@ int main() {
         auto modrinth(ModrinthPlatform{});
         global::platforms = std::make_shared<Platforms>(curseForge, modrinth);
 
-        auto authController(std::make_shared<api::v1::AuthController>(authConfig));
+        auto authController(std::make_shared<api::v1::AuthController>(appUrl, authConfig));
         auto controller(std::make_shared<api::v1::DocsController>());
         auto browseController(std::make_shared<api::v1::BrowseController>());
         auto projectsController(std::make_shared<api::v1::ProjectsController>(local));

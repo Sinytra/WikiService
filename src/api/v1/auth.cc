@@ -17,17 +17,18 @@ using namespace logging;
 #define SESSION_COOKIE "sessionid"
 
 namespace api::v1 {
-    AuthController::AuthController(const config::AuthConfig &config) : config_(config), appDomain_(uri{config.frontendUrl}.get_host()) {}
+    AuthController::AuthController(const std::string &appUrl, const config::AuthConfig &config) :
+        config_(config), appDomain_(uri{appUrl}.get_host()) {}
 
-    Task<> AuthController::initLogin(HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
+    Task<> AuthController::initLogin(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
         const auto url = global::auth->getGitHubOAuthInitURL();
         const auto resp = HttpResponse::newRedirectionResponse(url);
         callback(resp);
         co_return;
     }
 
-    Task<> AuthController::callbackGithub(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback,
-                                          std::string code) const {
+    Task<> AuthController::callbackGithub(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+                                          const std::string code) const {
         if (code.empty()) {
             throw ApiException(Error::ErrBadRequest, "Missing code parameter");
         }
@@ -47,7 +48,7 @@ namespace api::v1 {
             cookie.setValue(sessionId);
             cookie.setSecure(true);
             cookie.setHttpOnly(true);
-            cookie.setSameSite(Cookie::SameSite::kStrict);
+            cookie.setSameSite(Cookie::SameSite::kLax);
             cookie.setPath("/");
             cookie.setMaxAge(std::chrono::duration_cast<std::chrono::seconds>(30 * 24h).count());
             cookie.setDomain(appDomain_);

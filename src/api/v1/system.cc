@@ -108,14 +108,19 @@ namespace api::v1 {
             throw ApiException(Error::ErrNotFound, "not_found");
         }
 
-        Error result;
+        app().getLoop()->queueInLoop(async_func([&]() -> Task<> {
+            co_await executeDataMigration(id, migration->runner);
+        }));
+
+        callback(statusResponse(k200OK));
+    }
+
+    Task<> SystemController::executeDataMigration(const std::string id, const std::function<Task<Error>()> runner) const {
         try {
-            result = co_await migration->runner();
+            co_await runner();
+            logger.info("Data migration {} finished succesfully", id);
         } catch (std::exception e) {
             logger.error("Error running data migration {}: {}", id, e.what());
-            result = Error::ErrInternal;
         }
-
-        callback(statusResponse(result == Error::Ok ? k200OK : k500InternalServerError));
     }
 }

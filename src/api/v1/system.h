@@ -27,5 +27,7 @@ namespace api::v1 {
 
         drogon::Task<> getAvailableMigrations(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback) const;
         drogon::Task<> runDataMigration(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback, std::string id) const;
+    private:
+        drogon::Task<> executeDataMigration(std::string id, std::function<drogon::Task<service::Error>()> runner) const;
     };
 }
