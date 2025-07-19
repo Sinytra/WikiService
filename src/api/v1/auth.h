@@ -8,7 +8,7 @@
 namespace api::v1 {
     class AuthController final : public drogon::HttpController<AuthController, false> {
     public:
-        explicit AuthController(const std::string &, const config::AuthConfig &);
+        explicit AuthController(const config::AuthConfig &);
 
         // clang-format off
         METHOD_LIST_BEGIN

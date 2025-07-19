@@ -17,8 +17,7 @@ using namespace logging;
 #define SESSION_COOKIE "sessionid"
 
 namespace api::v1 {
-    AuthController::AuthController(const std::string &appUrl, const config::AuthConfig &config) :
-        config_(config), appDomain_(uri{appUrl}.get_host()) {}
+    AuthController::AuthController(const config::AuthConfig &config) : config_(config), appDomain_(uri{config.frontendUrl}.get_host()) {}
 
     Task<> AuthController::initLogin(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
         const auto url = global::auth->getGitHubOAuthInitURL();
@@ -48,7 +47,7 @@ namespace api::v1 {
             cookie.setValue(sessionId);
             cookie.setSecure(true);
             cookie.setHttpOnly(true);
-            cookie.setSameSite(Cookie::SameSite::kLax);
+            cookie.setSameSite(Cookie::SameSite::kStrict);
             cookie.setPath("/");
             cookie.setMaxAge(std::chrono::duration_cast<std::chrono::seconds>(30 * 24h).count());
             cookie.setDomain(appDomain_);
