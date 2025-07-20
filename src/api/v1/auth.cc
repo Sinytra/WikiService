@@ -47,7 +47,7 @@ namespace api::v1 {
             cookie.setValue(sessionId);
             cookie.setSecure(true);
             cookie.setHttpOnly(true);
-            cookie.setSameSite(Cookie::SameSite::kStrict);
+            cookie.setSameSite(Cookie::SameSite::kLax);
             cookie.setPath("/");
             cookie.setMaxAge(std::chrono::duration_cast<std::chrono::seconds>(30 * 24h).count());
             cookie.setDomain(appDomain_);
