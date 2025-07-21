@@ -1,10 +1,10 @@
 #include "resolved.h"
 
-#include <service/lang/lang.h>
 #include <service/database/database.h>
 #include <service/database/resolved_db.h>
-#include <service/storage/gitops.h>
+#include <service/lang/lang.h>
 #include <service/schemas.h>
+#include <service/storage/gitops.h>
 #include <service/util.h>
 
 #include <filesystem>
@@ -17,6 +17,8 @@
 #include <models/Item.h>
 #include <models/ProjectItem.h>
 #include <project/properties.h>
+
+#include "storage/storage.h"
 
 #define DOCS_META_FILE "sinytra-wiki.json"
 #define FOLDER_META_FILE "_meta.json"
@@ -79,17 +81,24 @@ fs::path getFolderMetaFilePath(const fs::path &rootDir, const fs::path &dir, con
     return dir / FOLDER_META_FILE;
 }
 
-FolderMetadata getFolderMetadata(const Project &project, const fs::path &path) {
+FolderMetadata getFolderMetadata(const service::ResolvedProject &resolved, const fs::path &path) {
     FolderMetadata metadata;
     if (!exists(path)) {
         return metadata;
     }
 
     std::ifstream ifs(path);
+    const auto rel = relative(path, resolved.getDocsDirectoryPath());
     try {
         nlohmann::ordered_json parsed = nlohmann::ordered_json::parse(ifs);
         if (const auto error = validateJson(schemas::folderMetadata, parsed)) {
-            logger.error("Invalid folder metadata: Project: {} Path: {} Error: {}", project.getValueOfId(), path.string(), error->msg);
+            logger.error("Invalid folder metadata: Project: {} Path: {} Error: {}", resolved.getProject().getValueOfId(), path.string(),
+                         error->msg);
+
+            trantor::EventLoop::getEventLoopOfCurrentThread()->queueInLoop(async_func([resolved, error, rel]() -> Task<> {
+                co_await global::storage->addProjectIssue(resolved, service::ProjectIssueLevel::ERROR, service::ProjectIssueType::FILE,
+                                                          service::ProjectError::INVALID_FORMAT, error->msg, rel);
+            }));
         } else {
             for (auto &[key, val]: parsed.items()) {
                 metadata.keys.push_back(key);
@@ -102,10 +111,15 @@ FolderMetadata getFolderMetadata(const Project &project, const fs::path &path) {
             }
         }
         ifs.close();
-    } catch (const nlohmann::json::parse_error &e) {
+    } catch (const nlohmann::json::parse_error &error) {
         ifs.close();
-        logger.error("Error parsing folder metadata: Project '{}', path {}", project.getValueOfId(), path.string());
-        logger.error("JSON parse error (getFolderMetadata): {}", e.what());
+        logger.error("Error parsing folder metadata: Project '{}', path {}", resolved.getProject().getValueOfId(), path.string());
+        logger.error("JSON parse error (getFolderMetadata): {}", error.what());
+
+        trantor::EventLoop::getEventLoopOfCurrentThread()->queueInLoop(async_func([resolved, error, rel]() -> Task<> {
+            co_await global::storage->addProjectIssue(resolved, service::ProjectIssueLevel::ERROR, service::ProjectIssueType::FILE,
+                                                      service::ProjectError::INVALID_FILE, error.what(), rel);
+        }));
     }
     return metadata;
 }
@@ -133,11 +147,12 @@ auto createDirEntriesComparator(const std::vector<std::string> &keys) {
     };
 }
 
-nlohmann::ordered_json getDirTreeJson(const Project &project, const fs::path &rootDir, const fs::path &dir, const std::string &locale) {
+nlohmann::ordered_json getDirTreeJson(const service::ResolvedProject &resolved, const fs::path &rootDir, const fs::path &dir,
+                                      const std::string &locale) {
     nlohmann::ordered_json root(nlohmann::json::value_t::array);
 
     const auto metaFilePath = getFolderMetaFilePath(rootDir, dir, locale);
-    auto [keys, entries] = getFolderMetadata(project, metaFilePath);
+    auto [keys, entries] = getFolderMetadata(resolved, metaFilePath);
 
     std::vector<fs::directory_entry> paths;
     for (const auto &entry: fs::directory_iterator(dir)) {
@@ -163,7 +178,7 @@ nlohmann::ordered_json getDirTreeJson(const Project &project, const fs::path &ro
         obj["path"] = getDocsTreeEntryPath(relativePath);
         obj["type"] = entry.is_directory() ? "dir" : "file";
         if (entry.is_directory()) {
-            nlohmann::ordered_json children = getDirTreeJson(project, rootDir, entry.path(), locale);
+            nlohmann::ordered_json children = getDirTreeJson(resolved, rootDir, entry.path(), locale);
             obj["children"] = children;
         }
         root.push_back(obj);
@@ -225,22 +240,16 @@ namespace service {
         return removeTrailingSlash(project.getValueOfSourceRepo()) + "/" + result;
     }
 
-    ResolvedProject::ResolvedProject(const Project &p, const std::filesystem::path &d,
-                                     const ProjectVersion &v) :
-        project_(p), defaultVersion_(nullptr), docsDir_(d), version_(v),
-        projectDb_(std::make_shared<ProjectDatabaseAccess>(*this)) {}
+    ResolvedProject::ResolvedProject(const Project &p, const std::filesystem::path &d, const ProjectVersion &v) :
+        project_(p), defaultVersion_(nullptr), docsDir_(d), version_(v), projectDb_(std::make_shared<ProjectDatabaseAccess>(*this)) {}
 
     void ResolvedProject::setDefaultVersion(const ResolvedProject &defaultVersion) {
         defaultVersion_ = std::make_shared<ResolvedProject>(defaultVersion);
     }
 
-    void ResolvedProject::setLocale(const std::optional<std::string> &locale) {
-        locale_ = locale.value_or("");
-    }
+    void ResolvedProject::setLocale(const std::optional<std::string> &locale) { locale_ = locale.value_or(""); }
 
-    std::string ResolvedProject::getLocale() const {
-        return locale_.empty() ? DEFAULT_LOCALE : locale_;
-    }
+    std::string ResolvedProject::getLocale() const { return locale_.empty() ? DEFAULT_LOCALE : locale_; }
 
     bool ResolvedProject::hasLocale(const std::string &locale) const {
         const auto locales = getLocales();
@@ -370,7 +379,7 @@ namespace service {
     }
 
     std::tuple<nlohmann::ordered_json, Error> ResolvedProject::getDirectoryTree() const {
-        const auto tree = getDirTreeJson(project_, docsDir_, docsDir_, locale_);
+        const auto tree = getDirTreeJson(*this, docsDir_, docsDir_, locale_);
         return {tree, Error::Ok};
     }
 
@@ -379,7 +388,7 @@ namespace service {
         if (!exists(contentPath)) {
             return {nlohmann::ordered_json(), Error::ErrNotFound};
         }
-        const auto tree = getDirTreeJson(project_, docsDir_, contentPath, locale_);
+        const auto tree = getDirTreeJson(*this, docsDir_, contentPath, locale_);
         return {tree, Error::Ok};
     }
 

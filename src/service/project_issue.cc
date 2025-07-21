@@ -15,6 +15,7 @@ namespace service {
 
     ENUM_FROM_TO_STR(ProjectIssueType,
         {ProjectIssueType::META, "meta"},
+        {ProjectIssueType::FILE, "file"},
         {ProjectIssueType::GIT_CLONE, "git_clone"},
         {ProjectIssueType::GIT_INFO, "git_info"},
         {ProjectIssueType::INGESTOR, "ingestor"},

@@ -537,22 +537,13 @@ namespace service {
             co_return Error::ErrNotFound;
         }
 
-        auto resolvedPath = path;
-        if (!path.empty()) {
-            const auto filePath = resolved.getPagePath(path);
-            if (!filePath) {
-                co_return Error::ErrNotFound;
-            }
-            resolvedPath = *filePath;
-        }
-
         const auto taskKey = createProjectIssueKey(projectId, enumToStr(level), enumToStr(type), enumToStr(subject), path);
 
         if (const auto pending = co_await getOrStartTask<Error>(taskKey)) {
             co_return co_await patientlyAwaitTaskResult(*pending);
         }
 
-        if (const auto existing = co_await global::database->getProjectIssue(deployment->getValueOfId(), level, type, resolvedPath)) {
+        if (const auto existing = co_await global::database->getProjectIssue(deployment->getValueOfId(), level, type, path)) {
             co_return co_await completeTask<Error>(taskKey, Error::ErrBadRequest);
         }
 
@@ -562,8 +553,8 @@ namespace service {
         issue.setType(enumToStr(type));
         issue.setSubject(enumToStr(subject));
         issue.setDetails(details);
-        if (!resolvedPath.empty()) {
-            issue.setFile(resolvedPath);
+        if (!path.empty()) {
+            issue.setFile(path);
         }
         if (const auto versionName = resolved.getProjectVersion().getName()) {
             issue.setVersionName(*versionName);

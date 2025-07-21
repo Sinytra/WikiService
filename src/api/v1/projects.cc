@@ -577,7 +577,15 @@ namespace api::v1 {
 
         const auto details = (*json)["details"].asString();
         const auto path = (*json)["path"].asString();
-        const auto res = co_await global::storage->addProjectIssue(resolved, parsedLevel, parsedType, parsedSubject, details, path);
+        auto resolvedPath = path;
+        if (!path.empty()) {
+            const auto filePath = resolved.getPagePath(path);
+            if (!filePath) {
+                throw ApiException(Error::ErrBadRequest, "invalid_path");
+            }
+            resolvedPath = *filePath;
+        }
+        const auto res = co_await global::storage->addProjectIssue(resolved, parsedLevel, parsedType, parsedSubject, details, resolvedPath);
 
         if (res == Error::ErrNotFound) {
             throw ApiException(Error::ErrNotFound, "not_found");

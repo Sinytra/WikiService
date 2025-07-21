@@ -10,7 +10,7 @@ namespace service {
     std::string enumToStr(ProjectIssueLevel level);
     ProjectIssueLevel parseProjectIssueLevel(const std::string &level);
 
-    enum class ProjectIssueType { META, GIT_CLONE, GIT_INFO, PAGE_RENDER, INGESTOR, INTERNAL, UNKNOWN };
+    enum class ProjectIssueType { META, FILE, GIT_CLONE, GIT_INFO, PAGE_RENDER, INGESTOR, INTERNAL, UNKNOWN };
     std::string enumToStr(ProjectIssueType type);
     ProjectIssueType parseProjectIssueType(const std::string &level);
 
