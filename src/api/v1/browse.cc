@@ -15,8 +15,8 @@ using namespace drogon::orm;
 using namespace drogon_model::postgres;
 
 namespace api::v1 {
-    Task<> BrowseController::browse(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, const std::string query,
-                                    const std::string types, const std::string sort, const int page) const {
+    Task<> BrowseController::browse(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+                                    const std::string query, const std::string types, const std::string sort, const int page) const {
         const auto [searchResults, searchError] = co_await global::database->findProjects(query, types, sort, page);
 
         Json::Value root;

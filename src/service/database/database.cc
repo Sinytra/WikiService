@@ -146,6 +146,7 @@ namespace service {
                     "    FROM project"
                     "    WHERE ((cast($1 as varchar) IS NULL OR $1 = '' OR search_vector @@ to_tsquery('simple', $1))"
                     "    AND ((cast($2 as varchar) IS NULL OR $2 = '' OR type = ANY (STRING_TO_ARRAY($2, ',')))))"
+                    "    AND EXISTS(SELECT * FROM deployment WHERE project_id = project.id)"
                     "    " + sortQuery +
                     "),"
                     "     total_count AS ("
