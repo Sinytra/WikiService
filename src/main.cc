@@ -21,6 +21,7 @@
 
 #include <service/content/recipe_builtin.h>
 #include "api/v1/moderation.h"
+#include "service/access_keys.h"
 #include "service/content/game_data.h"
 #include "service/lang/crowdin.h"
 
@@ -43,6 +44,7 @@ namespace global {
     std::shared_ptr<LangService> lang;
     std::shared_ptr<GameDataService> gameData;
     std::shared_ptr<Crowdin> crowdin;
+    std::shared_ptr<AccessKeys> accessKeys;
 
     std::shared_ptr<Platforms> platforms;
 }
@@ -56,6 +58,7 @@ void globalExceptionHandler(const std::exception &e, const HttpRequestPtr &req, 
         return;
     }
 
+    // TODO Sentry
     logger.error("Unhandled exception: {}", e.what());
     callback(statusResponse(k500InternalServerError));
 }
@@ -76,7 +79,7 @@ int main() {
         configureLoggingLevel();
 
         const auto [authConfig, githubAppConfig, mrApp, cloudFlareConfig, crowdinConfig, sentryConfig, appUrl, curseForgeKey, storagePath,
-                    local] = config::configure();
+                    salt, local] = config::configure();
 
         if (!sentryConfig.dsn.empty()) {
             monitoring::initSentry(sentryConfig.dsn);
@@ -93,6 +96,7 @@ int main() {
         global::lang = std::make_shared<LangService>();
         global::gameData = std::make_shared<GameDataService>(storagePath);
         global::crowdin = std::make_shared<Crowdin>(crowdinConfig);
+        global::accessKeys = std::make_shared<AccessKeys>(salt);
         auto curseForge(CurseForgePlatform{curseForgeKey});
         auto modrinth(ModrinthPlatform{});
         global::platforms = std::make_shared<Platforms>(curseForge, modrinth);

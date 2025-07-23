@@ -133,14 +133,14 @@ namespace api::v1 {
      * - no_path: Invalid path / metadata not found at given path
      * - invalid_meta: Metadata file format is invalid
      */
-    Task<ValidatedProjectData> ProjectsController::validateProjectData(const Json::Value &json, const User user,
+    Task<ValidatedProjectData> ProjectsController::validateProjectData(const nlohmann::json &json, const User user,
                                                                        const bool checkExisting) const {
         static const std::set<std::string> allowedProtocols = {"http", "https"};
 
         // Required
-        const auto branch = json["branch"].asString();
-        const auto repo = json["repo"].asString();
-        const auto path = json["path"].asString();
+        const std::string branch = json["branch"];
+        const std::string repo = json["repo"];
+        const std::string path = json["path"];
 
         try {
             const uri repoUri(repo);
@@ -290,30 +290,23 @@ namespace api::v1 {
 
     Task<> ProjectsController::create(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
         const auto session{co_await global::auth->getSession(req)};
-        auto json(req->getJsonObject());
-        if (!json) {
-            throw ApiException(Error::ErrBadRequest, req->getJsonError());
-        }
-        if (const auto error = validateJson(schemas::projectRegister, *json)) {
-            throw ApiException(Error::ErrBadRequest, error->msg);
-        }
-
-        const auto isCommunity = (*json)["is_community"].asBool();
+        const auto json(BaseProjectController::validatedBody(req, schemas::projectRegister));
 
         // TODO Add support for community projects
+        const bool isCommunity = json["is_community"];
         if (isCommunity) {
             throw ApiException(Error::ErrInternal, "unsupported");
         }
 
-        const auto repo = (*json)["repo"].asString();
-        const auto branch = (*json)["branch"].asString();
-        const auto path = (*json)["path"].asString();
+        const std::string repo = json["repo"];
+        const std::string branch = json["branch"];
+        const std::string path = json["path"];
 
         if (co_await global::database->existsForRepo(repo, branch, path)) {
             throw ApiException(Error::ErrBadRequest, "exists");
         }
 
-        auto validated = co_await validateProjectData(*json, session.user, false);
+        auto validated = co_await validateProjectData(json, session.user, false);
         auto [project, platforms] = validated;
         project.setIsCommunity(isCommunity);
 
@@ -345,16 +338,9 @@ namespace api::v1 {
 
     Task<> ProjectsController::update(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
         const auto session{co_await global::auth->getSession(req)};
+        const auto json(BaseProjectController::validatedBody(req, schemas::projectRegister));
 
-        const auto json(req->getJsonObject());
-        if (!json) {
-            throw ApiException(Error::ErrBadRequest, req->getJsonError());
-        }
-        if (const auto error = validateJson(schemas::projectRegister, *json)) {
-            throw ApiException(Error::ErrBadRequest, error->msg);
-        }
-
-        auto [project, platforms] = co_await validateProjectData(*json, session.user, true);
+        auto [project, platforms] = co_await validateProjectData(json, session.user, true);
 
         if (const auto [proj, projErr] = co_await global::database->getProjectSource(project.getValueOfId()); !proj) {
             throw ApiException(Error::ErrNotFound, "not_found");
@@ -485,7 +471,7 @@ namespace api::v1 {
 
     Task<> ProjectsController::getDeployment(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                              const std::string id) const {
-        const auto deployment(co_await global::database->getModel<Deployment>(id));
+        const auto deployment(co_await global::database->findByPrimaryKey<Deployment>(id));
         if (!deployment) {
             throw ApiException(Error::ErrNotFound, "not_found");
         }
@@ -512,7 +498,7 @@ namespace api::v1 {
 
     Task<> ProjectsController::deleteDeployment(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                                 const std::string id) const {
-        const auto deployment(co_await global::database->getModel<Deployment>(id));
+        const auto deployment(co_await global::database->findByPrimaryKey<Deployment>(id));
         if (!deployment) {
             throw ApiException(Error::ErrNotFound, "not_found");
         }
@@ -550,33 +536,27 @@ namespace api::v1 {
 
     Task<> ProjectsController::addIssue(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                         const std::string id) const {
-        const auto json(req->getJsonObject());
-        if (!json) {
-            throw ApiException(Error::ErrBadRequest, req->getJsonError());
-        }
-        if (const auto error = validateJson(schemas::projectIssue, *json)) {
-            throw ApiException(Error::ErrBadRequest, error->msg);
-        }
+        const auto json(BaseProjectController::validatedBody(req, schemas::projectIssue));
 
         const auto resolved(co_await BaseProjectController::getProjectWithParams(req, id));
 
-        const auto parsedLevel = parseProjectIssueLevel((*json)["level"].asString());
+        const auto parsedLevel = parseProjectIssueLevel(json["level"]);
         if (parsedLevel == ProjectIssueLevel::UNKNOWN) {
             throw ApiException(Error::ErrBadRequest, "invalid_level");
         }
 
-        const auto parsedType = parseProjectIssueType((*json)["type"].asString());
+        const auto parsedType = parseProjectIssueType(json["type"]);
         if (parsedType == ProjectIssueType::UNKNOWN) {
             throw ApiException(Error::ErrBadRequest, "invalid_type");
         }
 
-        const auto parsedSubject = parseProjectError((*json)["subject"].asString());
+        const auto parsedSubject = parseProjectError(json["subject"]);
         if (parsedSubject == ProjectError::UNKNOWN) {
             throw ApiException(Error::ErrBadRequest, "invalid_subject");
         }
 
-        const auto details = (*json)["details"].asString();
-        const auto path = (*json)["path"].asString();
+        const auto details = json["details"];
+        const auto path = json["path"];
         auto resolvedPath = path;
         if (!path.empty()) {
             const auto filePath = resolved.getPagePath(path);

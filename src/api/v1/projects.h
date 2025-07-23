@@ -109,7 +109,7 @@ namespace api::v1 {
         drogon::Task<service::PlatformProject> validatePlatform(const std::string &id, const std::string &repo, const std::string &platform,
                                                                 const std::string &slug, bool checkExisting, User user) const;
 
-        drogon::Task<ValidatedProjectData> validateProjectData(const Json::Value &json, User user, bool checkExisting) const;
+        drogon::Task<ValidatedProjectData> validateProjectData(const nlohmann::json &json, User user, bool checkExisting) const;
 
         void enqueueDeploy(const Project &project, std::string userId) const;
 

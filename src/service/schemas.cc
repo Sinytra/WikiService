@@ -78,6 +78,19 @@ nlohmann::json schemas::ruleReport = R"(
 }
 )"_json;
 
+nlohmann::json schemas::accessKey = R"(
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Access Key Creation",
+    "type": "object",
+    "properties": {
+        "name": { "type": "string" },
+        "days_valid": { "type": "integer", "minimum": 0, "maximum": 365 }
+    },
+    "required": ["name"]
+}
+)"_json;
+
 nlohmann::json schemas::projectMetadata = R"(@PROJECT_META_SCHEMA@)"_json;
 
 nlohmann::json schemas::folderMetadata = R"(@FOLDER_META_SCHEMA@)"_json;

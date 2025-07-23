@@ -86,6 +86,7 @@ SystemConfig configureFromEnvironment() {
             .appUrl = std::getenv("APP_URL"),
             .curseForgeKey = std::getenv("CURSEFORGE_KEY"),
             .storagePath = std::getenv("STORAGE_PATH"),
+            .salt = std::getenv("SALT"),
             .local = std::string(std::getenv("LOCAL")) == "true"};
 }
 
@@ -136,6 +137,7 @@ SystemConfig config::configure() {
                            .appUrl = customConfig["app_url"].asString(),
                            .curseForgeKey = customConfig["curseforge_key"].asString(),
                            .storagePath = customConfig["storage_path"].asString(),
+                           .salt = customConfig["salt"].asString(),
                            .local = customConfig.isMember("local") && customConfig["local"].asBool()};
 
     if (!customConfig.isMember("api_key") || customConfig["api_key"].asString().empty()) {

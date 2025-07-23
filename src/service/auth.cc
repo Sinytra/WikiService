@@ -116,7 +116,7 @@ namespace service {
             co_return std::nullopt;
         }
 
-        const auto user = co_await global::database->getModel<User>(*username);
+        const auto user = co_await global::database->findByPrimaryKey<User>(*username);
         if (!user) {
             co_return std::nullopt;
         }
@@ -180,7 +180,7 @@ namespace service {
     Task<std::optional<User>> Auth::getGitHubTokenUser(const std::string token) const {
         if (const auto [ghProfile, ghErr](co_await global::github->getAuthenticatedUser(token)); ghProfile) {
             const auto username = (*ghProfile)["login"].asString();
-            const auto user = co_await global::database->getModel<User>(strToLower(username));
+            const auto user = co_await global::database->findByPrimaryKey<User>(strToLower(username));
             co_return user;
         }
         co_return std::nullopt;

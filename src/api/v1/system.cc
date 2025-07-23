@@ -3,14 +3,17 @@
 
 #include <log/log.h>
 #include <models/Project.h>
+#include <service/auth.h>
 #include <service/serializers.h>
+#include <service/system_data/system_data_import.h>
 #include <service/util.h>
 #include <version.h>
 
+#include "access_keys.h"
+#include "base.h"
 #include "lang/crowdin.h"
 #include "lang/lang.h"
-#include "service/auth.h"
-#include "service/system_data/system_data_import.h"
+#include "schemas.h"
 
 using namespace std;
 using namespace drogon;
@@ -32,6 +35,16 @@ namespace api::v1 {
 
     std::vector<DataMigration> dataMigrations = {
         {"deployments", "Project deployments", "Run initial project deployments", sys::runInitialDeployments}};
+
+    Task<bool> authAccessKey(const HttpRequestPtr req) {
+        const auto authHeader = req->getHeader("Authorization");
+        if (authHeader.empty()) {
+            co_return false;
+        }
+        const auto token = authHeader.substr(7);
+        const auto key = co_await global::accessKeys->getAccessKey(token);
+        co_return key && global::accessKeys->isValidKey(*key);
+    }
 
     Task<> SystemController::getLocales(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
         auto locales = co_await global::crowdin->getAvailableLocales();
@@ -72,16 +85,14 @@ namespace api::v1 {
     }
 
     Task<> SystemController::importData(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
-        co_await global::auth->ensurePrivilegedAccess(req);
-
-        const auto json(req->getJsonObject());
-        if (!json) {
-            throw ApiException(Error::ErrBadRequest, req->getJsonError());
+        if (!co_await authAccessKey(req)) {
+            co_await global::auth->ensurePrivilegedAccess(req);
         }
-        const auto parsed = parkourJson(*json);
+
+        const auto json(BaseProjectController::jsonBody(req));
 
         constexpr sys::SystemDataImporter importer;
-        const auto result = co_await importer.importData(parsed);
+        const auto result = co_await importer.importData(json);
 
         callback(statusResponse(result == Error::Ok ? k200OK : k500InternalServerError));
     }
@@ -122,5 +133,38 @@ namespace api::v1 {
         } catch (std::exception e) {
             logger.error("Error running data migration {}: {}", id, e.what());
         }
+    }
+
+    Task<> SystemController::getAccessKeys(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
+        co_await global::auth->ensurePrivilegedAccess(req);
+
+        const auto [query, page] = getTableQueryParams(req);
+        const auto keys{co_await global::accessKeys->getAccessKeys(query, page)};
+        callback(jsonResponse(keys));
+    }
+
+    Task<> SystemController::createAccessKey(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
+        co_await global::auth->ensurePrivilegedAccess(req);
+        const auto session{co_await global::auth->getSession(req)};
+        const auto json(BaseProjectController::validatedBody(req, schemas::accessKey));
+
+        const std::string name = json["name"];
+        const int daysValid = json.contains("days_valid") ? json["days_valid"].get<int>() : 0;
+
+        const auto [key, value] = co_await global::accessKeys->createAccessKey(name, session.username, daysValid);
+
+        nlohmann::json root;
+        root["key"] = key;
+        root["token"] = value;
+
+        callback(jsonResponse(root));
+    }
+
+    Task<> SystemController::deleteAccessKey(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback, const int64_t id) const {
+        co_await global::auth->ensurePrivilegedAccess(req);
+
+        co_await global::accessKeys->deleteAccessKey(id);
+
+        callback(statusResponse(k200OK));
     }
 }

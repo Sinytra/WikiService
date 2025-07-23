@@ -11,6 +11,7 @@ namespace schemas {
     extern nlohmann::json projectIssue;
     extern nlohmann::json report;
     extern nlohmann::json ruleReport;
+    extern nlohmann::json accessKey;
 
     extern nlohmann::json gameRecipe;
     extern nlohmann::json gameRecipeType;

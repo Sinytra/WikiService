@@ -47,6 +47,7 @@ namespace config {
         std::string appUrl;
         std::string curseForgeKey;
         std::string storagePath;
+        std::string salt;
         bool local;
     };
 

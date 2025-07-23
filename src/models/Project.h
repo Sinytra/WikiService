@@ -340,11 +340,10 @@ class Project
         {
             needSelection=true;
         }
-        sql += "modid,";
-        ++parametersCount;
-        if(!dirtyFlag_[11])
+        if(dirtyFlag_[11])
         {
-            needSelection=true;
+            sql += "modid,";
+            ++parametersCount;
         }
         if(parametersCount > 0)
         {
@@ -428,10 +427,6 @@ class Project
         {
             n = snprintf(placeholderStr,sizeof(placeholderStr),"$%d,",placeholder++);
             sql.append(placeholderStr, n);
-        }
-        else
-        {
-            sql +="default,";
         }
         if(parametersCount > 0)
         {

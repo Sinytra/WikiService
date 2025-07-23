@@ -161,3 +161,5 @@ T unwrap(std::optional<T> opt) {
     }
     return opt.value();
 }
+
+std::string formatDateTime(const std::string &databaseData);

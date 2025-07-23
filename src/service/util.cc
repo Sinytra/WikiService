@@ -278,3 +278,7 @@ bool isSubpath(const fs::path &path, const fs::path &base) {
     const auto [fst, snd] = std::mismatch(path.begin(), path.end(), base.begin(), base.end());
     return snd == base.end();
 }
+
+std::string formatDateTime(const std::string &databaseData) {
+    return trantor::Date::fromDbString(databaseData).toCustomFormattedString("%Y-%m-%dT%H:%M:%SZ");
+}

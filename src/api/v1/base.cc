@@ -60,4 +60,20 @@ namespace api::v1 {
 
         co_return *resolved;
     }
+
+    nlohmann::json BaseProjectController::jsonBody(const HttpRequestPtr &req) {
+        const auto json(req->getJsonObject());
+        if (!json) {
+            throw ApiException(Error::ErrBadRequest, req->getJsonError());
+        }
+        return parkourJson(*json);
+    }
+
+    nlohmann::json BaseProjectController::validatedBody(const HttpRequestPtr &req, const nlohmann::json &schema) {
+        const auto json(jsonBody(req));
+        if (const auto error = validateJson(schema, json)) {
+            throw ApiException(Error::ErrBadRequest, error->msg);
+        }
+        return json;
+    }
 }

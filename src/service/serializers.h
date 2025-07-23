@@ -1,7 +1,8 @@
 #pragma once
 
-#include <models/ProjectVersion.h>
+#include <models/AccessKey.h>
 #include <models/DataImport.h>
+#include <models/ProjectVersion.h>
 #include <nlohmann/json.hpp>
 
 namespace drogon_model::postgres {
@@ -31,6 +32,17 @@ namespace drogon_model::postgres {
             {"path", report.getValueOfPath()},
             {"submitter_id", report.getValueOfSubmitterId()},
             {"created_at", report.getValueOfCreatedAt().toCustomFormattedString("%Y-%m-%d %H:%M:%S")}
+        };
+    }
+
+    inline void to_json(nlohmann::json &j, const AccessKey &key) {
+        j = nlohmann::json{
+            {"id", key.getValueOfId()},
+            {"name", key.getValueOfName()},
+            {"user_id", key.getValueOfUserId()},
+            {"expired", key.getExpiresAt() && key.getValueOfExpiresAt() <= trantor::Date::now()},
+            {"expires_at", key.getExpiresAt() ? nlohmann::json(key.getValueOfExpiresAt().toCustomFormattedString("%Y-%m-%d %H:%M:%S")) : nlohmann::json(nullptr)},
+            {"created_at", key.getValueOfCreatedAt().toCustomFormattedString("%Y-%m-%d %H:%M:%S")},
         };
     }
 }

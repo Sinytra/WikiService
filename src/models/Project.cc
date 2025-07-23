@@ -1739,6 +1739,11 @@ bool Project::validateJsonForCreation(const Json::Value &pJson, std::string &err
         if(!validJsonOfField(11, "modid", pJson["modid"], err, true))
             return false;
     }
+    else
+    {
+        err="The modid column cannot be null";
+        return false;
+    }
     return true;
 }
 bool Project::validateMasqueradedJsonForCreation(const Json::Value &pJson,
@@ -1881,6 +1886,11 @@ bool Project::validateMasqueradedJsonForCreation(const Json::Value &pJson,
               if(!validJsonOfField(11, pMasqueradingVector[11], pJson[pMasqueradingVector[11]], err, true))
                   return false;
           }
+        else
+        {
+            err="The " + pMasqueradingVector[11] + " column cannot be null";
+            return false;
+        }
       }
     }
     catch(const Json::LogicError &e)

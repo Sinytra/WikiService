@@ -22,7 +22,8 @@
     "data_import",
     "deployment",
     "project_issue",
-    "report"
+    "report",
+    "access_key"
   ],
   "relationships": {
     "enabled": true,

@@ -1,12 +1,12 @@
 #include "moderation.h"
 
 #include <log/log.h>
-#include <models/Project.h>
 #include <service/auth.h>
 #include <service/serializers.h>
 #include <service/storage/storage.h>
 #include <service/util.h>
 
+#include "base.h"
 #include "reports.h"
 #include "schemas.h"
 
@@ -29,36 +29,29 @@ namespace api::v1 {
 
     Task<> ModerationController::submitReport(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
         const auto session(co_await global::auth->getSession(req));
+        const auto json(BaseProjectController::validatedBody(req, schemas::report));
 
-        const auto json(req->getJsonObject());
-        if (!json) {
-            throw ApiException(Error::ErrBadRequest, req->getJsonError());
-        }
-        if (const auto error = validateJson(schemas::report, *json)) {
-            throw ApiException(Error::ErrBadRequest, error->msg);
-        }
-
-        const auto projectId = (*json)["project_id"].asString();
+        const auto projectId = json["project_id"];
         const auto [proj, projErr] = co_await global::database->getProjectSource(projectId);
         if (!proj) {
             throw ApiException(Error::ErrNotFound, "invalid_project");
         }
 
-        const auto type = parseReportType((*json)["type"].asString());
+        const auto type = parseReportType(json["type"]);
         if (type == ReportType::UNKNOWN) {
             throw ApiException(Error::ErrBadRequest, "invalid_type");
         }
 
-        const auto reason = parseReportReason((*json)["reason"].asString());
+        const auto reason = parseReportReason(json["reason"]);
         if (reason == ReportReason::UNKNOWN) {
             throw ApiException(Error::ErrBadRequest, "invalid_reason");
         }
 
         Report report;
 
-        if (json->isMember("version") || json->isMember("locale")) {
-            const auto version = json->isMember("version") ? std::make_optional((*json)["version"].asString()) : std::nullopt;
-            const auto locale = json->isMember("locale") ? std::make_optional((*json)["locale"].asString()) : std::nullopt;
+        if (json.contains("version") || json.contains("locale")) {
+            const auto version = json.contains("version") ? std::make_optional(json["version"].get<std::string>()) : std::nullopt;
+            const auto locale = json.contains("locale") ? std::make_optional(json["locale"].get<std::string>()) : std::nullopt;
 
             const auto [resolved, resErr](co_await global::storage->getProject(*proj, version, locale));
             if (!resolved) {
@@ -71,8 +64,8 @@ namespace api::v1 {
             }
         }
 
-        const auto body = (*json)["body"].asString();
-        const auto path = (*json)["path"].asString();
+        const std::string body = json["body"];
+        const std::string path = json["path"];
 
         report.setProjectId(projectId);
         report.setType(enumToStr(type));
@@ -95,14 +88,14 @@ namespace api::v1 {
                                            const std::string id) const {
         co_await global::auth->ensurePrivilegedAccess(req);
 
-        const auto report(co_await global::database->getModel<Report>(id));
+        const auto report(co_await global::database->findByPrimaryKey<Report>(id));
         if (!report) {
             throw ApiException(Error::ErrNotFound, "not_found");
         }
 
         nlohmann::json root(*report);
         if (const auto versionId = report->getVersionId()) {
-            if (const auto version = co_await global::database->getModel<ProjectVersion>(*versionId); version && version->getName()) {
+            if (const auto version = co_await global::database->findByPrimaryKey<ProjectVersion>(*versionId); version && version->getName()) {
                 root["version"] = version->getValueOfName();
             }
         }
@@ -113,22 +106,14 @@ namespace api::v1 {
     Task<> ModerationController::ruleReport(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                             const std::string id) const {
         co_await global::auth->ensurePrivilegedAccess(req);
+        const auto json(BaseProjectController::validatedBody(req, schemas::ruleReport));
 
-        const auto json(req->getJsonObject());
-        if (!json) {
-            throw ApiException(Error::ErrBadRequest, req->getJsonError());
-        }
-
-        if (const auto error = validateJson(schemas::ruleReport, *json)) {
-            throw ApiException(Error::ErrBadRequest, error->msg);
-        }
-
-        auto report(co_await global::database->getModel<Report>(id));
+        auto report(co_await global::database->findByPrimaryKey<Report>(id));
         if (!report) {
             throw ApiException(Error::ErrNotFound, "not_found");
         }
 
-        const auto resolution = (*json)["resolution"].asString();
+        const auto resolution = json["resolution"];
         const auto status = resolution == "accept" ? ReportStatus::ACCEPTED : ReportStatus::DISMISSED;
 
         report->setStatus(enumToStr(status));

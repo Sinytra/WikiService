@@ -23,7 +23,7 @@ namespace service {
     std::string paginatedQuery(const std::string &dataQuery, int pageSize, int page);
 
     class DatabaseBase {
-    protected:
+    public:
         virtual drogon::orm::DbClientPtr getDbClientPtr() const;
 
         template<typename Ret>
@@ -105,10 +105,19 @@ namespace service {
         }
 
         template<typename T>
-        drogon::Task<std::optional<T>> getModel(typename drogon::orm::Mapper<T>::TraitsPKType id) const {
+        drogon::Task<std::optional<T>> findByPrimaryKey(typename drogon::orm::Mapper<T>::TraitsPKType id) const {
             const auto [res, err] = co_await handleDatabaseOperation<T>([id](const drogon::orm::DbClientPtr &client) -> drogon::Task<T> {
                 drogon::orm::CoroMapper<T> mapper(client);
                 co_return co_await mapper.findByPrimaryKey(id);
+            });
+            co_return res;
+        }
+
+        template<typename T>
+        drogon::Task<std::optional<T>> findOne(drogon::orm::Criteria criteria) const {
+            const auto [res, err] = co_await handleDatabaseOperation<T>([criteria](const drogon::orm::DbClientPtr &client) -> drogon::Task<T> {
+                drogon::orm::CoroMapper<T> mapper(client);
+                co_return co_await mapper.findOne(criteria);
             });
             co_return res;
         }
@@ -145,6 +154,16 @@ namespace service {
                 throw std::runtime_error(std::format("Failed to get {} with id {}", name, std::to_string(id)));
             }
             co_return *res;
+        }
+
+        template<typename T>
+        drogon::Task<Error> deleteByPrimaryKey(int64_t id) const {
+            const auto [res, err] = co_await handleDatabaseOperation<Error>([id](const drogon::orm::DbClientPtr &client) -> drogon::Task<Error> {
+                drogon::orm::CoroMapper<T> mapper(client);
+                co_await mapper.deleteByPrimaryKey(id);
+                co_return Error::Ok;
+            });
+            co_return err;
         }
     };
 }

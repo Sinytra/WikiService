@@ -1,12 +1,15 @@
 #include "crypto.h"
 
+#include <iomanip>
 #include <openssl/bio.h>
 #include <openssl/buffer.h>
+#include <openssl/core_names.h>
 #include <openssl/evp.h>
+#include <openssl/kdf.h>
 #include <openssl/rand.h>
-#include <vector>
+#include <openssl/thread.h>
 #include <sstream>
-#include <iomanip>
+#include <vector>
 
 #define AES_KEY_SIZE 32
 #define AES_BLOCK_SIZE 16
@@ -194,5 +197,43 @@ namespace crypto {
 
         EVP_CIPHER_CTX_free(ctx);
         return std::string(plaintext.begin(), plaintext.end());
+    }
+
+    std::string hashSecureString(std::string input, std::string salt) {
+        EVP_KDF *kdf = nullptr;
+        EVP_KDF_CTX *kctx = nullptr;
+
+        uint32_t lanes = 2, threads = 2, memcost = 65536;
+
+        constexpr size_t outlen = 128;
+        std::vector<unsigned char> result(outlen);
+
+        if (OSSL_set_max_threads(nullptr, threads) != 1) {
+            return "";
+        }
+
+        const OSSL_PARAM params[6] = {
+            OSSL_PARAM_construct_uint32(OSSL_KDF_PARAM_THREADS, &threads),
+            OSSL_PARAM_construct_uint32(OSSL_KDF_PARAM_ARGON2_LANES, &lanes),
+            OSSL_PARAM_construct_uint32(OSSL_KDF_PARAM_ARGON2_MEMCOST, &memcost),
+            OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_SALT, salt.data(), salt.size()),
+            OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_PASSWORD, input.data(), input.size()),
+            OSSL_PARAM_construct_end()
+        };
+
+        std::string output = "";
+        if ((kdf = EVP_KDF_fetch(nullptr, "ARGON2D", nullptr)) != nullptr) {
+            if ((kctx = EVP_KDF_CTX_new(kdf)) != nullptr) {
+                if (EVP_KDF_derive(kctx, &result[0], outlen, params) == 1) {
+                    output = base64Encode(result);
+                }
+            }
+        }
+
+        EVP_KDF_free(kdf);
+        EVP_KDF_CTX_free(kctx);
+        OSSL_set_max_threads(nullptr, 0);
+
+        return output;
     }
 }

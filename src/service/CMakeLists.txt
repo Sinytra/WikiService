@@ -60,6 +60,7 @@ add_library(service STATIC
         storage/gitops.cc
         storage/realtime.cc
         system_data/system_data_import.cc
+        access_keys.cc
         auth.cc
         cache.cc
         cloudflare.cc

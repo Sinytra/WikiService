@@ -21,5 +21,8 @@ namespace api::v1 {
         static drogon::Task<service::ResolvedProject> getUserProject(drogon::HttpRequestPtr req, const std::string &project,
                                                                      const std::optional<std::string> &version,
                                                                      const std::optional<std::string> &locale);
+
+        static nlohmann::json jsonBody(const drogon::HttpRequestPtr &req);
+        static nlohmann::json validatedBody(const drogon::HttpRequestPtr &req, const nlohmann::json &schema);
     };
 }
