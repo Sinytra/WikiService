@@ -590,6 +590,7 @@ namespace service {
     Task<ItemData> ResolvedProject::getItemName(const Item item) const { co_return co_await getItemName(item.getValueOfLoc()); }
 
     Task<ItemData> ResolvedProject::getItemName(const std::string loc) const {
+        // TODO Read h1 heading for missing title attributes
         if (const auto path = co_await projectDb_->getProjectContentPath(loc)) {
             const auto title = readPageAttribute(*path, "title");
             co_return ItemData{.name = title.value_or(""), .path = *path};

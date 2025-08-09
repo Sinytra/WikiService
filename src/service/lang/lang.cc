@@ -26,6 +26,16 @@ namespace service {
         co_return mojangLanguages.contains(*locale) ? mojangLanguages.at(*locale) : *locale;
     }
 
+    Task<std::vector<Locale>> LangService::getAvailableLocales() const {
+        auto locales = co_await global::crowdin->getAvailableLocales();
+        for (auto &locale : locales) {
+            if (const auto mapped = mojangLanguages.find(locale.code); mapped != mojangLanguages.end()) {
+                locale.code = mapped->second;
+            }
+        }
+        co_return locales;
+    }
+
     Task<std::string> LangService::getItemName(const std::optional<std::string> lang, const std::string location) {
         const std::string mcLang = lang.value_or(DEFAULT_LOCALE);
 

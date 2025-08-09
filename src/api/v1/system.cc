@@ -47,7 +47,7 @@ namespace api::v1 {
     }
 
     Task<> SystemController::getLocales(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
-        auto locales = co_await global::crowdin->getAvailableLocales();
+        auto locales = co_await global::lang->getAvailableLocales();
         std::ranges::sort(locales, [](const Locale &a, const Locale &b) { return a.id < b.id; });
         locales.insert(locales.begin(), {"en", "English", DEFAULT_LOCALE});
         callback(jsonResponse(locales));
