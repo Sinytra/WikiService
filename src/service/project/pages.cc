@@ -1,9 +1,9 @@
 #include <fmt/args.h>
 #include <fstream>
 #include <regex>
+#include <service/database/resolved_db.h>
 #include <service/resolved.h>
 #include <service/schemas.h>
-#include <service/database/resolved_db.h>
 
 #include "git_hosts.h"
 #include "storage/storage.h"
@@ -18,63 +18,11 @@ using namespace drogon;
 using namespace drogon_model::postgres;
 namespace fs = std::filesystem;
 
-struct FolderMetadataEntry {
-    const std::string name;
-    const std::string icon;
-};
-
-struct FolderMetadata {
-    std::vector<std::string> keys;
-    std::map<std::string, FolderMetadataEntry> entries;
-};
-
 std::string getDocsTreeEntryName(std::string s) {
     if (s.ends_with(DOCS_FILE_EXT)) {
         s = s.substr(0, s.size() - 4);
     }
     return toCamelCase(s);
-}
-
-FolderMetadata getFolderMetadata(const service::ResolvedProject &resolved, const fs::path &path) {
-    FolderMetadata metadata;
-    if (!exists(path)) {
-        return metadata;
-    }
-
-    std::ifstream ifs(path);
-    const auto rel = relative(path, resolved.getRootDirectory());
-    try {
-        nlohmann::ordered_json parsed = nlohmann::ordered_json::parse(ifs);
-
-        if (const auto error = validateJson(schemas::folderMetadata, parsed)) {
-            logger.error("Invalid folder metadata: Project: {} Path: {} Error: {}", resolved.getProject().getValueOfId(), path.string(),
-                         error->msg);
-
-            global::storage->addProjectIssueAsync(resolved, service::ProjectIssueLevel::ERROR, service::ProjectIssueType::FILE,
-                                                  service::ProjectError::INVALID_FORMAT, error->msg, rel);
-        } else {
-            for (auto &[key, val]: parsed.items()) {
-                metadata.keys.push_back(key);
-                if (val.is_string()) {
-                    metadata.entries.try_emplace(key, val, "");
-                } else if (val.is_object()) {
-                    const auto name = val.contains("name") ? val["name"].get<std::string>() : getDocsTreeEntryName(key);
-                    const auto icon = val.contains("icon") ? (val["icon"].is_null() ? NO_ICON : val.value("icon", "")) : "";
-                    metadata.entries.try_emplace(key, name, icon);
-                }
-            }
-        }
-
-        ifs.close();
-    } catch (const nlohmann::json::parse_error &error) {
-        ifs.close();
-        logger.error("Error parsing folder metadata: Project '{}', path {}", resolved.getProject().getValueOfId(), path.string());
-        logger.error("JSON parse error (getFolderMetadata): {}", error.what());
-
-        global::storage->addProjectIssueAsync(resolved, service::ProjectIssueLevel::ERROR, service::ProjectIssueType::FILE,
-                                              service::ProjectError::INVALID_FILE, error.what(), rel);
-    }
-    return metadata;
 }
 
 auto createDirEntriesComparator(const std::vector<std::string> &keys) {
@@ -98,48 +46,6 @@ auto createDirEntriesComparator(const std::vector<std::string> &keys) {
         const auto bIdx = std::distance(keys.begin(), bPos);
         return aIdx < bIdx;
     };
-}
-
-// TODO Abolish JSON, use struct
-nlohmann::ordered_json getDirTreeJson(const service::ResolvedProject &resolved, const fs::path &dir) {
-    nlohmann::ordered_json root(nlohmann::json::value_t::array);
-
-    const auto format = resolved.getFormat();
-    const auto metaFilePath = format.getFolderMetaFilePath(dir);
-    auto [keys, entries] = getFolderMetadata(resolved, metaFilePath);
-
-    std::vector<fs::directory_entry> paths;
-    for (const auto &entry: fs::directory_iterator(dir)) {
-        if (const auto fileName = entry.path().filename().string();
-            (entry.is_directory() || entry.is_regular_file() && fileName.ends_with(DOCS_FILE_EXT)) && !fileName.starts_with(".") &&
-            !fileName.starts_with("_"))
-        {
-            paths.push_back(entry);
-        }
-    }
-    std::ranges::sort(paths, createDirEntriesComparator(keys));
-
-    for (const auto &entry: paths) {
-        const auto fileName = entry.path().filename().string();
-        const auto relativePath = relative(entry.path(), format.getRoot()).string();
-        const auto displayPath = relativePath.substr(0, relativePath.size() - 4);
-
-        const auto [name, icon] = entries.contains(fileName) ? entries[fileName] : FolderMetadataEntry{getDocsTreeEntryName(fileName), ""};
-        nlohmann::ordered_json obj;
-        obj["name"] = name;
-        if (!icon.empty()) {
-            obj["icon"] = icon;
-        }
-        obj["path"] = displayPath;
-        obj["type"] = entry.is_directory() ? "dir" : "file";
-        if (entry.is_directory()) {
-            nlohmann::ordered_json children = getDirTreeJson(resolved, entry.path());
-            obj["children"] = children;
-        }
-        root.push_back(obj);
-    }
-
-    return root;
 }
 
 std::optional<std::string> readPageHeading(const std::string &filePath) {
@@ -183,6 +89,111 @@ std::string formatEditUrl(const Project &project, const std::string &filePath) {
 }
 
 namespace service {
+    FolderMetadata ResolvedProject::getFolderMetadata(const fs::path &path) const {
+        FolderMetadata metadata;
+        if (!exists(path)) {
+            return metadata;
+        }
+
+        std::ifstream ifs(path);
+        const auto rel = relative(path, format_.getRoot());
+        try {
+            nlohmann::ordered_json parsed = nlohmann::ordered_json::parse(ifs);
+
+            if (const auto error = validateJson(schemas::folderMetadata, parsed)) {
+                logger.error("Invalid folder metadata: Project: {} Path: {} Error: {}", project_.getValueOfId(), path.string(), error->msg);
+
+                global::storage->addProjectIssueAsync(*this, ProjectIssueLevel::ERROR, ProjectIssueType::FILE, ProjectError::INVALID_FORMAT,
+                                                      error->msg, rel);
+            } else {
+                for (auto &[key, val]: parsed.items()) {
+                    metadata.keys.push_back(key);
+
+                    std::string name = "";
+                    std::string icon = "";
+                    if (val.is_string()) {
+                        name = val;
+                    } else if (val.is_object()) {
+                        if (val.contains("name"))
+                            name = val["name"].get<std::string>();
+                        icon = val.contains("icon") ? (val["icon"].is_null() ? NO_ICON : val.value("icon", "")) : "";
+                    } else {
+                        throw std::runtime_error("Unexpected format");
+                    }
+
+                    // Fallback to page heading
+                    if (name.empty()) {
+                        const auto pagePath = rel.parent_path() / key;
+                        name = getPageTitle(pagePath).value_or("");
+                    }
+
+                    // Last resort autogenerated title
+                    if (name.empty()) {
+                        name = getDocsTreeEntryName(key);
+                    }
+
+                    metadata.entries.try_emplace(key, name, icon);
+                }
+            }
+
+            ifs.close();
+        } catch (const nlohmann::json::parse_error &error) {
+            ifs.close();
+            logger.error("Error parsing folder metadata: Project '{}', path {}", project_.getValueOfId(), path.string());
+            logger.error("JSON parse error (getFolderMetadata): {}", error.what());
+
+            global::storage->addProjectIssueAsync(*this, ProjectIssueLevel::ERROR, ProjectIssueType::FILE, ProjectError::INVALID_FILE,
+                                                  error.what(), rel);
+        }
+        return metadata;
+    }
+
+    // TODO Abolish JSON, use struct
+    nlohmann::ordered_json ResolvedProject::getDirTreeJson(const fs::path &dir) const {
+        nlohmann::ordered_json root(nlohmann::json::value_t::array);
+
+        const auto metaFilePath = format_.getFolderMetaFilePath(dir);
+        auto [keys, entries] = getFolderMetadata(metaFilePath);
+
+        std::vector<fs::directory_entry> paths;
+        for (const auto &entry: fs::directory_iterator(dir)) {
+            if (const auto fileName = entry.path().filename().string();
+                (entry.is_directory() || entry.is_regular_file() && fileName.ends_with(DOCS_FILE_EXT)) && !fileName.starts_with(".") &&
+                !fileName.starts_with("_"))
+            {
+                paths.push_back(entry);
+            }
+        }
+        std::ranges::sort(paths, createDirEntriesComparator(keys));
+
+        for (const auto &entry: paths) {
+            const auto fileName = entry.path().filename().string();
+            const auto relativePath = relative(entry.path(), format_.getRoot()).string();
+            const auto displayPath = relativePath.substr(0, relativePath.size() - 4);
+
+            auto [name, icon] =
+                entries.contains(fileName) ? entries[fileName] : FolderMetadataEntry{getPageTitle(relativePath).value_or(""), ""};
+            if (name.empty()) {
+                name = getDocsTreeEntryName(fileName);
+            }
+
+            nlohmann::ordered_json obj;
+            obj["name"] = name;
+            if (!icon.empty()) {
+                obj["icon"] = icon;
+            }
+            obj["path"] = displayPath;
+            obj["type"] = entry.is_directory() ? "dir" : "file";
+            if (entry.is_directory()) {
+                nlohmann::ordered_json children = getDirTreeJson(entry.path());
+                obj["children"] = children;
+            }
+            root.push_back(obj);
+        }
+
+        return root;
+    }
+
     std::optional<std::string> ResolvedProject::getPagePath(const std::string &path) const {
         const auto filePath = format_.getLocalizedFilePath(removeLeadingSlash(path) + DOCS_FILE_EXT);
         if (!exists(filePath))
@@ -254,7 +265,7 @@ namespace service {
     }
 
     std::tuple<nlohmann::ordered_json, Error> ResolvedProject::getDirectoryTree() const {
-        const auto tree = getDirTreeJson(*this, docsDir_);
+        const auto tree = getDirTreeJson(docsDir_);
         return {tree, Error::Ok};
     }
 
@@ -263,7 +274,7 @@ namespace service {
         if (!exists(contentPath)) {
             return {nlohmann::ordered_json(), Error::ErrNotFound};
         }
-        const auto tree = getDirTreeJson(*this, contentPath);
+        const auto tree = getDirTreeJson(contentPath);
         return {tree, Error::Ok};
     }
 }

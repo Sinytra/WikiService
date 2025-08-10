@@ -14,6 +14,16 @@
 using namespace drogon_model::postgres;
 
 namespace service {
+    struct FolderMetadataEntry {
+        std::string name;
+        std::string icon;
+    };
+
+    struct FolderMetadata {
+        std::vector<std::string> keys;
+        std::map<std::string, FolderMetadataEntry> entries;
+    };
+
     struct ProjectPage {
         std::string content;
         std::string editUrl;
@@ -125,6 +135,8 @@ namespace service {
         drogon::Task<ItemData> getItemName(std::string loc) const;
 
     private:
+        FolderMetadata getFolderMetadata(const std::filesystem::path &path) const;
+        nlohmann::ordered_json getDirTreeJson(const std::filesystem::path &dir) const;
         std::optional<std::string> getPageTitle(const std::string &path) const;
 
         Project project_;
