@@ -55,6 +55,10 @@ add_library(service STATIC
         database/resolved_db.cc
         lang/crowdin.cc
         lang/lang.cc
+        project/git_hosts.cc
+        project/pages.cc
+        project/content.cc
+        project/format.cc
         project/properties.cc
         storage/storage.cc
         storage/gitops.cc

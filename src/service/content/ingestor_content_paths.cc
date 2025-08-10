@@ -19,7 +19,7 @@ namespace content {
     Task<PreparationResult> ContentPathsSubIngestor::prepare() {
         PreparationResult result;
 
-        for (const auto docsRoot = project_.getDocsDirectoryPath(); const auto &entry: fs::recursive_directory_iterator(docsRoot)) {
+        for (const auto docsRoot = project_.getRootDirectory(); const auto &entry: fs::recursive_directory_iterator(docsRoot)) {
             if (const auto fileName = entry.path().filename().string(); !entry.is_regular_file() || entry.path().extension() != EXT_MDX ||
                                                                         fileName.starts_with(".") && !fileName.starts_with(CONTENT_DIR))
             {
@@ -28,7 +28,7 @@ namespace content {
             const auto relative_path = relative(entry.path(), docsRoot);
             ProjectFileIssueCallback fileIssues{issues_, entry.path()};
 
-            if (const auto id = project_.readPageAttribute(relative_path.string(), "id")) {
+            if (const auto id = project_.getPageAttribute(relative_path.string(), "id")) {
                 if (pagePaths_.contains(*id)) {
                     logger_->warn("Skipping duplicate page for item {} at {}", *id, relative_path.string());
                     co_await fileIssues.addIssue(ProjectIssueLevel::WARNING, ProjectIssueType::INGESTOR, ProjectError::DUPLICATE_PAGE, *id);

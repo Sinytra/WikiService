@@ -77,7 +77,7 @@ namespace content {
 
         co_await wipeExistingData(project_.getProjectDatabase().getDbClientPtr(), projectId);
 
-        ProjectFileIssueCallback rootFileIssues{issues_, project_.getDocsDirectoryPath()};
+        ProjectFileIssueCallback rootFileIssues{issues_, project_.getRootDirectory()};
         std::vector<std::pair<std::string, std::unique_ptr<SubIngestor>>> ingestors;
         ingestors.emplace_back("Content paths", std::make_unique<ContentPathsSubIngestor>(project_, logger_, rootFileIssues));
         ingestors.emplace_back("Tags", std::make_unique<TagsSubIngestor>(project_, logger_, rootFileIssues));

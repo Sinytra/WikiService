@@ -21,10 +21,11 @@ namespace fs = std::filesystem;
 
 const std::set<std::string> allowedFileExtensions = {".mdx", ".json", ".png", ".jpg", ".jpeg", ".webp", ".gif"};
 
-Error copyProjectFiles(const fs::path &root, const fs::path &docsRoot, const fs::path &dest, const std::shared_ptr<spdlog::logger> &logger) {
+Error copyProjectFiles(const fs::path &root, const fs::path &docsRoot, const fs::path &dest,
+                       const std::shared_ptr<spdlog::logger> &projectLog) {
     const auto gitPath = root / ".git";
 
-    logger->info("Copying project files for version '{}'", dest.filename().string());
+    projectLog->info("Copying project files for version '{}'", dest.filename().string());
 
     try {
         create_directories(dest);
@@ -34,7 +35,7 @@ Error copyProjectFiles(const fs::path &root, const fs::path &docsRoot, const fs:
                 fs::path relative_path = relative(entry.path(), docsRoot);
 
                 if (const auto extension = entry.path().extension().string(); !allowedFileExtensions.contains(extension)) {
-                    logger->warn("Ignoring file {}", relative_path.string());
+                    projectLog->warn("Ignoring file {}", relative_path.string());
                     continue;
                 }
 
@@ -46,11 +47,11 @@ Error copyProjectFiles(const fs::path &root, const fs::path &docsRoot, const fs:
             }
         }
     } catch (std::exception e) {
-        logger->error("FS copy error: {}", e.what());
+        projectLog->error("FS copy error: {}", e.what());
         return Error::ErrInternal;
     }
 
-    logger->info("Done copying files");
+    projectLog->info("Done copying files");
 
     return Error::Ok;
 }
@@ -100,7 +101,7 @@ namespace service {
         return targetPath;
     }
 
-    std::shared_ptr<spdlog::logger> Storage::getProjectLogger(const Project &project, bool file) const {
+    std::shared_ptr<spdlog::logger> Storage::getProjectLogger(const Project &project, const bool file) const {
         static std::shared_mutex loggersMapLock;
 
         const auto id = project.getValueOfId();
@@ -397,8 +398,9 @@ namespace service {
     }
 
     // TODO Cache
-    Task<std::tuple<std::optional<ResolvedProject>, Error>>
-    Storage::getProject(const std::string projectId, const std::optional<std::string> &version, const std::optional<std::string> &locale) const {
+    Task<std::tuple<std::optional<ResolvedProject>, Error>> Storage::getProject(const std::string projectId,
+                                                                                const std::optional<std::string> &version,
+                                                                                const std::optional<std::string> &locale) const {
         const auto [proj, projErr] = co_await global::database->getProjectSource(projectId);
         if (!proj) {
             co_return {std::nullopt, Error::ErrNotFound};
@@ -563,5 +565,11 @@ namespace service {
         co_await global::database->addModel(issue);
 
         co_return co_await completeTask<Error>(taskKey, Error::Ok);
+    }
+
+    void Storage::addProjectIssueAsync(const ResolvedProject &resolved, const ProjectIssueLevel level, const ProjectIssueType type,
+                                       const ProjectError subject, const std::string &details, const std::string &path) const {
+        trantor::EventLoop::getEventLoopOfCurrentThread()->queueInLoop(
+            async_func([=]() -> Task<> { co_await global::storage->addProjectIssue(resolved, level, type, subject, details, path); }));
     }
 }

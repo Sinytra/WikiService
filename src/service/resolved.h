@@ -8,6 +8,7 @@
 #include "content/game_recipes.h"
 #include "database/database.h"
 #include "error.h"
+#include "project/format.h"
 #include "util.h"
 
 using namespace drogon_model::postgres;
@@ -83,11 +84,11 @@ namespace service {
         drogon::Task<std::unordered_map<std::string, std::string>> getAvailableVersions() const;
         drogon::Task<bool> hasVersion(std::string version) const;
 
-        std::tuple<ProjectPage, Error> readFile(std::string path) const;
-        std::optional<std::string> getPagePath(const std::string &path) const;
+        std::optional<std::string> getPagePath(const std::string &path) const; // For project issues
+        std::optional<std::string> getPageAttribute(const std::string &path, const std::string &prop) const;
+        std::tuple<ProjectPage, Error> readPageFile(std::string path) const;
         drogon::Task<std::tuple<ProjectPage, Error>> readContentPage(std::string id) const;
         drogon::Task<nlohmann::json> readItemProperties(std::string id) const;
-        std::optional<std::string> readPageAttribute(std::string path, std::string prop) const;
         std::optional<std::string> readLangKey(const std::string &key) const;
 
         std::tuple<nlohmann::ordered_json, Error> getDirectoryTree() const;
@@ -110,7 +111,9 @@ namespace service {
 
         const ProjectVersion &getProjectVersion() const;
 
-        const std::filesystem::path &getDocsDirectoryPath() const;
+        const std::filesystem::path &getRootDirectory() const;
+
+        const ProjectFormat &getFormat() const;
 
         ProjectDatabaseAccess &getProjectDatabase() const;
 
@@ -122,12 +125,14 @@ namespace service {
         drogon::Task<ItemData> getItemName(std::string loc) const;
 
     private:
+        std::optional<std::string> getPageTitle(const std::string &path) const;
+
         Project project_;
         std::shared_ptr<ResolvedProject> defaultVersion_;
+        ProjectFormat format_;
 
         std::filesystem::path docsDir_;
 
-        std::string locale_;
         ProjectVersion version_;
 
         std::shared_ptr<ProjectDatabaseAccess> projectDb_;

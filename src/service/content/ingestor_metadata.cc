@@ -13,7 +13,7 @@ namespace content {
                                              ProjectFileIssueCallback &issues) : SubIngestor(proj, log, issues) {}
 
     Task<PreparationResult> MetadataSubIngestor::prepare() {
-        const auto docsRoot = project_.getDocsDirectoryPath();
+        const auto docsRoot = project_.getRootDirectory();
         const auto workbenchesFile = docsRoot / ".data" / "workbenches.json";
 
         if (exists(workbenchesFile)) {

@@ -39,6 +39,9 @@ namespace service {
         drogon::Task<Error> addProjectIssue(const ResolvedProject &resolved, ProjectIssueLevel level, ProjectIssueType type,
                                             ProjectError subject, std::string details, std::string path);
 
+        void addProjectIssueAsync(const ResolvedProject &resolved, ProjectIssueLevel level, ProjectIssueType type, ProjectError subject,
+                                  const std::string &details, const std::string &path) const;
+
     private:
         drogon::Task<ProjectError> setupProject(const Project &project, Deployment &deployment, std::filesystem::path clonePath) const;
         drogon::Task<std::tuple<std::optional<Deployment>, ProjectError>> setupProjectCached(const Project &project, std::string userId);

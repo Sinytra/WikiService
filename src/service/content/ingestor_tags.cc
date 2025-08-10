@@ -24,7 +24,7 @@ namespace content {
 
         static const std::set<std::string> allowedTypes{"item"};
 
-        const auto docsRoot = project_.getDocsDirectoryPath();
+        const auto docsRoot = project_.getRootDirectory();
         const auto dataRoot = docsRoot / ".data";
         if (!exists(dataRoot)) {
             co_return result;

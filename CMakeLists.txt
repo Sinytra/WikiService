@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.10)
 project(wiki CXX)
 
 set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 set(BUILD_SHARED_LIBS OFF)
 
 option(USE_LOCAL_DEPS "Build dependencies locally" OFF)

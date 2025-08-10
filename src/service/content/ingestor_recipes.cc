@@ -16,7 +16,7 @@ namespace content {
     Task<PreparationResult> RecipesSubIngestor::prepare() {
         PreparationResult result;
 
-        const auto docsRoot = project_.getDocsDirectoryPath();
+        const auto docsRoot = project_.getRootDirectory();
         const auto modid = project_.getProject().getValueOfModid();
 
         if (const auto recipesRoot = docsRoot / ".data" / modid / "recipe"; exists(recipesRoot)) {
