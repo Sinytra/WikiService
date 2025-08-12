@@ -25,7 +25,7 @@ namespace service {
 
     ENUM_FROM_TO_STR(ProjectError,
         {ProjectError::OK, "ok"},
-        {ProjectError::REQUIRES_AUTH, "required_auth"},
+        {ProjectError::REQUIRES_AUTH, "requires_auth"},
         {ProjectError::NO_REPOSITORY, "no_repository"},
         {ProjectError::REPO_TOO_LARGE, "repo_too_large"},
         {ProjectError::NO_BRANCH, "no_branch"},

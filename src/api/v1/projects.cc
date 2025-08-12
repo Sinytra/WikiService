@@ -293,7 +293,7 @@ namespace api::v1 {
         const auto json(BaseProjectController::validatedBody(req, schemas::projectRegister));
 
         // TODO Add support for community projects
-        const bool isCommunity = json["is_community"];
+        const bool isCommunity = json.contains("is_community") && json["is_community"];
         if (isCommunity) {
             throw ApiException(Error::ErrInternal, "unsupported");
         }
