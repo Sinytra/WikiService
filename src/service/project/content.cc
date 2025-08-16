@@ -75,15 +75,15 @@ namespace service {
             localized = readLangKey("block." + projectId + "." + parsed->path_);
         }
 
+        const auto path = co_await projectDb_->getProjectContentPath(loc);
+
         // Use page title instead
-        if (!localized) {
-            if (const auto path = co_await projectDb_->getProjectContentPath(loc)) {
-                const auto title = getPageTitle(*path);
-                co_return ItemData{.name = title.value_or(""), .path = *path};
-            }
+        if (!localized && path) {
+            const auto title = getPageTitle(*path);
+            co_return ItemData{.name = title.value_or(""), .path = *path};
         }
 
-        co_return ItemData{.name = localized.value_or(""), .path = ""};
+        co_return ItemData{.name = localized.value_or(""), .path = path.value_or("")};
     }
 
     // TODO Cache

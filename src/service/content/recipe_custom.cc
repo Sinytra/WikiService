@@ -8,32 +8,44 @@ using namespace drogon::orm;
 using namespace service;
 
 namespace content {
-    std::optional<StubRecipeIngredient> readCustomIngredient(const std::string &slot, const bool input, const nlohmann::json &data) {
-        std::string rawId;
-        int count;
-
-        if (data.is_string()) {
-            rawId = data;
-            count = 1;
-        } else if (data.is_object()) {
-            rawId = data["id"];
-            count = data["count"];
-        } else {
-            return std::nullopt;
-        }
-
-        const auto isTag = rawId.starts_with("#");
-        const auto id = isTag ? rawId.substr(1) : rawId;
+    StubRecipeIngredient readSingleIngredient(const std::string &slot, const bool input, const std::string &id, const int count) {
+        const auto isTag = id.starts_with("#");
+        const auto actualId = isTag ? id.substr(1) : id;
 
         return StubRecipeIngredient{id, slot, count, input, isTag};
     }
 
-    std::optional<StubRecipeIngredient> parseCustomIngredient(const std::string &slot, const bool input, const nlohmann::json &data,
-                                                          const ProjectFileIssueCallback &issues) {
+    void readIngredientArray(std::vector<StubRecipeIngredient> &results, const std::string &slot, const bool input,
+                             const nlohmann::json &data, const int count) {
+        for (auto &item: data) {
+            results.push_back(readSingleIngredient(slot, input, item, count));
+        }
+    }
+
+    std::vector<StubRecipeIngredient> readCustomIngredient(const std::string &slot, const bool input, const nlohmann::json &data) {
+        std::vector<StubRecipeIngredient> results;
+
+        if (data.is_string()) {
+            results.push_back(readSingleIngredient(slot, input, data, 1));
+        } else if (data.is_object()) {
+            const int count = data["count"];
+            if (data["id"].is_array()) {
+                readIngredientArray(results, slot, input, data["id"], count);
+            } else {
+                results.push_back(readSingleIngredient(slot, input, data["id"], count));
+            }
+        } else if (data.is_array()) {
+            readIngredientArray(results, slot, input, data, 1);
+        }
+
+        return results;
+    }
+
+    std::vector<StubRecipeIngredient> parseCustomIngredient(const std::string &slot, const bool input, const nlohmann::json &data,
+                                                              const ProjectFileIssueCallback &issues) {
         const auto ingredient = readCustomIngredient(slot, input, data);
-        if (!ingredient) {
+        if (ingredient.empty()) {
             issues.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::INVALID_INGREDIENT, data.dump());
-            return std::nullopt;
         }
         return ingredient;
     }
@@ -53,7 +65,7 @@ namespace content {
     }
 
     std::optional<StubRecipe> CustomRecipeParser::parseRecipe(const std::string &id, const std::string &type, const nlohmann::json &data,
-                                                             const ProjectFileIssueCallback &issues) {
+                                                              const ProjectFileIssueCallback &issues) {
         static const std::vector<std::string> slots{"input", "output"};
 
         if (const auto error = validateJson(schemas::gameRecipeCustom, data)) {
@@ -65,11 +77,11 @@ namespace content {
 
         for (const auto &slot: slots) {
             for (const auto &[key, val]: data[slot].items()) {
-                const auto ingredient = parseCustomIngredient(key, slot == "input", val, issues);
-                if (!ingredient) {
+                const auto ingredients = parseCustomIngredient(key, slot == "input", val, issues);
+                if (ingredients.empty()) {
                     return std::nullopt;
                 }
-                recipe.ingredients.push_back(*ingredient);
+                recipe.ingredients.insert(recipe.ingredients.end(), ingredients.begin(), ingredients.end());
             }
         }
 
