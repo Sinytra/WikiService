@@ -60,6 +60,7 @@ add_library(service STATIC
         project/content.cc
         project/format.cc
         project/properties.cc
+        storage/deployment.cc
         storage/storage.cc
         storage/gitops.cc
         storage/realtime.cc

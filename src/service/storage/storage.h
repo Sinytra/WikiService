@@ -13,6 +13,8 @@ namespace service {
     enum class ProjectStatus { UNKNOWN, LOADING, HEALTHY, AT_RISK, ERROR };
     std::string enumToStr(ProjectStatus status);
 
+    std::string createProjectSetupKey(const Project &project);
+
     class Storage : public CacheableServiceBase {
     public:
         explicit Storage(const std::string &);
@@ -43,13 +45,17 @@ namespace service {
                                   const std::string &details, const std::string &path) const;
 
     private:
-        drogon::Task<ProjectError> setupProject(const Project &project, Deployment &deployment, std::filesystem::path clonePath) const;
-        drogon::Task<std::tuple<std::optional<Deployment>, ProjectError>> setupProjectCached(const Project &project, std::string userId);
-        std::filesystem::directory_entry getBaseDir() const;
-        std::filesystem::path getProjectLogPath(const Project &project) const;
-        std::filesystem::path getProjectDirPath(const Project &project, const std::string &version) const;
+        drogon::Task<std::optional<ProjectVersion>> getDefaultVersion(const Project &project) const;
+
+        drogon::Task<ProjectError> deployProject(const Project &project, Deployment &deployment, std::filesystem::path clonePath) const;
+        drogon::Task<std::tuple<std::optional<Deployment>, ProjectError>> deployProjectCached(const Project &project, std::string userId);
+
         drogon::Task<std::tuple<std::optional<ResolvedProject>, Error>>
         findProject(const Project &project, const std::optional<std::string> &version, const std::optional<std::string> &locale) const;
+
+        std::filesystem::directory_entry getBaseDir() const;
+        std::filesystem::path getProjectLogPath(const Project &project) const;
+        std::filesystem::path getProjectDirPath(const Project &project, const std::string &version = "") const;
         std::shared_ptr<spdlog::logger> getProjectLogger(const Project &project, bool file = true) const;
 
         const std::string &basePath_;

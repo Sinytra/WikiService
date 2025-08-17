@@ -404,9 +404,9 @@ namespace api::v1 {
         callback(HttpResponse::newHttpJsonResponse(root));
     }
 
-    void ProjectsController::enqueueDeploy(const Project &project, const std::string userId) const {
+    void ProjectsController::enqueueDeploy(const Project &project, const std::string &userId) const {
         const auto currentLoop = trantor::EventLoop::getEventLoopOfCurrentThread();
-        currentLoop->queueInLoop(async_func([this, project, userId]() -> Task<> {
+        currentLoop->queueInLoop(async_func([project, userId]() -> Task<> {
             logger.debug("Deploying project '{}' from branch '{}'", project.getValueOfId(), project.getValueOfSourceBranch());
 
             if (const auto [resolved, resErr](co_await global::storage->deployProject(project, userId)); resErr == Error::Ok) {

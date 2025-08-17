@@ -111,7 +111,7 @@ namespace api::v1 {
 
         drogon::Task<ValidatedProjectData> validateProjectData(const nlohmann::json &json, User user, bool checkExisting) const;
 
-        void enqueueDeploy(const Project &project, std::string userId) const;
+        void enqueueDeploy(const Project &project, const std::string &userId) const;
 
         bool localEnv_;
     };
