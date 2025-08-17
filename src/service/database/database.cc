@@ -177,7 +177,7 @@ namespace service {
         if (res) {
             co_return {*res, err};
         }
-        co_return {{}, err};
+        co_return {ProjectSearchResponse{}, err};
     }
 
     Task<bool> Database::existsForRepo(const std::string repo, const std::string branch, const std::string path) const {
