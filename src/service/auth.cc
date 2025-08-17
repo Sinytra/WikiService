@@ -1,6 +1,9 @@
 #include "auth.h"
 
+#include <database/database.h>
 #include <models/User.h>
+#include <service/github.h>
+#include <service/platforms.h>
 
 #include "crypto.h"
 #include "log/log.h"
@@ -15,7 +18,9 @@
 #define MR_OAUTH_TOKEN_PATH "/_internal/oauth/token"
 
 #define SESSION_ID_LEN 64
+#define ROLE_ADMIN "admin"
 
+using namespace logging;
 using namespace drogon;
 using namespace drogon_model::postgres;
 using namespace std::chrono_literals;
@@ -23,9 +28,8 @@ using namespace std::chrono_literals;
 std::string createSessionCacheKey(const std::string &sessionId) { return "session:" + sessionId; }
 
 namespace service {
-    Auth::Auth(const std::string &appUrl, const OAuthApp &ghApp, const OAuthApp &mrApp, Database &db, MemoryCache &ch, Platforms &pl,
-               GitHub &gh) :
-        database_(db), cache_(ch), platforms_(pl), github_(gh), appUrl_(appUrl), githubApp_(ghApp), modrinthApp_(mrApp) {}
+    Auth::Auth(const std::string &appUrl, const OAuthApp &ghApp, const OAuthApp &mrApp) :
+        appUrl_(appUrl), githubApp_(ghApp), modrinthApp_(mrApp) {}
 
     std::string Auth::getGitHubOAuthInitURL() const {
         const auto callbackUrl = appUrl_ + "/api/v1/auth/callback/github";
@@ -66,19 +70,31 @@ namespace service {
     Task<std::string> Auth::createUserSession(const std::string username, const std::string profile) const {
         const auto normalUserName = strToLower(username);
 
-        co_await database_.createUserIfNotExists(normalUserName);
+        co_await global::database->createUserIfNotExists(normalUserName);
 
         const auto sessionId = crypto::generateSecureRandomString(SESSION_ID_LEN);
 
         const std::unordered_map<std::string, std::string> values = {{"username", normalUserName}, {"profile", profile}};
-        co_await cache_.updateCacheHash(createSessionCacheKey(sessionId), values, 30 * 24h);
+        co_await global::cache->updateCacheHash(createSessionCacheKey(sessionId), values, 30 * 24h);
 
         co_return sessionId;
     }
 
-    Task<std::optional<UserSession>> Auth::getSession(const HttpRequestPtr req) const {
+    Task<UserSession> Auth::getSession(const HttpRequestPtr req) const {
         const auto token = req->getParameter("token");
-        co_return co_await getSession(token);
+        const auto session = co_await getSession(token);
+        if (!session) {
+            throw ApiException(Error::ErrUnauthorized, "unauthorized");
+        }
+        co_return *session;
+    }
+
+    Task<> Auth::ensurePrivilegedAccess(const HttpRequestPtr req) const {
+        const auto session(co_await getSession(req));
+
+        if (const auto role = session.user.getValueOfRole(); role != ROLE_ADMIN) {
+            throw ApiException(Error::ErrForbidden, "forbidden");
+        }
     }
 
     Task<std::optional<UserSession>> Auth::getSession(const std::string id) const {
@@ -87,11 +103,11 @@ namespace service {
         }
 
         const auto sid = createSessionCacheKey(id);
-        const auto username = co_await cache_.getHashMember(sid, "username");
+        const auto username = co_await global::cache->getHashMember(sid, "username");
         if (!username) {
             co_return std::nullopt;
         }
-        const auto profile = co_await cache_.getHashMember(sid, "profile");
+        const auto profile = co_await global::cache->getHashMember(sid, "profile");
         if (!profile) {
             co_return std::nullopt;
         }
@@ -100,7 +116,7 @@ namespace service {
             co_return std::nullopt;
         }
 
-        const auto user = co_await database_.getUser(*username);
+        const auto user = co_await global::database->findByPrimaryKey<User>(*username);
         if (!user) {
             co_return std::nullopt;
         }
@@ -109,11 +125,12 @@ namespace service {
         root["username"] = (*profileJson)["login"].asString();
         root["avatar_url"] = (*profileJson)["avatar_url"].asString();
         root["modrinth_id"] = user->getModrinthId() ? user->getValueOfModrinthId() : Json::Value::null;
+        root["role"] = user->getValueOfRole();
 
         co_return UserSession{.sessionId = id, .username = *username, .user = *user, .profile = root};
     }
 
-    Task<> Auth::expireSession(const std::string id) const { co_await cache_.erase(createSessionCacheKey(id)); }
+    Task<> Auth::expireSession(const std::string id) const { co_await global::cache->erase(createSessionCacheKey(id)); }
 
     std::string Auth::getModrinthOAuthInitURL(std::string state) const {
         const auto callbackUrl = appUrl_ + "/api/v1/auth/callback/modrinth";
@@ -148,22 +165,22 @@ namespace service {
     }
 
     Task<Error> Auth::linkModrinthAccount(const std::string username, const std::string token) const {
-        const auto modrinthId = co_await platforms_.modrinth_.getAuthenticatedUserID(token);
+        const auto modrinthId = co_await global::platforms->modrinth_.getAuthenticatedUserID(token);
         if (!modrinthId) {
             co_return Error::ErrBadRequest;
         }
 
-        co_return co_await database_.linkUserModrinthAccount(username, *modrinthId);
+        co_return co_await global::database->linkUserModrinthAccount(username, *modrinthId);
     }
 
     Task<Error> Auth::unlinkModrinthAccount(const std::string username) const {
-        co_return co_await database_.unlinkUserModrinthAccount(username);
+        co_return co_await global::database->unlinkUserModrinthAccount(username);
     }
 
     Task<std::optional<User>> Auth::getGitHubTokenUser(const std::string token) const {
-        if (const auto [ghProfile, ghErr](co_await github_.getAuthenticatedUser(token)); ghProfile) {
+        if (const auto [ghProfile, ghErr](co_await global::github->getAuthenticatedUser(token)); ghProfile) {
             const auto username = (*ghProfile)["login"].asString();
-            const auto user = co_await database_.getUser(strToLower(username));
+            const auto user = co_await global::database->findByPrimaryKey<User>(strToLower(username));
             co_return user;
         }
         co_return std::nullopt;

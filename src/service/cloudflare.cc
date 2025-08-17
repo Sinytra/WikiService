@@ -9,8 +9,7 @@ using namespace drogon;
 using namespace std::chrono_literals;
 
 namespace service {
-    CloudFlare::CloudFlare(const std::string &token, const std::string &accountTag, const std::string &siteTag, MemoryCache &c) :
-        cache_(c), apiToken_(token), accountTag_(accountTag), siteTag_(siteTag) {}
+    CloudFlare::CloudFlare(const config::CloudFlare &config) : config_(config) {}
 
     Task<std::vector<std::string>> CloudFlare::computeMostVisitedProjectIDs() const {
         const auto client = createHttpClient(CLOUDFLARE_API_URL);
@@ -45,14 +44,14 @@ namespace service {
         const auto today = std::chrono::system_clock::now();
         const auto thirtyDaysAgo = today - std::chrono::days(30);
         const auto date = std::format("{:%Y-%m-%d}", thirtyDaysAgo);
-        const auto formatted = std::format(query, accountTag_, date, siteTag_, limit);
+        const auto formatted = std::format(query, config_.accountTag, date, config_.siteTag, limit);
         Json::Value body;
         body["query"] = formatted;
         const auto bodyStr = serializeJsonString(body);
 
         std::vector<std::string> projects;
 
-        if (const auto [data, err] = co_await sendAuthenticatedRequest(client, Post, "/client/v4/graphql", apiToken_,
+        if (const auto [data, err] = co_await sendAuthenticatedRequest(client, Post, "/client/v4/graphql", config_.token,
                                                                        [&bodyStr](const HttpRequestPtr &req) {
                                                                            req->setContentTypeCode(CT_APPLICATION_JSON);
                                                                            req->setBody(bodyStr);
@@ -66,9 +65,8 @@ namespace service {
             std::map<std::string, int> visits;
             for (const auto &top_path: topPaths) {
                 const auto path = top_path["dimensions"]["metric"].asString();
-                auto parts = path.substr(1)
-                    | std::views::split('/')
-                    | std::views::transform([](auto r) { return std::string(r.data(), r.size()); });
+                auto parts =
+                    path.substr(1) | std::views::split('/') | std::views::transform([](auto r) { return std::string(r.data(), r.size()); });
                 auto split = std::vector(parts.begin(), parts.end());
 
                 auto project = split[2];
@@ -92,13 +90,13 @@ namespace service {
     }
 
     Task<std::vector<std::string>> CloudFlare::getMostVisitedProjectIDs() {
-        if (apiToken_.empty()) {
+        if (config_.token.empty()) {
             co_return std::vector<std::string>();
         }
 
         static const auto cacheKey = "popular_projects";
 
-        if (const auto cached = co_await cache_.getFromCache(cacheKey)) {
+        if (const auto cached = co_await global::cache->getFromCache(cacheKey)) {
             if (const auto parsed = tryParseJson<nlohmann::ordered_json>(*cached)) {
                 co_return parsed->get<std::vector<std::string>>();
             }
@@ -111,7 +109,7 @@ namespace service {
         auto result = co_await computeMostVisitedProjectIDs();
         const auto serialized = nlohmann::json(result).dump();
 
-        co_await cache_.updateCache(cacheKey, serialized, 7 * 24h);
+        co_await global::cache->updateCache(cacheKey, serialized, 7 * 24h);
         co_return co_await completeTask<std::vector<std::string>>(cacheKey, std::move(result));
     }
 }

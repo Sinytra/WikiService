@@ -5,22 +5,26 @@
 
 #include <any>
 #include <optional>
-#include <set>
 #include <shared_mutex>
 #include <string>
 #include "log/log.h"
 
 namespace service {
-    // TODO Per-task pool
     extern trantor::EventLoopThreadPool cacheAwaiterThreadPool;
 
     template<class T>
     drogon::Task<T> patientlyAwaitTaskResult(const std::shared_future<T> task) {
-        using namespace logging;
-
         const auto currentLoop = trantor::EventLoop::getEventLoopOfCurrentThread();
         co_await drogon::switchThreadCoro(cacheAwaiterThreadPool.getNextLoop());
         const auto result = task.get();
+        co_await drogon::switchThreadCoro(currentLoop);
+        co_return result;
+    }
+
+    template<class T>
+    drogon::Task<T> supplyAsync(std::function<T()> task) {
+        const auto currentLoop = trantor::EventLoop::getEventLoopOfCurrentThread();
+        const auto result = co_await drogon::queueInLoopCoro<T>(cacheAwaiterThreadPool.getNextLoop(), task);
         co_await drogon::switchThreadCoro(currentLoop);
         co_return result;
     }
@@ -29,12 +33,16 @@ namespace service {
     public:
         MemoryCache();
 
+        drogon::Task<bool> exists(std::string key) const;
+        drogon::Task<bool> isSetMember(std::string key, std::string value) const;
+
         drogon::Task<std::optional<std::string>> getFromCache(std::string key) const;
 
         drogon::Task<std::optional<std::string>> getHashMember(std::string key, std::string value) const;
 
         drogon::Task<> updateCache(std::string key, std::string value, std::chrono::duration<long> expire) const;
         drogon::Task<> updateCacheHash(std::string key, std::unordered_map<std::string, std::string> values, std::chrono::duration<long> expire) const;
+        drogon::Task<> updateCacheSet(std::string key, std::vector<std::string> value, std::chrono::duration<long> expire) const;
 
         drogon::Task<> erase(std::string key) const;
     };
@@ -66,6 +74,10 @@ namespace service {
             return std::nullopt;
         }
 
+        bool hasPendingTask(const std::string &key) const {
+            return pendingTasks_.contains(key);
+        }
+
         template<class T>
         drogon::Task<std::optional<std::shared_future<T>>> getOrStartTask(const std::string &key) {
             if (const auto pending = getPendingTask<T>(key)) {
@@ -78,7 +90,7 @@ namespace service {
         }
 
         template<class T>
-        drogon::Task<T> completeTask(const std::string &key, T &&value) {
+        drogon::Task<T> completeTask(const std::string &key, T value) {
             if (!pendingTasks_.contains(key)) {
                 throw std::invalid_argument("No task for key " + key);
             }
@@ -97,4 +109,8 @@ namespace service {
         std::shared_mutex pendingTasks_mtx_;
         std::unordered_map<std::string, std::any> pendingTasks_;
     };
+}
+
+namespace global {
+    extern std::shared_ptr<service::MemoryCache> cache;
 }

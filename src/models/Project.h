@@ -57,6 +57,7 @@ class Project
         static const std::string _search_vector;
         static const std::string _created_at;
         static const std::string _is_public;
+        static const std::string _modid;
     };
 
     static const int primaryKeyNumber;
@@ -205,8 +206,17 @@ class Project
     ///Set the value of the column is_public
     void setIsPublic(const bool &pIsPublic) noexcept;
 
+    /**  For column modid  */
+    ///Get the value of the column modid, returns the default value if the column is null
+    const std::string &getValueOfModid() const noexcept;
+    ///Return a shared_ptr object pointing to the column const value, or an empty shared_ptr object if the column is null
+    const std::shared_ptr<std::string> &getModid() const noexcept;
+    ///Set the value of the column modid
+    void setModid(const std::string &pModid) noexcept;
+    void setModid(std::string &&pModid) noexcept;
 
-    static size_t getColumnNumber() noexcept {  return 11;  }
+
+    static size_t getColumnNumber() noexcept {  return 12;  }
     static const std::string &getColumnName(size_t index) noexcept(false);
 
     Json::Value toJson() const;
@@ -242,6 +252,7 @@ class Project
     std::shared_ptr<std::string> searchVector_;
     std::shared_ptr<::trantor::Date> createdAt_;
     std::shared_ptr<bool> isPublic_;
+    std::shared_ptr<std::string> modid_;
     struct MetaData
     {
         const std::string colName_;
@@ -253,7 +264,7 @@ class Project
         const bool notNull_;
     };
     static const std::vector<MetaData> metaData_;
-    bool dirtyFlag_[11]={ false };
+    bool dirtyFlag_[12]={ false };
   public:
     static const std::string &sqlForFindingByPrimaryKey()
     {
@@ -328,6 +339,11 @@ class Project
         if(!dirtyFlag_[10])
         {
             needSelection=true;
+        }
+        if(dirtyFlag_[11])
+        {
+            sql += "modid,";
+            ++parametersCount;
         }
         if(parametersCount > 0)
         {
@@ -406,6 +422,11 @@ class Project
         else
         {
             sql +="default,";
+        }
+        if(dirtyFlag_[11])
+        {
+            n = snprintf(placeholderStr,sizeof(placeholderStr),"$%d,",placeholder++);
+            sql.append(placeholderStr, n);
         }
         if(parametersCount > 0)
         {

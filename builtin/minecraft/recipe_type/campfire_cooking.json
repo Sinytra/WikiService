@@ -1,0 +1,9 @@
+{
+  "background": "gui/recipe/campfire_cooking",
+  "inputSlots": {
+    "1": {"x": 14, "y": 29}
+  },
+  "outputSlots": {
+    "1": {"x": 134, "y": 50}
+  }
+}

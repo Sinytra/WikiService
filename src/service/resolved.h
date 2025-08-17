@@ -1,69 +1,152 @@
 #pragma once
 
+#include <models/Item.h>
+#include <models/Project.h>
+#include <models/ProjectVersion.h>
+#include <nlohmann/json_fwd.hpp>
 #include "cache.h"
+#include "content/game_recipes.h"
+#include "database/database.h"
 #include "error.h"
-#include "models/Project.h"
+#include "project/format.h"
 #include "util.h"
-
-#include <nlohmann/json.hpp>
 
 using namespace drogon_model::postgres;
 
 namespace service {
+    struct FolderMetadataEntry {
+        std::string name;
+        std::string icon;
+    };
+
+    struct FolderMetadata {
+        std::vector<std::string> keys;
+        std::map<std::string, FolderMetadataEntry> entries;
+    };
+
     struct ProjectPage {
         std::string content;
         std::string editUrl;
-        std::string updatedAt;
     };
 
     struct ProjectMetadata {
         Json::Value platforms;
     };
 
-    enum class ProjectError {
-        OK,
-        REQUIRES_AUTH,
-        NO_REPOSITORY,
-        REPO_TOO_LARGE,
-        NO_BRANCH,
-        NO_PATH,
-        INVALID_META,
-        UNKNOWN
+    struct ProjectErrorInstance {
+        ProjectError error;
+        std::string message;
     };
-    std::string projectErrorToString(ProjectError status);
+
+    struct ItemData {
+        std::string name;
+        std::string path;
+    };
+
+    struct FullItemData {
+        std::string id;
+        std::string name;
+        std::string path;
+
+        friend void to_json(nlohmann::json &j, const FullItemData &obj) {
+            j = nlohmann::json{
+                {"id", obj.id}, {"name", obj.name}, {"path", obj.path.empty() ? nlohmann::json(nullptr) : nlohmann::json(obj.path)}};
+        }
+    };
+
+    struct FullTagData {
+        std::string id;
+        std::vector<std::string> items;
+
+        friend void to_json(nlohmann::json &j, const FullTagData &obj) {
+            j = nlohmann::json{
+                {"id", obj.id},
+                {"items", obj.items},
+            };
+        }
+    };
+
+    struct FullRecipeData {
+        std::string id;
+        nlohmann::json data;
+
+        friend void to_json(nlohmann::json &j, const FullRecipeData &obj) {
+            j = nlohmann::json{{"id", obj.id}, {"data", obj.data}};
+        }
+    };
+
+    // See resolved_db.h
+    class ProjectDatabaseAccess;
+
+    std::string formatCommitUrl(const Project &project, const std::string &hash);
 
     class ResolvedProject {
     public:
-        explicit ResolvedProject(const Project &, const std::filesystem::path &, const std::filesystem::path &);
+        explicit ResolvedProject(const Project &, const std::filesystem::path &, const ProjectVersion &);
 
         void setDefaultVersion(const ResolvedProject &defaultVersion);
+        void setLocale(const std::optional<std::string> &locale);
 
-        bool setLocale(const std::optional<std::string> &locale);
-
+        std::string getLocale() const;
         bool hasLocale(const std::string &locale) const;
         std::set<std::string> getLocales() const;
 
-        std::optional<std::unordered_map<std::string, std::string>> getAvailableVersionsFiltered() const;
-        std::unordered_map<std::string, std::string> getAvailableVersions() const;
+        drogon::Task<std::unordered_map<std::string, std::string>> getAvailableVersions() const;
+        drogon::Task<bool> hasVersion(std::string version) const;
 
-        std::tuple<ProjectPage, Error> readFile(std::string path) const;
+        std::optional<std::string> getPagePath(const std::string &path) const; // For project issues
+        std::optional<std::string> getPageAttribute(const std::string &path, const std::string &prop) const;
+        std::tuple<ProjectPage, Error> readPageFile(std::string path) const;
+        drogon::Task<std::tuple<ProjectPage, Error>> readContentPage(std::string id) const;
+        drogon::Task<nlohmann::json> readItemProperties(std::string id) const;
+        std::optional<std::string> readLangKey(const std::string &key) const;
 
         std::tuple<nlohmann::ordered_json, Error> getDirectoryTree() const;
+        std::tuple<nlohmann::ordered_json, Error> getContentDirectoryTree() const;
+        drogon::Task<std::tuple<std::optional<nlohmann::ordered_json>, Error>> getProjectContents() const;
 
         std::optional<std::filesystem::path> getAsset(const ResourceLocation &location) const;
+        std::optional<content::GameRecipeType> getRecipeType(const ResourceLocation &location) const;
+        drogon::Task<std::optional<content::ResolvedGameRecipe>> getRecipe(std::string id) const;
 
         std::tuple<std::optional<nlohmann::json>, ProjectError, std::string> validateProjectMetadata() const;
 
+        drogon::Task<PaginatedData<FullItemData>> getItems(TableQueryParams params) const;
+        drogon::Task<PaginatedData<FullTagData>> getTags(TableQueryParams params) const;
+        drogon::Task<PaginatedData<FullItemData>> getTagItems(std::string tag, TableQueryParams params) const;
+        drogon::Task<PaginatedData<FullRecipeData>> getRecipes(TableQueryParams params) const;
+        drogon::Task<PaginatedData<ProjectVersion>> getVersions(TableQueryParams params) const;
+
         const Project &getProject() const;
 
-        Json::Value toJson() const;
+        const ProjectVersion &getProjectVersion() const;
+
+        const std::filesystem::path &getRootDirectory() const;
+
+        const ProjectFormat &getFormat() const;
+
+        ProjectDatabaseAccess &getProjectDatabase() const;
+
+        drogon::Task<Json::Value> toJson(bool full = false) const;
+        drogon::Task<Json::Value> toJsonVerbose() const;
+
+        // Content
+        drogon::Task<ItemData> getItemName(Item item) const;
+        drogon::Task<ItemData> getItemName(std::string loc) const;
+
     private:
+        FolderMetadata getFolderMetadata(const std::filesystem::path &path) const;
+        nlohmann::ordered_json getDirTreeJson(const std::filesystem::path &dir) const;
+        std::optional<std::string> getPageTitle(const std::string &path) const;
+
         Project project_;
         std::shared_ptr<ResolvedProject> defaultVersion_;
+        ProjectFormat format_;
 
-        std::filesystem::path rootDir_;
         std::filesystem::path docsDir_;
 
-        std::string locale_;
+        ProjectVersion version_;
+
+        std::shared_ptr<ProjectDatabaseAccess> projectDb_;
     };
 }

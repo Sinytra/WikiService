@@ -1,13 +1,12 @@
 #pragma once
 
-#include "cache.h"
-#include "database.h"
-#include "github.h"
-#include "platforms.h"
-
 #include <drogon/HttpRequest.h>
-#include <drogon/utils/coroutine.h>
 #include <json/value.h>
+#include <models/User.h>
+#include "cache.h"
+#include "error.h"
+
+using namespace drogon_model::postgres;
 
 namespace service {
     struct UserSession {
@@ -24,12 +23,13 @@ namespace service {
 
     class Auth : public CacheableServiceBase {
     public:
-        explicit Auth(const std::string &, const OAuthApp &, const OAuthApp &, Database &, MemoryCache &, Platforms &, GitHub &);
+        explicit Auth(const std::string &, const OAuthApp &, const OAuthApp &);
 
         std::string getGitHubOAuthInitURL() const;
         drogon::Task<std::string> createUserSession(std::string username, std::string profile) const;
         drogon::Task<std::optional<std::string>> requestUserAccessToken(std::string code) const;
-        drogon::Task<std::optional<UserSession>> getSession(drogon::HttpRequestPtr req) const;
+        drogon::Task<UserSession> getSession(drogon::HttpRequestPtr req) const;
+        drogon::Task<> ensurePrivilegedAccess(drogon::HttpRequestPtr req) const;
         drogon::Task<std::optional<UserSession>> getSession(std::string id) const;
         drogon::Task<> expireSession(std::string id) const;
 
@@ -39,13 +39,14 @@ namespace service {
         drogon::Task<Error> unlinkModrinthAccount(std::string username) const;
 
         drogon::Task<std::optional<User>> getGitHubTokenUser(std::string token) const;
+
     private:
-        Database &database_;
-        MemoryCache &cache_;
-        Platforms &platforms_;
-        GitHub &github_;
         const std::string appUrl_;
         const OAuthApp githubApp_;
         const OAuthApp modrinthApp_;
     };
+}
+
+namespace global {
+    extern std::shared_ptr<service::Auth> auth;
 }

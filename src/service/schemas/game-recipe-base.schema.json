@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Sinytra Wiki Base Game Recipe",
+  "description": "Common properties shared by all recipe formats",
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "type"
+  ]
+}

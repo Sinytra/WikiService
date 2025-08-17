@@ -1,11 +1,11 @@
 #include "websocket.h"
-
-#include <models/Project.h>
-
-#include <service/util.h>
-#include "log/log.h"
-
 #include "error.h"
+#include "auth.h"
+
+#include <database/database.h>
+#include <log/log.h>
+
+#define WS_DEPLOYMENT "<<hello<<"
 
 using namespace std;
 using namespace drogon;
@@ -16,9 +16,6 @@ using namespace drogon::orm;
 using namespace drogon_model::postgres;
 
 namespace api::v1 {
-    ProjectWebSocketController::ProjectWebSocketController(Database &d, Storage &s, RealtimeConnectionStorage &c, Auth &a) :
-        database_(d), storage_(s), connections_(c), auth_(a) {}
-
     void ProjectWebSocketController::handleNewMessage(const WebSocketConnectionPtr &wsConnPtr, std::string &&message,
                                                       const WebSocketMessageType &type) {}
 
@@ -37,26 +34,33 @@ namespace api::v1 {
 
         app().getLoop()->queueInLoop(async_func([&, projectId, token]() -> Task<> {
             // Handle unauthenticated user
-            const auto session = co_await auth_.getSession(token);
+            const auto session = co_await global::auth->getSession(token);
             if (!session) {
-                wsConnPtr->shutdown(CloseCode::kViolation);
+                if (wsConnPtr) wsConnPtr->shutdown(CloseCode::kViolation);
+                co_return;
             }
 
-            const auto project = co_await database_.getUserProject(session->username, projectId);
+            const auto project = co_await global::database->getUserProject(session->username, projectId);
             if (!project) {
-                wsConnPtr->shutdown(CloseCode::kViolation);
+                if (wsConnPtr) wsConnPtr->shutdown(CloseCode::kViolation);
                 co_return;
             }
 
             // Handle already loaded project
-            if (const auto status = co_await storage_.getProjectStatus(*project); status == LOADED || status == ERROR) {
-                wsConnPtr->shutdown();
+            const auto loadingDeployment = co_await global::database->getLoadingDeployment(projectId);
+            if (!loadingDeployment) {
+                if (wsConnPtr) wsConnPtr->shutdown();
                 co_return;
             }
 
-            connections_.connect(projectId, wsConnPtr);
+            global::connections->connect(projectId, wsConnPtr);
+
+            // Send initial deployment info
+            wsConnPtr->send(WS_DEPLOYMENT + loadingDeployment->getValueOfId());
         }));
     }
 
-    void ProjectWebSocketController::handleConnectionClosed(const WebSocketConnectionPtr &wsConnPtr) { connections_.disconnect(wsConnPtr); }
+    void ProjectWebSocketController::handleConnectionClosed(const WebSocketConnectionPtr &wsConnPtr) {
+        global::connections->disconnect(wsConnPtr);
+    }
 }

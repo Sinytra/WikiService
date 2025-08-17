@@ -1,5 +1,5 @@
 #include "github.h"
-#include "log/log.h"
+#include <log/log.h>
 #include "util.h"
 
 #define GITHUB_API_URL "https://api.github.com/"

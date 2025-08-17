@@ -8,8 +8,22 @@
   "password": "postgres",
   "tables": [
     "project",
+    "project_version",
     "user_",
-    "user_project"
+    "user_project",
+    "item",
+    "project_item",
+    "tag",
+    "recipe",
+    "recipe_type",
+    "recipe_workbench",
+    "recipe_ingredient_item",
+    "recipe_ingredient_tag",
+    "data_import",
+    "deployment",
+    "project_issue",
+    "report",
+    "access_key"
   ],
   "relationships": {
     "enabled": true,

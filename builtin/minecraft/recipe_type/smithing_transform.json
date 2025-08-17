@@ -1,0 +1,11 @@
+{
+  "background": "gui/recipe/smithing",
+  "inputSlots": {
+    "1": {"x": 16, "y": 50},
+    "2": {"x": 52, "y": 50},
+    "3": {"x": 88, "y": 50}
+  },
+  "outputSlots": {
+    "1": {"x": 206, "y": 50}
+  }
+}

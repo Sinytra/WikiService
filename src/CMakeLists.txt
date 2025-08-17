@@ -20,7 +20,11 @@ endif ()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-add_executable(${PROJECT_NAME} main.cc)
+add_executable(${PROJECT_NAME}
+        config.cc
+        monitoring.cc
+        main.cc
+)
 
 # ##############################################################################
 # If you include the drogon source code locally in your project, use this method
@@ -32,6 +36,7 @@ if (NOT USE_LOCAL_DEPS)
     find_package(Drogon CONFIG REQUIRED)
     find_package(spdlog CONFIG REQUIRED)
     find_package(OpenSSL CONFIG REQUIRED)
+    find_package(libzip CONFIG REQUIRED)
 endif ()
 target_link_libraries(${PROJECT_NAME} PRIVATE
         api
@@ -41,6 +46,8 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
         libgit2
         libgit2package
         OpenSSL::Crypto
+        libzip::zip
+        sentry::sentry
 )
 
 # ##############################################################################
@@ -94,4 +101,10 @@ set_target_properties(${PROJECT_NAME}
         ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
         LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
         RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+)
+
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy
+        $<TARGET_FILE:crashpad::handler>
+        $<TARGET_FILE_DIR:${PROJECT_NAME}>/crashpad_handler
 )

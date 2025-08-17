@@ -11,6 +11,10 @@
       "maxLength": 126,
       "pattern": "^[a-z]+[a-z0-9-]+$"
     },
+    "modid": {
+      "description": "In-game modid, used to identify mod content data",
+      "type": "string"
+    },
     "platforms": {
       "description": "A map of your project's available distribution platforms to platform project slugs.",
       "type": "object",
@@ -30,11 +34,18 @@
       "description": "The host platform's project slug. Deprecated: use 'platforms' instead",
       "type": "string",
       "deprecated": true
+    },
+    "owners": {
+      "description": "Usernames of wiki accounts authorized to register this project.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
     }
   },
   "allOf": [
     {
-      "required": ["id"]
+      "required": ["id", "modid"]
     },
     {
       "oneOf": [

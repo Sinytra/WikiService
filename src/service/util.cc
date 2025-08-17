@@ -4,22 +4,78 @@
 
 #include <fstream>
 #include <ranges>
+#include <regex>
 
 using namespace drogon;
 using namespace logging;
+using namespace service;
+namespace fs = std::filesystem;
+
+TableQueryParams getTableQueryParams(const HttpRequestPtr& req) {
+    const auto query = req->getOptionalParameter<std::string>("query").value_or("");
+    const auto page = req->getOptionalParameter<int>("page").value_or(1);
+    return TableQueryParams{ .query = query, .page = page };
+}
+
+HttpResponsePtr jsonResponse(const nlohmann::json &json) {
+    const auto resp = HttpResponse::newHttpJsonResponse(unparkourJson(json));
+    resp->setStatusCode(k200OK);
+    return resp;
+}
+
+HttpResponsePtr simpleResponse(const std::string &msg) {
+    Json::Value root;
+    root["message"] = msg;
+    const auto resp = HttpResponse::newHttpJsonResponse(root);
+    resp->setStatusCode(k200OK);
+    return resp;
+}
+
+HttpResponsePtr statusResponse(const HttpStatusCode code) {
+    const auto resp = HttpResponse::newHttpResponse();
+    resp->setStatusCode(code);
+    return resp;
+}
 
 std::string removeLeadingSlash(const std::string &s) { return s.starts_with('/') ? s.substr(1) : s; }
 
 std::string removeTrailingSlash(const std::string &s) { return s.ends_with('/') ? s.substr(0, s.size() - 1) : s; }
 
+void ltrim(std::string &s) {
+    s.erase(s.begin(), std::ranges::find_if(s, [](const unsigned char ch) { return !std::isspace(ch); }));
+}
+
+void rtrim(std::string &s) {
+    s.erase(std::find_if(s.rbegin(), s.rend(), [](const unsigned char ch) { return !std::isspace(ch); }).base(), s.end());
+}
+
+bool ResourceLocation::validate(const std::string &str) {
+    static const std::regex resLocRegex("^([a-z0-9_.-]+:)?[a-z0-9_./-]+$", std::regex_constants::ECMAScript);
+    return std::regex_match(str.data(), resLocRegex);
+}
+
 std::optional<ResourceLocation> ResourceLocation::parse(const std::string &str) {
-    const auto delimeter = str.find(':');
-    if (delimeter == std::string::npos || delimeter == str.size() - 1) {
+    if (!validate(str)) {
         return std::nullopt;
     }
+
+    const auto delimeter = str.find(':');
+    if (delimeter == str.size() - 1) {
+        return std::nullopt;
+    }
+    if (delimeter == std::string::npos) {
+        return ResourceLocation{DEFAULT_NAMESPACE, str};
+    }
+
     const auto namespace_ = str.substr(0, delimeter);
     const auto path_ = str.substr(delimeter + 1);
     return ResourceLocation{namespace_, path_};
+}
+
+std::string JsonValidationError::format() const {
+    auto field = pointer.to_string();
+    if (field.starts_with("/")) field = field.substr(1);
+    return field + ": " + msg + "\n> " + value.dump(2);
 }
 
 void replaceAll(std::string &s, std::string const &toReplace, std::string const &replaceWith) {
@@ -44,6 +100,14 @@ void replaceAll(std::string &s, std::string const &toReplace, std::string const 
     s.swap(buf);
 }
 
+Json::Value parseJsonOrThrow(const std::string &str) {
+    const auto parsed = parseJsonString(str);
+    if (!parsed) {
+        throw ApiException(Error::ErrInternal, "Error parsing JSON string");
+    }
+    return *parsed;
+}
+
 std::optional<Json::Value> parseJsonString(const std::string &str) {
     Json::Value root;
     JSONCPP_STRING err;
@@ -57,6 +121,9 @@ std::optional<Json::Value> parseJsonString(const std::string &str) {
 }
 
 std::optional<nlohmann::json> parseJsonFile(const std::filesystem::path &path) {
+    if (!exists(path)) {
+        return std::nullopt;
+    }
     std::ifstream ifs(path);
     try {
         nlohmann::json jf = nlohmann::json::parse(ifs);
@@ -147,6 +214,14 @@ nlohmann::json parkourJson(const Json::Value &json) {
     return nlohmann::json::parse(ser);
 }
 
+Json::Value unparkourJson(const nlohmann::json &json) {
+    const auto parsed = parseJsonString(json.dump());
+    if (!parsed) {
+        throw std::runtime_error("Failed to convert JSON: " + json.dump());
+    }
+    return *parsed;
+}
+
 std::optional<JsonValidationError> validateJson(const nlohmann::json &schema, const Json::Value &json) {
     const auto newJson = parkourJson(json);
     return validateJson(schema, newJson);
@@ -157,7 +232,7 @@ std::optional<JsonValidationError> validateJson(const nlohmann::json &schema, co
     public:
         void error(const nlohmann::json_pointer<std::basic_string<char>> &pointer, const nlohmann::json &json1,
                    const std::string &string1) override {
-            error_ = std::make_unique<JsonValidationError>(pointer, string1);
+            error_ = std::make_unique<JsonValidationError>(json1, pointer, string1);
         }
 
         const std::unique_ptr<JsonValidationError> &getError() { return error_; }
@@ -176,18 +251,34 @@ std::optional<JsonValidationError> validateJson(const nlohmann::json &schema, co
         }
         return std::nullopt;
     } catch ([[maybe_unused]] const std::exception &e) {
-        return JsonValidationError{nlohmann::json::json_pointer{"/"}, e.what()};
+        return JsonValidationError{nlohmann::json(), nlohmann::json::json_pointer{"/"}, e.what()};
     }
 }
 
-Json::Value projectToJson(const drogon_model::postgres::Project &project) {
+Json::Value projectToJson(const drogon_model::postgres::Project &project, const bool verbose) {
     Json::Value json = project.toJson();
     json["platforms"] = parseJsonString(project.getValueOfPlatforms()).value_or(Json::Value());
     json.removeMember("search_vector");
+    if (!verbose) {
+        if (!project.getValueOfIsPublic()) {
+            json.removeMember("source_repo");
+        }
+        json.removeMember("source_path");
+        json.removeMember("source_branch");
+    }
     return json;
 }
 
 std::string strToLower(std::string copy) {
     std::ranges::transform(copy, copy.begin(), [](const unsigned char c) { return std::tolower(c); });
     return copy;
+}
+
+bool isSubpath(const fs::path &path, const fs::path &base) {
+    const auto [fst, snd] = std::mismatch(path.begin(), path.end(), base.begin(), base.end());
+    return snd == base.end();
+}
+
+std::string formatDateTime(const std::string &databaseData) {
+    return trantor::Date::fromDbString(databaseData).toCustomFormattedString("%Y-%m-%dT%H:%M:%SZ");
 }

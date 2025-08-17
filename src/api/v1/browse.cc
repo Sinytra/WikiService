@@ -1,13 +1,10 @@
 #include "browse.h"
 
-#include <models/Project.h>
-
-#include "log/log.h"
-#include <service/util.h>
-
 #include <string>
 
-#include "error.h"
+#include <log/log.h>
+#include <models/Project.h>
+#include <service/util.h>
 
 using namespace std;
 using namespace drogon;
@@ -18,11 +15,9 @@ using namespace drogon::orm;
 using namespace drogon_model::postgres;
 
 namespace api::v1 {
-    BrowseController::BrowseController(Database &db) : database_(db) {}
-
-    Task<> BrowseController::browse(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, const std::string query,
-                                    const std::string types, const std::string sort, const int page) const {
-        const auto [searchResults, searchError] = co_await database_.findProjects(query, types, sort, page);
+    Task<> BrowseController::browse(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+                                    const std::string query, const std::string types, const std::string sort, const int page) const {
+        const auto [searchResults, searchError] = co_await global::database->findProjects(query, types, sort, page);
 
         Json::Value root;
         Json::Value data(Json::arrayValue);
@@ -40,9 +35,7 @@ namespace api::v1 {
         root["total"] = searchResults.total;
         root["data"] = data;
 
-        const auto resp = HttpResponse::newHttpJsonResponse(root);
-        resp->setStatusCode(k200OK);
-        callback(resp);
+        callback(HttpResponse::newHttpJsonResponse(root));
 
         co_return;
     }

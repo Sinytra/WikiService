@@ -1,12 +1,13 @@
 #include "platforms.h"
+#include "util.h"
+
+#include <drogon/drogon.h>
+#include <log/log.h>
 
 #define CURSEFORGE_API_URL "https://api.curseforge.com/"
 #define MC_GAME_ID 432
 
-#include <drogon/drogon.h>
-
-#include "log/log.h"
-#include "util.h"
+using namespace service;
 
 const std::map<int, ProjectType> curseforgeProjectTypes = {{6, mod},       {12, resourcepack}, {6945, datapack},
                                                            {6552, shader}, {4471, modpack},    {5, plugin}};

@@ -10,7 +10,8 @@ namespace {
     const unordered_map<Error, HttpStatusCode> errorMap = {{Error::Ok, k200OK},
                                                            {Error::ErrNotFound, k404NotFound},
                                                            {Error::ErrBadRequest, k400BadRequest},
-                                                           {Error::ErrUnauthorized, k401Unauthorized}};
+                                                           {Error::ErrUnauthorized, k401Unauthorized},
+                                                           {Error::ErrForbidden, k403Forbidden}};
 }
 
 namespace api::v1 {
@@ -21,31 +22,12 @@ namespace api::v1 {
         return k500InternalServerError;
     }
 
-    Error mapStatusCode(const HttpStatusCode& code) {
-        for (const auto &[error, statusCode] : errorMap) {
+    Error mapStatusCode(const HttpStatusCode &code) {
+        for (const auto &[error, statusCode]: errorMap) {
             if (code == statusCode) {
                 return error;
             }
         }
         return Error::ErrInternal;
-    }
-
-    void errorResponse(const Error &error, const std::string &message, const std::function<void(const HttpResponsePtr &)> &callback) {
-        Json::Value json;
-        json["error"] = message;
-        const auto resp = HttpResponse::newHttpJsonResponse(std::move(json));
-        resp->setStatusCode(mapError(error));
-
-        callback(resp);
-    }
-
-    void simpleError(const Error &error, const std::string &message, const std::function<void(const HttpResponsePtr &)> &callback,
-                     const std::function<void(Json::Value &)> &jsonBuilder) {
-        Json::Value root;
-        root["error"] = message;
-        jsonBuilder(root);
-        const auto resp = HttpResponse::newHttpJsonResponse(root);
-        resp->setStatusCode(mapError(error));
-        callback(resp);
     }
 }

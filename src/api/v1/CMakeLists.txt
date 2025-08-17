@@ -1,10 +1,14 @@
 add_library(api STATIC
         auth.cc
+        base.cc
         browse.cc
         docs.cc
+        game.cc
         error.cc
+        moderation.cc
         projects.cc
         websocket.cc
+        system.cc
 )
 
 target_link_libraries(api PRIVATE

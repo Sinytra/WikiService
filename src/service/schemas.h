@@ -1,7 +1,6 @@
 #pragma once
 
-#include <nlohmann/json-schema.hpp>
-#include <nlohmann/json.hpp>
+#include <nlohmann/json_fwd.hpp>
 
 namespace schemas {
     extern nlohmann::json systemConfig;
@@ -9,4 +8,18 @@ namespace schemas {
     extern nlohmann::json projectUpdate;
     extern nlohmann::json projectMetadata;
     extern nlohmann::json folderMetadata;
+    extern nlohmann::json projectIssue;
+    extern nlohmann::json report;
+    extern nlohmann::json ruleReport;
+    extern nlohmann::json accessKey;
+
+    extern nlohmann::json gameRecipe;
+    extern nlohmann::json gameRecipeType;
+    extern nlohmann::json gameRecipeBase;
+    extern nlohmann::json gameRecipeCustom;
+    extern nlohmann::json gameTag;
+    extern nlohmann::json recipeWorkbenches;
+    extern nlohmann::json properties;
+
+    extern nlohmann::json gameDataExport;
 }

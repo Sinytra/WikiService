@@ -1,109 +1,144 @@
-#include <drogon/drogon.h>
-#include <service/cloudflare.h>
-#include <stdexcept>
-
 #include "api/v1/auth.h"
 #include "api/v1/browse.h"
 #include "api/v1/docs.h"
+#include "api/v1/game.h"
 #include "api/v1/projects.h"
+#include "api/v1/system.h"
 #include "api/v1/websocket.h"
-#include "git2.h"
-#include "log/log.h"
-#include "service/github.h"
-#include "service/platforms.h"
-#include "service/schemas.h"
-#include "service/storage.h"
-#include "service/util.h"
 
-using namespace std;
+#include <service/cloudflare.h>
+#include <service/database/database.h>
+#include <service/github.h>
+#include <service/lang/lang.h>
+#include <service/storage/realtime.h>
+#include "config.h"
+#include "monitoring.h"
+#include "version.h"
+
+#include <api/v1/error.h>
+#include <git2.h>
+#include <log/log.h>
+
+#include <service/content/recipe_builtin.h>
+#include "api/v1/moderation.h"
+#include "service/access_keys.h"
+#include "service/content/game_data.h"
+#include "service/lang/crowdin.h"
+
 using namespace drogon;
 using namespace logging;
+using namespace service;
 
 namespace service {
-    trantor::EventLoopThreadPool cacheAwaiterThreadPool{1};
+    trantor::EventLoopThreadPool cacheAwaiterThreadPool{10};
+}
+
+namespace global {
+    std::shared_ptr<Database> database;
+    std::shared_ptr<MemoryCache> cache;
+    std::shared_ptr<GitHub> github;
+    std::shared_ptr<realtime::ConnectionManager> connections;
+    std::shared_ptr<Storage> storage;
+    std::shared_ptr<CloudFlare> cloudFlare;
+    std::shared_ptr<Auth> auth;
+    std::shared_ptr<LangService> lang;
+    std::shared_ptr<GameDataService> gameData;
+    std::shared_ptr<Crowdin> crowdin;
+    std::shared_ptr<AccessKeys> accessKeys;
+
+    std::shared_ptr<Platforms> platforms;
+}
+
+void globalExceptionHandler(const std::exception &e, const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&callback) {
+    if (const auto cast = dynamic_cast<const ApiException *>(&e); cast != nullptr) {
+        const auto resp = HttpResponse::newHttpJsonResponse(std::move(cast->data));
+        resp->setStatusCode(api::v1::mapError(cast->error));
+
+        callback(resp);
+        return;
+    }
+
+    // TODO Sentry
+    logger.error("Unhandled exception: {}", e.what());
+    callback(statusResponse(k500InternalServerError));
+}
+
+Task<> runStartupTaks() {
+    co_await global::database->failLoadingDeployments();
+    co_await global::gameData->setupGameData();
+    co_await global::crowdin->getAvailableLocales(); // TODO Reload in production
 }
 
 int main() {
     constexpr auto port(8080);
-    logger.info("Starting wiki service server on port {}", port);
+    logger.info("Starting wiki service version {} on port {}", PROJECT_VERSION, port);
 
     try {
-        app().loadConfigFile("config.json");
-
         const auto level = trantor::Logger::logLevel();
         app().setLogLevel(level).addListener("0.0.0.0", port).setThreadNum(16);
         configureLoggingLevel();
 
-        const Json::Value &customConfig = app().getCustomConfig();
+        const auto [authConfig, githubAppConfig, mrApp, cloudFlareConfig, crowdinConfig, sentryConfig, appUrl, curseForgeKey, storagePath,
+                    salt, local] = config::configure();
 
-        if (const auto error = validateJson(schemas::systemConfig, customConfig)) {
-            logger.error("App config validation failed at {}: {}", error->pointer.to_string(), error->msg);
-            throw std::runtime_error("Invalid configuration");
+        if (!sentryConfig.dsn.empty()) {
+            monitoring::initSentry(sentryConfig.dsn);
         }
 
-        // TODO Turn into structs
-        const std::string &appUrl = customConfig["app_url"].asString();
-        const std::string &appFrontendUrl = customConfig["frontend_url"].asString();
-        const Json::Value &authConfig = customConfig["auth"];
-        const std::string &authCallbackUrl = authConfig["callback_url"].asString();
-        const std::string &authSettingsCallbackUrl = authConfig["settings_callback_url"].asString();
-        const std::string &authErrorCallbackUrl = authConfig["error_callback_url"].asString();
-        const std::string &authTokenSecret = authConfig["token_secret"].asString();
-        const Json::Value &githubAppConfig = customConfig["github_app"];
-        const std::string &appClientId = githubAppConfig["client_id"].asString();
-        const std::string &appClientSecret = githubAppConfig["client_secret"].asString();
-        const std::string &curseForgeKey = customConfig["curseforge_key"].asString();
-        const std::string &storageBasePath = customConfig["storage_path"].asString();
-        const Json::Value &mrApp = customConfig["modrinth_app"];
-        const std::string &mrAppClientId = mrApp["client_id"].asString();
-        const std::string &mrAppClientSecret = mrApp["client_secret"].asString();
-        const Json::Value &cloudFlareConfig = customConfig["cloudflare"];
-        const std::string &cloudFlareToken = cloudFlareConfig["token"].asString();
-        const std::string &cloudFlareAccTag = cloudFlareConfig["account_tag"].asString();
-        const std::string &cloudFlareSiteTag = cloudFlareConfig["site_tag"].asString();
-
-        if (!customConfig.isMember("api_key") || customConfig["api_key"].asString().empty()) {
-            logger.warn("No API key configured, allowing public API access.");
-        }
-
-        auto database(Database{});
-        auto cache(MemoryCache{});
-        auto github(GitHub{});
-        auto connections(RealtimeConnectionStorage{});
-        auto storage(Storage{storageBasePath, cache, connections});
-
-        auto cloudflare(CloudFlare{cloudFlareToken, cloudFlareAccTag, cloudFlareSiteTag, cache});
-
-        auto modrinth(ModrinthPlatform{});
+        global::database = std::make_shared<Database>();
+        global::cache = std::make_shared<MemoryCache>();
+        global::github = std::make_shared<GitHub>();
+        global::connections = std::make_shared<realtime::ConnectionManager>();
+        global::storage = std::make_shared<Storage>(storagePath);
+        global::cloudFlare = std::make_shared<CloudFlare>(cloudFlareConfig);
+        global::auth = std::make_shared<Auth>(appUrl, OAuthApp{githubAppConfig.clientId, githubAppConfig.clientSecret},
+                                              OAuthApp{mrApp.clientId, mrApp.clientSecret});
+        global::lang = std::make_shared<LangService>();
+        global::gameData = std::make_shared<GameDataService>(storagePath);
+        global::crowdin = std::make_shared<Crowdin>(crowdinConfig);
+        global::accessKeys = std::make_shared<AccessKeys>(salt);
         auto curseForge(CurseForgePlatform{curseForgeKey});
-        auto platforms(Platforms(curseForge, modrinth));
+        auto modrinth(ModrinthPlatform{});
+        global::platforms = std::make_shared<Platforms>(curseForge, modrinth);
 
-        auto auth(Auth{appUrl, {appClientId, appClientSecret}, {mrAppClientId, mrAppClientSecret}, database, cache, platforms, github});
-
-        auto authController(make_shared<api::v1::AuthController>(appFrontendUrl, authCallbackUrl, authSettingsCallbackUrl,
-                                                                 authErrorCallbackUrl, authTokenSecret, auth, github, cache, database));
-        auto controller(make_shared<api::v1::DocsController>(database, storage));
-        auto browseController(make_shared<api::v1::BrowseController>(database));
-        auto projectsController(make_shared<api::v1::ProjectsController>(auth, platforms, database, storage, cloudflare));
-        auto projectWSController(make_shared<api::v1::ProjectWebSocketController>(database, storage, connections, auth));
+        auto authController(std::make_shared<api::v1::AuthController>(authConfig));
+        auto controller(std::make_shared<api::v1::DocsController>());
+        auto browseController(std::make_shared<api::v1::BrowseController>());
+        auto projectsController(std::make_shared<api::v1::ProjectsController>(local));
+        auto projectWSController(std::make_shared<api::v1::ProjectWebSocketController>());
+        auto gameController(std::make_shared<api::v1::GameController>());
+        auto systemController(std::make_shared<api::v1::SystemController>());
+        auto moderationController(std::make_shared<api::v1::ModerationController>());
 
         app().registerController(authController);
         app().registerController(controller);
         app().registerController(browseController);
         app().registerController(projectsController);
         app().registerController(projectWSController);
+        app().registerController(gameController);
+        app().registerController(systemController);
+        app().registerController(moderationController);
+        app().setExceptionHandler(globalExceptionHandler);
 
         cacheAwaiterThreadPool.start();
         git_libgit2_init();
 
+        content::loadBuiltinRecipeTypes();
+
+        app().getLoop()->queueInLoop(async_func([]() -> Task<> { co_await runStartupTaks(); }));
+
         app().run();
 
         git_libgit2_shutdown();
-        cacheAwaiterThreadPool.getLoop(0)->quit();
+        for (auto &loop: cacheAwaiterThreadPool.getLoops()) {
+            loop->quit();
+        }
         cacheAwaiterThreadPool.wait();
     } catch (const std::exception &e) {
         logger.critical("Error running app: {}", e.what());
     }
+
+    monitoring::closeSentry();
 
     return 0;
 }

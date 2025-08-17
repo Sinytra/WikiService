@@ -1,11 +1,12 @@
 #include "auth.h"
-
-#include <service/util.h>
-#include "log/log.h"
 #include "error.h"
-#include "include/uri.h"
 
+#include <database/database.h>
+#include <include/uri.h>
+#include <log/log.h>
 #include <service/crypto.h>
+#include <service/github.h>
+#include <service/util.h>
 #include <string>
 
 using namespace std;
@@ -16,42 +17,37 @@ using namespace logging;
 #define SESSION_COOKIE "sessionid"
 
 namespace api::v1 {
-    AuthController::AuthController(const std::string &fe, const std::string &cb, const std::string &cbs, const std::string &cbe,
-                                   const std::string &tk, Auth &a, GitHub &gh, MemoryCache &c, Database &d) :
-        auth_(a), github_(gh), database_(d), cache_(c), appFrontendUrl_(fe), authCallbackUrl_(cb), authSettingsCallbackUrl_(cbs),
-        authErrorCallbackUrl_(cbe), tokenEncryptionKey_(tk), appDomain_(uri{appFrontendUrl_}.get_host()) {}
+    AuthController::AuthController(const config::AuthConfig &config) : config_(config), appDomain_(uri{config.frontendUrl}.get_host()) {}
 
-    Task<> AuthController::initLogin(HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
-        const auto url = auth_.getGitHubOAuthInitURL();
+    Task<> AuthController::initLogin(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
+        const auto url = global::auth->getGitHubOAuthInitURL();
         const auto resp = HttpResponse::newRedirectionResponse(url);
         callback(resp);
         co_return;
     }
 
-    Task<> AuthController::callbackGithub(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback,
-                                          std::string code) const {
+    Task<> AuthController::callbackGithub(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+                                          const std::string code) const {
         if (code.empty()) {
-            co_return errorResponse(Error::ErrBadRequest, "Missing code parameter", callback);
+            throw ApiException(Error::ErrBadRequest, "Missing code parameter");
         }
 
-        if (const auto token = co_await auth_.requestUserAccessToken(code)) {
-            const auto [profile, err] = co_await github_.getAuthenticatedUser(*token);
+        if (const auto token = co_await global::auth->requestUserAccessToken(code)) {
+            const auto [profile, err] = co_await global::github->getAuthenticatedUser(*token);
             if (!profile) {
-                const auto resp = HttpResponse::newHttpResponse();
-                resp->setStatusCode(k400BadRequest);
-                callback(resp);
+                callback(statusResponse(k400BadRequest));
             }
 
             const auto username = (*profile)["login"].asString();
-            const auto sessionId = co_await auth_.createUserSession(username, serializeJsonString(*profile));
+            const auto sessionId = co_await global::auth->createUserSession(username, serializeJsonString(*profile));
 
-            const auto resp = HttpResponse::newRedirectionResponse(authCallbackUrl_);
+            const auto resp = HttpResponse::newRedirectionResponse(config_.callbackUrl);
             Cookie cookie;
             cookie.setKey(SESSION_COOKIE);
             cookie.setValue(sessionId);
             cookie.setSecure(true);
             cookie.setHttpOnly(true);
-            cookie.setSameSite(Cookie::SameSite::kStrict);
+            cookie.setSameSite(Cookie::SameSite::kLax);
             cookie.setPath("/");
             cookie.setMaxAge(std::chrono::duration_cast<std::chrono::seconds>(30 * 24h).count());
             cookie.setDomain(appDomain_);
@@ -61,7 +57,7 @@ namespace api::v1 {
             co_return;
         }
 
-        callback(HttpResponse::newRedirectionResponse(authErrorCallbackUrl_));
+        callback(HttpResponse::newRedirectionResponse(config_.errorCallbackUrl));
 
         co_return;
     }
@@ -69,9 +65,9 @@ namespace api::v1 {
     Task<> AuthController::logout(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
         const auto session = req->getCookie(SESSION_COOKIE);
 
-        co_await auth_.expireSession(session);
+        co_await global::auth->expireSession(session);
 
-        const auto resp = HttpResponse::newRedirectionResponse(appFrontendUrl_);
+        const auto resp = HttpResponse::newRedirectionResponse(config_.frontendUrl);
         Cookie cookie;
         cookie.setKey(SESSION_COOKIE);
         cookie.setValue("");
@@ -87,94 +83,75 @@ namespace api::v1 {
     Task<> AuthController::linkModrinth(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
         const auto token = req->getParameter("token");
         if (token.empty()) {
-            co_return errorResponse(Error::ErrBadRequest, "Missing token parameter", callback);
+            throw ApiException(Error::ErrBadRequest, "Missing token parameter");
         }
-        const auto encryptToken = crypto::encryptString(token, tokenEncryptionKey_);
+        const auto encryptToken = crypto::encryptString(token, config_.tokenSecret);
 
-        const auto url = auth_.getModrinthOAuthInitURL(encryptToken);
+        const auto url = global::auth->getModrinthOAuthInitURL(encryptToken);
         const auto resp = HttpResponse::newRedirectionResponse(url);
         callback(resp);
         co_return;
     }
 
-    Task<> AuthController::callbackModrinth(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string code,
-                                            std::string state) const {
+    Task<> AuthController::callbackModrinth(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+                                            const std::string code, const std::string state) const {
         if (code.empty()) {
-            co_return errorResponse(Error::ErrBadRequest, "Missing code parameter", callback);
+            throw ApiException(Error::ErrBadRequest, "Missing code parameter");
         }
         if (state.empty()) {
-            co_return errorResponse(Error::ErrBadRequest, "Missing state parameter", callback);
+            throw ApiException(Error::ErrBadRequest, "Missing state parameter");
         }
 
-        const auto decryptedToken = crypto::decryptString(state, tokenEncryptionKey_);
+        const auto decryptedToken = crypto::decryptString(state, config_.tokenSecret);
 
-        const auto session = co_await auth_.getSession(decryptedToken);
+        const auto session = co_await global::auth->getSession(decryptedToken);
         if (!session) {
-            co_return errorResponse(Error::ErrUnauthorized, "Unauthorized", callback);
+            throw ApiException(Error::ErrUnauthorized, "Unauthorized");
         }
 
-        if (const auto token = co_await auth_.requestModrinthUserAccessToken(code)) {
-            if (const auto result = co_await auth_.linkModrinthAccount(session->username, *token); result != Error::Ok) {
-                co_return errorResponse(result, "Error linking Modrinth account", callback);
+        if (const auto token = co_await global::auth->requestModrinthUserAccessToken(code)) {
+            if (const auto result = co_await global::auth->linkModrinthAccount(session->username, *token); result != Error::Ok) {
+                throw ApiException(result, "Error linking Modrinth account");
             }
 
-            const auto resp = HttpResponse::newRedirectionResponse(authSettingsCallbackUrl_);
+            const auto resp = HttpResponse::newRedirectionResponse(config_.settingsCallbackUrl);
             callback(resp);
             co_return;
         }
 
-        const auto resp = HttpResponse::newHttpResponse();
-        resp->setStatusCode(k400BadRequest);
-        callback(resp);
-
-        co_return;
+        callback(statusResponse(k400BadRequest));
     }
 
     Task<> AuthController::unlinkModrinth(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
-        const auto session = co_await auth_.getSession(req);
-        if (!session) {
-            co_return errorResponse(Error::ErrUnauthorized, "Unauthorized", callback);
+        const auto session{co_await global::auth->getSession(req)};
+
+        if (const auto result = co_await global::database->unlinkUserModrinthAccount(session.username); result != Error::Ok) {
+            throw ApiException(result, "Failed to unlink Modrinth account");
         }
 
-        if (const auto result = co_await database_.unlinkUserModrinthAccount(session->username); result != Error::Ok) {
-            co_return errorResponse(result, "Failed to unlink Modrinth account", callback);
-        }
-
-        callback(HttpResponse::newHttpResponse());
-
-        co_return;
+        callback(statusResponse(k200OK));
     }
 
     Task<> AuthController::userProfile(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
-        const auto session = co_await auth_.getSession(req);
-        if (!session) {
-            co_return errorResponse(Error::ErrUnauthorized, "Unauthorized", callback);
-        }
+        const auto session{co_await global::auth->getSession(req)};
+        Json::Value root = session.profile;
+        root["created_at"] = session.user.getValueOfCreatedAt().toCustomFormattedString("%Y-%m-%d");
 
-        Json::Value root = session->profile;
-        root["created_at"] = session->user.getValueOfCreatedAt().toCustomFormattedString("%Y-%m-%d");
-        const auto resp = HttpResponse::newHttpJsonResponse(root);
-        resp->setStatusCode(k200OK);
-        callback(resp);
-
-        co_return;
+        callback(HttpResponse::newHttpJsonResponse(root));
     }
 
     Task<> AuthController::deleteAccount(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
-        const auto session = co_await auth_.getSession(req);
-        if (!session) {
-            co_return errorResponse(Error::ErrUnauthorized, "Unauthorized", callback);
+        const auto session{co_await global::auth->getSession(req)};
+
+        if (const auto result = co_await global::database->deleteUserProjects(session.username); result != Error::Ok) {
+            throw ApiException(result, "Error deleting account");
         }
 
-        if (const auto result = co_await database_.deleteUserProjects(session->username); result != Error::Ok) {
-            co_return errorResponse(result, "Error deleting account", callback);
+        if (const auto result = co_await global::database->deleteUser(session.username); result != Error::Ok) {
+            throw ApiException(result, "Error deleting account");
         }
 
-        if (const auto result = co_await database_.deleteUser(session->username); result != Error::Ok) {
-            co_return errorResponse(result, "Error deleting account", callback);
-        }
-
-        co_await auth_.expireSession(session->sessionId);
+        co_await global::auth->expireSession(session.sessionId);
 
         Cookie cookie;
         cookie.setKey(SESSION_COOKIE);

@@ -1,6 +1,7 @@
 #include "AuthFilter.h"
 
 #include <drogon/drogon.h>
+#include <service/util.h>
 
 using namespace drogon;
 
@@ -16,9 +17,7 @@ void AuthFilter::doFilter(const HttpRequestPtr &req, FilterCallback &&fcb, Filte
             fccb();
             return;
         }
-        const auto res = HttpResponse::newHttpResponse();
-        res->setStatusCode(k401Unauthorized);
-        fcb(res);
+        fcb(statusResponse(k401Unauthorized));
     } else {
         fccb();
     }
