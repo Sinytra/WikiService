@@ -169,7 +169,8 @@ namespace service {
         for (const auto &entry: paths) {
             const auto fileName = entry.path().filename().string();
             const auto relativePath = relative(entry.path(), format_.getRoot()).string();
-            const auto displayPath = relativePath.substr(0, relativePath.size() - 4);
+            const auto isDirectory = entry.is_directory();
+            const auto displayPath = isDirectory ? relativePath : relativePath.substr(0, relativePath.size() - 4);
 
             auto [name, icon] =
                 entries.contains(fileName) ? entries[fileName] : FolderMetadataEntry{getPageTitle(relativePath).value_or(""), ""};
@@ -183,8 +184,8 @@ namespace service {
                 obj["icon"] = icon;
             }
             obj["path"] = displayPath;
-            obj["type"] = entry.is_directory() ? "dir" : "file";
-            if (entry.is_directory()) {
+            obj["type"] = isDirectory ? "dir" : "file";
+            if (isDirectory) {
                 nlohmann::ordered_json children = getDirTreeJson(entry.path());
                 obj["children"] = children;
             }
