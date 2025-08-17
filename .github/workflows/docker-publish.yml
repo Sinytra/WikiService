@@ -85,8 +85,7 @@ jobs:
     name: Deploy to server
     runs-on: ubuntu-latest
     needs: build
-    env:
-      DEPLOY_SCRIPT: ${{ github.event_name == 'push' && github.ref_name == 'deploy/staging' && secrets.SSH_SCRIPT_STAGING || secrets.SSH_SCRIPT_PROD }}
+    environment: ${{ github.event_name == 'push' && github.ref_name == 'deploy/staging' && 'staging' || 'production' }}
     steps:
       - name: Execute remote SSH call
         uses: appleboy/ssh-action@v1.2.2
@@ -94,4 +93,4 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
-          script: ${{ env.DEPLOY_SCRIPT }}
+          script: ${{ secrets.DEPLOY_SCRIPT }}
