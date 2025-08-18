@@ -262,20 +262,6 @@ namespace api::v1 {
         callback(HttpResponse::newHttpJsonResponse(root));
     }
 
-    Task<> ProjectsController::getProjectLog(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
-                                             const std::string id) const {
-        const auto project{co_await BaseProjectController::getUserProject(req, id)};
-        const auto log{global::storage->getProjectLog(project)};
-        if (!log) {
-            throw ApiException(Error::ErrNotFound, "not_found");
-        }
-
-        Json::Value root;
-        root["content"] = *log;
-
-        callback(HttpResponse::newHttpJsonResponse(root));
-    }
-
     Task<> ProjectsController::listPopularProjects(const HttpRequestPtr req,
                                                    const std::function<void(const HttpResponsePtr &)> callback) const {
         const std::vector<std::string> ids = co_await global::cloudFlare->getMostVisitedProjectIDs();
@@ -368,7 +354,7 @@ namespace api::v1 {
             throw ApiException(Error::ErrInternal, "internal");
         }
 
-        co_await global::storage->invalidateProject(project);
+        global::storage->invalidateProject(project);
         co_await global::database->refreshFlatTagItemView();
 
         callback(simpleResponse("Project deleted successfully"));
@@ -517,7 +503,7 @@ namespace api::v1 {
 
         if (deployment->getValueOfActive()) {
             logger.debug("Invalidating project after active deployment was removed");
-            co_await global::storage->invalidateProject(project);
+            global::storage->removeDeployment(*deployment);
         }
 
         callback(simpleResponse("Deployment deleted successfully"));

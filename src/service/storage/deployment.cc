@@ -127,7 +127,7 @@ namespace service {
     }
 
     Task<ProjectError> Storage::deployProject(const Project &project, Deployment &deployment, const fs::path clonePath) const {
-        const auto logger = getProjectLogger(project);
+        const auto logger = getDeploymentLogger(deployment);
         logger->info("Setting up project");
 
         deployment.setStatus(enumToStr(DeploymentStatus::LOADING));
@@ -135,6 +135,7 @@ namespace service {
 
         ProjectIssueCallback issues{deployment.getValueOfId(), logger};
 
+        // 1. Clone repository
         const auto [repo, cloneError] =
             co_await git::cloneRepository(project.getValueOfSourceRepo(), clonePath, project.getValueOfSourceBranch(), logger);
         if (!repo || cloneError.error != ProjectError::OK) {
@@ -142,8 +143,10 @@ namespace service {
             co_return cloneError.error;
         }
 
+        // 2. Validate metadata
         // TODO Validate metadata
 
+        // 3. Create default version if not exists
         auto defaultVersion = co_await getDefaultVersion(project);
         if (!defaultVersion) {
             defaultVersion = co_await createDefaultVersion(project);
@@ -155,20 +158,22 @@ namespace service {
             }
         }
 
+        // 4. Assign revision info to deployment
         const auto revision = git::getLatestRevision(repo);
         if (!revision) {
             logger->error("Error getting commit information");
             co_await issues.addIssue(ProjectIssueLevel::ERROR, ProjectIssueType::GIT_INFO, ProjectError::UNKNOWN);
             co_return ProjectError::UNKNOWN;
         }
-
         deployment.setRevision(nlohmann::json(*revision).dump());
         co_await global::database->updateModel(deployment);
 
+        // 5. Ingest game content
         const auto cloneDocsRoot = clonePath / removeLeadingSlash(project.getValueOfSourcePath());
         ResolvedProject resolved{project, cloneDocsRoot, *defaultVersion};
 
         // TODO Ingest from other versions?
+        // TODO Move transaction scope up
         content::Ingestor ingestor{resolved, logger, issues};
         if (const auto result = co_await ingestor.runIngestor(); result != Error::Ok) {
             logger->error("Error ingesting project data");
@@ -180,17 +185,19 @@ namespace service {
             co_return ProjectError::UNKNOWN;
         }
 
+        // 6. Setup versions
         const auto branches = git::listBranches(repo);
         auto versions = co_await resolved.getProjectDatabase().getVersions();
+        // TODO Sync instead of only creating once how else do they add more?
         if (versions.empty()) {
             versions = co_await setupProjectVersions(resolved, branches, logger);
         }
 
-        // TODO Remove first
-
-        const auto dest = getProjectDirPath(project);
+        // 7. Copy default version
+        const auto dest = getDeploymentVersionedDir(deployment);
         copyProjectFiles(clonePath, cloneDocsRoot, dest, logger);
 
+        // 8. Copy other versions
         for (const auto &version: versions) {
             const auto name = version.getValueOfName();
             const auto branch = version.getValueOfBranch();
@@ -201,7 +208,7 @@ namespace service {
                 continue;
             }
 
-            const auto versionDest = getProjectDirPath(project, name);
+            const auto versionDest = getDeploymentVersionedDir(deployment, name);
             copyProjectFiles(clonePath, cloneDocsRoot, versionDest, logger);
         }
 
@@ -223,6 +230,8 @@ namespace service {
             co_return co_await patientlyAwaitTaskResult(*pending);
         }
 
+        const auto activeDeployment(co_await global::database->getActiveDeployment(project.getValueOfId()));
+
         const auto projectId = project.getValueOfId();
         Deployment tmpDep;
         tmpDep.setProjectId(projectId);
@@ -239,13 +248,14 @@ namespace service {
         }
         auto deployment = *dbResult;
 
-        // Clean logs
-        fs::remove(getProjectLogPath(project));
+        const auto deploymentDir = getDeploymentRootDir(deployment);
+        remove_all(deploymentDir);
+        fs::create_directories(deploymentDir);
 
-        const auto clonePath = getBaseDir().path() / TEMP_DIR / projectId;
+        const auto clonePath = getBaseDir().path() / TEMP_DIR / (projectId + "-" + deployment.getValueOfId().substr(0, 9));
         remove_all(clonePath);
 
-        const auto projectLogger = getProjectLogger(project);
+        const auto deployLog = getDeploymentLogger(deployment);
         ProjectError result;
         try {
             result = co_await deployProject(project, deployment, clonePath);
@@ -255,21 +265,35 @@ namespace service {
         }
 
         if (result == ProjectError::OK) {
-            projectLogger->info("====================================");
-            projectLogger->info("==   Project deployment complete  ==");
-            projectLogger->info("====================================");
+            deployLog->info("====================================");
+            deployLog->info("==   Project deployment complete  ==");
+            deployLog->info("====================================");
 
             global::connections->complete(projectId, true);
 
             deployment.setStatus(enumToStr(DeploymentStatus::SUCCESS));
+
+            // Cleanup previous data
+            try {
+                if (activeDeployment) {
+                    const auto oldPath = getDeploymentRootDir(*activeDeployment);
+                    deployLog->info("Cleaning up previous deployment");
+                    remove_all(oldPath);
+                }
+            } catch (std::exception e) {
+                const auto id = activeDeployment ? activeDeployment->getValueOfId() : "";
+                logger.error("Failed to cleanup previous deployment '{}': {}", id, e.what());
+            }
         } else {
-            projectLogger->error("!!================================!!");
-            projectLogger->error("!!   Project deployment failed    !!");
-            projectLogger->error("!!================================!!");
+            deployLog->error("!!================================!!");
+            deployLog->error("!!   Project deployment failed    !!");
+            deployLog->error("!!================================!!");
 
             global::connections->complete(projectId, false);
 
             deployment.setStatus(enumToStr(DeploymentStatus::ERROR));
+
+            remove_all(deploymentDir);
         }
 
         remove_all(clonePath);

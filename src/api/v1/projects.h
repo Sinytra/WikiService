@@ -27,7 +27,6 @@ namespace api::v1 {
         // Private
         ADD_METHOD_TO(ProjectsController::listUserProjects, "/api/v1/dev/projects",                             drogon::Get,    "AuthFilter");
         ADD_METHOD_TO(ProjectsController::getProject,       "/api/v1/dev/projects/{1:id}",                      drogon::Get,    "AuthFilter");
-        ADD_METHOD_TO(ProjectsController::getProjectLog,    "/api/v1/dev/projects/{1:id}/log",                  drogon::Get,    "AuthFilter");
         ADD_METHOD_TO(ProjectsController::create,           "/api/v1/dev/projects",                             drogon::Post,   "AuthFilter");
         ADD_METHOD_TO(ProjectsController::update,           "/api/v1/dev/projects",                             drogon::Put,    "AuthFilter");
         ADD_METHOD_TO(ProjectsController::remove,           "/api/v1/dev/projects/{1:id}",                      drogon::Delete, "AuthFilter");
@@ -57,9 +56,6 @@ namespace api::v1 {
 
         drogon::Task<> getProject(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
                                   std::string id) const;
-
-        drogon::Task<> getProjectLog(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
-                                     std::string id) const;
 
         drogon::Task<> listPopularProjects(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback) const;
 
