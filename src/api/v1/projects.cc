@@ -173,9 +173,11 @@ namespace api::v1 {
             throw ApiException(Error::ErrBadRequest, "illegal_id");
         }
 
-        const std::string modid = (*resolved)["modid"];
-        if (modid == ResourceLocation::DEFAULT_NAMESPACE || modid == ResourceLocation::COMMON_NAMESPACE) {
-            throw ApiException(Error::ErrBadRequest, "illegal_modid");
+        const std::string modid = resolved->contains("modid") ? (*resolved)["modid"] : "";
+        if (!modid.empty()) {
+            if (modid == ResourceLocation::DEFAULT_NAMESPACE || modid == ResourceLocation::COMMON_NAMESPACE) {
+                throw ApiException(Error::ErrBadRequest, "illegal_modid");
+            }
         }
 
         const auto platforms = processPlatforms(*resolved);
@@ -202,7 +204,9 @@ namespace api::v1 {
         project.setType(projectTypeToString(preferredProj.type));
         project.setPlatforms(platforms.dump());
         project.setIsPublic(isPublic);
-        project.setModid(modid);
+        if (!modid.empty()) {
+            project.setModid(modid);
+        }
 
         co_return ValidatedProjectData{.project = project, .platforms = platforms};
     }

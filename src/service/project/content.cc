@@ -55,8 +55,8 @@ namespace service {
         co_return content::parseItemProperties(filePath, id);
     }
 
-    std::optional<std::string> ResolvedProject::readLangKey(const std::string &key) const {
-        const auto path = format_.getLanguageFilePath(project_.getValueOfModid());
+    std::optional<std::string> ResolvedProject::readLangKey(const std::string &namespace_, const std::string &key) const {
+        const auto path = format_.getLanguageFilePath(namespace_);
         const auto json = parseJsonFile(path);
         if (!json || !json->is_object() || !json->contains(key)) {
             return std::nullopt;
@@ -70,9 +70,9 @@ namespace service {
         const auto projectId = project_.getValueOfId();
         const auto parsed = ResourceLocation::parse(loc);
 
-        auto localized = readLangKey("item." + projectId + "." + parsed->path_);
+        auto localized = readLangKey(parsed->namespace_, "item." + parsed->namespace_ + "." + parsed->path_);
         if (!localized) {
-            localized = readLangKey("block." + projectId + "." + parsed->path_);
+            localized = readLangKey(parsed->namespace_, "block." + parsed->namespace_ + "." + parsed->path_);
         }
 
         const auto path = co_await projectDb_->getProjectContentPath(loc);

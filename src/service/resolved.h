@@ -99,7 +99,7 @@ namespace service {
         std::tuple<ProjectPage, Error> readPageFile(std::string path) const;
         drogon::Task<std::tuple<ProjectPage, Error>> readContentPage(std::string id) const;
         drogon::Task<nlohmann::json> readItemProperties(std::string id) const;
-        std::optional<std::string> readLangKey(const std::string &key) const;
+        std::optional<std::string> readLangKey(const std::string &namespace_, const std::string &key) const;
 
         std::tuple<nlohmann::ordered_json, Error> getDirectoryTree() const;
         std::tuple<nlohmann::ordered_json, Error> getContentDirectoryTree() const;

@@ -214,6 +214,7 @@ class Project
     ///Set the value of the column modid
     void setModid(const std::string &pModid) noexcept;
     void setModid(std::string &&pModid) noexcept;
+    void setModidToNull() noexcept;
 
 
     static size_t getColumnNumber() noexcept {  return 12;  }
