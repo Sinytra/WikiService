@@ -101,8 +101,11 @@ namespace service {
     Task<std::vector<std::string>> Database::getUndeployedProjects() const {
         // language=postgresql
         static constexpr auto query = "SELECT project.id FROM project \
-                                       LEFT JOIN deployment d ON d.project_id = project.id \
-                                       WHERE d.id IS NULL";
+                                       WHERE NOT exists( \
+                                           SELECT * FROM deployment \
+                                           WHERE project_id = project.id \
+                                               AND active = TRUE \
+                                       )";
 
         const auto [res, err] = co_await handleDatabaseOperation<std::vector<std::string>>([](const DbClientPtr &client) -> Task<std::vector<std::string>> {
             std::vector<std::string> ids;
