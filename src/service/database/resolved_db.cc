@@ -33,6 +33,19 @@ namespace service {
         co_return co_await handlePaginatedQuery<ProjectVersion>(query, searchQuery, page);
     }
 
+    Task<Error> ProjectDatabaseAccess::deleteUnusedVersions(const std::vector<std::string> keep) const {
+        const auto [res, err] = co_await handleDatabaseOperation<Error>([&](const DbClientPtr &client) -> Task<Error> {
+            CoroMapper<ProjectVersion> mapper(client);
+
+            co_await mapper.deleteBy(Criteria(ProjectVersion::Cols::_project_id, CompareOperator::EQ, projectId_)
+                && Criteria(ProjectVersion::Cols::_name, CompareOperator::IsNotNull)
+                && Criteria(ProjectVersion::Cols::_name, CompareOperator::NotIn, keep));
+
+            co_return Error::Ok;
+        });
+        co_return res.value_or(err);
+    }
+
     Task<Error> ProjectDatabaseAccess::addProjectItem(const std::string item) const {
         // language=postgresql
         static constexpr auto query = "INSERT INTO project_item (item_id, version_id) \
@@ -306,11 +319,9 @@ namespace service {
     Task<std::optional<RecipeType>> ProjectDatabaseAccess::getRecipeType(std::string type) const {
         const auto [res, err] = co_await handleDatabaseOperation<RecipeType>([&, type](const DbClientPtr &client) -> Task<RecipeType> {
             CoroMapper<RecipeType> mapper(client);
-            const auto results = co_await mapper.findBy(
-                Criteria(Recipe::Cols::_loc, CompareOperator::EQ, type)
-                && (Criteria(Recipe::Cols::_version_id, CompareOperator::IsNull)
-                    || Criteria(Recipe::Cols::_version_id, CompareOperator::EQ, versionId_))
-                );
+            const auto results = co_await mapper.findBy(Criteria(Recipe::Cols::_loc, CompareOperator::EQ, type) &&
+                                                        (Criteria(Recipe::Cols::_version_id, CompareOperator::IsNull) ||
+                                                         Criteria(Recipe::Cols::_version_id, CompareOperator::EQ, versionId_)));
             if (results.size() != 1) {
                 throw DrogonDbException{};
             }
@@ -326,14 +337,15 @@ namespace service {
                                        JOIN recipe_ingredient_item ritem ON ritem.recipe_id = recipe.id \
                                        JOIN item ON item.id = ritem.item_id \
                                        WHERE NOT ritem.input AND version_id = $1 AND item.loc = $2";
-        const auto [res, err] = co_await handleDatabaseOperation<std::vector<std::string>>([&, item](const DbClientPtr &client) -> Task<std::vector<std::string>> {
-            const auto results = co_await client->execSqlCoro(query, versionId_, item);
-            std::vector<std::string> ids;
-            for (const auto &row: results) {
-                ids.emplace_back(row[0].as<std::string>());
-            }
-            co_return ids;
-        });
+        const auto [res, err] = co_await handleDatabaseOperation<std::vector<std::string>>(
+            [&, item](const DbClientPtr &client) -> Task<std::vector<std::string>> {
+                const auto results = co_await client->execSqlCoro(query, versionId_, item);
+                std::vector<std::string> ids;
+                for (const auto &row: results) {
+                    ids.emplace_back(row[0].as<std::string>());
+                }
+                co_return ids;
+            });
         co_return res.value_or(std::vector<std::string>{});
     }
 }

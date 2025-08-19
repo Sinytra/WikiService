@@ -71,30 +71,49 @@ namespace service {
 
     Task<std::vector<ProjectVersion>> setupProjectVersions(const ResolvedProject &resolved,
                                                            const std::unordered_map<std::string, std::string> &branches,
-                                                           const std::shared_ptr<spdlog::logger> logger) {
+                                                           const std::shared_ptr<spdlog::logger> logger, ProjectIssueCallback &issues) {
+        const auto path = resolved.getFormat().getWikiMetadataPath();
+        const ProjectFileIssueCallback fileIssues(issues, path);
+
         const auto projectId = resolved.getProject().getValueOfId();
         const auto [json, err, det] = resolved.validateProjectMetadata();
         if (!json) {
             co_return std::vector<ProjectVersion>{};
         }
+
+        std::unordered_map<std::string, ProjectVersion> existingVersions;
+        for (const auto existing = co_await resolved.getProjectDatabase().getVersions(); auto &version: existing) {
+            existingVersions.try_emplace(version.getValueOfName(), version);
+        }
+
         const auto defaultBranch = resolved.getProject().getValueOfSourceBranch();
-        const auto versions(readVersionsFromMetadata(*json, defaultBranch));
+        const auto newVersions = readVersionsFromMetadata(*json, defaultBranch);
 
         std::vector<ProjectVersion> resolvedVersions;
-        for (auto &[key, val]: versions) {
+        for (auto &[key, val]: newVersions) {
             if (!branches.contains(val)) {
                 logger->warn("Ignoring version '{}' with unknown branch '{}'", key, val);
+                co_await fileIssues.addIssue(ProjectIssueLevel::WARNING, ProjectIssueType::META, ProjectError::INVALID_VERSION_BRANCH, val);
                 continue;
             }
 
-            ProjectVersion version;
-            version.setProjectId(projectId);
-            version.setName(key);
-            version.setBranch(val);
-            if (const auto [result, err] = co_await global::database->createProjectVersion(version); result) {
-                resolvedVersions.push_back(version);
+            if (existingVersions.contains(key)) {
+                ProjectVersion version = existingVersions[key];
+                version.setBranch(val);
+                if (const auto result = co_await global::database->updateModel(version)) {
+                    resolvedVersions.push_back(*result);
+                }
+            } else {
+                ProjectVersion version;
+                version.setProjectId(projectId);
+                version.setName(key);
+                version.setBranch(val);
+                if (const auto [result, err] = co_await global::database->createProjectVersion(version); result) {
+                    resolvedVersions.push_back(*result);
+                }
             }
         }
+
         co_return resolvedVersions;
     }
 
@@ -187,11 +206,7 @@ namespace service {
 
         // 6. Setup versions
         const auto branches = git::listBranches(repo);
-        auto versions = co_await resolved.getProjectDatabase().getVersions();
-        // TODO Sync instead of only creating once how else do they add more?
-        if (versions.empty()) {
-            versions = co_await setupProjectVersions(resolved, branches, logger);
-        }
+        const auto versions = co_await setupProjectVersions(resolved, branches, logger, issues);
 
         // 7. Copy default version
         const auto dest = getDeploymentVersionedDir(deployment);
@@ -214,9 +229,19 @@ namespace service {
 
         git_repository_free(repo);
 
+        // 9. Set active
         if (const auto err = co_await setActiveDeployment(project.getValueOfId(), deployment); err != Error::Ok) {
             logger->error("Error setting active deployment");
             co_return ProjectError::UNKNOWN;
+        }
+
+        // 10. Free redundant versions
+        std::vector<std::string> versionNames;
+        for (auto &version: versions) {
+            versionNames.push_back(version.getValueOfName());
+        }
+        if (const auto err = co_await resolved.getProjectDatabase().deleteUnusedVersions(versionNames); err != Error::Ok) {
+            logger->warn("Error deleting old versions");
         }
 
         co_return ProjectError::OK;
