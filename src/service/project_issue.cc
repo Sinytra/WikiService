@@ -39,7 +39,8 @@ namespace service {
         {ProjectError::INVALID_FORMAT, "invalid_format"},
         {ProjectError::INVALID_RESLOC, "invalid_resloc"},
         {ProjectError::INVALID_VERSION_BRANCH, "invalid_version_branch"},
-        {ProjectError::MISSING_PLATFORM_PROJECT, "missing_platform_project"}
+        {ProjectError::MISSING_PLATFORM_PROJECT, "missing_platform_project"},
+        {ProjectError::NO_PAGE_TITLE, "no_page_title"}
     )
     // clang-format on
 

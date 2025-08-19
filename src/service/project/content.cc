@@ -9,32 +9,26 @@ using namespace drogon;
 using namespace drogon_model::postgres;
 namespace fs = std::filesystem;
 
-Task<> addPageIDs(const std::unordered_map<std::string, std::string> &ids, nlohmann::ordered_json &json) {
-    if (!json.is_array()) {
-        co_return;
-    }
-    for (auto it = json.begin(); it != json.end();) {
-        if (auto &item = *it; item.is_object()) {
-            if (item["type"].get<std::string>() == "dir") {
-                if (item.contains("children")) {
-                    co_await addPageIDs(ids, item["children"]);
-                }
-            } else if (item["type"].get<std::string>() == "file") {
-                const auto path = item["path"].get<std::string>();
-                if (const auto id = ids.find(path + DOCS_FILE_EXT); id != ids.end()) {
-                    item["id"] = id->second;
+namespace service {
+    Task<> addPageIDs(const std::unordered_map<std::string, std::string> &ids, FileTree &tree) {
+        for (auto it = tree.begin(); it != tree.end();) {
+            auto entry = it;
+
+            if (entry->type == FileType::DIR) {
+                co_await addPageIDs(ids, entry->children);
+            } else if (entry->type == FileType::FILE) {
+                if (const auto id = ids.find(entry->path + DOCS_FILE_EXT); id != ids.end()) {
+                    entry->id = id->second;
                 } else {
-                    it = json.erase(it);
+                    it = tree.erase(it);
                     continue;
                 }
             }
+            ++it;
         }
-        ++it;
     }
-}
 
-namespace service {
-    Task<std::tuple<std::optional<nlohmann::ordered_json>, Error>> ResolvedProject::getProjectContents() const {
+    Task<std::tuple<std::optional<FileTree>, Error>> ResolvedProject::getProjectContents() const {
         std::unordered_map<std::string, std::string> ids;
         for (const auto contents = co_await projectDb_->getProjectItemPages(); const auto &[id, path]: contents) {
             ids.emplace(path, id);

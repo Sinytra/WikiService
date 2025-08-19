@@ -54,6 +54,30 @@ Error copyProjectFiles(const fs::path &root, const fs::path &docsRoot, const fs:
 }
 
 namespace service {
+    void validatePageFile(const FileTreeEntry &entry, const ResolvedProject &resolved, ProjectIssueCallback &issues) {
+        const auto path = entry.path + DOCS_FILE_EXT;
+        if (const auto title = resolved.getPageTitle(path); !title) {
+            issues.addIssueAsync(ProjectIssueLevel::WARNING, ProjectIssueType::FILE, ProjectError::NO_PAGE_TITLE, "", path);
+        }
+    }
+
+    void validatePagesTree(const FileTree &tree, const ResolvedProject &resolved, ProjectIssueCallback &issues) {
+        for (const auto &entry : tree) {
+            if (entry.type == FileType::FILE) {
+                validatePageFile(entry, resolved, issues);
+            } else if (entry.type == FileType::DIR) {
+                validatePagesTree(entry.children, resolved, issues);
+            }
+        }
+    }
+
+    void validatePages(const ResolvedProject &resolved, ProjectIssueCallback &issues) {
+        const auto [tree, tErr](resolved.getDirectoryTree());
+        validatePagesTree(tree, resolved, issues);
+        const auto [contentTree, cErr](resolved.getContentDirectoryTree());
+        validatePagesTree(contentTree, resolved, issues);
+    }
+
     std::unordered_map<std::string, std::string> readVersionsFromMetadata(const nlohmann::json &metadata,
                                                                           const std::string &defaultBranch) {
         std::unordered_map<std::string, std::string> versions;
@@ -162,10 +186,7 @@ namespace service {
             co_return cloneError.error;
         }
 
-        // 2. Validate metadata
-        // TODO Validate metadata
-
-        // 3. Create default version if not exists
+        // 2. Create default version if not exists
         auto defaultVersion = co_await getDefaultVersion(project);
         if (!defaultVersion) {
             defaultVersion = co_await createDefaultVersion(project);
@@ -177,7 +198,7 @@ namespace service {
             }
         }
 
-        // 4. Assign revision info to deployment
+        // 3. Assign revision info to deployment
         const auto revision = git::getLatestRevision(repo);
         if (!revision) {
             logger->error("Error getting commit information");
@@ -187,9 +208,13 @@ namespace service {
         deployment.setRevision(nlohmann::json(*revision).dump());
         co_await global::database->updateModel(deployment);
 
-        // 5. Ingest game content
+        // 4. Ingest game content
         const auto cloneDocsRoot = clonePath / removeLeadingSlash(project.getValueOfSourcePath());
         ResolvedProject resolved{project, cloneDocsRoot, *defaultVersion};
+
+        // 5. Validate metadata
+        // TODO Validate metadata
+        validatePages(resolved, issues);
 
         // TODO Ingest from other versions?
         // TODO Move transaction scope up

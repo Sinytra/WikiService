@@ -149,15 +149,13 @@ namespace service {
         co_return projectJson;
     }
 
-    int countPagesRecursive(nlohmann::ordered_json json) {
+    int countPagesRecursive(const FileTree &tree) {
         int sum = 0;
 
-        for (auto &item: json) {
-            if (item["type"] == "dir") {
-                if (item.contains("children")) {
-                    sum += countPagesRecursive(item["children"]);
-                }
-            } else if (item["type"] == "file") {
+        for (const auto &entry: tree) {
+            if (entry.type == FileType::DIR) {
+                sum += countPagesRecursive(entry.children);
+            } else if (entry.type == FileType::FILE) {
                 sum++;
             }
         }

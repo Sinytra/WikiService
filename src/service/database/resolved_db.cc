@@ -37,9 +37,12 @@ namespace service {
         const auto [res, err] = co_await handleDatabaseOperation<Error>([&](const DbClientPtr &client) -> Task<Error> {
             CoroMapper<ProjectVersion> mapper(client);
 
-            co_await mapper.deleteBy(Criteria(ProjectVersion::Cols::_project_id, CompareOperator::EQ, projectId_)
-                && Criteria(ProjectVersion::Cols::_name, CompareOperator::IsNotNull)
-                && Criteria(ProjectVersion::Cols::_name, CompareOperator::NotIn, keep));
+            Criteria criteria = Criteria(ProjectVersion::Cols::_project_id, CompareOperator::EQ, projectId_) &&
+                                Criteria(ProjectVersion::Cols::_name, CompareOperator::IsNotNull);
+            if (!keep.empty()) {
+                criteria = criteria && Criteria(ProjectVersion::Cols::_name, CompareOperator::NotIn, keep);
+            }
+            co_await mapper.deleteBy(criteria);
 
             co_return Error::Ok;
         });

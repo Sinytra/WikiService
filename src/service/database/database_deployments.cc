@@ -85,6 +85,7 @@ namespace service {
         co_return res.value_or(false);
     }
 
+    // TODO Delete failing deployments folders
     Task<Error> Database::failLoadingDeployments() const {
         const auto [res, err] = co_await handleDatabaseOperation<Error>([](const DbClientPtr &client) -> Task<Error> {
             CoroMapper<Deployment> mapper(client);

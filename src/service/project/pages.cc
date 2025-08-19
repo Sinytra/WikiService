@@ -89,6 +89,15 @@ std::string formatEditUrl(const Project &project, const std::string &filePath) {
 }
 
 namespace service {
+    ENUM_TO_STR(FileType,
+        {FileType::FILE, "file"},
+        {FileType::DIR, "dir"}
+    )
+
+    void to_json(nlohmann::json &j, const FileType &obj) {
+        j = enumToStr(obj);
+    }
+
     FolderMetadata ResolvedProject::getFolderMetadata(const fs::path &path) const {
         FolderMetadata metadata;
         if (!exists(path)) {
@@ -148,9 +157,8 @@ namespace service {
         return metadata;
     }
 
-    // TODO Abolish JSON, use struct
-    nlohmann::ordered_json ResolvedProject::getDirTreeJson(const fs::path &dir) const {
-        nlohmann::ordered_json root(nlohmann::json::value_t::array);
+    FileTree ResolvedProject::getDirectoryTree(const fs::path &dir) const {
+        FileTree root;
 
         const auto metaFilePath = format_.getFolderMetaFilePath(dir);
         auto [keys, entries] = getFolderMetadata(metaFilePath);
@@ -178,16 +186,14 @@ namespace service {
                 name = getDocsTreeEntryName(fileName);
             }
 
-            nlohmann::ordered_json obj;
-            obj["name"] = name;
-            if (!icon.empty()) {
-                obj["icon"] = icon;
-            }
-            obj["path"] = displayPath;
-            obj["type"] = isDirectory ? "dir" : "file";
+            FileTreeEntry obj;
+            obj.name = name;
+            obj.icon = icon;
+            obj.path = displayPath;
+            obj.type = isDirectory ? FileType::DIR : FileType::FILE;
             if (isDirectory) {
-                nlohmann::ordered_json children = getDirTreeJson(entry.path());
-                obj["children"] = children;
+                FileTree children = getDirectoryTree(entry.path());
+                obj.children = children;
             }
             root.push_back(obj);
         }
@@ -265,17 +271,19 @@ namespace service {
         co_return readPageFile(*contentPath);
     }
 
-    std::tuple<nlohmann::ordered_json, Error> ResolvedProject::getDirectoryTree() const {
-        const auto tree = getDirTreeJson(docsDir_);
+    // TODO Make sure this is ordered
+    std::tuple<FileTree, Error> ResolvedProject::getDirectoryTree() const {
+        const auto tree = getDirectoryTree(docsDir_);
         return {tree, Error::Ok};
     }
 
-    std::tuple<nlohmann::ordered_json, Error> ResolvedProject::getContentDirectoryTree() const {
+    // TODO Make sure this is ordered
+    std::tuple<FileTree, Error> ResolvedProject::getContentDirectoryTree() const {
         const auto contentPath = getFormat().getContentDirectoryPath();
         if (!exists(contentPath)) {
-            return {nlohmann::ordered_json(), Error::ErrNotFound};
+            return {FileTree{}, Error::ErrNotFound};
         }
-        const auto tree = getDirTreeJson(contentPath);
+        const auto tree = getDirectoryTree(contentPath);
         return {tree, Error::Ok};
     }
 }
