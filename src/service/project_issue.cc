@@ -40,7 +40,8 @@ namespace service {
         {ProjectError::INVALID_RESLOC, "invalid_resloc"},
         {ProjectError::INVALID_VERSION_BRANCH, "invalid_version_branch"},
         {ProjectError::MISSING_PLATFORM_PROJECT, "missing_platform_project"},
-        {ProjectError::NO_PAGE_TITLE, "no_page_title"}
+        {ProjectError::NO_PAGE_TITLE, "no_page_title"},
+        {ProjectError::MISSING_REQUIRED_ATTRIBUTE, "missing_required_attribute"}
     )
     // clang-format on
 

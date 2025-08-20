@@ -54,28 +54,37 @@ Error copyProjectFiles(const fs::path &root, const fs::path &docsRoot, const fs:
 }
 
 namespace service {
-    void validatePageFile(const FileTreeEntry &entry, const ResolvedProject &resolved, ProjectIssueCallback &issues) {
+    void validatePageFile(const FileTreeEntry &entry, const ResolvedProject &resolved, ProjectIssueCallback &issues,
+                          const std::vector<std::string> &requiredAttributes) {
         const auto path = entry.path + DOCS_FILE_EXT;
         if (const auto title = resolved.getPageTitle(path); !title) {
             issues.addIssueAsync(ProjectIssueLevel::WARNING, ProjectIssueType::FILE, ProjectError::NO_PAGE_TITLE, "", path);
         }
+
+        for (const auto &attr: requiredAttributes) {
+            if (const auto val = resolved.getPageAttribute(path, attr); !val) {
+                issues.addIssueAsync(ProjectIssueLevel::WARNING, ProjectIssueType::FILE, ProjectError::MISSING_REQUIRED_ATTRIBUTE, attr,
+                                     path);
+            }
+        }
     }
 
-    void validatePagesTree(const FileTree &tree, const ResolvedProject &resolved, ProjectIssueCallback &issues) {
-        for (const auto &entry : tree) {
+    void validatePagesTree(const FileTree &tree, const ResolvedProject &resolved, ProjectIssueCallback &issues,
+                           const std::vector<std::string> &requiredAttributes) {
+        for (const auto &entry: tree) {
             if (entry.type == FileType::FILE) {
-                validatePageFile(entry, resolved, issues);
+                validatePageFile(entry, resolved, issues, requiredAttributes);
             } else if (entry.type == FileType::DIR) {
-                validatePagesTree(entry.children, resolved, issues);
+                validatePagesTree(entry.children, resolved, issues, requiredAttributes);
             }
         }
     }
 
     void validatePages(const ResolvedProject &resolved, ProjectIssueCallback &issues) {
         const auto [tree, tErr](resolved.getDirectoryTree());
-        validatePagesTree(tree, resolved, issues);
+        validatePagesTree(tree, resolved, issues, {});
         const auto [contentTree, cErr](resolved.getContentDirectoryTree());
-        validatePagesTree(contentTree, resolved, issues);
+        validatePagesTree(contentTree, resolved, issues, {"id"});
     }
 
     std::unordered_map<std::string, std::string> readVersionsFromMetadata(const nlohmann::json &metadata,
