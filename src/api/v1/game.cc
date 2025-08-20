@@ -25,7 +25,7 @@ namespace api::v1 {
             throw ApiException(contentsErr, "Contents directory not found");
         }
 
-        callback(HttpResponse::newHttpJsonResponse(unparkourJson(*contents)));
+        callback(jsonResponse(*contents));
     }
 
     Task<> GameController::contentItem(const HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback,

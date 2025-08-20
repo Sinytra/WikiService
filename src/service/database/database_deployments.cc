@@ -75,18 +75,17 @@ namespace service {
     }
 
     Task<bool> Database::hasFailingDeployment(const std::string projectId) const {
-        // language=postgresql
-        static constexpr auto query = "SELECT * FROM deployment \
-                                       WHERE project_id = $1 AND status = 'error' \
-                                       AND created_at > (SELECT created_at FROM deployment WHERE project_id = $1 AND active)";
-
         const auto [res, err] = co_await handleDatabaseOperation<bool>([projectId](const DbClientPtr &client) -> Task<bool> {
-            const auto rows = co_await client->execSqlCoro(query, projectId);
-            co_return rows.size() > 0;
+            CoroMapper<Deployment> mapper(client);
+            mapper.orderBy(Deployment::Cols::_created_at, SortOrder::DESC);
+            mapper.limit(1);
+            const auto results = co_await mapper.findBy(Criteria(Deployment::Cols::_project_id, CompareOperator::EQ, projectId));
+            co_return !results.empty() && results.front().getValueOfStatus() == enumToStr(DeploymentStatus::ERROR);
         });
         co_return res.value_or(false);
     }
 
+    // TODO Delete failing deployments folders
     Task<Error> Database::failLoadingDeployments() const {
         const auto [res, err] = co_await handleDatabaseOperation<Error>([](const DbClientPtr &client) -> Task<Error> {
             CoroMapper<Deployment> mapper(client);
@@ -102,8 +101,11 @@ namespace service {
     Task<std::vector<std::string>> Database::getUndeployedProjects() const {
         // language=postgresql
         static constexpr auto query = "SELECT project.id FROM project \
-                                       LEFT JOIN deployment d ON d.project_id = project.id \
-                                       WHERE d.id IS NULL";
+                                       WHERE NOT exists( \
+                                           SELECT * FROM deployment \
+                                           WHERE project_id = project.id \
+                                               AND active = TRUE \
+                                       )";
 
         const auto [res, err] = co_await handleDatabaseOperation<std::vector<std::string>>([](const DbClientPtr &client) -> Task<std::vector<std::string>> {
             std::vector<std::string> ids;

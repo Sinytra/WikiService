@@ -92,14 +92,14 @@ namespace service {
         }
 
         template<typename T>
-        drogon::Task<std::optional<T>> updateModel(const T deployment) const {
+        drogon::Task<std::optional<T>> updateModel(const T entity) const {
             const auto [res, err] =
-                co_await handleDatabaseOperation<T>([&deployment](const drogon::orm::DbClientPtr &client) -> drogon::Task<T> {
+                co_await handleDatabaseOperation<T>([&entity](const drogon::orm::DbClientPtr &client) -> drogon::Task<T> {
                     drogon::orm::CoroMapper<T> mapper(client);
-                    if (const auto rows = co_await mapper.update(deployment); rows < 1) {
+                    if (const auto rows = co_await mapper.update(entity); rows < 1) {
                         throw drogon::orm::DrogonDbException();
                     }
-                    co_return deployment;
+                    co_return entity;
                 });
             co_return res;
         }

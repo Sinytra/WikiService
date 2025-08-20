@@ -45,7 +45,7 @@
   },
   "allOf": [
     {
-      "required": ["id", "modid"]
+      "required": ["id"]
     },
     {
       "oneOf": [

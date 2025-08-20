@@ -54,6 +54,39 @@ Error copyProjectFiles(const fs::path &root, const fs::path &docsRoot, const fs:
 }
 
 namespace service {
+    void validatePageFile(const FileTreeEntry &entry, const ResolvedProject &resolved, ProjectIssueCallback &issues,
+                          const std::vector<std::string> &requiredAttributes) {
+        const auto path = entry.path + DOCS_FILE_EXT;
+        if (const auto title = resolved.getPageTitle(path); !title) {
+            issues.addIssueAsync(ProjectIssueLevel::WARNING, ProjectIssueType::FILE, ProjectError::NO_PAGE_TITLE, "", path);
+        }
+
+        for (const auto &attr: requiredAttributes) {
+            if (const auto val = resolved.getPageAttribute(path, attr); !val) {
+                issues.addIssueAsync(ProjectIssueLevel::WARNING, ProjectIssueType::FILE, ProjectError::MISSING_REQUIRED_ATTRIBUTE, attr,
+                                     path);
+            }
+        }
+    }
+
+    void validatePagesTree(const FileTree &tree, const ResolvedProject &resolved, ProjectIssueCallback &issues,
+                           const std::vector<std::string> &requiredAttributes) {
+        for (const auto &entry: tree) {
+            if (entry.type == FileType::FILE) {
+                validatePageFile(entry, resolved, issues, requiredAttributes);
+            } else if (entry.type == FileType::DIR) {
+                validatePagesTree(entry.children, resolved, issues, requiredAttributes);
+            }
+        }
+    }
+
+    void validatePages(const ResolvedProject &resolved, ProjectIssueCallback &issues) {
+        const auto [tree, tErr](resolved.getDirectoryTree());
+        validatePagesTree(tree, resolved, issues, {});
+        const auto [contentTree, cErr](resolved.getContentDirectoryTree());
+        validatePagesTree(contentTree, resolved, issues, {"id"});
+    }
+
     std::unordered_map<std::string, std::string> readVersionsFromMetadata(const nlohmann::json &metadata,
                                                                           const std::string &defaultBranch) {
         std::unordered_map<std::string, std::string> versions;
@@ -71,30 +104,49 @@ namespace service {
 
     Task<std::vector<ProjectVersion>> setupProjectVersions(const ResolvedProject &resolved,
                                                            const std::unordered_map<std::string, std::string> &branches,
-                                                           const std::shared_ptr<spdlog::logger> logger) {
+                                                           const std::shared_ptr<spdlog::logger> logger, ProjectIssueCallback &issues) {
+        const auto path = resolved.getFormat().getWikiMetadataPath();
+        const ProjectFileIssueCallback fileIssues(issues, path);
+
         const auto projectId = resolved.getProject().getValueOfId();
         const auto [json, err, det] = resolved.validateProjectMetadata();
         if (!json) {
             co_return std::vector<ProjectVersion>{};
         }
+
+        std::unordered_map<std::string, ProjectVersion> existingVersions;
+        for (const auto existing = co_await resolved.getProjectDatabase().getVersions(); auto &version: existing) {
+            existingVersions.try_emplace(version.getValueOfName(), version);
+        }
+
         const auto defaultBranch = resolved.getProject().getValueOfSourceBranch();
-        const auto versions(readVersionsFromMetadata(*json, defaultBranch));
+        const auto newVersions = readVersionsFromMetadata(*json, defaultBranch);
 
         std::vector<ProjectVersion> resolvedVersions;
-        for (auto &[key, val]: versions) {
+        for (auto &[key, val]: newVersions) {
             if (!branches.contains(val)) {
                 logger->warn("Ignoring version '{}' with unknown branch '{}'", key, val);
+                co_await fileIssues.addIssue(ProjectIssueLevel::WARNING, ProjectIssueType::META, ProjectError::INVALID_VERSION_BRANCH, val);
                 continue;
             }
 
-            ProjectVersion version;
-            version.setProjectId(projectId);
-            version.setName(key);
-            version.setBranch(val);
-            if (const auto [result, err] = co_await global::database->createProjectVersion(version); result) {
-                resolvedVersions.push_back(version);
+            if (existingVersions.contains(key)) {
+                ProjectVersion version = existingVersions[key];
+                version.setBranch(val);
+                if (const auto result = co_await global::database->updateModel(version)) {
+                    resolvedVersions.push_back(*result);
+                }
+            } else {
+                ProjectVersion version;
+                version.setProjectId(projectId);
+                version.setName(key);
+                version.setBranch(val);
+                if (const auto [result, err] = co_await global::database->createProjectVersion(version); result) {
+                    resolvedVersions.push_back(*result);
+                }
             }
         }
+
         co_return resolvedVersions;
     }
 
@@ -127,7 +179,7 @@ namespace service {
     }
 
     Task<ProjectError> Storage::deployProject(const Project &project, Deployment &deployment, const fs::path clonePath) const {
-        const auto logger = getProjectLogger(project);
+        const auto logger = getDeploymentLogger(deployment);
         logger->info("Setting up project");
 
         deployment.setStatus(enumToStr(DeploymentStatus::LOADING));
@@ -135,6 +187,7 @@ namespace service {
 
         ProjectIssueCallback issues{deployment.getValueOfId(), logger};
 
+        // 1. Clone repository
         const auto [repo, cloneError] =
             co_await git::cloneRepository(project.getValueOfSourceRepo(), clonePath, project.getValueOfSourceBranch(), logger);
         if (!repo || cloneError.error != ProjectError::OK) {
@@ -142,8 +195,7 @@ namespace service {
             co_return cloneError.error;
         }
 
-        // TODO Validate metadata
-
+        // 2. Create default version if not exists
         auto defaultVersion = co_await getDefaultVersion(project);
         if (!defaultVersion) {
             defaultVersion = co_await createDefaultVersion(project);
@@ -155,20 +207,26 @@ namespace service {
             }
         }
 
+        // 3. Assign revision info to deployment
         const auto revision = git::getLatestRevision(repo);
         if (!revision) {
             logger->error("Error getting commit information");
             co_await issues.addIssue(ProjectIssueLevel::ERROR, ProjectIssueType::GIT_INFO, ProjectError::UNKNOWN);
             co_return ProjectError::UNKNOWN;
         }
-
         deployment.setRevision(nlohmann::json(*revision).dump());
         co_await global::database->updateModel(deployment);
 
+        // 4. Ingest game content
         const auto cloneDocsRoot = clonePath / removeLeadingSlash(project.getValueOfSourcePath());
         ResolvedProject resolved{project, cloneDocsRoot, *defaultVersion};
 
+        // 5. Validate metadata
+        // TODO Validate metadata
+        validatePages(resolved, issues);
+
         // TODO Ingest from other versions?
+        // TODO Move transaction scope up
         content::Ingestor ingestor{resolved, logger, issues};
         if (const auto result = co_await ingestor.runIngestor(); result != Error::Ok) {
             logger->error("Error ingesting project data");
@@ -180,17 +238,15 @@ namespace service {
             co_return ProjectError::UNKNOWN;
         }
 
+        // 6. Setup versions
         const auto branches = git::listBranches(repo);
-        auto versions = co_await resolved.getProjectDatabase().getVersions();
-        if (versions.empty()) {
-            versions = co_await setupProjectVersions(resolved, branches, logger);
-        }
+        const auto versions = co_await setupProjectVersions(resolved, branches, logger, issues);
 
-        // TODO Remove first
-
-        const auto dest = getProjectDirPath(project);
+        // 7. Copy default version
+        const auto dest = getDeploymentVersionedDir(deployment);
         copyProjectFiles(clonePath, cloneDocsRoot, dest, logger);
 
+        // 8. Copy other versions
         for (const auto &version: versions) {
             const auto name = version.getValueOfName();
             const auto branch = version.getValueOfBranch();
@@ -201,15 +257,25 @@ namespace service {
                 continue;
             }
 
-            const auto versionDest = getProjectDirPath(project, name);
+            const auto versionDest = getDeploymentVersionedDir(deployment, name);
             copyProjectFiles(clonePath, cloneDocsRoot, versionDest, logger);
         }
 
         git_repository_free(repo);
 
+        // 9. Set active
         if (const auto err = co_await setActiveDeployment(project.getValueOfId(), deployment); err != Error::Ok) {
             logger->error("Error setting active deployment");
             co_return ProjectError::UNKNOWN;
+        }
+
+        // 10. Free redundant versions
+        std::vector<std::string> versionNames;
+        for (auto &version: versions) {
+            versionNames.push_back(version.getValueOfName());
+        }
+        if (const auto err = co_await resolved.getProjectDatabase().deleteUnusedVersions(versionNames); err != Error::Ok) {
+            logger->warn("Error deleting old versions");
         }
 
         co_return ProjectError::OK;
@@ -222,6 +288,8 @@ namespace service {
         if (const auto pending = co_await getOrStartTask<std::tuple<std::optional<Deployment>, ProjectError>>(taskKey)) {
             co_return co_await patientlyAwaitTaskResult(*pending);
         }
+
+        const auto activeDeployment(co_await global::database->getActiveDeployment(project.getValueOfId()));
 
         const auto projectId = project.getValueOfId();
         Deployment tmpDep;
@@ -239,13 +307,14 @@ namespace service {
         }
         auto deployment = *dbResult;
 
-        // Clean logs
-        fs::remove(getProjectLogPath(project));
+        const auto deploymentDir = getDeploymentRootDir(deployment);
+        remove_all(deploymentDir);
+        fs::create_directories(deploymentDir);
 
-        const auto clonePath = getBaseDir().path() / TEMP_DIR / projectId;
+        const auto clonePath = getBaseDir().path() / TEMP_DIR / (projectId + "-" + deployment.getValueOfId().substr(0, 9));
         remove_all(clonePath);
 
-        const auto projectLogger = getProjectLogger(project);
+        const auto deployLog = getDeploymentLogger(deployment);
         ProjectError result;
         try {
             result = co_await deployProject(project, deployment, clonePath);
@@ -255,21 +324,35 @@ namespace service {
         }
 
         if (result == ProjectError::OK) {
-            projectLogger->info("====================================");
-            projectLogger->info("==   Project deployment complete  ==");
-            projectLogger->info("====================================");
+            deployLog->info("====================================");
+            deployLog->info("==   Project deployment complete  ==");
+            deployLog->info("====================================");
 
             global::connections->complete(projectId, true);
 
             deployment.setStatus(enumToStr(DeploymentStatus::SUCCESS));
+
+            // Cleanup previous data
+            try {
+                if (activeDeployment) {
+                    const auto oldPath = getDeploymentRootDir(*activeDeployment);
+                    deployLog->info("Cleaning up previous deployment");
+                    remove_all(oldPath);
+                }
+            } catch (std::exception e) {
+                const auto id = activeDeployment ? activeDeployment->getValueOfId() : "";
+                logger.error("Failed to cleanup previous deployment '{}': {}", id, e.what());
+            }
         } else {
-            projectLogger->error("!!================================!!");
-            projectLogger->error("!!   Project deployment failed    !!");
-            projectLogger->error("!!================================!!");
+            deployLog->error("!!================================!!");
+            deployLog->error("!!   Project deployment failed    !!");
+            deployLog->error("!!================================!!");
 
             global::connections->complete(projectId, false);
 
             deployment.setStatus(enumToStr(DeploymentStatus::ERROR));
+
+            remove_all(deploymentDir);
         }
 
         remove_all(clonePath);

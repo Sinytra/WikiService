@@ -14,6 +14,36 @@
 using namespace drogon_model::postgres;
 
 namespace service {
+    enum class FileType {
+        DIR,
+        FILE
+    };
+    std::string enumToStr(FileType type);
+
+    void to_json(nlohmann::json &j, const FileType &obj);
+
+    struct FileTreeEntry {
+        std::string id;
+        std::string name;
+        std::string icon;
+        std::string path;
+        FileType type;
+        std::vector<FileTreeEntry> children;
+
+        friend void to_json(nlohmann::json &j, const FileTreeEntry &obj) {
+            j = {
+                {"id", obj.id.empty() ? nlohmann::json(nullptr) : nlohmann::json(obj.id)},
+                {"name", obj.name},
+                {"icon", obj.icon.empty() ? nlohmann::json(nullptr) : nlohmann::json(obj.icon)},
+                {"path", obj.path},
+                {"type", obj.type},
+                {"children", obj.children}
+            };
+        }
+    };
+
+    typedef std::vector<FileTreeEntry> FileTree;
+
     struct FolderMetadataEntry {
         std::string name;
         std::string icon;
@@ -96,14 +126,15 @@ namespace service {
 
         std::optional<std::string> getPagePath(const std::string &path) const; // For project issues
         std::optional<std::string> getPageAttribute(const std::string &path, const std::string &prop) const;
+        std::optional<std::string> getPageTitle(const std::string &path) const;
         std::tuple<ProjectPage, Error> readPageFile(std::string path) const;
         drogon::Task<std::tuple<ProjectPage, Error>> readContentPage(std::string id) const;
         drogon::Task<nlohmann::json> readItemProperties(std::string id) const;
-        std::optional<std::string> readLangKey(const std::string &key) const;
+        std::optional<std::string> readLangKey(const std::string &namespace_, const std::string &key) const;
 
-        std::tuple<nlohmann::ordered_json, Error> getDirectoryTree() const;
-        std::tuple<nlohmann::ordered_json, Error> getContentDirectoryTree() const;
-        drogon::Task<std::tuple<std::optional<nlohmann::ordered_json>, Error>> getProjectContents() const;
+        std::tuple<FileTree, Error> getDirectoryTree() const;
+        std::tuple<FileTree, Error> getContentDirectoryTree() const;
+        drogon::Task<std::tuple<std::optional<FileTree>, Error>> getProjectContents() const;
 
         std::optional<std::filesystem::path> getAsset(const ResourceLocation &location) const;
         std::optional<content::GameRecipeType> getRecipeType(const ResourceLocation &location) const;
@@ -136,8 +167,7 @@ namespace service {
 
     private:
         FolderMetadata getFolderMetadata(const std::filesystem::path &path) const;
-        nlohmann::ordered_json getDirTreeJson(const std::filesystem::path &dir) const;
-        std::optional<std::string> getPageTitle(const std::string &path) const;
+        FileTree getDirectoryTree(const std::filesystem::path &dir) const;
 
         Project project_;
         std::shared_ptr<ResolvedProject> defaultVersion_;

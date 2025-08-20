@@ -43,7 +43,7 @@ const std::vector<typename Project::MetaData> Project::metaData_={
 {"search_vector","std::string","tsvector",0,0,0,0},
 {"created_at","::trantor::Date","timestamp without time zone",0,0,0,1},
 {"is_public","bool","boolean",1,0,0,1},
-{"modid","std::string","character varying",255,0,0,1}
+{"modid","std::string","character varying",255,0,0,0}
 };
 const std::string &Project::getColumnName(size_t index) noexcept(false)
 {
@@ -951,6 +951,11 @@ void Project::setModid(std::string &&pModid) noexcept
     modid_ = std::make_shared<std::string>(std::move(pModid));
     dirtyFlag_[11] = true;
 }
+void Project::setModidToNull() noexcept
+{
+    modid_.reset();
+    dirtyFlag_[11] = true;
+}
 
 void Project::updateId(const uint64_t id)
 {
@@ -1739,11 +1744,6 @@ bool Project::validateJsonForCreation(const Json::Value &pJson, std::string &err
         if(!validJsonOfField(11, "modid", pJson["modid"], err, true))
             return false;
     }
-    else
-    {
-        err="The modid column cannot be null";
-        return false;
-    }
     return true;
 }
 bool Project::validateMasqueradedJsonForCreation(const Json::Value &pJson,
@@ -1886,11 +1886,6 @@ bool Project::validateMasqueradedJsonForCreation(const Json::Value &pJson,
               if(!validJsonOfField(11, pMasqueradingVector[11], pJson[pMasqueradingVector[11]], err, true))
                   return false;
           }
-        else
-        {
-            err="The " + pMasqueradingVector[11] + " column cannot be null";
-            return false;
-        }
       }
     }
     catch(const Json::LogicError &e)
@@ -2210,8 +2205,7 @@ bool Project::validJsonOfField(size_t index,
         case 11:
             if(pJson.isNull())
             {
-                err="The " + fieldName + " column cannot be null";
-                return false;
+                return true;
             }
             if(!pJson.isString())
             {

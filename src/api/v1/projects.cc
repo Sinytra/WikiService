@@ -173,9 +173,11 @@ namespace api::v1 {
             throw ApiException(Error::ErrBadRequest, "illegal_id");
         }
 
-        const std::string modid = (*resolved)["modid"];
-        if (modid == ResourceLocation::DEFAULT_NAMESPACE || modid == ResourceLocation::COMMON_NAMESPACE) {
-            throw ApiException(Error::ErrBadRequest, "illegal_modid");
+        const std::string modid = resolved->contains("modid") ? (*resolved)["modid"] : "";
+        if (!modid.empty()) {
+            if (modid == ResourceLocation::DEFAULT_NAMESPACE || modid == ResourceLocation::COMMON_NAMESPACE) {
+                throw ApiException(Error::ErrBadRequest, "illegal_modid");
+            }
         }
 
         const auto platforms = processPlatforms(*resolved);
@@ -202,7 +204,9 @@ namespace api::v1 {
         project.setType(projectTypeToString(preferredProj.type));
         project.setPlatforms(platforms.dump());
         project.setIsPublic(isPublic);
-        project.setModid(modid);
+        if (!modid.empty()) {
+            project.setModid(modid);
+        }
 
         co_return ValidatedProjectData{.project = project, .platforms = platforms};
     }
@@ -258,20 +262,6 @@ namespace api::v1 {
         }
         root["status"] = enumToStr(co_await global::storage->getProjectStatus(project));
         root["has_active_deployment"] = (co_await global::database->getActiveDeployment(id)).has_value();
-
-        callback(HttpResponse::newHttpJsonResponse(root));
-    }
-
-    Task<> ProjectsController::getProjectLog(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
-                                             const std::string id) const {
-        const auto project{co_await BaseProjectController::getUserProject(req, id)};
-        const auto log{global::storage->getProjectLog(project)};
-        if (!log) {
-            throw ApiException(Error::ErrNotFound, "not_found");
-        }
-
-        Json::Value root;
-        root["content"] = *log;
 
         callback(HttpResponse::newHttpJsonResponse(root));
     }
@@ -368,7 +358,7 @@ namespace api::v1 {
             throw ApiException(Error::ErrInternal, "internal");
         }
 
-        co_await global::storage->invalidateProject(project);
+        global::storage->invalidateProject(project);
         co_await global::database->refreshFlatTagItemView();
 
         callback(simpleResponse("Project deleted successfully"));
@@ -517,7 +507,7 @@ namespace api::v1 {
 
         if (deployment->getValueOfActive()) {
             logger.debug("Invalidating project after active deployment was removed");
-            co_await global::storage->invalidateProject(project);
+            global::storage->removeDeployment(*deployment);
         }
 
         callback(simpleResponse("Deployment deleted successfully"));

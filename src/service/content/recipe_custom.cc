@@ -56,7 +56,7 @@ namespace content {
         if (auto result = project.getRecipeType(type)) {
             result->id = type;
             const auto langKey = std::format("recipe_type.{}.{}", type.namespace_, type.path_);
-            if (const auto localName = project.readLangKey(langKey)) {
+            if (const auto localName = project.readLangKey(type.namespace_, langKey)) {
                 result->localizedName = *localName;
             }
             return result;

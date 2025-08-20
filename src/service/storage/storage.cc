@@ -7,6 +7,7 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 
 #define LATEST_VERSION "latest"
+#define LOG_FILE "project.log"
 
 using namespace logging;
 using namespace drogon;
@@ -49,20 +50,19 @@ namespace service {
         return baseDir;
     }
 
-    std::filesystem::path Storage::getProjectLogPath(const Project &project) const {
-        return getBaseDir().path() / project.getValueOfId() / "project.log";
+    fs::path Storage::getDeploymentRootDir(const Deployment &deployment) const {
+        const auto baseDir = getBaseDir();
+        return baseDir.path() / deployment.getValueOfProjectId() / deployment.getValueOfId();
     }
 
-    fs::path Storage::getProjectDirPath(const Project &project, const std::string &version) const {
-        const fs::directory_entry baseDir = getBaseDir();
-        const auto targetPath = baseDir.path() / project.getValueOfId() / (version.empty() ? LATEST_VERSION : version);
-        return targetPath;
+    fs::path Storage::getDeploymentVersionedDir(const Deployment &deployment, const std::string &version) const {
+        const auto rootDir = getDeploymentRootDir(deployment);
+        return rootDir / (version.empty() ? LATEST_VERSION : version);
     }
 
-    std::shared_ptr<spdlog::logger> Storage::getProjectLogger(const Project &project, const bool file) const {
+    std::shared_ptr<spdlog::logger> Storage::getProjectLoggerImpl(const std::string &id, const std::optional<fs::path> &file) const {
         static std::shared_mutex loggersMapLock;
 
-        const auto id = project.getValueOfId();
         {
             std::shared_lock<std::shared_mutex> readLock;
             // Get existing logger
@@ -88,9 +88,7 @@ namespace service {
         sinks.push_back(consoleSink);
 
         if (file) {
-            const auto filePath = getProjectLogPath(project);
-
-            const auto fileSink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(absolute(filePath).string());
+            const auto fileSink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(absolute(*file).string());
             fileSink->set_pattern("[%^%L%$] [%Y-%m-%d %T] [%n] %v");
             sinks.push_back(fileSink);
         }
@@ -101,12 +99,29 @@ namespace service {
         return projectLog;
     }
 
+    std::shared_ptr<spdlog::logger> Storage::getProjectLogger(const Project &project, const bool file) const {
+        const auto id = project.getValueOfId();
+        const auto path = file ? std::make_optional(getBaseDir().path() / project.getValueOfId() / LOG_FILE) : std::nullopt;
+        return getProjectLoggerImpl(id, path);
+    }
+
+    std::shared_ptr<spdlog::logger> Storage::getDeploymentLogger(const Deployment &deployment) const {
+        const auto id = deployment.getValueOfProjectId() + "-" + deployment.getValueOfId().substr(0, 9);
+        const auto path = getBaseDir().path() / deployment.getValueOfProjectId() / deployment.getValueOfId() / LOG_FILE;
+        return getProjectLoggerImpl(id, path);
+    }
+
     Task<std::tuple<std::optional<ResolvedProject>, Error>> Storage::findProject(const Project &project,
                                                                                  const std::optional<std::string> &version,
                                                                                  const std::optional<std::string> &locale) const {
         const auto branch = project.getValueOfSourceBranch();
-        const auto rootDir = getProjectDirPath(project, version.value_or(""));
 
+        const auto activeDeployment(co_await global::database->getActiveDeployment(project.getValueOfId()));
+        if (!activeDeployment) {
+            co_return {std::nullopt, Error::ErrNotFound};
+        }
+
+        const auto rootDir = getDeploymentVersionedDir(*activeDeployment, version.value_or(""));
         if (!exists(rootDir)) {
             co_return {std::nullopt, Error::ErrNotFound};
         }
@@ -122,7 +137,6 @@ namespace service {
             co_return {resolved, Error::Ok};
         }
 
-        // TODO Check for deployment instead
         const auto defaultVersion = co_await getDefaultVersion(project);
         if (!defaultVersion) {
             co_return {std::nullopt, Error::ErrNotFound};
@@ -166,13 +180,22 @@ namespace service {
         co_return resolved;
     }
 
-    Task<Error> Storage::invalidateProject(const Project &project) const {
+    Error Storage::removeDeployment(const Deployment &deployment) const {
+        logger.debug("Deleting deployment dir '{}'", deployment.getValueOfId());
+
+        const auto path = getDeploymentRootDir(deployment);
+        remove_all(path);
+
+        return Error::Ok;
+    }
+
+    Error Storage::invalidateProject(const Project &project) const {
         logger.debug("Invalidating project '{}'", project.getValueOfId());
 
         const auto basePath = getBaseDir().path() / project.getValueOfId();
         remove_all(basePath);
 
-        co_return Error::Ok;
+        return Error::Ok;
     }
 
     Task<ProjectStatus> Storage::getProjectStatus(const Project &project) const {
@@ -181,9 +204,6 @@ namespace service {
         }
 
         if (const auto resolved = co_await maybeGetProject(project); !resolved) {
-            if (const auto filePath = getProjectLogPath(project); exists(filePath)) {
-                co_return ProjectStatus::ERROR;
-            }
             co_return ProjectStatus::UNKNOWN;
         }
 
@@ -198,23 +218,6 @@ namespace service {
         }
 
         co_return ProjectStatus::HEALTHY;
-    }
-
-    std::optional<std::string> Storage::getProjectLog(const Project &project) const {
-        const auto filePath = getProjectLogPath(project);
-
-        std::ifstream file(filePath);
-
-        if (!file) {
-            return std::nullopt;
-        }
-
-        std::stringstream buffer;
-        buffer << file.rdbuf();
-
-        file.close();
-
-        return buffer.str();
     }
 
     Task<std::tuple<std::optional<Deployment>, Error>> Storage::deployProject(const Project &project, const std::string userId) {

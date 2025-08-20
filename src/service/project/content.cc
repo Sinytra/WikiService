@@ -9,32 +9,26 @@ using namespace drogon;
 using namespace drogon_model::postgres;
 namespace fs = std::filesystem;
 
-Task<> addPageIDs(const std::unordered_map<std::string, std::string> &ids, nlohmann::ordered_json &json) {
-    if (!json.is_array()) {
-        co_return;
-    }
-    for (auto it = json.begin(); it != json.end();) {
-        if (auto &item = *it; item.is_object()) {
-            if (item["type"].get<std::string>() == "dir") {
-                if (item.contains("children")) {
-                    co_await addPageIDs(ids, item["children"]);
-                }
-            } else if (item["type"].get<std::string>() == "file") {
-                const auto path = item["path"].get<std::string>();
-                if (const auto id = ids.find(path + DOCS_FILE_EXT); id != ids.end()) {
-                    item["id"] = id->second;
+namespace service {
+    Task<> addPageIDs(const std::unordered_map<std::string, std::string> &ids, FileTree &tree) {
+        for (auto it = tree.begin(); it != tree.end();) {
+            auto entry = it;
+
+            if (entry->type == FileType::DIR) {
+                co_await addPageIDs(ids, entry->children);
+            } else if (entry->type == FileType::FILE) {
+                if (const auto id = ids.find(entry->path + DOCS_FILE_EXT); id != ids.end()) {
+                    entry->id = id->second;
                 } else {
-                    it = json.erase(it);
+                    it = tree.erase(it);
                     continue;
                 }
             }
+            ++it;
         }
-        ++it;
     }
-}
 
-namespace service {
-    Task<std::tuple<std::optional<nlohmann::ordered_json>, Error>> ResolvedProject::getProjectContents() const {
+    Task<std::tuple<std::optional<FileTree>, Error>> ResolvedProject::getProjectContents() const {
         std::unordered_map<std::string, std::string> ids;
         for (const auto contents = co_await projectDb_->getProjectItemPages(); const auto &[id, path]: contents) {
             ids.emplace(path, id);
@@ -55,8 +49,8 @@ namespace service {
         co_return content::parseItemProperties(filePath, id);
     }
 
-    std::optional<std::string> ResolvedProject::readLangKey(const std::string &key) const {
-        const auto path = format_.getLanguageFilePath(project_.getValueOfModid());
+    std::optional<std::string> ResolvedProject::readLangKey(const std::string &namespace_, const std::string &key) const {
+        const auto path = format_.getLanguageFilePath(namespace_);
         const auto json = parseJsonFile(path);
         if (!json || !json->is_object() || !json->contains(key)) {
             return std::nullopt;
@@ -70,9 +64,9 @@ namespace service {
         const auto projectId = project_.getValueOfId();
         const auto parsed = ResourceLocation::parse(loc);
 
-        auto localized = readLangKey("item." + projectId + "." + parsed->path_);
+        auto localized = readLangKey(parsed->namespace_, "item." + parsed->namespace_ + "." + parsed->path_);
         if (!localized) {
-            localized = readLangKey("block." + projectId + "." + parsed->path_);
+            localized = readLangKey(parsed->namespace_, "block." + parsed->namespace_ + "." + parsed->path_);
         }
 
         const auto path = co_await projectDb_->getProjectContentPath(loc);
