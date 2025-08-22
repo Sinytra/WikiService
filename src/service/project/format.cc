@@ -9,6 +9,7 @@
 #define CONTENT_DIR_PATH ".content"
 #define FOLDER_META_FILE "_meta.json"
 #define PROPERTIES_PATH ".data/properties.json"
+#define WORKBENCHES_PATH ".data/workbenches.json"
 #define WIKI_META_FILE "sinytra-wiki.json"
 
 namespace fs = std::filesystem;
@@ -65,6 +66,10 @@ namespace service {
 
     fs::path ProjectFormat::getItemPropertiesPath() const {
         return getLocalizedFilePath(PROPERTIES_PATH);
+    }
+
+    fs::path ProjectFormat::getWorkbenchesPath() const {
+        return root_ / WORKBENCHES_PATH;
     }
 
     fs::path ProjectFormat::getAssetPath(const ResourceLocation &location) const {

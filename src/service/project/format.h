@@ -22,6 +22,7 @@ namespace service {
         std::filesystem::path getLocalizedFilePath(const std::string &path) const;
         std::filesystem::path getFolderMetaFilePath(const std::filesystem::path &dir) const;
         std::filesystem::path getItemPropertiesPath() const;
+        std::filesystem::path getWorkbenchesPath() const;
         std::filesystem::path getAssetPath(const ResourceLocation &location) const;
         std::filesystem::path getLanguageFilePath(const std::string &namespace_) const;
     private:

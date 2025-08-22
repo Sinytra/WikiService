@@ -14,7 +14,7 @@ namespace content {
 
     Task<PreparationResult> MetadataSubIngestor::prepare() {
         const auto docsRoot = project_.getRootDirectory();
-        const auto workbenchesFile = docsRoot / ".data" / "workbenches.json";
+        const auto workbenchesFile = project_.getFormat().getWorkbenchesPath();
 
         if (exists(workbenchesFile)) {
             const ProjectFileIssueCallback fileIssues{issues_, workbenchesFile};

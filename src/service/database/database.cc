@@ -360,10 +360,21 @@ namespace service {
                                        JOIN project_version ver ON pitem.version_id = ver.id \
                                        JOIN item ON pitem.item_id = item.id \
                                        LEFT JOIN project_item_page pip ON pitem.id = pip.item_id \
-                                       WHERE NOT ri.input AND EXISTS ( \
-                                           SELECT 1 FROM recipe_ingredient_item ri_sub \
-                                           JOIN item i ON ri_sub.item_id = i.id \
-                                           WHERE ri_sub.recipe_id = r.id AND i.loc = $1 AND ri_sub.input)";
+                                       WHERE NOT ri.input AND ( \
+                                           EXISTS ( \
+                                               SELECT 1 FROM recipe_ingredient_item ri_sub \
+                                               JOIN item i ON ri_sub.item_id = i.id \
+                                               WHERE ri_sub.recipe_id = r.id AND i.loc = $1 AND ri_sub.input \
+                                           ) \
+                                           OR EXISTS( \
+                                               SELECT 1 FROM recipe_ingredient_tag rt_sub \
+                                               JOIN project_tag pt ON pt.tag_id = rt_sub.tag_id \
+                                               JOIN tag_item_flat flat ON flat.parent = pt.id \
+                                               JOIN project_item pit on pit.id = flat.child \
+                                               JOIN item i ON pit.item_id = i.id \
+                                               WHERE rt_sub.recipe_id = r.id AND i.loc = $1 AND rt_sub.input \
+                                           ) \
+                                       )";
 
         const auto [res, err] = co_await handleDatabaseOperation<std::vector<ContentUsage>>(
             [item](const DbClientPtr &client) -> Task<std::vector<ContentUsage>> {
