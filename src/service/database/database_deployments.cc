@@ -25,7 +25,7 @@ namespace service {
                 data.user_id = row.at("user_id").as<std::string>();
                 const auto createdAt = row.at("created_at").as<std::string>();
                 data.created_at = trantor::Date::fromDbString(createdAt).toCustomFormattedString("%Y-%m-%dT%H:%M:%SZ");
-                data.current = row.at("active").as<bool>();
+                data.active = row.at("active").as<bool>();
                 return data;
             },
             projectId);

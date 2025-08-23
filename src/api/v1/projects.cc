@@ -510,7 +510,7 @@ namespace api::v1 {
             global::storage->removeDeployment(*deployment);
         }
 
-        callback(simpleResponse("Deployment deleted successfully"));
+        callback(jsonResponse(parkourJson(deployment->toJson())));
     }
 
     Task<> ProjectsController::getIssues(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,

@@ -50,7 +50,7 @@ namespace service {
         std::string status;
         std::string user_id;
         std::string created_at;
-        bool current;
+        bool active;
 
         friend void to_json(nlohmann::json &j, const DeploymentData &d) {
             j = nlohmann::json{{"id", d.id},
@@ -60,7 +60,7 @@ namespace service {
                                {"status", d.status},
                                {"user_id", d.user_id.empty() ? nlohmann::json(nullptr) : nlohmann::json(d.user_id)},
                                {"created_at", d.created_at},
-                               {"current", d.current}};
+                               {"active", d.active}};
         }
     };
 
