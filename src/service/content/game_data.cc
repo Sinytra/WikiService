@@ -1,6 +1,8 @@
 #include "game_data.h"
+
 #include <fstream>
 #include <include/uri.h>
+#include <lang/lang.h>
 #include <nlohmann/json.hpp>
 #include <service/util.h>
 #include <zip.h>
@@ -120,17 +122,17 @@ namespace service {
                 struct zip_stat st;
                 zip_stat_init(&st);
                 zip_stat(archive, name, 0, &st);
-                auto contents = new char[st.size];
+                std::vector<char> contents(st.size);
                 zip_file *f = zip_fopen(archive, name, 0);
-                zip_fread(f, contents, st.size);
+                zip_fread(f, contents.data(), st.size);
                 zip_fclose(f);
 
-                const auto dest = langDir / "en_us.json";
-                std::ofstream file(dest);
+                const auto dest = langDir / DEFAULT_LOCALE ".json";
+                std::ofstream file(dest, std::ios::out | std::ios::binary | std::ios::trunc);
                 if (!file) {
                     throw std::runtime_error("Failed to open output stream to " + dest.string());
                 }
-                file << contents;
+                file.write(contents.data(), st.size);
                 file.close();
 
                 break;

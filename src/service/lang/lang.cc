@@ -40,7 +40,7 @@ namespace service {
         const std::string mcLang = lang.value_or(DEFAULT_LOCALE);
 
         if (const auto err = co_await loadItemLanguageKeys(mcLang); err != Error::Ok) {
-            if (err == Error::ErrNotFound) {
+            if (mcLang != DEFAULT_LOCALE && err == Error::ErrNotFound) {
                 co_return co_await getItemName(std::nullopt, location);
             }
             co_return "";

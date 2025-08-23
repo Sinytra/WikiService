@@ -131,7 +131,7 @@ std::optional<nlohmann::json> parseJsonFile(const std::filesystem::path &path) {
         return jf;
     } catch (const nlohmann::json::parse_error &e) {
         ifs.close();
-        logger.error("JSON parse error in (parseJsonFile): {}", e.what());
+        logger.error("JSON parse error in (parseJsonFile) at {}: {}", path.string(), e.what());
         return std::nullopt;
     }
 }
