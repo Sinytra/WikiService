@@ -33,10 +33,16 @@ namespace realtime {
     void ConnectionManager::connect(const std::string &project, const WebSocketConnectionPtr &connection) {
         std::unique_lock lock(mutex_);
 
+        if (!connection || !connection->connected()) {
+            return;
+        }
+
         connections_[project].push_back(connection);
         if (const auto messages = pending_.find(project); messages != pending_.end()) {
             for (const auto &message: messages->second) {
-                connection->send(message);
+                if (connection->connected()) {
+                    connection->send(message);
+                }
             }
         }
     }

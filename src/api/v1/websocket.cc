@@ -56,7 +56,9 @@ namespace api::v1 {
             global::connections->connect(projectId, wsConnPtr);
 
             // Send initial deployment info
-            wsConnPtr->send(WS_DEPLOYMENT + loadingDeployment->getValueOfId());
+            if (wsConnPtr && wsConnPtr->connected()) {
+                wsConnPtr->send(WS_DEPLOYMENT + loadingDeployment->getValueOfId());
+            }
         }));
     }
 
