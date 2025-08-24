@@ -53,7 +53,9 @@ namespace api::v1 {
                 co_return;
             }
 
-            global::connections->connect(projectId, wsConnPtr);
+            if (wsConnPtr && wsConnPtr->connected()) {
+                global::connections->connect(projectId, wsConnPtr);
+            }
 
             // Send initial deployment info
             if (wsConnPtr && wsConnPtr->connected()) {
