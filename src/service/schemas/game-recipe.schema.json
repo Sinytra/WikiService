@@ -15,7 +15,7 @@
       },
       "then": {
         "description": "Represents a recipe in a campfire.",
-        "anyOf": [
+        "allOf": [
           {
             "$ref": "#/definitions/tagsCommonToAllRecipes"
           },
@@ -38,7 +38,7 @@
       },
       "then": {
         "description": "Represents a shaped crafting recipe in a crafting table.",
-        "anyOf": [
+        "allOf": [
           {
             "$ref": "#/definitions/tagsCommonToAllRecipes"
           },
@@ -103,7 +103,7 @@
       },
       "then": {
         "description": "Represents a shapeless crafting recipe in a crafting table.",
-        "anyOf": [
+        "allOf": [
           {
             "$ref": "#/definitions/tagsCommonToAllRecipes"
           },
@@ -115,19 +115,18 @@
           "ingredients": {
             "description": "A list of entries for this shapeless crafting recipe.",
             "type": "array",
+            "minItems": 1,
+            "maxItems": 9,
             "items": {
               "oneOf": [
                 {
                   "$ref": "#/definitions/ingredient",
                   "title": "ingredient",
-                  "description": "An entry made of a single ingredient.",
-                  "type": "object"
+                  "description": "An entry made of a single ingredient."
                 },
                 {
                   "description": "An entry made of a list of acceptable ingredients.",
                   "type": "array",
-                  "minItems": 1,
-                  "maxItems": 9,
                   "items": {
                     "$ref": "#/definitions/ingredient"
                   }
@@ -151,7 +150,7 @@
       },
       "then": {
         "description": "Represents a recipe in a furnace.",
-        "anyOf": [
+        "allOf": [
           {
             "$ref": "#/definitions/tagsCommonToAllRecipes"
           },
@@ -174,7 +173,7 @@
       },
       "then": {
         "description": "Represents a recipe in a blast furnace.",
-        "anyOf": [
+        "allOf": [
           {
             "$ref": "#/definitions/tagsCommonToAllRecipes"
           },
@@ -230,7 +229,7 @@
       },
       "then": {
         "description": "Represents a recipe in a smoker.",
-        "anyOf": [
+        "allOf": [
           {
             "$ref": "#/definitions/tagsCommonToAllRecipes"
           },
@@ -281,7 +280,7 @@
   ],
   "definitions": {
     "item": {
-      "type": "object",
+      "type": ["object", "string"],
       "properties": {
         "item": {
           "description": "An item ID.",
@@ -330,7 +329,7 @@
         },
         "result": {
           "description": "An item ID. The output item of the recipe.",
-          "type": "string"
+          "$ref": "#/definitions/result"
         },
         "experience": {
           "description": "The output experience of the recipe.",
@@ -360,7 +359,7 @@
       "properties": {
         "category": {
           "type": "string",
-          "enum": ["food", "blocks", "misc "]
+          "enum": ["food", "blocks", "misc"]
         }
       }
     },
@@ -374,7 +373,7 @@
           "type": "integer",
           "default": 1
         },
-        "item": {
+        "id": {
           "description": "An item ID.",
           "type": "string"
         }
