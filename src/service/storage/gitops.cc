@@ -3,7 +3,7 @@
 #include <git2.h>
 #include <include/uri.h>
 
-#define BYTE_RECEIVE_LIMIT 2.5e+8
+#define BYTE_RECEIVE_LIMIT 5.0e+8
 
 using namespace logging;
 using namespace service;
@@ -37,9 +37,9 @@ namespace git {
             if (pd->tick != -1) {
                 pd->tick = -1;
                 pd->error = "size";
-                pd->logger->error("Terminating fetch as it exceeded maximum size limit of 250MB");
+                pd->logger->error("Terminating fetch as it exceeded maximum size limit of 500MB");
             }
-            return 1;
+            return -1;
         }
 
         const auto progress = stats->received_objects / static_cast<double>(stats->total_objects) * 100;
@@ -207,7 +207,7 @@ namespace git {
                 co_return {nullptr, {ProjectError::NO_BRANCH, e->message}};
             }
             if (d.error == "size") {
-                co_return {nullptr, {ProjectError::REPO_TOO_LARGE, e->message}};
+                co_return {nullptr, {ProjectError::REPO_TOO_LARGE, ""}};
             }
 
             co_return {nullptr, {ProjectError::UNKNOWN, e->message}};

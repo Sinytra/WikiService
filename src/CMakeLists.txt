@@ -22,6 +22,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_executable(${PROJECT_NAME}
         config.cc
+        cors.cc
         monitoring.cc
         main.cc
 )

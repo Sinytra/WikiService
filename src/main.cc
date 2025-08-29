@@ -12,6 +12,7 @@
 #include <service/lang/lang.h>
 #include <service/storage/realtime.h>
 #include "config.h"
+#include "cors.h"
 #include "monitoring.h"
 #include "version.h"
 
@@ -20,6 +21,7 @@
 #include <log/log.h>
 
 #include <service/content/recipe_builtin.h>
+
 #include "api/v1/moderation.h"
 #include "service/access_keys.h"
 #include "service/content/game_data.h"
@@ -119,6 +121,8 @@ int main() {
         app().registerController(systemController);
         app().registerController(moderationController);
         app().setExceptionHandler(globalExceptionHandler);
+        app().setIdleConnectionTimeout(180);
+        setupCors();
 
         cacheAwaiterThreadPool.start();
         git_libgit2_init();

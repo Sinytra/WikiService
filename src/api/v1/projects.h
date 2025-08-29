@@ -21,13 +21,13 @@ namespace api::v1 {
         METHOD_LIST_BEGIN
         // Public
         ADD_METHOD_TO(ProjectsController::greet,                "/",                        drogon::Get);
+        ADD_METHOD_TO(ProjectsController::create,               "/api/v1/dev/projects",     drogon::Post, drogon::Options, "PublicFilter");
         // Internal
         ADD_METHOD_TO(ProjectsController::listIDs,              "/api/v1/projects",         drogon::Get, "AuthFilter");
         ADD_METHOD_TO(ProjectsController::listPopularProjects,  "/api/v1/projects/popular", drogon::Get, "AuthFilter");
         // Private
         ADD_METHOD_TO(ProjectsController::listUserProjects, "/api/v1/dev/projects",                             drogon::Get,    "AuthFilter");
         ADD_METHOD_TO(ProjectsController::getProject,       "/api/v1/dev/projects/{1:id}",                      drogon::Get,    "AuthFilter");
-        ADD_METHOD_TO(ProjectsController::create,           "/api/v1/dev/projects",                             drogon::Post,   "AuthFilter");
         ADD_METHOD_TO(ProjectsController::update,           "/api/v1/dev/projects",                             drogon::Put,    "AuthFilter");
         ADD_METHOD_TO(ProjectsController::remove,           "/api/v1/dev/projects/{1:id}",                      drogon::Delete, "AuthFilter");
         ADD_METHOD_TO(ProjectsController::deployProject,    "/api/v1/dev/projects/{1:id}/deploy",               drogon::Post,   "AuthFilter");

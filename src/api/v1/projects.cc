@@ -46,7 +46,7 @@ namespace api::v1 {
 
     bool isOwner(const nlohmann::json &owners, const std::string &username) {
         const auto lowerUsername = strToLower(username);
-        for (const auto &owner : owners) {
+        for (const auto &owner: owners) {
             if (strToLower(owner.get<std::string>()) == lowerUsername) {
                 return true;
             }
@@ -164,7 +164,7 @@ namespace api::v1 {
             throw ApiException(Error::ErrBadRequest, enumToStr(err), [&details](Json::Value &root) { root["details"] = details; });
         }
 
-        if (!checkExisting && resolved->contains("owners") && !isOwner((*resolved)["owners"], user.getValueOfId())) {
+        if (!localEnv_ && !checkExisting && resolved->contains("owners") && !isOwner((*resolved)["owners"], user.getValueOfId())) {
             throw ApiException(Error::ErrBadRequest, "not_owner");
         }
 
