@@ -31,8 +31,9 @@ namespace api::v1 {
 
         const auto token = *tokenParam;
         const auto projectId = path.substr(prefix.size());
+        const auto currentLoop = trantor::EventLoop::getEventLoopOfCurrentThread();
 
-        app().getLoop()->queueInLoop(async_func([&, projectId, token]() -> Task<> {
+        currentLoop->queueInLoop(async_func([wsConnPtr, projectId, token]() -> Task<> {
             // Handle unauthenticated user
             const auto session = co_await global::auth->getSession(token);
             if (!session) {
