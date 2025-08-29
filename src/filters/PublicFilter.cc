@@ -11,7 +11,5 @@ void PublicFilter::doFilter(const HttpRequestPtr &req, FilterCallback &&fcb, Fil
         }
     }
 
-    // TODO Rate limits
-
     fccb();
 }
