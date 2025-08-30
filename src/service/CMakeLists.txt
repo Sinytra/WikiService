@@ -7,7 +7,7 @@ read_and_escape_schema("../../builtin/minecraft/recipe_type/stonecutting.json" S
 read_and_escape_schema("../../builtin/minecraft/recipe_type/smithing_transform.json" SMITHING_TRANSFORM)
 
 configure_file(content/recipe/builtin_recipe_type.h.in
-        ${CMAKE_CURRENT_BINARY_DIR}/content/recipe/builtin_recipe_type.h
+        ${CMAKE_CURRENT_BINARY_DIR}/service/content/recipe/builtin_recipe_type.h
         @ONLY
 )
 

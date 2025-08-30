@@ -1,6 +1,6 @@
 #include "recipe_builtin.h"
 
-#include <content/builtin_recipe_type.h>
+#include <service/content/recipe/builtin_recipe_type.h>
 #include <database/database.h>
 #include <drogon/drogon.h>
 #include <schemas/schemas.h>

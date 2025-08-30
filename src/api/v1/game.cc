@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include <content/recipe/recipe_parser.h>
+#include <service/content/recipe/recipe_parser.h>
 #include <database/resolved_db.h>
 #include <service/system/lang.h>
 

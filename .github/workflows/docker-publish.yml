@@ -19,9 +19,13 @@ jobs:
       id-token: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+
+      - name: Git describe
+        id: ghd
+        uses: proudust/gh-describe@v2
         with:
-          fetch-tags: true
+          match: 'v*'
 
       - name: Install cosign
         uses: sigstore/cosign-installer@59acb6260d9c0ba8f4a2f9d9b48431a222b68e20 #v3.5.0
@@ -49,6 +53,11 @@ jobs:
         uses: docker/build-push-action@0565240e2d4ab88bba5387d719585280857ece09 # v5.0.0
         with:
           context: .
+          build-args: |
+            "MANUAL_VERSIONING=true"
+            "GIT_VERSION=${{ steps.ghd.outputs.describe }}"
+            "GIT_HASH_FULL=${{ steps.ghd.outputs.sha }}"
+            "GIT_HASH_SHORT=${{ steps.ghd.outputs.short-sha }}"
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

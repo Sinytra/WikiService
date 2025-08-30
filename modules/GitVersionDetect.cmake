@@ -34,7 +34,13 @@ This will define the following variables:
 find_package(Git)
 
 # Check if a git executable was found
-if(GIT_EXECUTABLE)
+if (DEFINED ENV{MANUAL_VERSIONING} AND "$ENV{MANUAL_VERSIONING}" STREQUAL "true")
+    message("Using manual Git versioning")
+
+    string(REGEX REPLACE "^v" "" GITVERSIONDETECT_VERSION "$ENV{GIT_VERSION}")
+    set(GIT_HASH_FULL "$ENV{GIT_HASH_FULL}")
+    set(GIT_HASH_SHORT "$ENV{GIT_HASH_SHORT}")
+elseif(GIT_EXECUTABLE)
     # Generate a git-describe version string from Git repository tags
     execute_process(
             COMMAND ${GIT_EXECUTABLE} describe --tags --dirty --match "v*"

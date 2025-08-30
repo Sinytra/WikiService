@@ -1,5 +1,14 @@
 FROM debian:sid-slim AS build
 
+ARG MANUAL_VERSIONING=false
+ENV MANUAL_VERSIONING=${MANUAL_VERSIONING}
+ARG GIT_VERSION=0.0.0
+ENV GIT_VERSION=${GIT_VERSION}
+ARG GIT_HASH_FULL=unknown
+ENV GIT_HASH_FULL=${GIT_HASH_FULL}
+ARG GIT_HASH_SHORT=unknown
+ENV GIT_HASH_SHORT=${GIT_HASH_SHORT}
+
 WORKDIR /build
 
 # Install dependencies
@@ -25,7 +34,6 @@ RUN git clone https://github.com/drogonframework/drogon && cd drogon && git subm
 # Build app
 WORKDIR /build/src
 
-COPY $PWD/.git /build/src/.git
 COPY $PWD/builtin /build/src/builtin
 COPY $PWD/modules /build/src/modules
 COPY $PWD/src /build/src/src

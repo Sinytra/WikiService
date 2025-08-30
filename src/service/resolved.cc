@@ -11,7 +11,7 @@
 #include <filesystem>
 #include <unordered_map>
 
-#include <content/recipe/recipe_resolver.h>
+#include <service/content/recipe/recipe_resolver.h>
 #include <fmt/args.h>
 #include <models/Item.h>
 #include <models/ProjectItem.h>
