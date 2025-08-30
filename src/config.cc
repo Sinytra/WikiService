@@ -2,7 +2,7 @@
 
 #include <drogon/drogon.h>
 #include <log/log.h>
-#include <service/schemas.h>
+#include <schemas/schemas.h>
 #include <service/util.h>
 
 using namespace drogon;
@@ -65,7 +65,8 @@ SystemConfig configureFromEnvironment() {
                        .callbackUrl = std::getenv("AUTH_CALLBACK_URL"),
                        .settingsCallbackUrl = std::getenv("AUTH_SETTINGS_CALLBACK_URL"),
                        .errorCallbackUrl = std::getenv("AUTH_ERROR_CALLBACK_URL"),
-                       .tokenSecret = std::getenv("AUTH_TOKEN_SECRET")};
+                       .tokenSecret = std::getenv("AUTH_TOKEN_SECRET"),
+                       .frontendApiKey = std::getenv("FRONTEND_API_KEY")};
     GitHubConfig githubApp = {
         .clientId = std::getenv("GITHUB_CLIENT_ID"),
         .clientSecret = std::getenv("GITHUB_CLIENT_SECRET"),
@@ -108,7 +109,8 @@ SystemConfig config::configure() {
                        .callbackUrl = authConfig["callback_url"].asString(),
                        .settingsCallbackUrl = authConfig["settings_callback_url"].asString(),
                        .errorCallbackUrl = authConfig["error_callback_url"].asString(),
-                       .tokenSecret = authConfig["token_secret"].asString()};
+                       .tokenSecret = authConfig["token_secret"].asString(),
+                       .frontendApiKey = authConfig["frontend_api_key"].asString()};
 
     const Json::Value &githubAppConfig = customConfig["github_app"];
     GitHubConfig githubApp = {.clientId = githubAppConfig["client_id"].asString(),

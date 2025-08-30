@@ -1,8 +1,8 @@
 #include "game_data.h"
+#include "lang.h"
 
 #include <fstream>
 #include <include/uri.h>
-#include <lang/lang.h>
 #include <nlohmann/json.hpp>
 #include <service/util.h>
 #include <zip.h>

@@ -1,9 +1,9 @@
+#include <schemas/schemas.h>
 #include <fmt/args.h>
 #include <fstream>
 #include <regex>
 #include <service/database/resolved_db.h>
 #include <service/resolved.h>
-#include <service/schemas.h>
 
 #include "git_hosts.h"
 #include "storage/storage.h"

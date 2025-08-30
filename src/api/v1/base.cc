@@ -1,8 +1,7 @@
 #include "base.h"
 
 #include <auth.h>
-
-#include "lang/lang.h"
+#include <service/system/lang.h>
 
 using namespace drogon;
 using namespace service;

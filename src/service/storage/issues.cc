@@ -1,8 +1,8 @@
-#include "project_issue.h"
+#include "issues.h"
 
-#include "database/database.h"
+#include <service/database/database.h>
+#include <service/util.h>
 #include "models/ProjectIssue.h"
-#include "util.h"
 
 using namespace drogon;
 

@@ -1,11 +1,10 @@
 #include "recipe_parser.h"
-
-#include <drogon/drogon.h>
-#include "ingestor.h"
-#include "ingestor_recipes.h"
 #include "recipe_builtin.h"
 #include "recipe_custom.h"
-#include "schemas.h"
+
+#include <drogon/drogon.h>
+#include <schemas/schemas.h>
+#include <service/content/ingestor/ingestor.h>
 
 using namespace drogon;
 using namespace drogon::orm;

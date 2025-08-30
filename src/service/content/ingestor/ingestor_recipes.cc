@@ -1,8 +1,8 @@
-#include "ingestor_recipes.h"
+#include "ingestor.h"
+
 #include <database/database.h>
 #include <database/resolved_db.h>
 #include <drogon/drogon.h>
-#include "ingestor.h"
 
 using namespace drogon;
 using namespace drogon::orm;

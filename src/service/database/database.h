@@ -1,24 +1,21 @@
 #pragma once
 
+#include "database_base.h"
+
 #include <drogon/HttpAppFramework.h>
 #include <drogon/utils/coroutine.h>
 #include <log/log.h>
 #include <models/Recipe.h>
 #include <models/RecipeType.h>
-#include <models/User.h>
+#include <models/ProjectVersion.h>
+#include <models/DataImport.h>
+#include <models/Deployment.h>
+#include <models/ProjectIssue.h>
+#include <models/Report.h>
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <service/error.h>
-#include "database_base.h"
-
-#include <models/ProjectVersion.h>
-
-#include <service/project_issue.h>
-#include "models/DataImport.h"
-#include "models/Deployment.h"
-#include "models/ProjectIssue.h"
-
-#include "models/Report.h"
+#include <service/storage/issues.h>
 
 using namespace drogon_model::postgres;
 

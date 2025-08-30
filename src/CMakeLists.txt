@@ -95,6 +95,7 @@ target_sources(${PROJECT_NAME}
 
 add_subdirectory(api/v1)
 add_subdirectory(log)
+add_subdirectory(schemas)
 add_subdirectory(service)
 
 set_target_properties(${PROJECT_NAME}

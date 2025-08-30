@@ -6,11 +6,11 @@
 #include "api/v1/system.h"
 #include "api/v1/websocket.h"
 
-#include <service/cloudflare.h>
 #include <service/database/database.h>
-#include <service/github.h>
-#include <service/lang/lang.h>
+#include <service/external/cloudflare.h>
+#include <service/external/github.h>
 #include <service/storage/realtime.h>
+#include <service/system/lang.h>
 #include "config.h"
 #include "cors.h"
 #include "monitoring.h"
@@ -20,12 +20,12 @@
 #include <git2.h>
 #include <log/log.h>
 
-#include <service/content/recipe_builtin.h>
+#include <service/content/recipe/recipe_builtin.h>
 
 #include "api/v1/moderation.h"
-#include "service/access_keys.h"
-#include "service/content/game_data.h"
-#include "service/lang/crowdin.h"
+#include "service/external/crowdin.h"
+#include "service/system/access_keys.h"
+#include "service/system/game_data.h"
 
 using namespace drogon;
 using namespace logging;

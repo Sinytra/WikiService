@@ -1,14 +1,15 @@
 #include "projects.h"
 
+#include <service/external/cloudflare.h>
 #include <database/database.h>
 #include <include/uri.h>
 #include <log/log.h>
 #include <models/UserProject.h>
+#include <schemas/schemas.h>
 #include <service/auth.h>
-#include <service/cloudflare.h>
-#include <service/crypto.h>
 #include <service/error.h>
-#include <service/schemas.h>
+#include <service/storage/deployment.h>
+#include <service/util/crypto.h>
 // ReSharper disable once CppUnusedIncludeDirective
 #include <service/serializers.h>
 #include <service/storage/gitops.h>
@@ -16,7 +17,6 @@
 #include <service/util.h>
 
 #include "base.h"
-#include "deployment.h"
 #include "error.h"
 
 using namespace std;

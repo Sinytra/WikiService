@@ -1,9 +1,9 @@
 #pragma once
 
+#include <service/external/crowdin.h>
 #include <drogon/utils/coroutine.h>
 #include <service/cache.h>
 #include <service/error.h>
-#include <service/lang/crowdin.h>
 
 #define DEFAULT_LOCALE "en_us"
 

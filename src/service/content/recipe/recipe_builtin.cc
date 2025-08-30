@@ -1,10 +1,9 @@
 #include "recipe_builtin.h"
+
 #include <content/builtin_recipe_type.h>
 #include <database/database.h>
 #include <drogon/drogon.h>
-#include <schemas.h>
-#include "ingestor.h"
-#include "ingestor_recipes.h"
+#include <schemas/schemas.h>
 
 using namespace drogon;
 using namespace drogon::orm;

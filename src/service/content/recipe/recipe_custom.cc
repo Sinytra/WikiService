@@ -1,7 +1,7 @@
 #include "recipe_custom.h"
 
 #include <drogon/drogon.h>
-#include <service/schemas.h>
+#include <schemas/schemas.h>
 
 using namespace drogon;
 using namespace drogon::orm;

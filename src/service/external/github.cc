@@ -1,6 +1,7 @@
 #include "github.h"
+
 #include <log/log.h>
-#include "util.h"
+#include <service/util.h>
 
 #define GITHUB_API_URL "https://api.github.com/"
 

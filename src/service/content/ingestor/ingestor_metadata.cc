@@ -1,7 +1,8 @@
-#include "ingestor_metadata.h"
-#include "database/resolved_db.h"
 #include "ingestor.h"
-#include "schemas.h"
+#include "ingestor_metadata.h"
+
+#include <schemas/schemas.h>
+#include <database/resolved_db.h>
 
 using namespace drogon;
 using namespace drogon::orm;

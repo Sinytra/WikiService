@@ -1,11 +1,12 @@
 #pragma once
 
+#include "ingestor_metadata.h"
+
 #include <drogon/utils/coroutine.h>
 #include <service/error.h>
-#include <service/project_issue.h>
 #include <service/resolved.h>
-#include "ingestor_recipes.h"
-#include "ingestor_metadata.h"
+#include <service/storage/issues.h>
+#include <service/content/recipe/recipe_parser.h>
 
 namespace content {
     struct PreparationResult {

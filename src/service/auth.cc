@@ -1,13 +1,13 @@
 #include "auth.h"
 
 #include <database/database.h>
+#include <external/github.h>
 #include <models/User.h>
-#include <service/github.h>
 #include <service/platforms.h>
 
-#include "crypto.h"
 #include "log/log.h"
 #include "util.h"
+#include "util/crypto.h"
 
 #define GH_HOST "https://github.com"
 #define GH_OAUTH_SCOPE "read:user+read:org"

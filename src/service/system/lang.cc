@@ -1,9 +1,9 @@
 #include "lang.h"
+#include "game_data.h"
 
 #include <chrono>
-#include "content/game_data.h"
-#include "crowdin.h"
-#include "util.h"
+#include <service/external/crowdin.h>
+#include <service/util.h>
 
 using namespace drogon;
 using namespace std::chrono;

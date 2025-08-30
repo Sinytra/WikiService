@@ -9,6 +9,7 @@ namespace config {
         std::string settingsCallbackUrl;
         std::string errorCallbackUrl;
         std::string tokenSecret;
+        std::string frontendApiKey;
     };
 
     struct GitHubConfig {

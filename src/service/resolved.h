@@ -5,7 +5,7 @@
 #include <models/ProjectVersion.h>
 #include <nlohmann/json_fwd.hpp>
 #include "cache.h"
-#include "content/game_recipes.h"
+#include "content/recipe/game_recipes.h"
 #include "database/database.h"
 #include "error.h"
 #include "project/format.h"

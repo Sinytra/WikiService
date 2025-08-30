@@ -2,8 +2,7 @@
 
 #include <models/Deployment.h>
 #include <nlohmann/json.hpp>
-
-#include "util.h"
+#include <service/util.h>
 
 namespace service {
     enum class ProjectIssueLevel { WARNING, ERROR, UNKNOWN };

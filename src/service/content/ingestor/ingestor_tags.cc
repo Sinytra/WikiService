@@ -1,11 +1,9 @@
-#include <database/database.h>
-
-
 #include "ingestor.h"
 
+#include <database/database.h>
 #include <database/resolved_db.h>
 #include <drogon/drogon.h>
-#include <schemas.h>
+#include <schemas/schemas.h>
 
 #define CONTENT_DIR ".content/"
 

@@ -1,17 +1,17 @@
 #include "resolved.h"
 
+#include <schemas/schemas.h>
 #include <service/database/database.h>
 #include <service/database/resolved_db.h>
 #include <service/project/git_hosts.h>
 #include <service/project/properties.h>
-#include <service/schemas.h>
 #include <service/storage/gitops.h>
 #include <service/util.h>
 
 #include <filesystem>
 #include <unordered_map>
 
-#include <content/recipe_resolver.h>
+#include <content/recipe/recipe_resolver.h>
 #include <fmt/args.h>
 #include <models/Item.h>
 #include <models/ProjectItem.h>

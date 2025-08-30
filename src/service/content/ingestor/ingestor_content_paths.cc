@@ -3,7 +3,7 @@
 #include <database/resolved_db.h>
 #include <drogon/drogon.h>
 
-#define EXT_MDX ".mdx"
+// TODO Use Format
 #define CONTENT_DIR ".content/"
 
 using namespace drogon;
@@ -20,7 +20,7 @@ namespace content {
         PreparationResult result;
 
         for (const auto docsRoot = project_.getRootDirectory(); const auto &entry: fs::recursive_directory_iterator(docsRoot)) {
-            if (const auto fileName = entry.path().filename().string(); !entry.is_regular_file() || entry.path().extension() != EXT_MDX ||
+            if (const auto fileName = entry.path().filename().string(); !entry.is_regular_file() || entry.path().extension() != DOCS_FILE_EXT ||
                                                                         fileName.starts_with(".") && !fileName.starts_with(CONTENT_DIR))
             {
                 continue;

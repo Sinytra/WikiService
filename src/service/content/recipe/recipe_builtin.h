@@ -1,6 +1,5 @@
 #pragma once
 
-#include "ingestor_recipes.h"
 #include "recipe_parser.h"
 
 namespace content {

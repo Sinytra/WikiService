@@ -1,0 +1,5 @@
+function(read_and_escape_schema input_file output_var)
+    file(READ "${CMAKE_CURRENT_SOURCE_DIR}/${input_file}" temp_schema)
+    string(CONFIGURE "${temp_schema}" ${output_var} ESCAPE_QUOTES)
+    set(${output_var} "${temp_schema}" PARENT_SCOPE)
+endfunction()

@@ -1,11 +1,11 @@
 #include "storage.h"
 
+#include <service/content/ingestor/ingestor.h>
 #include <filesystem>
 #include <fstream>
 #include <git2/repository.h>
-#include <service/content/ingestor.h>
 #include <service/database/resolved_db.h>
-#include <service/deployment.h>
+#include <service/storage/deployment.h>
 #include <service/storage/gitops.h>
 #include <service/util.h>
 
@@ -54,6 +54,15 @@ Error copyProjectFiles(const fs::path &root, const fs::path &docsRoot, const fs:
 }
 
 namespace service {
+    // clang-format off
+    ENUM_TO_STR(DeploymentStatus,
+        {DeploymentStatus::CREATED, "created"},
+        {DeploymentStatus::LOADING, "loading"},
+        {DeploymentStatus::SUCCESS, "success"},
+        {DeploymentStatus::ERROR, "error"}
+    )
+    // clang-format on
+
     void validatePageFile(const FileTreeEntry &entry, const ResolvedProject &resolved, ProjectIssueCallback &issues,
                           const std::vector<std::string> &requiredAttributes) {
         const auto path = entry.path + DOCS_FILE_EXT;

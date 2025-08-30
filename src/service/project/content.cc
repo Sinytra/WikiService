@@ -1,8 +1,8 @@
-#include <service/content/recipe_resolver.h>
+#include <service/content/recipe/recipe_resolver.h>
+#include <schemas/schemas.h>
 #include <service/database/resolved_db.h>
 #include <service/project/properties.h>
 #include <service/resolved.h>
-#include <service/schemas.h>
 
 using namespace logging;
 using namespace drogon;

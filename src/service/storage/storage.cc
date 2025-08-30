@@ -1,7 +1,7 @@
 #include "storage.h"
 
 #include <fstream>
-#include <service/deployment.h>
+#include <service/storage/deployment.h>
 #include <service/util.h>
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>

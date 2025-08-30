@@ -1,6 +1,6 @@
 #include "properties.h"
 
-#include "schemas.h"
+#include <schemas/schemas.h>
 #include "util.h"
 
 namespace content {

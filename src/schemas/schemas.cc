@@ -1,7 +1,7 @@
 //ReSharper disable CppUseAuto
 #include "schemas.h"
 
-#include <nlohmann/json-schema.hpp>
+#include <nlohmann/json.hpp>
 
 nlohmann::json schemas::projectRegister = R"(
 {
