@@ -32,6 +32,7 @@ add_library(service STATIC
 
         external/cloudflare.cc
         external/crowdin.cc
+        external/frontend.cc
         external/github.cc
 
         project/content.cc

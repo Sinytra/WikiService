@@ -1,31 +1,30 @@
-#include "api/v1/auth.h"
-#include "api/v1/browse.h"
-#include "api/v1/docs.h"
-#include "api/v1/game.h"
-#include "api/v1/projects.h"
-#include "api/v1/system.h"
-#include "api/v1/websocket.h"
+#include "config.h"
+#include "cors.h"
+#include "monitor.h"
+#include "version.h"
+
+#include <api/v1/error.h>
+#include <api/v1/moderation.h>
+#include <api/v1/auth.h>
+#include <api/v1/browse.h>
+#include <api/v1/docs.h>
+#include <api/v1/game.h>
+#include <api/v1/projects.h>
+#include <api/v1/system.h>
+#include <api/v1/websocket.h>
+#include <git2.h>
+#include <log/log.h>
 
 #include <service/database/database.h>
 #include <service/external/cloudflare.h>
 #include <service/external/github.h>
 #include <service/storage/realtime.h>
 #include <service/system/lang.h>
-#include "config.h"
-#include "cors.h"
-#include "monitoring.h"
-#include "version.h"
-
-#include <api/v1/error.h>
-#include <git2.h>
-#include <log/log.h>
-
+#include <service/external/crowdin.h>
+#include <service/external/frontend.h>
+#include <service/system/access_keys.h>
+#include <service/system/game_data.h>
 #include <service/content/recipe/recipe_builtin.h>
-
-#include "api/v1/moderation.h"
-#include "service/external/crowdin.h"
-#include "service/system/access_keys.h"
-#include "service/system/game_data.h"
 
 using namespace drogon;
 using namespace logging;
@@ -47,6 +46,7 @@ namespace global {
     std::shared_ptr<GameDataService> gameData;
     std::shared_ptr<Crowdin> crowdin;
     std::shared_ptr<AccessKeys> accessKeys;
+    std::shared_ptr<FrontendService> frontend;
 
     std::shared_ptr<Platforms> platforms;
 }
@@ -84,7 +84,7 @@ int main() {
                     salt, local] = config::configure();
 
         if (!sentryConfig.dsn.empty()) {
-            monitoring::initSentry(sentryConfig.dsn);
+            monitor::initSentry(sentryConfig.dsn);
         }
 
         global::database = std::make_shared<Database>();
@@ -99,6 +99,7 @@ int main() {
         global::gameData = std::make_shared<GameDataService>(storagePath);
         global::crowdin = std::make_shared<Crowdin>(crowdinConfig);
         global::accessKeys = std::make_shared<AccessKeys>(salt);
+        global::frontend = std::make_shared<FrontendService>(authConfig.frontendUrl, authConfig.frontendApiKey);
         auto curseForge(CurseForgePlatform{curseForgeKey});
         auto modrinth(ModrinthPlatform{});
         global::platforms = std::make_shared<Platforms>(curseForge, modrinth);
@@ -142,7 +143,7 @@ int main() {
         logger.critical("Error running app: {}", e.what());
     }
 
-    monitoring::closeSentry();
+    monitor::closeSentry();
 
     return 0;
 }

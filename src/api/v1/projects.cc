@@ -1,6 +1,7 @@
 #include "projects.h"
 
 #include <service/external/cloudflare.h>
+#include <service/external/frontend.h>
 #include <database/database.h>
 #include <include/uri.h>
 #include <log/log.h>
@@ -401,6 +402,8 @@ namespace api::v1 {
 
             if (const auto [resolved, resErr](co_await global::storage->deployProject(project, userId)); resErr == Error::Ok) {
                 logger.debug("Project '{}' deployed successfully", project.getValueOfId());
+
+                co_await global::frontend->revalidateProject(project.getValueOfId());
             } else {
                 logger.error("Encountered error while deploying project '{}'", project.getValueOfId());
             }

@@ -2,7 +2,7 @@
 
 #include <string>
 
-namespace monitoring {
+namespace monitor {
     void initSentry(const std::string &dsn);
 
     void closeSentry();
