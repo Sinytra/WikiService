@@ -30,7 +30,6 @@ add_library(service STATIC
         database/database_reports.cc
         database/resolved_db.cc
 
-        external/cloudflare.cc
         external/crowdin.cc
         external/frontend.cc
         external/github.cc

@@ -1,7 +1,5 @@
 #include "projects.h"
 
-#include <service/external/cloudflare.h>
-#include <service/external/frontend.h>
 #include <database/database.h>
 #include <include/uri.h>
 #include <log/log.h>
@@ -9,6 +7,7 @@
 #include <schemas/schemas.h>
 #include <service/auth.h>
 #include <service/error.h>
+#include <service/external/frontend.h>
 #include <service/storage/deployment.h>
 #include <service/util/crypto.h>
 // ReSharper disable once CppUnusedIncludeDirective
@@ -267,11 +266,12 @@ namespace api::v1 {
         callback(HttpResponse::newHttpJsonResponse(root));
     }
 
-    Task<> ProjectsController::listPopularProjects(const HttpRequestPtr req,
-                                                   const std::function<void(const HttpResponsePtr &)> callback) const {
-        const std::vector<std::string> ids = co_await global::cloudFlare->getMostVisitedProjectIDs();
+    Task<> ProjectsController::getProjects(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
+        const auto json(BaseProjectController::validatedBody(req, schemas::getBulkProjects));
+        const std::vector<std::string> ids = json["ids"];
+
         Json::Value root(Json::arrayValue);
-        for (const auto &id: ids) {
+        for (const auto &id : ids) {
             if (const auto [project, error] = co_await global::database->getProjectSource(id); project) {
                 root.append(projectToJson(*project));
             }

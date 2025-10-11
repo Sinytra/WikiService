@@ -24,8 +24,8 @@ namespace api::v1 {
         ADD_METHOD_TO(ProjectsController::create,               "/api/v1/dev/projects",     drogon::Post, drogon::Options,   "PublicFilter");
         ADD_METHOD_TO(ProjectsController::update,               "/api/v1/dev/projects",     drogon::Put, drogon::Options,    "PublicFilter");
         // Internal
-        ADD_METHOD_TO(ProjectsController::listIDs,              "/api/v1/projects",         drogon::Get, "AuthFilter");
-        ADD_METHOD_TO(ProjectsController::listPopularProjects,  "/api/v1/projects/popular", drogon::Get, "AuthFilter");
+        ADD_METHOD_TO(ProjectsController::listIDs,              "/api/v1/projects",         drogon::Get,  "AuthFilter");
+        ADD_METHOD_TO(ProjectsController::getProjects,          "/api/v1/projects/bulk",    drogon::Post, "AuthFilter");
         // Private
         ADD_METHOD_TO(ProjectsController::listUserProjects, "/api/v1/dev/projects",                             drogon::Get,    "AuthFilter");
         ADD_METHOD_TO(ProjectsController::getProject,       "/api/v1/dev/projects/{1:id}",                      drogon::Get,    "AuthFilter");
@@ -57,7 +57,7 @@ namespace api::v1 {
         drogon::Task<> getProject(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
                                   std::string id) const;
 
-        drogon::Task<> listPopularProjects(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback) const;
+        drogon::Task<> getProjects(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback) const;
 
         drogon::Task<> create(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback) const;
 

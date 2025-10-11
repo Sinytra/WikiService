@@ -3,6 +3,8 @@
 #include <nlohmann/json_fwd.hpp>
 
 namespace schemas {
+    extern nlohmann::json getBulkProjects;
+
     extern nlohmann::json systemConfig;
     extern nlohmann::json projectRegister;
     extern nlohmann::json projectUpdate;
