@@ -78,7 +78,7 @@ int main() {
         app().setLogLevel(level).addListener("0.0.0.0", port).setThreadNum(16);
         configureLoggingLevel();
 
-        const auto [authConfig, githubAppConfig, mrApp, cloudFlareConfig, crowdinConfig, sentryConfig, appUrl, curseForgeKey, storagePath,
+        const auto [authConfig, githubAppConfig, mrApp, crowdinConfig, sentryConfig, appUrl, curseForgeKey, storagePath,
                     salt, local] = config::configure();
 
         if (!sentryConfig.dsn.empty()) {

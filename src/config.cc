@@ -72,15 +72,11 @@ SystemConfig configureFromEnvironment() {
         .clientSecret = std::getenv("GITHUB_CLIENT_SECRET"),
     };
     Modrinth modrinth = {.clientId = std::getenv("MODRINTH_CLIENT_ID"), .clientSecret = std::getenv("MODRINTH_CLIENT_SECRET")};
-    CloudFlare cloudFlare = {.token = std::getenv("CLOUDFLARE_TOKEN"),
-                             .accountTag = std::getenv("CLOUDFLARE_ACCOUNT_TAG"),
-                             .siteTag = std::getenv("CLOUDFLARE_SITE_TAG")};
     Crowdin crowdin = {.token = std::getenv("CROWDIN_TOKEN"), .projectId = std::getenv("CROWDIN_PROJECT_ID")};
     Sentry sentry = {.dsn = std::getenv("SENTRY_DSN")};
     return {.auth = auth,
             .githubApp = githubApp,
             .modrinth = modrinth,
-            .cloudFlare = cloudFlare,
             .crowdin = crowdin,
             .sentry = sentry,
 
@@ -119,11 +115,6 @@ SystemConfig config::configure() {
     const Json::Value &mrApp = customConfig["modrinth_app"];
     Modrinth modrinth = {.clientId = mrApp["client_id"].asString(), .clientSecret = mrApp["client_secret"].asString()};
 
-    const Json::Value &cloudFlareConfig = customConfig["cloudflare"];
-    CloudFlare cloudFlare = {.token = cloudFlareConfig["token"].asString(),
-                             .accountTag = cloudFlareConfig["account_tag"].asString(),
-                             .siteTag = cloudFlareConfig["site_tag"].asString()};
-
     const Json::Value &crowdinConfig = customConfig["crowdin"];
     Crowdin crowdin = {.token = crowdinConfig["token"].asString(), .projectId = crowdinConfig["project_id"].asString()};
 
@@ -133,7 +124,6 @@ SystemConfig config::configure() {
     SystemConfig config = {.auth = auth,
                            .githubApp = githubApp,
                            .modrinth = modrinth,
-                           .cloudFlare = cloudFlare,
                            .crowdin = crowdin,
                            .sentry = sentry,
                            .appUrl = customConfig["app_url"].asString(),

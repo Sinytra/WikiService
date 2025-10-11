@@ -58,11 +58,6 @@
       "client_id": "",
       "client_secret": ""
     },
-    "cloudflare": {
-      "token": "",
-      "account_tag": "",
-      "site_tag": ""
-    },
     "sentry": {
       "dsn": ""
     },

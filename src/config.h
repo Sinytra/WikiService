@@ -22,12 +22,6 @@ namespace config {
         std::string clientSecret;
     };
 
-    struct CloudFlare {
-        std::string token;
-        std::string accountTag;
-        std::string siteTag;
-    };
-
     struct Crowdin {
         std::string token;
         std::string projectId;
@@ -41,7 +35,6 @@ namespace config {
         AuthConfig auth;
         GitHubConfig githubApp;
         Modrinth modrinth;
-        CloudFlare cloudFlare;
         Crowdin crowdin;
         Sentry sentry;
 
