@@ -220,27 +220,6 @@ namespace service {
         co_return co_await handlePaginatedQuery<Recipe>(query, searchQuery, page);
     }
 
-    Task<std::vector<ProjectContent>> ProjectDatabaseAccess::getProjectItemPages() const {
-        // language=postgresql
-        static constexpr auto query = "SELECT item.loc, path FROM project_item pitem \
-                                       JOIN project_item_page pip ON pitem.id = pip.item_id \
-                                       JOIN item ON item.id = pitem.item_id \
-                                       WHERE pitem.version_id = $1 AND starts_with(pip.path, '.content/')";
-
-        const auto [res, err] = co_await handleDatabaseOperation<std::vector<ProjectContent>>(
-            [&](const DbClientPtr &client) -> Task<std::vector<ProjectContent>> {
-                const auto results = co_await client->execSqlCoro(query, versionId_);
-                std::vector<ProjectContent> contents;
-                for (const auto &row: results) {
-                    const auto id = row[0].as<std::string>();
-                    const auto path = row[1].as<std::string>();
-                    contents.emplace_back(id, path);
-                }
-                co_return contents;
-            });
-        co_return res.value_or(std::vector<ProjectContent>{});
-    }
-
     Task<int> ProjectDatabaseAccess::getProjectContentCount() const {
         // language=postgresql
         static constexpr auto query = "SELECT count(*) FROM project_item pitem \

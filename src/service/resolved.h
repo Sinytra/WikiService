@@ -14,10 +14,7 @@
 using namespace drogon_model::postgres;
 
 namespace service {
-    enum class FileType {
-        DIR,
-        FILE
-    };
+    enum class FileType { DIR, FILE };
     std::string enumToStr(FileType type);
 
     void to_json(nlohmann::json &j, const FileType &obj);
@@ -31,14 +28,12 @@ namespace service {
         std::vector<FileTreeEntry> children;
 
         friend void to_json(nlohmann::json &j, const FileTreeEntry &obj) {
-            j = {
-                {"id", obj.id.empty() ? nlohmann::json(nullptr) : nlohmann::json(obj.id)},
-                {"name", obj.name},
-                {"icon", obj.icon.empty() ? nlohmann::json(nullptr) : nlohmann::json(obj.icon)},
-                {"path", obj.path},
-                {"type", obj.type},
-                {"children", obj.children}
-            };
+            j = {{"id", obj.id.empty() ? nlohmann::json(nullptr) : nlohmann::json(obj.id)},
+                 {"name", obj.name},
+                 {"icon", obj.icon.empty() ? nlohmann::json(nullptr) : nlohmann::json(obj.icon)},
+                 {"path", obj.path},
+                 {"type", obj.type},
+                 {"children", obj.children}};
         }
     };
 
@@ -100,9 +95,13 @@ namespace service {
         std::string id;
         nlohmann::json data;
 
-        friend void to_json(nlohmann::json &j, const FullRecipeData &obj) {
-            j = nlohmann::json{{"id", obj.id}, {"data", obj.data}};
-        }
+        friend void to_json(nlohmann::json &j, const FullRecipeData &obj) { j = nlohmann::json{{"id", obj.id}, {"data", obj.data}}; }
+    };
+
+    struct Frontmatter {
+        std::string id;
+        std::string title;
+        std::string icon;
     };
 
     // See resolved_db.h
@@ -112,7 +111,7 @@ namespace service {
 
     class ResolvedProject {
     public:
-        explicit ResolvedProject(const Project &, const std::filesystem::path &, const ProjectVersion &);
+        explicit ResolvedProject(const Project &, const std::filesystem::path &, const ProjectVersion &, const std::shared_ptr<spdlog::logger> &);
 
         void setDefaultVersion(const ResolvedProject &defaultVersion);
         void setLocale(const std::optional<std::string> &locale);
@@ -125,10 +124,11 @@ namespace service {
         drogon::Task<bool> hasVersion(std::string version) const;
 
         std::optional<std::string> getPagePath(const std::string &path) const; // For project issues
-        std::optional<std::string> getPageAttribute(const std::string &path, const std::string &prop) const;
         std::optional<std::string> getPageTitle(const std::string &path) const;
         std::tuple<ProjectPage, Error> readPageFile(std::string path) const;
         drogon::Task<std::tuple<ProjectPage, Error>> readContentPage(std::string id) const;
+        std::optional<Frontmatter> readPageAttributes(const std::string &path) const;
+
         drogon::Task<nlohmann::json> readItemProperties(std::string id) const;
         std::optional<std::string> readLangKey(const std::string &namespace_, const std::string &key) const;
 
@@ -168,10 +168,15 @@ namespace service {
     private:
         FolderMetadata getFolderMetadata(const std::filesystem::path &path) const;
         FileTree getDirectoryTree(const std::filesystem::path &dir) const;
+        void addPageMetadata(FileTree &tree) const;
+
+        void addProjectIssueAsync(ProjectIssueLevel level, ProjectIssueType type, ProjectError subject, const std::string &details,
+                                  const std::string &path) const;
 
         Project project_;
         std::shared_ptr<ResolvedProject> defaultVersion_;
         ProjectFormat format_;
+        std::shared_ptr<spdlog::logger> logger_;
 
         std::filesystem::path docsDir_;
 

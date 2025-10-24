@@ -5,6 +5,7 @@
 #include <service/database/resolved_db.h>
 #include <service/project/git_hosts.h>
 #include <service/project/properties.h>
+#include <service/storage/storage.h>
 #include <service/storage/gitops.h>
 #include <service/util.h>
 
@@ -35,9 +36,9 @@ namespace service {
         return removeTrailingSlash(project.getValueOfSourceRepo()) + "/" + result;
     }
 
-    ResolvedProject::ResolvedProject(const Project &p, const std::filesystem::path &d, const ProjectVersion &v) :
+    ResolvedProject::ResolvedProject(const Project &p, const std::filesystem::path &d, const ProjectVersion &v, const std::shared_ptr<spdlog::logger> &log) :
         project_(p), defaultVersion_(nullptr), docsDir_(d), version_(v), projectDb_(std::make_shared<ProjectDatabaseAccess>(*this)),
-        format_(ProjectFormat{d, ""}) {}
+        format_(ProjectFormat{d, ""}), logger_(log) {}
 
     void ResolvedProject::setDefaultVersion(const ResolvedProject &defaultVersion) {
         defaultVersion_ = std::make_shared<ResolvedProject>(defaultVersion);
@@ -252,5 +253,9 @@ namespace service {
 
     Task<PaginatedData<ProjectVersion>> ResolvedProject::getVersions(const TableQueryParams params) const {
         co_return co_await projectDb_->getVersionsDev(params.query, params.page);
+    }
+
+    void ResolvedProject::addProjectIssueAsync(const ProjectIssueLevel level, const ProjectIssueType type, const ProjectError subject, const std::string &details, const std::string &path) const {
+        global::storage->addProjectIssueAsync(*this, level, type, subject, details, path);
     }
 }

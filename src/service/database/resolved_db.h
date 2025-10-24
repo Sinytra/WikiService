@@ -69,7 +69,6 @@ namespace service {
         drogon::Task<PaginatedData<ProjectContent>> getProjectTagItemsDev(std::string tag, std::string searchQuery, int page) const;
         drogon::Task<PaginatedData<ProjectTag>> getProjectTagsDev(std::string searchQuery, int page) const;
         drogon::Task<PaginatedData<Recipe>> getProjectRecipesDev(std::string searchQuery, int page) const;
-        drogon::Task<std::vector<ProjectContent>> getProjectItemPages() const;
         drogon::Task<int> getProjectContentCount() const;
         drogon::Task<std::optional<std::string>> getProjectContentPath(std::string id) const;
         drogon::Task<Error> addProjectContentPage(std::string id, std::string path) const;

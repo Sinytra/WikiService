@@ -20,29 +20,33 @@ namespace content {
         PreparationResult result;
 
         for (const auto docsRoot = project_.getRootDirectory(); const auto &entry: fs::recursive_directory_iterator(docsRoot)) {
-            if (const auto fileName = entry.path().filename().string(); !entry.is_regular_file() || entry.path().extension() != DOCS_FILE_EXT ||
+            if (const auto fileName = entry.path().filename().string(); !entry.is_regular_file() ||
+                                                                        entry.path().extension() != DOCS_FILE_EXT ||
                                                                         fileName.starts_with(".") && !fileName.starts_with(CONTENT_DIR))
             {
                 continue;
             }
-            const auto relative_path = relative(entry.path(), docsRoot);
+            const auto relativePath = relative(entry.path(), docsRoot);
             ProjectFileIssueCallback fileIssues{issues_, entry.path()};
 
-            if (const auto id = project_.getPageAttribute(relative_path.string(), "id")) {
-                if (pagePaths_.contains(*id)) {
-                    logger_->warn("Skipping duplicate page for item {} at {}", *id, relative_path.string());
-                    co_await fileIssues.addIssue(ProjectIssueLevel::WARNING, ProjectIssueType::INGESTOR, ProjectError::DUPLICATE_PAGE, *id);
+            if (const auto pageAttributes = project_.readPageAttributes(relativePath.string());
+                pageAttributes && !pageAttributes->id.empty())
+            {
+                const auto id = pageAttributes->id;
+                if (pagePaths_.contains(id)) {
+                    logger_->warn("Skipping duplicate page for item {} at {}", id, relativePath.string());
+                    co_await fileIssues.addIssue(ProjectIssueLevel::WARNING, ProjectIssueType::INGESTOR, ProjectError::DUPLICATE_PAGE, id);
                     continue;
                 }
 
-                if (!fileIssues.validateResourceLocation(*id)) {
+                if (!fileIssues.validateResourceLocation(id)) {
                     continue;
                 }
 
-                logger_->trace("Found page for '{}' at '{}'", *id, relative_path.string());
+                logger_->trace("Found page for '{}' at '{}'", id, relativePath.string());
 
-                result.items.insert(*id);
-                pagePaths_[*id] = relative_path.string();
+                result.items.insert(id);
+                pagePaths_[id] = relativePath.string();
             }
         }
 

@@ -36,6 +36,7 @@ add_library(service STATIC
 
         project/content.cc
         project/format.cc
+        project/frontmatter.cc
         project/git_hosts.cc
         project/pages.cc
         project/properties.cc
@@ -70,6 +71,7 @@ target_link_libraries(service PRIVATE
         libgit2package
         OpenSSL::Crypto
         libzip::zip
+        yaml-cpp::yaml-cpp
 )
 
 target_include_directories(service PUBLIC

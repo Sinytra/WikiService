@@ -49,6 +49,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
         OpenSSL::Crypto
         libzip::zip
         sentry::sentry
+        yaml-cpp::yaml-cpp
 )
 
 # ##############################################################################

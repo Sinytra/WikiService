@@ -19,7 +19,7 @@ namespace service {
         {ProjectIssueType::GIT_CLONE, "git_clone"},
         {ProjectIssueType::GIT_INFO, "git_info"},
         {ProjectIssueType::INGESTOR, "ingestor"},
-        {ProjectIssueType::PAGE_RENDER, "page_render"},
+        {ProjectIssueType::PAGE, "page"},
         {ProjectIssueType::INTERNAL, "internal"}
     )
 
@@ -31,7 +31,7 @@ namespace service {
         {ProjectError::NO_BRANCH, "no_branch"},
         {ProjectError::NO_PATH, "no_path"},
         {ProjectError::INVALID_META, "invalid_meta"},
-        {ProjectError::INVALID_PAGE, "invalid_page"},
+        {ProjectError::PAGE_RENDER, "page_render"},
         {ProjectError::DUPLICATE_PAGE, "duplicate_page"},
         {ProjectError::UNKNOWN_RECIPE_TYPE, "unknown_recipe_type"},
         {ProjectError::INVALID_INGREDIENT, "invalid_ingredient"},
@@ -41,6 +41,7 @@ namespace service {
         {ProjectError::INVALID_VERSION_BRANCH, "invalid_version_branch"},
         {ProjectError::MISSING_PLATFORM_PROJECT, "missing_platform_project"},
         {ProjectError::NO_PAGE_TITLE, "no_page_title"},
+        {ProjectError::INVALID_FRONTMATTER, "invalid_frontmatter"},
         {ProjectError::MISSING_REQUIRED_ATTRIBUTE, "missing_required_attribute"}
     )
     // clang-format on

@@ -10,15 +10,16 @@ using namespace drogon_model::postgres;
 namespace fs = std::filesystem;
 
 namespace service {
-    Task<> addPageIDs(const std::unordered_map<std::string, std::string> &ids, FileTree &tree) {
+    void ResolvedProject::addPageMetadata(FileTree &tree) const {
         for (auto it = tree.begin(); it != tree.end();) {
             auto entry = it;
 
             if (entry->type == FileType::DIR) {
-                co_await addPageIDs(ids, entry->children);
+                addPageMetadata(entry->children);
             } else if (entry->type == FileType::FILE) {
-                if (const auto id = ids.find(entry->path + DOCS_FILE_EXT); id != ids.end()) {
-                    entry->id = id->second;
+                if (const auto page = readPageAttributes(entry->path + DOCS_FILE_EXT)) {
+                    entry->id = page->id;
+                    entry->icon = page->icon;
                 } else {
                     it = tree.erase(it);
                     continue;
@@ -29,17 +30,12 @@ namespace service {
     }
 
     Task<std::tuple<std::optional<FileTree>, Error>> ResolvedProject::getProjectContents() const {
-        std::unordered_map<std::string, std::string> ids;
-        for (const auto contents = co_await projectDb_->getProjectItemPages(); const auto &[id, path]: contents) {
-            ids.emplace(path, id);
-        }
-
         auto [tree, treeErr] = getContentDirectoryTree();
         if (treeErr != Error::Ok) {
             co_return {std::nullopt, treeErr};
         }
 
-        co_await addPageIDs(ids, tree);
+        addPageMetadata(tree);
 
         co_return {tree, Error::Ok};
     }

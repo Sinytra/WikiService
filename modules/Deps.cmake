@@ -73,6 +73,14 @@ CPMAddPackage(
 )
 
 CPMAddPackage(
+        NAME yaml-cpp
+        GITHUB_REPOSITORY jbeder/yaml-cpp
+        GIT_TAG 0.8.0
+        OPTIONS
+        "YAML_BUILD_SHARED_LIBS OFF"
+)
+
+CPMAddPackage(
         NAME sentry
         VERSION 0.9.1
         URL https://github.com/getsentry/sentry-native/releases/download/0.9.1/sentry-native.zip

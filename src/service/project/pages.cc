@@ -1,7 +1,7 @@
-#include <schemas/schemas.h>
 #include <fmt/args.h>
 #include <fstream>
 #include <regex>
+#include <schemas/schemas.h>
 #include <service/database/resolved_db.h>
 #include <service/resolved.h>
 
@@ -10,7 +10,6 @@
 
 #define NO_ICON "_none"
 
-#define TITLE_ATTR "title"
 #define H1_REGEX R"(^#\s+([^\n<>*_`]+)$)"
 
 using namespace logging;
@@ -89,14 +88,9 @@ std::string formatEditUrl(const Project &project, const std::string &filePath) {
 }
 
 namespace service {
-    ENUM_TO_STR(FileType,
-        {FileType::FILE, "file"},
-        {FileType::DIR, "dir"}
-    )
+    ENUM_TO_STR(FileType, {FileType::FILE, "file"}, {FileType::DIR, "dir"})
 
-    void to_json(nlohmann::json &j, const FileType &obj) {
-        j = enumToStr(obj);
-    }
+    void to_json(nlohmann::json &j, const FileType &obj) { j = enumToStr(obj); }
 
     FolderMetadata ResolvedProject::getFolderMetadata(const fs::path &path) const {
         FolderMetadata metadata;
@@ -208,40 +202,11 @@ namespace service {
         return relative(filePath, docsDir_).string();
     }
 
-    std::optional<std::string> ResolvedProject::getPageAttribute(const std::string &path, const std::string &prop) const {
-        const auto filePath = format_.getLocalizedFilePath(removeLeadingSlash(path));
-
-        std::ifstream ifs(filePath);
-        if (!ifs) {
-            return std::nullopt;
-        }
-
-        std::string line;
-        int frontMatterBorder = 0;
-        while (std::getline(ifs, line)) {
-            if (frontMatterBorder > 1) {
-                break;
-            }
-            if (line.starts_with("---")) {
-                frontMatterBorder++;
-            }
-            if (frontMatterBorder == 1 && line.starts_with(prop + ":")) {
-                if (const auto pos = line.find(":"); pos != std::string::npos) {
-                    auto sub = line.substr(pos + 1);
-                    ifs.close();
-                    ltrim(sub);
-                    rtrim(sub);
-                    return sub;
-                }
-            }
-        }
-        ifs.close();
-        return std::nullopt;
-    }
-
     std::optional<std::string> ResolvedProject::getPageTitle(const std::string &path) const {
-        const auto title = getPageAttribute(path, TITLE_ATTR);
-        return title ? title : readPageHeading(format_.getLocalizedFilePath(removeLeadingSlash(path)));
+        if (const auto frontmatter = readPageAttributes(path); frontmatter && !frontmatter->title.empty()) {
+            return frontmatter->title;
+        }
+        return readPageHeading(format_.getLocalizedFilePath(removeLeadingSlash(path)));
     }
 
     std::tuple<ProjectPage, Error> ResolvedProject::readPageFile(std::string path) const {

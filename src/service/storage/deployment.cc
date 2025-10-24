@@ -1,9 +1,9 @@
 #include "storage.h"
 
-#include <service/content/ingestor/ingestor.h>
 #include <filesystem>
 #include <fstream>
 #include <git2/repository.h>
+#include <service/content/ingestor/ingestor.h>
 #include <service/database/resolved_db.h>
 #include <service/storage/deployment.h>
 #include <service/storage/gitops.h>
@@ -70,10 +70,15 @@ namespace service {
             issues.addIssueAsync(ProjectIssueLevel::WARNING, ProjectIssueType::FILE, ProjectError::NO_PAGE_TITLE, "", path);
         }
 
-        for (const auto &attr: requiredAttributes) {
-            if (const auto val = resolved.getPageAttribute(path, attr); !val) {
-                issues.addIssueAsync(ProjectIssueLevel::WARNING, ProjectIssueType::FILE, ProjectError::MISSING_REQUIRED_ATTRIBUTE, attr,
-                                     path);
+        if (const auto pageAttributes = resolved.readPageAttributes(path)) {
+            const std::unordered_map<std::string, std::string> attributes = {
+                {"id", pageAttributes->id}, {"title", pageAttributes->title}, {"icon", pageAttributes->icon}};
+
+            for (const auto &attr: requiredAttributes) {
+                if (!attributes.contains(attr) || attributes.find(attr)->second.empty()) {
+                    issues.addIssueAsync(ProjectIssueLevel::WARNING, ProjectIssueType::FILE, ProjectError::MISSING_REQUIRED_ATTRIBUTE, attr,
+                                         path);
+                }
             }
         }
     }
@@ -227,8 +232,9 @@ namespace service {
         co_await global::database->updateModel(deployment);
 
         // 4. Ingest game content
+        const auto projectLog = getProjectLogger(project, false);
         const auto cloneDocsRoot = clonePath / removeLeadingSlash(project.getValueOfSourcePath());
-        ResolvedProject resolved{project, cloneDocsRoot, *defaultVersion};
+        ResolvedProject resolved{project, cloneDocsRoot, *defaultVersion, projectLog};
 
         // 5. Validate metadata
         // TODO Validate metadata
@@ -394,7 +400,7 @@ namespace service {
             co_return {std::nullopt, ProjectError::NO_PATH, ""};
         }
 
-        const ResolvedProject resolved{project, docsPath, ProjectVersion{}};
+        const ResolvedProject resolved{project, docsPath, ProjectVersion{}, logger};
 
         // Validate metadata
         const auto [json, error, details] = resolved.validateProjectMetadata();

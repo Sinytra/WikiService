@@ -132,7 +132,8 @@ namespace service {
                 co_return {std::nullopt, Error::ErrNotFound};
             }
 
-            ResolvedProject resolved{project, rootDir, *resolvedVersion};
+            const auto logger = getProjectLogger(project, false);
+            ResolvedProject resolved{project, rootDir, *resolvedVersion, logger};
             resolved.setLocale(locale);
             co_return {resolved, Error::Ok};
         }
@@ -142,7 +143,8 @@ namespace service {
             co_return {std::nullopt, Error::ErrNotFound};
         }
 
-        ResolvedProject resolved{project, rootDir, *defaultVersion};
+        const auto logger = getProjectLogger(project, false);
+        ResolvedProject resolved{project, rootDir, *defaultVersion, logger};
         resolved.setLocale(locale);
         co_return {resolved, Error::Ok};
     }
