@@ -16,7 +16,7 @@ namespace fs = std::filesystem;
 
 inline std::string createProjectIssueKey(const std::string &project, const std::string &level, const std::string &type,
                                          const std::string &subject, const std::string &path) {
-    return std::format("page_error:{}:{}:{}:{}:[{}]", project, level, type, subject, path);
+    return std::format("project_issue:{}:{}:{}:{}:[{}]", project, level, type, subject, path);
 }
 
 namespace service {
@@ -133,7 +133,8 @@ namespace service {
             }
 
             const auto logger = getProjectLogger(project, false);
-            ResolvedProject resolved{project, rootDir, *resolvedVersion, logger};
+            const auto issues = std::make_shared<ProjectIssueCallback>(activeDeployment->getValueOfId(), getDeploymentLogger(*activeDeployment));
+            ResolvedProject resolved{project, rootDir, *resolvedVersion, issues, logger};
             resolved.setLocale(locale);
             co_return {resolved, Error::Ok};
         }
@@ -143,8 +144,9 @@ namespace service {
             co_return {std::nullopt, Error::ErrNotFound};
         }
 
+        const auto issues = std::make_shared<ProjectIssueCallback>(activeDeployment->getValueOfId(), getDeploymentLogger(*activeDeployment));
         const auto logger = getProjectLogger(project, false);
-        ResolvedProject resolved{project, rootDir, *defaultVersion, logger};
+        ResolvedProject resolved{project, rootDir, *defaultVersion, issues, logger};
         resolved.setLocale(locale);
         co_return {resolved, Error::Ok};
     }

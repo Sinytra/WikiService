@@ -21,14 +21,12 @@ namespace service {
 
         drogon::Task<std::tuple<std::optional<ResolvedProject>, Error>>
         getProject(std::string projectId, const std::optional<std::string> &version, const std::optional<std::string> &locale) const;
-
         drogon::Task<std::tuple<std::optional<ResolvedProject>, Error>>
         getProject(const Project &project, const std::optional<std::string> &version, const std::optional<std::string> &locale) const;
+        drogon::Task<std::optional<ResolvedProject>> maybeGetProject(const Project &project) const;
 
         [[maybe_unused]] Error invalidateProject(const Project &project) const;
         [[maybe_unused]] Error removeDeployment(const Deployment &deployment) const;
-
-        drogon::Task<std::optional<ResolvedProject>> maybeGetProject(const Project &project) const;
 
         drogon::Task<ProjectStatus> getProjectStatus(const Project &project) const;
 

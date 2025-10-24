@@ -3,9 +3,7 @@
 #include <schemas/schemas.h>
 #include <service/database/database.h>
 #include <service/database/resolved_db.h>
-#include <service/project/git_hosts.h>
 #include <service/project/properties.h>
-#include <service/storage/storage.h>
 #include <service/storage/gitops.h>
 #include <service/util.h>
 
@@ -23,22 +21,9 @@ using namespace drogon_model::postgres;
 namespace fs = std::filesystem;
 
 namespace service {
-    std::string formatCommitUrl(const Project &project, const std::string &hash) {
-        const auto provider = getGitProvider(project.getValueOfSourceRepo());
-        if (!provider) {
-            return "";
-        }
-
-        fmt::dynamic_format_arg_store<fmt::format_context> store;
-        store.push_back(fmt::arg("hash", hash));
-        const auto result = vformat(provider->commitPath, store);
-
-        return removeTrailingSlash(project.getValueOfSourceRepo()) + "/" + result;
-    }
-
-    ResolvedProject::ResolvedProject(const Project &p, const std::filesystem::path &d, const ProjectVersion &v, const std::shared_ptr<spdlog::logger> &log) :
+    ResolvedProject::ResolvedProject(const Project &p, const std::filesystem::path &d, const ProjectVersion &v, const std::shared_ptr<ProjectIssueCallback> &issues, const std::shared_ptr<spdlog::logger> &log) :
         project_(p), defaultVersion_(nullptr), docsDir_(d), version_(v), projectDb_(std::make_shared<ProjectDatabaseAccess>(*this)),
-        format_(ProjectFormat{d, ""}), logger_(log) {}
+        format_(ProjectFormat{d, ""}), issues_(issues), logger_(log) {}
 
     void ResolvedProject::setDefaultVersion(const ResolvedProject &defaultVersion) {
         defaultVersion_ = std::make_shared<ResolvedProject>(defaultVersion);
@@ -134,7 +119,7 @@ namespace service {
                     projectJson["revision"] = parseJsonOrThrow(*revisionStr);
 
                     const git::GitRevision revision = nlohmann::json::parse(*revisionStr);
-                    if (const auto url = formatCommitUrl(project_, revision.fullHash); !url.empty()) {
+                    if (const auto url = git::formatCommitUrl(project_, revision.fullHash); !url.empty()) {
                         projectJson["revision"]["url"] = url;
                     }
                 }
@@ -253,9 +238,5 @@ namespace service {
 
     Task<PaginatedData<ProjectVersion>> ResolvedProject::getVersions(const TableQueryParams params) const {
         co_return co_await projectDb_->getVersionsDev(params.query, params.page);
-    }
-
-    void ResolvedProject::addProjectIssueAsync(const ProjectIssueLevel level, const ProjectIssueType type, const ProjectError subject, const std::string &details, const std::string &path) const {
-        global::storage->addProjectIssueAsync(*this, level, type, subject, details, path);
     }
 }

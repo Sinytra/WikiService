@@ -107,11 +107,9 @@ namespace service {
     // See resolved_db.h
     class ProjectDatabaseAccess;
 
-    std::string formatCommitUrl(const Project &project, const std::string &hash);
-
     class ResolvedProject {
     public:
-        explicit ResolvedProject(const Project &, const std::filesystem::path &, const ProjectVersion &, const std::shared_ptr<spdlog::logger> &);
+        explicit ResolvedProject(const Project &, const std::filesystem::path &, const ProjectVersion &, const std::shared_ptr<ProjectIssueCallback> &, const std::shared_ptr<spdlog::logger> &);
 
         void setDefaultVersion(const ResolvedProject &defaultVersion);
         void setLocale(const std::optional<std::string> &locale);
@@ -148,16 +146,16 @@ namespace service {
         drogon::Task<PaginatedData<FullRecipeData>> getRecipes(TableQueryParams params) const;
         drogon::Task<PaginatedData<ProjectVersion>> getVersions(TableQueryParams params) const;
 
+        void validatePages() const;
+
+        // Access
         const Project &getProject() const;
-
         const ProjectVersion &getProjectVersion() const;
-
         const std::filesystem::path &getRootDirectory() const;
-
         const ProjectFormat &getFormat() const;
-
         ProjectDatabaseAccess &getProjectDatabase() const;
 
+        // Serialization
         drogon::Task<Json::Value> toJson(bool full = false) const;
         drogon::Task<Json::Value> toJsonVerbose() const;
 
@@ -170,18 +168,13 @@ namespace service {
         FileTree getDirectoryTree(const std::filesystem::path &dir) const;
         void addPageMetadata(FileTree &tree) const;
 
-        void addProjectIssueAsync(ProjectIssueLevel level, ProjectIssueType type, ProjectError subject, const std::string &details,
-                                  const std::string &path) const;
-
         Project project_;
-        std::shared_ptr<ResolvedProject> defaultVersion_;
-        ProjectFormat format_;
-        std::shared_ptr<spdlog::logger> logger_;
-
         std::filesystem::path docsDir_;
-
+        ProjectFormat format_;
+        std::shared_ptr<ResolvedProject> defaultVersion_;
         ProjectVersion version_;
-
         std::shared_ptr<ProjectDatabaseAccess> projectDb_;
+        std::shared_ptr<ProjectIssueCallback> issues_;
+        std::shared_ptr<spdlog::logger> logger_;
     };
 }

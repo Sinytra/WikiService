@@ -26,6 +26,15 @@ namespace git {
         NLOHMANN_DEFINE_TYPE_INTRUSIVE(GitRevision, hash, fullHash, message, authorName, authorEmail, date)
     };
 
+    struct GitProvider {
+        std::string filePath;
+        std::string commitPath;
+    };
+
+    std::optional<GitProvider> getGitProvider(const std::string &url);
+
+    std::string formatCommitUrl(const Project &project, const std::string &hash);
+
     service::Error checkoutBranch(git_repository *repo, const std::string &branch, const std::shared_ptr<spdlog::logger> &logger);
 
     std::unordered_map<std::string, std::string> listBranches(git_repository *repo);

@@ -1,6 +1,6 @@
-#include "resolved.h"
 #include <fstream>
 #include <yaml-cpp/yaml.h>
+#include "resolved.h"
 
 #define DELIMITER "---"
 
@@ -34,6 +34,8 @@ namespace service {
 
         ifs.close();
         if (!valid) {
+            issues_->addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::PAGE, ProjectError::INVALID_FRONTMATTER,
+                                   "Frontmatter closing delimiter not found", path);
             return std::nullopt;
         }
 
@@ -47,10 +49,10 @@ namespace service {
             const auto title = root["title"] ? root["title"].as<std::string>() : "";
             const auto icon = root["icon"] ? root["icon"].as<std::string>() : "";
 
-            return Frontmatter{ .id = id, .title = title, .icon = icon };
+            return Frontmatter{.id = id, .title = title, .icon = icon};
         } catch (YAML::Exception e) {
             const auto msg = std::format("{} ({}:{})", e.msg, e.mark.line + 2, e.mark.column);
-            addProjectIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::PAGE, ProjectError::INVALID_FRONTMATTER, msg, path);
+            issues_->addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::PAGE, ProjectError::INVALID_FRONTMATTER, msg, path);
             logger_->error("Error parsing page metadata at path {}: {}", path, msg);
         }
         return std::nullopt;

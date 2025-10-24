@@ -1,7 +1,5 @@
 #include "storage.h"
 
-#include <filesystem>
-#include <fstream>
 #include <git2/repository.h>
 #include <service/content/ingestor/ingestor.h>
 #include <service/database/resolved_db.h>
@@ -62,44 +60,6 @@ namespace service {
         {DeploymentStatus::ERROR, "error"}
     )
     // clang-format on
-
-    void validatePageFile(const FileTreeEntry &entry, const ResolvedProject &resolved, ProjectIssueCallback &issues,
-                          const std::vector<std::string> &requiredAttributes) {
-        const auto path = entry.path + DOCS_FILE_EXT;
-        if (const auto title = resolved.getPageTitle(path); !title) {
-            issues.addIssueAsync(ProjectIssueLevel::WARNING, ProjectIssueType::FILE, ProjectError::NO_PAGE_TITLE, "", path);
-        }
-
-        if (const auto pageAttributes = resolved.readPageAttributes(path)) {
-            const std::unordered_map<std::string, std::string> attributes = {
-                {"id", pageAttributes->id}, {"title", pageAttributes->title}, {"icon", pageAttributes->icon}};
-
-            for (const auto &attr: requiredAttributes) {
-                if (!attributes.contains(attr) || attributes.find(attr)->second.empty()) {
-                    issues.addIssueAsync(ProjectIssueLevel::WARNING, ProjectIssueType::FILE, ProjectError::MISSING_REQUIRED_ATTRIBUTE, attr,
-                                         path);
-                }
-            }
-        }
-    }
-
-    void validatePagesTree(const FileTree &tree, const ResolvedProject &resolved, ProjectIssueCallback &issues,
-                           const std::vector<std::string> &requiredAttributes) {
-        for (const auto &entry: tree) {
-            if (entry.type == FileType::FILE) {
-                validatePageFile(entry, resolved, issues, requiredAttributes);
-            } else if (entry.type == FileType::DIR) {
-                validatePagesTree(entry.children, resolved, issues, requiredAttributes);
-            }
-        }
-    }
-
-    void validatePages(const ResolvedProject &resolved, ProjectIssueCallback &issues) {
-        const auto [tree, tErr](resolved.getDirectoryTree());
-        validatePagesTree(tree, resolved, issues, {});
-        const auto [contentTree, cErr](resolved.getContentDirectoryTree());
-        validatePagesTree(contentTree, resolved, issues, {"id"});
-    }
 
     std::unordered_map<std::string, std::string> readVersionsFromMetadata(const nlohmann::json &metadata,
                                                                           const std::string &defaultBranch) {
@@ -234,11 +194,22 @@ namespace service {
         // 4. Ingest game content
         const auto projectLog = getProjectLogger(project, false);
         const auto cloneDocsRoot = clonePath / removeLeadingSlash(project.getValueOfSourcePath());
-        ResolvedProject resolved{project, cloneDocsRoot, *defaultVersion, projectLog};
+        const auto sharedIssues = std::make_shared<ProjectIssueCallback>(issues);
+        ResolvedProject resolved{project, cloneDocsRoot, *defaultVersion, sharedIssues, projectLog};
 
         // 5. Validate metadata
-        // TODO Validate metadata
-        validatePages(resolved, issues);
+        if (const auto [c, e, details] = resolved.validateProjectMetadata(); !details.empty()) {
+            logger->error("Invalid project metadata found.");
+            co_await issues.addIssue(ProjectIssueLevel::ERROR, ProjectIssueType::META, ProjectError::INVALID_META, details);
+            co_return ProjectError::INVALID_META;
+        }
+
+        // Validate pages
+        resolved.validatePages();
+        if (issues.hasErrors()) {
+            logger->error("Found invalid page, aborting");
+            co_return ProjectError::UNKNOWN;
+        }
 
         // TODO Ingest from other versions?
         // TODO Move transaction scope up
@@ -400,7 +371,8 @@ namespace service {
             co_return {std::nullopt, ProjectError::NO_PATH, ""};
         }
 
-        const ResolvedProject resolved{project, docsPath, ProjectVersion{}, logger};
+        const auto issues = std::make_shared<ProjectIssueCallback>("", logger);
+        const ResolvedProject resolved{project, docsPath, ProjectVersion{}, issues, logger};
 
         // Validate metadata
         const auto [json, error, details] = resolved.validateProjectMetadata();

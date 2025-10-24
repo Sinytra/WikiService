@@ -32,10 +32,9 @@ namespace api::v1 {
         const auto json(BaseProjectController::validatedBody(req, schemas::report));
 
         const auto projectId = json["project_id"];
-        const auto [proj, projErr] = co_await global::database->getProjectSource(projectId);
-        if (!proj) {
-            throw ApiException(Error::ErrNotFound, "invalid_project");
-        }
+        const auto version = json.contains("version") ? std::make_optional(json["version"].get<std::string>()) : std::nullopt;
+        const auto locale = json.contains("locale") ? std::make_optional(json["locale"].get<std::string>()) : std::nullopt;
+        const auto resolved = co_await BaseProjectController::getProject(projectId, version, locale);
 
         const auto type = parseReportType(json["type"]);
         if (type == ReportType::UNKNOWN) {
@@ -49,21 +48,6 @@ namespace api::v1 {
 
         Report report;
 
-        if (json.contains("version") || json.contains("locale")) {
-            const auto version = json.contains("version") ? std::make_optional(json["version"].get<std::string>()) : std::nullopt;
-            const auto locale = json.contains("locale") ? std::make_optional(json["locale"].get<std::string>()) : std::nullopt;
-
-            const auto [resolved, resErr](co_await global::storage->getProject(*proj, version, locale));
-            if (!resolved) {
-                throw ApiException(Error::ErrNotFound, "invalid_project");
-            }
-
-            report.setVersionId(resolved->getProjectVersion().getValueOfId());
-            if (const auto projLocale = resolved->getLocale(); !projLocale.empty()) {
-                report.setLocale(projLocale);
-            }
-        }
-
         const std::string body = json["body"];
         const std::string path = json["path"];
 
@@ -75,6 +59,11 @@ namespace api::v1 {
         report.setStatus(enumToStr(ReportStatus::NEW));
         report.setReason(enumToStr(reason));
         report.setBody(body);
+
+        report.setVersionId(resolved.getProjectVersion().getValueOfId());
+        if (const auto projLocale = resolved.getLocale(); !projLocale.empty()) {
+            report.setLocale(projLocale);
+        }
 
         if (const auto res = co_await global::database->addModel(report); !res) {
             logger.error("Failed to create report");

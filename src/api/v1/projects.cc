@@ -283,12 +283,6 @@ namespace api::v1 {
         const auto session{co_await global::auth->getSession(req)};
         const auto json(BaseProjectController::validatedBody(req, schemas::projectRegister));
 
-        // TODO Add support for community projects
-        const bool isCommunity = json.contains("is_community") && json["is_community"];
-        if (isCommunity) {
-            throw ApiException(Error::ErrInternal, "unsupported");
-        }
-
         const std::string repo = json["repo"];
         const std::string branch = json["branch"];
         const std::string path = json["path"];
@@ -299,7 +293,7 @@ namespace api::v1 {
 
         auto validated = co_await validateProjectData(json, session.user, false);
         auto [project, platforms] = validated;
-        project.setIsCommunity(isCommunity);
+        project.setIsCommunity(false);
 
         if (co_await global::database->existsForData(project.getValueOfId(), platforms)) {
             throw ApiException(Error::ErrBadRequest, "exists");
@@ -476,7 +470,7 @@ namespace api::v1 {
             root["revision"] = parseJsonOrThrow(*revisionStr);
 
             const git::GitRevision revision = nlohmann::json::parse(*revisionStr);
-            if (const auto url = formatCommitUrl(project, revision.fullHash); !url.empty()) {
+            if (const auto url = git::formatCommitUrl(project, revision.fullHash); !url.empty()) {
                 root["revision"]["url"] = url;
             }
         } else {

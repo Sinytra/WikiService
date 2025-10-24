@@ -27,8 +27,7 @@ nlohmann::json schemas::projectRegister = R"(
     "properties": {
         "repo": { "type": "string" },
         "branch": { "type": "string" },
-        "path": { "type": "string" },
-        "is_community": { "type": "boolean" }
+        "path": { "type": "string" }
     },
     "required": ["repo", "branch", "path"]
 }

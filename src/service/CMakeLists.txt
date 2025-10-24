@@ -37,7 +37,6 @@ add_library(service STATIC
         project/content.cc
         project/format.cc
         project/frontmatter.cc
-        project/git_hosts.cc
         project/pages.cc
         project/properties.cc
         project/reports.cc

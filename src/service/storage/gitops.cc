@@ -1,5 +1,6 @@
 #include "gitops.h"
 
+#include <fmt/args.h>
 #include <git2.h>
 #include <include/uri.h>
 
@@ -11,6 +12,34 @@ using namespace drogon;
 namespace fs = std::filesystem;
 
 namespace git {
+    std::unordered_map<std::string, GitProvider> GIT_PROVIDERS = {
+        {"github.com", GitProvider{.filePath = "blob/{branch}/{base}/{path}", .commitPath = "commit/{hash}"}}};
+
+    std::optional<GitProvider> getGitProvider(const std::string &url) {
+        const uri parsed{url};
+        const auto domain = parsed.get_host();
+
+        const auto provider = GIT_PROVIDERS.find(domain);
+        if (provider == GIT_PROVIDERS.end()) {
+            return std::nullopt;
+        }
+
+        return provider->second;
+    }
+
+    std::string formatCommitUrl(const Project &project, const std::string &hash) {
+        const auto provider = getGitProvider(project.getValueOfSourceRepo());
+        if (!provider) {
+            return "";
+        }
+
+        fmt::dynamic_format_arg_store<fmt::format_context> store;
+        store.push_back(fmt::arg("hash", hash));
+        const auto result = vformat(provider->commitPath, store);
+
+        return removeTrailingSlash(project.getValueOfSourceRepo()) + "/" + result;
+    }
+
     bool is_local_url(const std::string &str) {
         try {
             const uri url{str};

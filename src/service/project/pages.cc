@@ -4,9 +4,7 @@
 #include <schemas/schemas.h>
 #include <service/database/resolved_db.h>
 #include <service/resolved.h>
-
-#include "git_hosts.h"
-#include "storage/storage.h"
+#include <storage/gitops.h>
 
 #define NO_ICON "_none"
 
@@ -73,7 +71,7 @@ std::optional<std::string> readPageHeading(const std::string &filePath) {
 }
 
 std::string formatEditUrl(const Project &project, const std::string &filePath) {
-    const auto provider = service::getGitProvider(project.getValueOfSourceRepo());
+    const auto provider = git::getGitProvider(project.getValueOfSourceRepo());
     if (!provider) {
         return "";
     }
@@ -106,8 +104,7 @@ namespace service {
             if (const auto error = validateJson(schemas::folderMetadata, parsed)) {
                 logger.error("Invalid folder metadata: Project: {} Path: {} Error: {}", project_.getValueOfId(), path.string(), error->msg);
 
-                global::storage->addProjectIssueAsync(*this, ProjectIssueLevel::ERROR, ProjectIssueType::FILE, ProjectError::INVALID_FORMAT,
-                                                      error->msg, rel);
+                issues_->addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::FILE, ProjectError::INVALID_FORMAT, error->msg, rel);
             } else {
                 for (auto &[key, val]: parsed.items()) {
                     metadata.keys.push_back(key);
@@ -142,11 +139,10 @@ namespace service {
             ifs.close();
         } catch (const nlohmann::json::parse_error &error) {
             ifs.close();
-            logger.error("Error parsing folder metadata: Project '{}', path {}", project_.getValueOfId(), path.string());
-            logger.error("JSON parse error (getFolderMetadata): {}", error.what());
+            logger_->error("Error parsing folder metadata: Project '{}', path {}", project_.getValueOfId(), path.string());
+            logger_->error("JSON parse error (getFolderMetadata): {}", error.what());
 
-            global::storage->addProjectIssueAsync(*this, ProjectIssueLevel::ERROR, ProjectIssueType::FILE, ProjectError::INVALID_FILE,
-                                                  error.what(), rel);
+            issues_->addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::FILE, ProjectError::INVALID_FILE, error.what(), rel);
         }
         return metadata;
     }
@@ -250,5 +246,46 @@ namespace service {
         }
         const auto tree = getDirectoryTree(contentPath);
         return {tree, Error::Ok};
+    }
+
+    void validatePageFile(const FileTreeEntry &entry, const ResolvedProject &resolved, const std::shared_ptr<ProjectIssueCallback> &issues,
+                          const std::vector<std::string> &requiredAttributes) {
+        const auto path = entry.path + DOCS_FILE_EXT;
+        if (const auto title = resolved.getPageTitle(path); !title) {
+            issues->addIssueAsync(ProjectIssueLevel::WARNING, ProjectIssueType::FILE, ProjectError::NO_PAGE_TITLE, "", path);
+        }
+
+        const auto frontmatter = resolved.readPageAttributes(path);
+
+        if (const auto pageAttributes = resolved.readPageAttributes(path)) {
+            const std::unordered_map<std::string, std::string> attributes = {
+                {"id", pageAttributes->id}, {"title", pageAttributes->title}, {"icon", pageAttributes->icon}};
+
+            for (const auto &attr: requiredAttributes) {
+                if (!attributes.contains(attr) || attributes.find(attr)->second.empty()) {
+                    issues->addIssueAsync(ProjectIssueLevel::WARNING, ProjectIssueType::FILE, ProjectError::MISSING_REQUIRED_ATTRIBUTE, attr,
+                                         path);
+                }
+            }
+        }
+    }
+
+    void validatePagesTree(const FileTree &tree, const ResolvedProject &resolved, const std::shared_ptr<ProjectIssueCallback> &issues,
+                           const std::vector<std::string> &requiredAttributes) {
+        for (const auto &entry: tree) {
+            if (entry.type == FileType::FILE) {
+                validatePageFile(entry, resolved, issues, requiredAttributes);
+            } else if (entry.type == FileType::DIR) {
+                validatePagesTree(entry.children, resolved, issues, requiredAttributes);
+            }
+        }
+    }
+
+    void ResolvedProject::validatePages() const {
+        const auto [tree, tErr](getDirectoryTree());
+        validatePagesTree(tree, *this, issues_, {});
+
+        const auto [contentTree, cErr](getContentDirectoryTree());
+        validatePagesTree(contentTree, *this, issues_, {"id"});
     }
 }
