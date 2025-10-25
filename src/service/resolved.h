@@ -104,6 +104,22 @@ namespace service {
         std::string icon;
     };
 
+    struct ItemContentPage {
+        std::string id;
+        std::string name;
+        std::string icon;
+        std::string path;
+
+        friend void to_json(nlohmann::json &j, const ItemContentPage &obj) {
+            j = nlohmann::json{
+                    {"id", obj.id},
+                    {"name", obj.name},
+                    {"icon", obj.icon.empty() ? nlohmann::json(nullptr) : nlohmann::json(obj.icon)},
+                    {"path", obj.path.empty() ? nlohmann::json(nullptr) : nlohmann::json(obj.path)}
+            };
+        }
+    };
+
     // See resolved_db.h
     class ProjectDatabaseAccess;
 
@@ -140,7 +156,7 @@ namespace service {
 
         std::tuple<std::optional<nlohmann::json>, ProjectError, std::string> validateProjectMetadata() const;
 
-        drogon::Task<PaginatedData<FullItemData>> getItems(TableQueryParams params) const;
+        drogon::Task<PaginatedData<ItemContentPage>> getItemContentPages(TableQueryParams params) const;
         drogon::Task<PaginatedData<FullTagData>> getTags(TableQueryParams params) const;
         drogon::Task<PaginatedData<FullItemData>> getTagItems(std::string tag, TableQueryParams params) const;
         drogon::Task<PaginatedData<FullRecipeData>> getRecipes(TableQueryParams params) const;

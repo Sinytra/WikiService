@@ -408,7 +408,7 @@ namespace api::v1 {
                                                const std::string id) const {
         const auto version = req->getOptionalParameter<std::string>("version");
         const auto resolved = co_await BaseProjectController::getUserProject(req, id, version, std::nullopt);
-        const auto items{co_await resolved.getItems(getTableQueryParams(req))};
+        const auto items{co_await resolved.getItemContentPages(getTableQueryParams(req))};
         callback(jsonResponse(items));
     }
 

@@ -192,12 +192,14 @@ namespace service {
         return {*meta, ProjectError::OK, ""};
     }
 
-    Task<PaginatedData<FullItemData>> ResolvedProject::getItems(const TableQueryParams params) const {
+    Task<PaginatedData<ItemContentPage>> ResolvedProject::getItemContentPages(const TableQueryParams params) const {
         const auto [total, pages, size, data] = co_await projectDb_->getProjectItemsDev(params.query, params.page);
-        std::vector<FullItemData> itemData;
+        std::vector<ItemContentPage> itemData;
         for (const auto &[id, path]: data) {
             const auto [name, _] = co_await getItemName(id);
-            itemData.emplace_back(id, name, path);
+            const auto frontmatter = readPageAttributes(path);
+            const auto icon = frontmatter ? frontmatter->icon : "";
+            itemData.emplace_back(id, name, icon, path);
         }
         co_return PaginatedData{.total = total, .pages = pages, .size = size, .data = itemData};
     }
