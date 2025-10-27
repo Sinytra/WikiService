@@ -151,11 +151,17 @@ namespace service {
 
     Task<Json::Value> ResolvedProject::toJsonVerbose() const {
         auto projectJson = co_await toJson();
+        // TODO Cache
         Json::Value infoJson;
 
-        if (const auto [meta, err, detail] = validateProjectMetadata(); meta && meta->contains("links")) {
-            if (const auto links = (*meta)["links"]; links.contains("website")) {
-                infoJson["website"] = links["website"].get<std::string>();
+        if (const auto [meta, err, detail] = validateProjectMetadata(); meta) {
+            if (meta->contains("links")) {
+                if (const auto links = (*meta)["links"]; links.contains("website")) {
+                    infoJson["website"] = links["website"].get<std::string>();
+                }
+            }
+            if (meta->contains("licenses")) {
+                infoJson["licenses"] = unparkourJson((*meta)["licenses"]);
             }
         }
 

@@ -1,62 +1,129 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Sinytra Wiki Documentation Metadata",
-  "description": "Provides documentation project meta information",
-  "type": "object",
-  "properties": {
-    "id": {
-      "description": "Unique project ID that identifies the project across the wiki. We recommend using your projectid.",
-      "type": "string",
-      "minLength": 2,
-      "maxLength": 126,
-      "pattern": "^[a-z]+[a-z0-9-]+$"
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Sinytra Wiki Documentation Metadata",
+    "description": "Provides documentation project meta information",
+    "type": "object",
+    "properties": {
+        "id": {
+            "description": "Unique project ID that identifies the project across the wiki. We recommend using your projectid.",
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 126,
+            "pattern": "^[a-z]+[a-z0-9-]+$"
+        },
+        "modid": {
+            "description": "In-game modid, used to identify mod content data",
+            "type": "string"
+        },
+        "platforms": {
+            "description": "A map of your project's available distribution platforms to platform project slugs.",
+            "type": "object",
+            "additionalProperties": {
+                "type": "string"
+            }
+        },
+        "versions": {
+            "description": "A map of additional minecraft versions to git branch names to make available.",
+            "type": "object",
+            "additionalProperties": {
+                "type": "string"
+            }
+        },
+        "platform": {
+            "description": "Your project's distribution platform. Deprecated: use 'platforms' instead",
+            "enum": [
+                "curseforge",
+                "modrinth"
+            ],
+            "deprecated": true
+        },
+        "slug": {
+            "description": "The host platform's project slug. Deprecated: use 'platforms' instead",
+            "type": "string",
+            "deprecated": true
+        },
+        "owners": {
+            "description": "Usernames of wiki accounts authorized to register this project.",
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "licenses": {
+            "description": "Contains license information for the project itself and its wiki docs.",
+            "type": "object",
+            "properties": {
+                "project": {
+                    "$ref": "#/definitions/license"
+                }
+            },
+            "additionalProperties": false
+        }
     },
-    "modid": {
-      "description": "In-game modid, used to identify mod content data",
-      "type": "string"
-    },
-    "platforms": {
-      "description": "A map of your project's available distribution platforms to platform project slugs.",
-      "type": "object",
-      "additionalProperties": { "type": "string" }
-    },
-    "versions": {
-      "description": "A map of additional minecraft versions to git branch names to make available.",
-      "type": "object",
-      "additionalProperties": { "type": "string" }
-    },
-    "platform": {
-      "description": "Your project's distribution platform. Deprecated: use 'platforms' instead",
-      "enum": ["curseforge", "modrinth"],
-      "deprecated": true
-    },
-    "slug": {
-      "description": "The host platform's project slug. Deprecated: use 'platforms' instead",
-      "type": "string",
-      "deprecated": true
-    },
-    "owners": {
-      "description": "Usernames of wiki accounts authorized to register this project.",
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
-    }
-  },
-  "allOf": [
-    {
-      "required": ["id"]
-    },
-    {
-      "oneOf": [
+    "allOf": [
         {
-          "required": ["platform", "slug"],
-          "deprecated": true
+            "required": [
+                "id"
+            ]
         },
         {
-          "required": ["platforms"]
+            "oneOf": [
+                {
+                    "required": [
+                        "platform",
+                        "slug"
+                    ],
+                    "deprecated": true
+                },
+                {
+                    "required": [
+                        "platforms"
+                    ]
+                }
+            ]
         }
-      ]
+    ],
+    "definitions": {
+        "license": {
+            "description": "Contains license information",
+            "type": "object",
+            "properties": {
+                "id": {
+                    "description": "SPDX License Identifier",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "Custom license name",
+                    "type": "string"
+                },
+                "url": {
+                    "description": "Link to license text",
+                    "type": "string"
+                }
+            },
+            "additionalProperties": false,
+            "oneOf": [
+                {
+                    "required": [
+                        "id"
+                    ],
+                    "not": {
+                        "required": [
+                            "name"
+                        ]
+                    }
+                },
+                {
+                    "required": [
+                        "name"
+                    ],
+                    "not": {
+                        "required": [
+                            "id"
+                        ]
+                    }
+                }
+            ]
+        }
     }
-  ]
 }
