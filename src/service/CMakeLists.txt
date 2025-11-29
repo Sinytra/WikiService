@@ -34,12 +34,14 @@ add_library(service STATIC
         external/frontend.cc
         external/github.cc
 
+        project/cached.cc
         project/content.cc
         project/format.cc
         project/frontmatter.cc
         project/pages.cc
         project/properties.cc
         project/reports.cc
+        project/resolved.cc
 
         storage/deployment.cc
         storage/issues.cc
@@ -57,7 +59,6 @@ add_library(service STATIC
         auth.cc
         cache.cc
         platforms.cc
-        resolved.cc
         util.cc
 )
 

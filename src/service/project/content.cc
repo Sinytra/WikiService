@@ -1,8 +1,8 @@
-#include <service/content/recipe/recipe_resolver.h>
 #include <schemas/schemas.h>
+#include <service/content/recipe/recipe_resolver.h>
 #include <service/database/resolved_db.h>
 #include <service/project/properties.h>
-#include <service/resolved.h>
+#include <service/project/resolved.h>
 
 using namespace logging;
 using namespace drogon;
@@ -29,15 +29,14 @@ namespace service {
         }
     }
 
-    Task<std::tuple<std::optional<FileTree>, Error>> ResolvedProject::getProjectContents() const {
-        auto [tree, treeErr] = getContentDirectoryTree();
-        if (treeErr != Error::Ok) {
-            co_return {std::nullopt, treeErr};
-        }
+    Task<TaskResult<FileTree>> ResolvedProject::getProjectContents() {
+        auto result(getContentDirectoryTree());
+        if (!result)
+            co_return result;
 
+        FileTree tree = *result;
         addPageMetadata(tree);
-
-        co_return {tree, Error::Ok};
+        co_return tree;
     }
 
     Task<nlohmann::json> ResolvedProject::readItemProperties(const std::string id) const {
@@ -76,21 +75,20 @@ namespace service {
         co_return ItemData{.name = localized.value_or(""), .path = path.value_or("")};
     }
 
-    // TODO Cache
-    std::optional<content::GameRecipeType> ResolvedProject::getRecipeType(const ResourceLocation &location) const {
+    Task<std::optional<content::GameRecipeType>> ResolvedProject::getRecipeType(const ResourceLocation &location) {
         const auto path = docsDir_ / ".data" / location.namespace_ / "recipe_type" / (location.path_ + ".json");
         const auto json = parseJsonFile(path);
         if (!json) {
-            return std::nullopt;
+            co_return std::nullopt;
         }
         if (const auto error = validateJson(schemas::gameRecipeType, *json)) {
             logger.error("Invalid recipe type {} in project {}: {}", std::string(location), project_.getValueOfId(), error->format());
-            return std::nullopt;
+            co_return std::nullopt;
         }
-        return std::make_optional<content::GameRecipeType>(*json);
+        co_return *json;
     }
 
-    Task<std::optional<content::ResolvedGameRecipe>> ResolvedProject::getRecipe(const std::string id) const {
+    Task<std::optional<content::ResolvedGameRecipe>> ResolvedProject::getRecipe(const std::string id) {
         const auto recipe = co_await projectDb_->getProjectRecipe(id);
         if (!recipe) {
             co_return std::nullopt;

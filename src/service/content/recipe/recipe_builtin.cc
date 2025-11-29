@@ -1,9 +1,7 @@
 #include "recipe_builtin.h"
 
-#include <service/content/recipe/builtin_recipe_type.h>
-#include <database/database.h>
-#include <drogon/drogon.h>
 #include <schemas/schemas.h>
+#include <service/content/recipe/builtin_recipe_type.h>
 
 using namespace drogon;
 using namespace drogon::orm;
@@ -147,7 +145,7 @@ namespace content {
     }
 
     std::optional<StubRecipe> readStonecuttingRecipe(const std::string &id, const std::string &type, const nlohmann::json &json,
-                                                 const ProjectFileIssueCallback &issues) {
+                                                     const ProjectFileIssueCallback &issues) {
         StubRecipe recipe{.id = id, .type = type};
 
         const auto ingredientsJson = json["ingredient"];
@@ -163,9 +161,9 @@ namespace content {
     }
 
     std::optional<StubRecipe> readSmithingTransformRecipe(const std::string &id, const std::string &type, const nlohmann::json &json,
-                                                 const ProjectFileIssueCallback &issues) {
+                                                          const ProjectFileIssueCallback &issues) {
         StubRecipe recipe{.id = id, .type = type};
-        static const std::vector<std::string> ingredientNames{ "template", "base", "addition" };
+        static const std::vector<std::string> ingredientNames{"template", "base", "addition"};
 
         for (int i = 0; i < ingredientNames.size(); ++i) {
             const auto key = ingredientNames[i];
@@ -208,9 +206,10 @@ namespace content {
 
     bool VanillaRecipeParser::handlesType(const ResourceLocation type) { return type.namespace_ == ResourceLocation::DEFAULT_NAMESPACE; }
 
-    std::optional<GameRecipeType> VanillaRecipeParser::getType(const ResolvedProject &project, const ResourceLocation type) {
+    Task<std::optional<GameRecipeType>> VanillaRecipeParser::getType(std::shared_ptr<ProjectBase> project,
+                                                                     const ResourceLocation type) const {
         const auto it = builtinRecipeTypes.find(type);
-        return it == builtinRecipeTypes.end() ? std::nullopt : std::make_optional(it->second.displaySchema);
+        co_return it == builtinRecipeTypes.end() ? std::nullopt : std::make_optional(it->second.displaySchema);
     }
 
     std::optional<StubRecipe> VanillaRecipeParser::parseRecipe(const std::string &id, const std::string &type, const nlohmann::json &data,

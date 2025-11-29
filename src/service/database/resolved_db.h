@@ -1,10 +1,10 @@
 #pragma once
 
-#include "database.h"
-#include "database_base.h"
-#include <service/resolved.h>
+#include <service/project/resolved.h>
 #include <models/Item.h>
 #include <models/ProjectVersion.h>
+#include "database.h"
+#include "database_base.h"
 
 using namespace drogon_model::postgres;
 

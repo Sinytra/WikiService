@@ -1,10 +1,10 @@
 #pragma once
 
+#include <service/project/resolved.h>
 #include <models/Project.h>
 #include <nlohmann/json_fwd.hpp>
 #include <service/cache.h>
 #include <service/error.h>
-#include <service/resolved.h>
 #include <service/storage/realtime.h>
 
 using namespace drogon_model::postgres;

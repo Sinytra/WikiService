@@ -10,6 +10,9 @@ namespace api::v1 {
         static drogon::Task<service::ResolvedProject>
         getProjectWithParams(drogon::HttpRequestPtr req, std::string project);
 
+        static drogon::Task<std::shared_ptr<service::ProjectBase>>
+        getProjectWithParamsCached(drogon::HttpRequestPtr req, std::string project);
+
         static drogon::Task<service::ResolvedProject>
         getVersionedProject(drogon::HttpRequestPtr req, std::string project);
 

@@ -6,6 +6,8 @@
 #include <database/resolved_db.h>
 #include <service/system/lang.h>
 
+#include "project/cached.h"
+
 using namespace std;
 using namespace drogon;
 using namespace service;
@@ -18,10 +20,10 @@ using namespace drogon_model::postgres;
 namespace api::v1 {
     Task<> GameController::contents(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                     const std::string project) const {
-        const auto resolved = co_await BaseProjectController::getProjectWithParams(req, project);
-        const auto [contents, contentsErr] = co_await resolved.getProjectContents();
+        const auto resolved = co_await BaseProjectController::getProjectWithParamsCached(req, project);
+        const auto contents = co_await resolved->getProjectContents();
         if (!contents) {
-            throw ApiException(contentsErr, "Contents directory not found");
+            throw ApiException(contents.error(), "Contents directory not found");
         }
 
         callback(jsonResponse(*contents));
@@ -35,17 +37,17 @@ namespace api::v1 {
 
         const auto resolved = co_await BaseProjectController::getProjectWithParams(req, project);
 
-        const auto [page, pageErr] = co_await resolved.readContentPage(id);
-        if (pageErr != Error::Ok) {
+        const auto page = co_await resolved.readContentPage(id);
+        if (!page) {
             throw ApiException(Error::ErrNotFound, "Content ID not found");
         }
 
         Json::Value root;
         root["project"] = co_await resolved.toJson();
-        root["content"] = page.content;
+        root["content"] = page->content;
         root["properties"] = unparkourJson(co_await resolved.readItemProperties(id));
-        if (resolved.getProject().getValueOfIsPublic() && !page.editUrl.empty()) {
-            root["edit_url"] = page.editUrl;
+        if (resolved.getProject().getValueOfIsPublic() && !page->editUrl.empty()) {
+            root["edit_url"] = page->editUrl;
         }
 
         callback(HttpResponse::newHttpJsonResponse(root));
@@ -57,7 +59,7 @@ namespace api::v1 {
             throw ApiException(Error::ErrBadRequest, "Insufficient parameters");
         }
 
-        const auto resolved = co_await BaseProjectController::getProjectWithParams(req, project);
+        auto resolved = co_await BaseProjectController::getProjectWithParams(req, project);
         const auto recipeIds = co_await resolved.getProjectDatabase().getItemRecipes(item);
         nlohmann::json root(nlohmann::json::value_t::array);
         for (const auto &id: recipeIds) {
@@ -108,7 +110,7 @@ namespace api::v1 {
         if (recipe.empty()) {
             throw ApiException(Error::ErrBadRequest, "Insufficient parameters");
         }
-        const auto resolved = co_await BaseProjectController::getProjectWithParams(req, project);
+        auto resolved = co_await BaseProjectController::getProjectWithParams(req, project);
         const auto resolvedResult = co_await resolved.getRecipe(recipe);
         if (!resolvedResult) {
             throw ApiException(Error::ErrNotFound, "not_found");
@@ -123,12 +125,14 @@ namespace api::v1 {
             throw ApiException(Error::ErrBadRequest, "Insufficient parameters");
         }
 
-        const auto resolved = co_await BaseProjectController::getProjectWithParams(req, project);
+        auto resolved = co_await BaseProjectController::getProjectWithParams(req, project);
         const auto recipeType = co_await resolved.getProjectDatabase().getRecipeType(type);
         if (!recipeType) {
             throw ApiException(Error::ErrNotFound, "not_found");
         }
-        const auto layout = content::getRecipeType(resolved, unwrap(ResourceLocation::parse(type)));
+        auto shared = std::make_shared<ResolvedProject>(resolved);
+
+        const auto layout = co_await content::getRecipeType(shared, unwrap(ResourceLocation::parse(type)));
         if (!layout) {
             throw ApiException(Error::ErrNotFound, "not_found");
         }

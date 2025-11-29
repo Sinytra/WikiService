@@ -3,10 +3,19 @@
 #include <auth.h>
 #include <service/system/lang.h>
 
+#include "project/cached.h"
+
 using namespace drogon;
 using namespace service;
 
 namespace api::v1 {
+    Task<std::shared_ptr<ProjectBase>> BaseProjectController::getProjectWithParamsCached(const HttpRequestPtr req, const std::string project) {
+        const auto resolved(co_await getProjectWithParams(req, project));
+        const auto shared(std::make_shared<ResolvedProject>(resolved));
+        const auto cached(std::make_shared<CachedProject>(shared));
+        co_return cached;
+    }
+
     Task<ResolvedProject> BaseProjectController::getProjectWithParams(const HttpRequestPtr req, const std::string project) {
         const auto version = req->getOptionalParameter<std::string>("version");
         const auto locale = req->getOptionalParameter<std::string>("locale");

@@ -1,9 +1,9 @@
 #pragma once
 
+#include <service/project/resolved.h>
 #include <drogon/utils/coroutine.h>
 #include <models/Recipe.h>
 #include <optional>
-#include <service/resolved.h>
 #include "game_recipes.h"
 
 using namespace drogon_model::postgres;

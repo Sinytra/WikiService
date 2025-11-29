@@ -39,19 +39,19 @@ namespace api::v1 {
 
             const auto resolved = co_await BaseProjectController::getProjectWithParams(req, project);
 
-            const auto [page, pageError](resolved.readPageFile(path + DOCS_FILE_EXT));
-            if (pageError != Error::Ok) {
+            const auto page(resolved.readPageFile(path + DOCS_FILE_EXT));
+            if (!page) {
                 const auto optionalParam = req->getOptionalParameter<std::string>("optional");
                 const auto optional = optionalParam.has_value() && optionalParam == "true";
 
-                throw ApiException(optional ? Error::Ok : pageError, "File not found");
+                throw ApiException(optional ? Error::Ok : page.error(), "File not found");
             }
 
             Json::Value root;
             root["project"] = co_await resolved.toJson();
-            root["content"] = page.content;
-            if (resolved.getProject().getValueOfIsPublic() && !page.editUrl.empty()) {
-                root["edit_url"] = page.editUrl;
+            root["content"] = page->content;
+            if (resolved.getProject().getValueOfIsPublic() && !page->editUrl.empty()) {
+                root["edit_url"] = page->editUrl;
             }
 
             callback(HttpResponse::newHttpJsonResponse(root));
@@ -68,9 +68,9 @@ namespace api::v1 {
                                 const std::string project) const {
         const auto resolved = co_await BaseProjectController::getProjectWithParams(req, project);
 
-        const auto [tree, treeError](resolved.getDirectoryTree());
-        if (treeError != Error::Ok) {
-            throw ApiException(treeError, "Error getting directory tree");
+        const auto tree(resolved.getDirectoryTree());
+        if (!tree) {
+            throw ApiException(tree.error(), "Error getting directory tree");
         }
 
         nlohmann::json root;

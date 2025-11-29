@@ -1,6 +1,5 @@
 #pragma once
 
-#include "error.h"
 #include <drogon/HttpClient.h>
 #include <drogon/HttpTypes.h>
 #include <log/log.h>
@@ -8,9 +7,42 @@
 #include <nlohmann/json-schema.hpp>
 #include <optional>
 #include <string>
+#include "error.h"
 
 #define EXT_JSON ".json"
 #define DOCS_FILE_EXT ".mdx"
+
+template<typename T>
+struct TaskResult {
+    TaskResult(const T val) : value_(val), error_(service::Error::Ok) {}
+    TaskResult(const std::optional<T> &val) : value_(val), error_(service::Error::Ok) {}
+    TaskResult(const service::Error err) : value_(std::nullopt), error_(err) {}
+    TaskResult(const std::optional<T> &val, const service::Error err) : value_(val), error_(err) {}
+
+    service::Error error() const { return error_; }
+
+    operator bool() const { return value_.has_value(); }
+    T const &operator*() const { return *value_; }
+    T const* operator->() const { return value_ ? &*value_ : nullptr; }
+
+    friend struct nlohmann::adl_serializer<TaskResult>;
+
+private:
+    std::optional<T> value_;
+    service::Error error_;
+};
+
+template<typename T>
+struct nlohmann::adl_serializer<TaskResult<T>> {
+    static TaskResult<T> from_json(const json &j) {
+        json serializedType = j["value"];
+        std::optional<T> value = serializedType.is_null() ? std::nullopt : std::make_optional(serializedType);
+        service::Error error = j["error"];
+        return TaskResult<T>{value, error};
+    }
+
+    static void to_json(json &j, TaskResult<T> t) { j = {{"value", t.value_}, {"error", t.error_}}; }
+};
 
 template<typename K, typename V>
 static std::unordered_map<V, K> reverse_map(const std::unordered_map<K, V> &m) {
@@ -84,9 +116,7 @@ struct ResourceLocation {
     static bool validate(const std::string &str);
     static std::optional<ResourceLocation> parse(const std::string &str);
 
-    operator std::string() const {
-        return namespace_ + ":" + path_;
-    }
+    operator std::string() const { return namespace_ + ":" + path_; }
 };
 
 struct JsonValidationError {
@@ -154,7 +184,7 @@ std::string strToLower(std::string copy);
 
 bool isSubpath(const std::filesystem::path &path, const std::filesystem::path &base);
 
-template <typename T>
+template<typename T>
 T unwrap(std::optional<T> opt) {
     if (!opt) {
         throw ApiException(service::Error::ErrInternal, "Internal server error");

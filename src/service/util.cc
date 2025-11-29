@@ -163,6 +163,7 @@ HttpClientPtr createHttpClient(const std::string &url) {
 Task<std::tuple<std::optional<Json::Value>, Error>> sendAuthenticatedRequest(const HttpClientPtr client, const HttpMethod method,
                                                                              const std::string path, const std::string token,
                                                                              const std::function<void(HttpRequestPtr &)> callback) {
+    // TODO Replace all "co_return co_await" with "return"
     co_return co_await sendApiRequest(client, method, path, [&](HttpRequestPtr &req) {
         req->addHeader("Authorization", "Bearer " + token);
         callback(req);

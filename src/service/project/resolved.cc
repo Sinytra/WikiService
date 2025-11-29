@@ -25,6 +25,10 @@ namespace service {
         project_(p), defaultVersion_(nullptr), docsDir_(d), version_(v), projectDb_(std::make_shared<ProjectDatabaseAccess>(*this)),
         format_(ProjectFormat{d, ""}), issues_(issues), logger_(log) {}
 
+    std::string ResolvedProject::getId() const {
+        return project_.getValueOfId();
+    }
+
     void ResolvedProject::setDefaultVersion(const ResolvedProject &defaultVersion) {
         defaultVersion_ = std::make_shared<ResolvedProject>(defaultVersion);
     }
@@ -168,8 +172,8 @@ namespace service {
         const auto count = co_await projectDb_->getProjectContentCount();
         infoJson["contentCount"] = count;
 
-        const auto [tree, treeErr] = getDirectoryTree();
-        infoJson["pageCount"] = treeErr == Error::Ok ? countPagesRecursive(tree) : 0;
+        const auto tree(getDirectoryTree());
+        infoJson["pageCount"] = tree ? countPagesRecursive(*tree) : 0;
 
         projectJson["info"] = infoJson;
         co_return projectJson;
