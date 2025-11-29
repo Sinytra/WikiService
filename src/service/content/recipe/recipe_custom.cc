@@ -51,11 +51,11 @@ namespace content {
 
     bool CustomRecipeParser::handlesType(const ResourceLocation type) { return type.namespace_ != ResourceLocation::DEFAULT_NAMESPACE; }
 
-    Task<std::optional<GameRecipeType>> CustomRecipeParser::getType(const std::shared_ptr<ProjectBase> project, const ResourceLocation type) const {
+    Task<std::optional<GameRecipeType>> CustomRecipeParser::getType(const ProjectBasePtr project, const ResourceLocation type) const {
         if (auto result = co_await project->getRecipeType(type)) {
             result->id = type;
             const auto langKey = std::format("recipe_type.{}.{}", type.namespace_, type.path_);
-            if (const auto localName = project->readLangKey(type.namespace_, langKey)) {
+            if (const auto localName = co_await project->readLangKey(type.namespace_, langKey)) {
                 result->localizedName = *localName;
             }
             co_return result;

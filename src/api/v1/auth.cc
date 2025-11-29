@@ -2,7 +2,7 @@
 #include "error.h"
 
 #include <service/external/github.h>
-#include <database/database.h>
+#include <service/database/database.h>
 #include <include/uri.h>
 #include <service/util/crypto.h>
 
@@ -30,7 +30,7 @@ namespace api::v1 {
         }
 
         if (const auto token = co_await global::auth->requestUserAccessToken(code)) {
-            const auto [profile, err] = co_await global::github->getAuthenticatedUser(*token);
+            const auto profile = co_await global::github->getAuthenticatedUser(*token);
             if (!profile) {
                 callback(statusResponse(k400BadRequest));
             }
@@ -107,8 +107,8 @@ namespace api::v1 {
         }
 
         if (const auto token = co_await global::auth->requestModrinthUserAccessToken(code)) {
-            if (const auto result = co_await global::auth->linkModrinthAccount(session->username, *token); result != Error::Ok) {
-                throw ApiException(result, "Error linking Modrinth account");
+            if (const auto result = co_await global::auth->linkModrinthAccount(session->username, *token); !result) {
+                throw ApiException(result.error(), "Error linking Modrinth account");
             }
 
             const auto resp = HttpResponse::newRedirectionResponse(config_.settingsCallbackUrl);
@@ -122,8 +122,8 @@ namespace api::v1 {
     Task<> AuthController::unlinkModrinth(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
         const auto session{co_await global::auth->getSession(req)};
 
-        if (const auto result = co_await global::database->unlinkUserModrinthAccount(session.username); result != Error::Ok) {
-            throw ApiException(result, "Failed to unlink Modrinth account");
+        if (const auto result = co_await global::database->unlinkUserModrinthAccount(session.username); !result) {
+            throw ApiException(result.error(), "Failed to unlink Modrinth account");
         }
 
         callback(statusResponse(k200OK));
@@ -140,12 +140,12 @@ namespace api::v1 {
     Task<> AuthController::deleteAccount(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
         const auto session{co_await global::auth->getSession(req)};
 
-        if (const auto result = co_await global::database->deleteUserProjects(session.username); result != Error::Ok) {
-            throw ApiException(result, "Error deleting account");
+        if (const auto result = co_await global::database->deleteUserProjects(session.username); !result) {
+            throw ApiException(result.error(), "Error deleting account");
         }
 
-        if (const auto result = co_await global::database->deleteUser(session.username); result != Error::Ok) {
-            throw ApiException(result, "Error deleting account");
+        if (const auto result = co_await global::database->deleteUser(session.username); !result) {
+            throw ApiException(result.error(), "Error deleting account");
         }
 
         co_await global::auth->expireSession(session.sessionId);

@@ -206,7 +206,7 @@ namespace content {
 
     bool VanillaRecipeParser::handlesType(const ResourceLocation type) { return type.namespace_ == ResourceLocation::DEFAULT_NAMESPACE; }
 
-    Task<std::optional<GameRecipeType>> VanillaRecipeParser::getType(std::shared_ptr<ProjectBase> project,
+    Task<std::optional<GameRecipeType>> VanillaRecipeParser::getType(ProjectBasePtr project,
                                                                      const ResourceLocation type) const {
         const auto it = builtinRecipeTypes.find(type);
         co_return it == builtinRecipeTypes.end() ? std::nullopt : std::make_optional(it->second.displaySchema);

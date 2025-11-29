@@ -2,10 +2,10 @@
 #include <log/log.h>
 #include "data_import.h"
 
-#include <database/database.h>
+#include <service/database/database.h>
 #include <schemas/schemas.h>
-#include "storage/storage.h"
-#include "util.h"
+#include <service/storage/storage.h>
+#include <service/util.h>
 
 using namespace drogon;
 using namespace service;
@@ -166,14 +166,13 @@ Task<Error> sys::runInitialDeployments() {
     for (const auto &id : candidateProjects) {
         logger.info("Deploying project {} [{}/{}]", id, ++i, total);
 
-        const auto [project, err] = co_await global::database->getProjectSource(id);
+        const auto project = co_await global::database->getProjectSource(id);
         if (!project) {
             logger.error("Project {} not found, skipping", id);
             continue;
         }
 
-        const auto [deployment, dErr] = co_await global::storage->deployProject(*project, "");
-        if (!deployment) {
+        if (const auto deployment = co_await global::storage->deployProject(*project, ""); !deployment) {
             logger.error("Failed to deploy project {}", id);
         } else {
             logger.info("Project {} deployment successful", id);

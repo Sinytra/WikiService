@@ -28,12 +28,13 @@ add_library(service STATIC
         database/database_deployments.cc
         database/database_issues.cc
         database/database_reports.cc
-        database/resolved_db.cc
+        database/project_database.cc
 
         external/crowdin.cc
         external/frontend.cc
         external/github.cc
 
+        project/virtual/virtual.cc
         project/cached.cc
         project/content.cc
         project/format.cc

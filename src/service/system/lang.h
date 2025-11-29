@@ -16,7 +16,7 @@ namespace service {
 
         drogon::Task<std::vector<Locale>> getAvailableLocales() const;
 
-        drogon::Task<std::string> getItemName(std::optional<std::string> lang, std::string location);
+        drogon::Task<std::optional<std::string>> getItemName(std::optional<std::string> lang, std::string location);
     private:
         drogon::Task<Error> loadItemLanguageKeys(std::string lang);
     };

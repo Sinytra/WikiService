@@ -6,6 +6,7 @@
 #include <log/log.h>
 #include <nlohmann/json.hpp>
 #include <service/error.h>
+#include <service/util.h>
 
 namespace service {
     template<class T>
@@ -26,22 +27,27 @@ namespace service {
     public:
         virtual drogon::orm::DbClientPtr getDbClientPtr() const;
 
-        template<typename Ret>
-        drogon::Task<std::tuple<std::optional<Ret>, Error>>
-        handleDatabaseOperation(const std::function<drogon::Task<Ret>(const drogon::orm::DbClientPtr &client)> &func) const {
+        template<typename F, typename Ret = WrapperInnerType_T<std::invoke_result_t<F, const drogon::orm::DbClientPtr &>>,
+                 typename Type = std::conditional_t<std::is_void_v<Ret>, std::monostate, Ret>>
+        drogon::Task<TaskResult<Type>> handleDatabaseOperation(F &&func) const {
             try {
                 const auto clientPtr = getDbClientPtr();
                 if (!clientPtr) {
-                    co_return {std::nullopt, Error::ErrInternal};
+                    co_return Error::ErrInternal;
                 }
 
-                const Ret result = co_await func(clientPtr);
-                co_return {result, Error::Ok};
+                if constexpr (std::is_void_v<Ret>) {
+                    co_await func(clientPtr);
+                    co_return Error::Ok;
+                } else {
+                    Ret result = co_await func(clientPtr);
+                    co_return result;
+                }
             } catch (const drogon::orm::Failure &e) {
                 logging::logger.error("Error querying database: {}", e.what());
-                co_return {std::nullopt, Error::ErrInternal};
+                co_return Error::ErrInternal;
             } catch ([[maybe_unused]] const drogon::orm::DrogonDbException &e) {
-                co_return {std::nullopt, Error::ErrNotFound};
+                co_return Error::ErrNotFound;
             }
         }
 
@@ -56,8 +62,8 @@ namespace service {
             const std::string query, const int page,
             const std::function<Ret(const drogon::orm::Row &)> callback = [](const drogon::orm::Row &row) { return Ret(row); },
             Arguments &&...args) const {
-            const auto [res, err] = co_await handleDatabaseOperation<PaginatedData<Ret>>(
-                [&](const drogon::orm::DbClientPtr &client) -> drogon::Task<PaginatedData<Ret>> {
+            const auto res =
+                co_await handleDatabaseOperation([&](const drogon::orm::DbClientPtr &client) -> drogon::Task<PaginatedData<Ret>> {
                     constexpr int size = 20;
                     const auto actualQuery = paginatedQuery(query, size, page);
 
@@ -77,75 +83,67 @@ namespace service {
 
                     co_return PaginatedData{.total = totalRows, .pages = totalPages, .size = size, .data = contents};
                 });
-            co_return res.value_or(PaginatedData<Ret>{});
-        }
-
-    public:
-        template<typename T>
-        drogon::Task<std::optional<T>> addModel(T entity) const {
-            const auto [res, err] =
-                co_await handleDatabaseOperation<T>([&entity](const drogon::orm::DbClientPtr &client) -> drogon::Task<T> {
-                    drogon::orm::CoroMapper<T> mapper(client);
-                    co_return co_await mapper.insert(entity);
-                });
-            co_return res;
+            co_return res.value_or({});
         }
 
         template<typename T>
-        drogon::Task<std::optional<T>> updateModel(const T entity) const {
-            const auto [res, err] =
-                co_await handleDatabaseOperation<T>([&entity](const drogon::orm::DbClientPtr &client) -> drogon::Task<T> {
-                    drogon::orm::CoroMapper<T> mapper(client);
-                    if (const auto rows = co_await mapper.update(entity); rows < 1) {
-                        throw drogon::orm::DrogonDbException();
-                    }
-                    co_return entity;
-                });
-            co_return res;
+        drogon::Task<TaskResult<T>> addModel(T entity) const {
+            return handleDatabaseOperation([&entity](const drogon::orm::DbClientPtr &client) -> drogon::Task<T> {
+                drogon::orm::CoroMapper<T> mapper(client);
+                co_return co_await mapper.insert(entity);
+            });
         }
 
         template<typename T>
-        drogon::Task<std::optional<T>> findByPrimaryKey(typename drogon::orm::Mapper<T>::TraitsPKType id) const {
-            const auto [res, err] = co_await handleDatabaseOperation<T>([id](const drogon::orm::DbClientPtr &client) -> drogon::Task<T> {
+        drogon::Task<TaskResult<T>> updateModel(const T entity) const {
+            return handleDatabaseOperation([&entity](const drogon::orm::DbClientPtr &client) -> drogon::Task<T> {
+                drogon::orm::CoroMapper<T> mapper(client);
+                if (const auto rows = co_await mapper.update(entity); rows < 1) {
+                    throw drogon::orm::DrogonDbException();
+                }
+                co_return entity;
+            });
+        }
+
+        template<typename T>
+        drogon::Task<TaskResult<T>> findByPrimaryKey(drogon::orm::Mapper<T>::TraitsPKType id) const {
+            return handleDatabaseOperation([id](const drogon::orm::DbClientPtr &client) -> drogon::Task<T> {
                 drogon::orm::CoroMapper<T> mapper(client);
                 co_return co_await mapper.findByPrimaryKey(id);
             });
-            co_return res;
         }
 
         template<typename T>
-        drogon::Task<std::optional<T>> findOne(drogon::orm::Criteria criteria) const {
-            const auto [res, err] = co_await handleDatabaseOperation<T>([criteria](const drogon::orm::DbClientPtr &client) -> drogon::Task<T> {
+        drogon::Task<TaskResult<T>> findOne(drogon::orm::Criteria criteria) const {
+            return handleDatabaseOperation([criteria](const drogon::orm::DbClientPtr &client) -> drogon::Task<T> {
                 drogon::orm::CoroMapper<T> mapper(client);
                 co_return co_await mapper.findOne(criteria);
             });
-            co_return res;
         }
 
         template<typename T>
         drogon::Task<size_t> getTotalModelCount() const {
-            const auto [res, err] =
-                co_await handleDatabaseOperation<size_t>([](const drogon::orm::DbClientPtr &client) -> drogon::Task<size_t> {
-                    drogon::orm::CoroMapper<T> mapper(client);
-                    co_return co_await mapper.count();
-                });
+            const auto res = co_await handleDatabaseOperation([](const drogon::orm::DbClientPtr &client) -> drogon::Task<size_t> {
+                drogon::orm::CoroMapper<T> mapper(client);
+                co_return co_await mapper.count();
+            });
             co_return res.value_or(-1);
         }
 
         template<typename T, typename U>
         drogon::Task<std::vector<T>> getRelated(const std::string col, const U id) const {
-            const auto [res, err] = co_await handleDatabaseOperation<std::vector<T>>(
-                [col, id](const drogon::orm::DbClientPtr &client) -> drogon::Task<std::vector<T>> {
+            const auto res =
+                co_await handleDatabaseOperation([col, id](const drogon::orm::DbClientPtr &client) -> drogon::Task<std::vector<T>> {
                     drogon::orm::CoroMapper<T> mapper(client);
                     const auto results = co_await mapper.findBy(drogon::orm::Criteria(col, drogon::orm::CompareOperator::EQ, id));
                     co_return results;
                 });
-            co_return res.value_or(std::vector<T>{});
+            co_return res.value_or({});
         }
 
         template<typename T>
         drogon::Task<T> getByPrimaryKey(int64_t id) const {
-            const auto [res, err] = co_await handleDatabaseOperation<T>([id](const drogon::orm::DbClientPtr &client) -> drogon::Task<T> {
+            const auto res = co_await handleDatabaseOperation([id](const drogon::orm::DbClientPtr &client) -> drogon::Task<T> {
                 drogon::orm::CoroMapper<T> mapper(client);
                 co_return co_await mapper.findByPrimaryKey(id);
             });
@@ -157,13 +155,11 @@ namespace service {
         }
 
         template<typename T>
-        drogon::Task<Error> deleteByPrimaryKey(int64_t id) const {
-            const auto [res, err] = co_await handleDatabaseOperation<Error>([id](const drogon::orm::DbClientPtr &client) -> drogon::Task<Error> {
+        drogon::Task<TaskResult<>> deleteByPrimaryKey(int64_t id) const {
+            return handleDatabaseOperation([id](const drogon::orm::DbClientPtr &client) -> drogon::Task<> {
                 drogon::orm::CoroMapper<T> mapper(client);
                 co_await mapper.deleteByPrimaryKey(id);
-                co_return Error::Ok;
             });
-            co_return err;
         }
     };
 }

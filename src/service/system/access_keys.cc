@@ -10,7 +10,8 @@ using namespace drogon_model::postgres;
 namespace service {
     AccessKeys::AccessKeys(const std::string &salt) : salt_(salt) {}
 
-    Task<std::pair<AccessKey, std::string>> AccessKeys::createAccessKey(const std::string name, const std::string user, const int expiryDays) const {
+    Task<std::pair<AccessKey, std::string>> AccessKeys::createAccessKey(const std::string name, const std::string user,
+                                                                        const int expiryDays) const {
         const auto rawValue = "mcw_" + crypto::generateSecureRandomString(64);
         const auto hashed = crypto::hashSecureString(rawValue, salt_);
         if (hashed.empty()) {
@@ -39,18 +40,16 @@ namespace service {
         co_return co_await global::database->handlePaginatedQueryWithArgs<AccessKey>(query, page, searchQuery);
     }
 
-    Task<std::optional<AccessKey>> AccessKeys::getAccessKey(const std::string value) const {
+    Task<TaskResult<AccessKey>> AccessKeys::getAccessKey(const std::string value) const {
         const auto hashed = crypto::hashSecureString(value, salt_);
         if (hashed.empty()) {
-            co_return std::nullopt;
+            co_return Error::ErrNotFound;
         }
-        co_return co_await global::database->findOne<AccessKey>(
-            Criteria(AccessKey::Cols::_value, CompareOperator::EQ, hashed)
-        );
+        co_return co_await global::database->findOne<AccessKey>(Criteria(AccessKey::Cols::_value, CompareOperator::EQ, hashed));
     }
 
-    Task<Error> AccessKeys::deleteAccessKey(const int64_t id) const {
-        co_return co_await global::database->deleteByPrimaryKey<AccessKey>(id);
+    Task<TaskResult<>> AccessKeys::deleteAccessKey(const int64_t id) const {
+        return global::database->deleteByPrimaryKey<AccessKey>(id);
     }
 
     bool AccessKeys::isValidKey(const AccessKey &key) const {

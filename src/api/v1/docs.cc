@@ -20,11 +20,11 @@ namespace api::v1 {
         const auto version = req->getOptionalParameter<std::string>("version");
         const auto resolved = co_await BaseProjectController::getProject(project, version, std::nullopt);
 
-        if (version && !co_await resolved.hasVersion(*version)) {
+        if (version && !co_await resolved->hasVersion(*version)) {
             throw ApiException(Error::ErrNotFound, "Version not found");
         }
 
-        const auto json = co_await resolved.toJsonVerbose();
+        const auto json = co_await resolved->toJsonVerbose();
         callback(HttpResponse::newHttpJsonResponse(json));
     }
 
@@ -39,7 +39,7 @@ namespace api::v1 {
 
             const auto resolved = co_await BaseProjectController::getProjectWithParams(req, project);
 
-            const auto page(resolved.readPageFile(path + DOCS_FILE_EXT));
+            const auto page(resolved->readPageFile(path + DOCS_FILE_EXT));
             if (!page) {
                 const auto optionalParam = req->getOptionalParameter<std::string>("optional");
                 const auto optional = optionalParam.has_value() && optionalParam == "true";
@@ -48,9 +48,9 @@ namespace api::v1 {
             }
 
             Json::Value root;
-            root["project"] = co_await resolved.toJson();
+            root["project"] = co_await resolved->toJson();
             root["content"] = page->content;
-            if (resolved.getProject().getValueOfIsPublic() && !page->editUrl.empty()) {
+            if (resolved->getProject().getValueOfIsPublic() && !page->editUrl.empty()) {
                 root["edit_url"] = page->editUrl;
             }
 
@@ -66,15 +66,15 @@ namespace api::v1 {
 
     Task<> DocsController::tree(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                 const std::string project) const {
-        const auto resolved = co_await BaseProjectController::getProjectWithParams(req, project);
+        auto resolved = co_await BaseProjectController::getProjectWithParams(req, project);
 
-        const auto tree(resolved.getDirectoryTree());
+        const auto tree(co_await resolved->getDirectoryTree());
         if (!tree) {
             throw ApiException(tree.error(), "Error getting directory tree");
         }
 
         nlohmann::json root;
-        root["project"] = parkourJson(co_await resolved.toJson());
+        root["project"] = parkourJson(co_await resolved->toJson());
         root["tree"] = tree;
 
         callback(jsonResponse(root));
@@ -96,7 +96,7 @@ namespace api::v1 {
                 throw ApiException(Error::ErrBadRequest, "Invalid location specified");
             }
 
-            const auto asset = resolved.getAsset(*resourceLocation);
+            const auto asset = resolved->getAsset(*resourceLocation);
             if (!asset) {
                 const auto optionalParam = req->getOptionalParameter<std::string>("optional");
                 const auto optional = optionalParam.has_value() && optionalParam == "true";

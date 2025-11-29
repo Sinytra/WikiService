@@ -1,12 +1,16 @@
 #pragma once
 
 #include <drogon/drogon.h>
+#include <models/Item.h>
 #include <service/content/recipe/game_recipes.h>
 #include <service/database/database.h>
 
 using namespace drogon_model::postgres;
 
 namespace service {
+    // See resolved_db.h
+    class ProjectDatabaseAccess;
+
     enum class FileType { UNKNOWN, DIR, FILE };
     std::string enumToStr(FileType type);
     FileType parseFileType(const std::string &type);
@@ -110,6 +114,9 @@ namespace service {
 
         // Basic info
         virtual std::string getId() const = 0;
+        virtual const Project &getProject() const = 0;
+        virtual const ProjectVersion &getProjectVersion() const = 0;
+        virtual ProjectDatabaseAccess &getProjectDatabase() const = 0;
 
         // Parameters
         virtual std::string getLocale() const = 0;
@@ -138,14 +145,19 @@ namespace service {
 
         // Files
         virtual drogon::Task<nlohmann::json> readItemProperties(std::string id) const = 0;
-        virtual std::optional<std::string> readLangKey(const std::string &namespace_, const std::string &key) const = 0;
+        virtual drogon::Task<std::optional<std::string>> readLangKey(const std::string &namespace_, const std::string &key) const = 0;
 
-        virtual TaskResult<FileTree> getDirectoryTree() const = 0;
-        virtual TaskResult<FileTree> getContentDirectoryTree() const = 0;
+        virtual drogon::Task<TaskResult<FileTree>> getDirectoryTree() = 0;
         virtual drogon::Task<TaskResult<FileTree>> getProjectContents() = 0;
 
         virtual std::optional<std::filesystem::path> getAsset(const ResourceLocation &location) const = 0;
         virtual drogon::Task<std::optional<content::GameRecipeType>> getRecipeType(const ResourceLocation &location) = 0;
         virtual drogon::Task<std::optional<content::ResolvedGameRecipe>> getRecipe(std::string id) = 0;
+
+        // Serialization
+        virtual drogon::Task<Json::Value> toJson(bool full = false) const = 0;
+        virtual drogon::Task<Json::Value> toJsonVerbose() = 0;
     };
+
+    typedef std::shared_ptr<ProjectBase> ProjectBasePtr;
 }

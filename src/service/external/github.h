@@ -1,16 +1,15 @@
 #pragma once
 
-#include <service/error.h>
 #include <drogon/utils/coroutine.h>
 #include <json/value.h>
-#include <optional>
+#include <service/util.h>
 
 namespace service {
     class GitHub {
     public:
         explicit GitHub();
 
-        drogon::Task<std::tuple<std::optional<Json::Value>, Error>> getAuthenticatedUser(std::string token) const;
+        drogon::Task<TaskResult<Json::Value>> getAuthenticatedUser(std::string token) const;
     };
 }
 

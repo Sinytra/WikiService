@@ -50,8 +50,8 @@ namespace service {
     Task<std::optional<std::string>> ModrinthPlatform::getAuthenticatedUserID(std::string token) const {
         const auto client = createHttpClient(MODRINTH_API_URL);
         client->setUserAgent(WIKI_USER_AGENT);
-        if (const auto [resp, err] = co_await sendApiRequest(
-                client, Get, "/v3/user", [&token](const HttpRequestPtr &req) { req->addHeader("Authorization", token); });
+        if (const auto resp = co_await sendApiRequest(client, Get, "/v3/user",
+                                                      [&token](const HttpRequestPtr &req) { req->addHeader("Authorization", token); });
             resp && resp->isObject())
         {
             const auto username = (*resp)["id"].asString();
@@ -64,9 +64,7 @@ namespace service {
         const auto client = createHttpClient(MODRINTH_API_URL);
         client->setUserAgent(WIKI_USER_AGENT);
         // Check direct project members
-        if (const auto [resp, err] = co_await sendApiRequest(client, Get, std::format("/v3/project/{}/members", slug));
-            resp && resp->isArray())
-        {
+        if (const auto resp = co_await sendApiRequest(client, Get, std::format("/v3/project/{}/members", slug)); resp && resp->isArray()) {
             for (const auto &item: *resp) {
                 if (const auto memberUsername = item["user"]["id"].asString(); memberUsername == userId) {
                     co_return true;
@@ -74,7 +72,7 @@ namespace service {
             }
         }
         // Check organization members
-        if (const auto [resp, err] = co_await sendApiRequest(client, Get, std::format("/v3/project/{}/organization", slug));
+        if (const auto resp = co_await sendApiRequest(client, Get, std::format("/v3/project/{}/organization", slug));
             resp && resp->isObject())
         {
             for (const auto members = (*resp)["members"]; const auto &item: members) {
@@ -89,7 +87,7 @@ namespace service {
     Task<std::optional<PlatformProject>> ModrinthPlatform::getProject(const std::string slug) {
         const auto client = createHttpClient(MODRINTH_API_URL);
         client->setUserAgent(WIKI_USER_AGENT);
-        if (const auto [resp, err] = co_await sendApiRequest(client, Get, "/v3/project/" + slug); resp && resp->isObject()) {
+        if (const auto resp = co_await sendApiRequest(client, Get, "/v3/project/" + slug); resp && resp->isObject()) {
             const auto projectSlug = (*resp)["slug"].asString();
             const auto name = (*resp)["name"].asString();
             const auto sourceUrl = resp->isMember("link_urls") && (*resp)["link_urls"].isMember("source")
@@ -124,8 +122,8 @@ namespace service {
 
         // Likely a project ID
         if (isNumber(slug)) {
-            if (const auto [resp, err] = co_await sendApiRequest(client, Get, std::format("/v1/mods/{}", slug),
-                                                                 [&](const HttpRequestPtr &req) { req->addHeader("x-api-key", apiKey_); });
+            if (const auto resp = co_await sendApiRequest(client, Get, std::format("/v1/mods/{}", slug),
+                                                          [&](const HttpRequestPtr &req) { req->addHeader("x-api-key", apiKey_); });
                 resp && resp->isObject())
             {
                 const auto data = (*resp)["data"];
@@ -133,9 +131,8 @@ namespace service {
             }
         }
 
-        if (const auto [resp, err] =
-                co_await sendApiRequest(client, Get, std::format("/v1/mods/search?gameId={}&slug={}", MC_GAME_ID, slug),
-                                        [&](const HttpRequestPtr &req) { req->addHeader("x-api-key", apiKey_); });
+        if (const auto resp = co_await sendApiRequest(client, Get, std::format("/v1/mods/search?gameId={}&slug={}", MC_GAME_ID, slug),
+                                                      [&](const HttpRequestPtr &req) { req->addHeader("x-api-key", apiKey_); });
             resp && resp->isObject())
         {
             const auto pagination = (*resp)["pagination"];

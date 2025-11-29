@@ -2,7 +2,7 @@
 
 #include <git2/repository.h>
 #include <service/content/ingestor/ingestor.h>
-#include <service/database/resolved_db.h>
+#include <service/database/project_database.h>
 #include <service/storage/deployment.h>
 #include <service/storage/gitops.h>
 #include <service/util.h>
@@ -115,7 +115,7 @@ namespace service {
                 version.setProjectId(projectId);
                 version.setName(key);
                 version.setBranch(val);
-                if (const auto [result, err] = co_await global::database->createProjectVersion(version); result) {
+                if (const auto result = co_await global::database->createProjectVersion(version); result) {
                     resolvedVersions.push_back(*result);
                 }
             }
@@ -124,32 +124,28 @@ namespace service {
         co_return resolvedVersions;
     }
 
-    Task<std::optional<ProjectVersion>> createDefaultVersion(const Project &project) {
+    Task<TaskResult<ProjectVersion>> createDefaultVersion(const Project &project) {
         logger.debug("Adding default version for project {}", project.getValueOfId());
 
         ProjectVersion defaultVersion;
         defaultVersion.setProjectId(project.getValueOfId());
         defaultVersion.setBranch(project.getValueOfSourceBranch());
-        auto [persistedDefaultVersion, dbErr] = co_await global::database->createProjectVersion(defaultVersion);
-        co_return persistedDefaultVersion;
+        return global::database->createProjectVersion(defaultVersion);
     }
 
-    Task<Error> setActiveDeployment(const std::string projectId, Deployment &deployment) {
-        const auto [res, err] = co_await executeTransaction<Error>([projectId, &deployment](const Database &client) -> Task<Error> {
-            if (const auto dbErr = co_await client.deactivateDeployments(projectId); dbErr != Error::Ok) {
-                co_return dbErr;
+    Task<TaskResult<>> setActiveDeployment(const std::string projectId, Deployment &deployment) {
+        return executeTransaction([projectId, &deployment](const Database &client) -> Task<> {
+            if (const auto result = co_await client.deactivateDeployments(projectId); !result) {
+                throw orm::Failure("Deployment deactivation failed");
             }
 
             deployment.setActive(true);
             co_await client.updateModel(deployment);
-
-            co_return Error::Ok;
         });
-        co_return res.value_or(err);
     }
 
-    Task<std::optional<ProjectVersion>> Storage::getDefaultVersion(const Project &project) const {
-        co_return co_await global::database->getDefaultProjectVersion(project.getValueOfId());
+    Task<TaskResult<ProjectVersion>> Storage::getDefaultVersion(const Project &project) const {
+        return global::database->getDefaultProjectVersion(project.getValueOfId());
     }
 
     Task<ProjectError> Storage::deployProject(const Project &project, Deployment &deployment, const fs::path clonePath) const {
@@ -205,7 +201,7 @@ namespace service {
         }
 
         // Validate pages
-        resolved.validatePages();
+        co_await resolved.validatePages();
         if (issues.hasErrors()) {
             logger->error("Found invalid page, aborting");
             co_return ProjectError::UNKNOWN;
@@ -250,7 +246,7 @@ namespace service {
         git_repository_free(repo);
 
         // 9. Set active
-        if (const auto err = co_await setActiveDeployment(project.getValueOfId(), deployment); err != Error::Ok) {
+        if (const auto result = co_await setActiveDeployment(project.getValueOfId(), deployment); !result) {
             logger->error("Error setting active deployment");
             co_return ProjectError::UNKNOWN;
         }
@@ -260,7 +256,7 @@ namespace service {
         for (auto &version: versions) {
             versionNames.push_back(version.getValueOfName());
         }
-        if (const auto err = co_await resolved.getProjectDatabase().deleteUnusedVersions(versionNames); err != Error::Ok) {
+        if (const auto result = co_await resolved.getProjectDatabase().deleteUnusedVersions(versionNames); !result) {
             logger->warn("Error deleting old versions");
         }
 

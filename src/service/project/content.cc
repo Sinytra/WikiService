@@ -1,6 +1,6 @@
 #include <schemas/schemas.h>
 #include <service/content/recipe/recipe_resolver.h>
-#include <service/database/resolved_db.h>
+#include <service/database/project_database.h>
 #include <service/project/properties.h>
 #include <service/project/resolved.h>
 
@@ -30,11 +30,11 @@ namespace service {
     }
 
     Task<TaskResult<FileTree>> ResolvedProject::getProjectContents() {
-        auto result(getContentDirectoryTree());
-        if (!result)
-            co_return result;
-
-        FileTree tree = *result;
+        const auto contentPath = getFormat().getContentDirectoryPath();
+        if (!exists(contentPath)) {
+            co_return Error::ErrNotFound;
+        }
+        auto tree = getDirectoryTree(contentPath);
         addPageMetadata(tree);
         co_return tree;
     }
@@ -44,24 +44,24 @@ namespace service {
         co_return content::parseItemProperties(filePath, id);
     }
 
-    std::optional<std::string> ResolvedProject::readLangKey(const std::string &namespace_, const std::string &key) const {
+    Task<std::optional<std::string>> ResolvedProject::readLangKey(const std::string &namespace_, const std::string &key) const {
         const auto path = format_.getLanguageFilePath(namespace_);
         const auto json = parseJsonFile(path);
         if (!json || !json->is_object() || !json->contains(key)) {
-            return std::nullopt;
+            co_return std::nullopt;
         }
-        return (*json)[key].get<std::string>();
+        co_return (*json)[key].get<std::string>();
     }
 
-    Task<ItemData> ResolvedProject::getItemName(const Item item) const { co_return co_await getItemName(item.getValueOfLoc()); }
+    Task<ItemData> ResolvedProject::getItemName(const Item item) const { return getItemName(item.getValueOfLoc()); }
 
     Task<ItemData> ResolvedProject::getItemName(const std::string loc) const {
         const auto projectId = project_.getValueOfId();
         const auto parsed = ResourceLocation::parse(loc);
 
-        auto localized = readLangKey(parsed->namespace_, "item." + parsed->namespace_ + "." + parsed->path_);
+        auto localized = co_await readLangKey(parsed->namespace_, "item." + parsed->namespace_ + "." + parsed->path_);
         if (!localized) {
-            localized = readLangKey(parsed->namespace_, "block." + parsed->namespace_ + "." + parsed->path_);
+            localized = co_await readLangKey(parsed->namespace_, "block." + parsed->namespace_ + "." + parsed->path_);
         }
 
         const auto path = co_await projectDb_->getProjectContentPath(loc);

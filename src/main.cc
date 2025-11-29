@@ -24,6 +24,7 @@
 #include <service/system/access_keys.h>
 #include <service/system/game_data.h>
 #include <service/content/recipe/recipe_builtin.h>
+#include <service/project/virtual/virtual.h>
 
 using namespace drogon;
 using namespace logging;
@@ -45,8 +46,8 @@ namespace global {
     std::shared_ptr<Crowdin> crowdin;
     std::shared_ptr<AccessKeys> accessKeys;
     std::shared_ptr<FrontendService> frontend;
-
     std::shared_ptr<Platforms> platforms;
+    std::shared_ptr<VirtualProject> virtualProject;
 }
 
 void globalExceptionHandler(const std::exception &e, const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&callback) {
@@ -64,6 +65,8 @@ void globalExceptionHandler(const std::exception &e, const HttpRequestPtr &req, 
 }
 
 Task<> runStartupTaks() {
+    global::virtualProject = co_await createVirtualProject();
+
     co_await global::database->failLoadingDeployments();
     co_await global::gameData->setupGameData();
     co_await global::crowdin->getAvailableLocales(); // TODO Reload in production

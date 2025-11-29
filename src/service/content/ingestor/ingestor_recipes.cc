@@ -1,7 +1,7 @@
 #include "ingestor.h"
 
-#include <database/database.h>
-#include <database/resolved_db.h>
+#include <service/database/database.h>
+#include <service/database/project_database.h>
 #include <drogon/drogon.h>
 
 using namespace drogon;

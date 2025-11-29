@@ -23,7 +23,7 @@ namespace content {
         return nullptr;
     }
 
-    Task<std::optional<GameRecipeType>> getRecipeType(const std::shared_ptr<ProjectBase> project, const ResourceLocation &type) {
+    Task<std::optional<GameRecipeType>> getRecipeType(const ProjectBasePtr project, const ResourceLocation &type) {
         const auto parser = getRecipeParser(type);
         co_return !parser ? std::nullopt : co_await parser->getType(project, type);
     }

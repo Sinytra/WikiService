@@ -2,7 +2,7 @@
 
 #include <schemas/schemas.h>
 #include <service/database/database.h>
-#include <service/database/resolved_db.h>
+#include <service/database/project_database.h>
 #include <service/project/properties.h>
 #include <service/storage/gitops.h>
 #include <service/util.h>
@@ -10,10 +10,10 @@
 #include <filesystem>
 #include <unordered_map>
 
-#include <service/content/recipe/recipe_resolver.h>
 #include <fmt/args.h>
 #include <models/Item.h>
 #include <models/ProjectItem.h>
+#include <service/content/recipe/recipe_resolver.h>
 
 using namespace logging;
 using namespace drogon;
@@ -21,13 +21,18 @@ using namespace drogon_model::postgres;
 namespace fs = std::filesystem;
 
 namespace service {
-    ResolvedProject::ResolvedProject(const Project &p, const std::filesystem::path &d, const ProjectVersion &v, const std::shared_ptr<ProjectIssueCallback> &issues, const std::shared_ptr<spdlog::logger> &log) :
+    ResolvedProject::ResolvedProject(const Project &p, const std::filesystem::path &d, const ProjectVersion &v,
+                                     const std::shared_ptr<ProjectIssueCallback> &issues, const std::shared_ptr<spdlog::logger> &log) :
         project_(p), defaultVersion_(nullptr), docsDir_(d), version_(v), projectDb_(std::make_shared<ProjectDatabaseAccess>(*this)),
         format_(ProjectFormat{d, ""}), issues_(issues), logger_(log) {}
 
-    std::string ResolvedProject::getId() const {
-        return project_.getValueOfId();
-    }
+    std::string ResolvedProject::getId() const { return project_.getValueOfId(); }
+
+    const Project &ResolvedProject::getProject() const { return project_; }
+
+    const ProjectVersion &ResolvedProject::getProjectVersion() const { return version_; }
+
+    ProjectDatabaseAccess &ResolvedProject::getProjectDatabase() const { return *projectDb_; }
 
     void ResolvedProject::setDefaultVersion(const ResolvedProject &defaultVersion) {
         defaultVersion_ = std::make_shared<ResolvedProject>(defaultVersion);
@@ -85,15 +90,9 @@ namespace service {
         return std::nullopt;
     }
 
-    const Project &ResolvedProject::getProject() const { return project_; }
-
-    const ProjectVersion &ResolvedProject::getProjectVersion() const { return version_; }
-
     const std::filesystem::path &ResolvedProject::getRootDirectory() const { return docsDir_; }
 
     const ProjectFormat &ResolvedProject::getFormat() const { return format_; };
-
-    ProjectDatabaseAccess &ResolvedProject::getProjectDatabase() const { return *projectDb_; }
 
     Task<Json::Value> ResolvedProject::toJson(const bool full) const {
         const auto versions = co_await getAvailableVersions();
@@ -153,7 +152,7 @@ namespace service {
         return sum;
     }
 
-    Task<Json::Value> ResolvedProject::toJsonVerbose() const {
+    Task<Json::Value> ResolvedProject::toJsonVerbose() {
         auto projectJson = co_await toJson();
         // TODO Cache
         Json::Value infoJson;
@@ -172,7 +171,7 @@ namespace service {
         const auto count = co_await projectDb_->getProjectContentCount();
         infoJson["contentCount"] = count;
 
-        const auto tree(getDirectoryTree());
+        const auto tree = co_await getDirectoryTree();
         infoJson["pageCount"] = tree ? countPagesRecursive(*tree) : 0;
 
         projectJson["info"] = infoJson;

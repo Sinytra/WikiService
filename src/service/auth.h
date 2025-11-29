@@ -1,10 +1,9 @@
 #pragma once
 
-#include <drogon/HttpRequest.h>
 #include <json/value.h>
 #include <models/User.h>
-#include "cache.h"
-#include "error.h"
+#include <service/cache.h>
+#include <service/util.h>
 
 using namespace drogon_model::postgres;
 
@@ -35,10 +34,10 @@ namespace service {
 
         std::string getModrinthOAuthInitURL(std::string state) const;
         drogon::Task<std::optional<std::string>> requestModrinthUserAccessToken(std::string code) const;
-        drogon::Task<Error> linkModrinthAccount(std::string username, std::string token) const;
-        drogon::Task<Error> unlinkModrinthAccount(std::string username) const;
+        drogon::Task<TaskResult<>> linkModrinthAccount(std::string username, std::string token) const;
+        drogon::Task<TaskResult<>> unlinkModrinthAccount(std::string username) const;
 
-        drogon::Task<std::optional<User>> getGitHubTokenUser(std::string token) const;
+        drogon::Task<TaskResult<User>> getGitHubTokenUser(std::string token) const;
 
     private:
         const std::string appUrl_;

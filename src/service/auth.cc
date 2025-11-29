@@ -1,6 +1,6 @@
 #include "auth.h"
 
-#include <database/database.h>
+#include <service/database/database.h>
 #include <external/github.h>
 #include <models/User.h>
 #include <service/platforms.h>
@@ -164,25 +164,24 @@ namespace service {
         co_return std::nullopt;
     }
 
-    Task<Error> Auth::linkModrinthAccount(const std::string username, const std::string token) const {
+    Task<TaskResult<>> Auth::linkModrinthAccount(const std::string username, const std::string token) const {
         const auto modrinthId = co_await global::platforms->modrinth_.getAuthenticatedUserID(token);
         if (!modrinthId) {
             co_return Error::ErrBadRequest;
         }
-
         co_return co_await global::database->linkUserModrinthAccount(username, *modrinthId);
     }
 
-    Task<Error> Auth::unlinkModrinthAccount(const std::string username) const {
-        co_return co_await global::database->unlinkUserModrinthAccount(username);
+    Task<TaskResult<>> Auth::unlinkModrinthAccount(const std::string username) const {
+        return global::database->unlinkUserModrinthAccount(username);
     }
 
-    Task<std::optional<User>> Auth::getGitHubTokenUser(const std::string token) const {
-        if (const auto [ghProfile, ghErr](co_await global::github->getAuthenticatedUser(token)); ghProfile) {
+    Task<TaskResult<User>> Auth::getGitHubTokenUser(const std::string token) const {
+        if (const auto ghProfile = co_await global::github->getAuthenticatedUser(token); ghProfile) {
             const auto username = (*ghProfile)["login"].asString();
             const auto user = co_await global::database->findByPrimaryKey<User>(strToLower(username));
             co_return user;
         }
-        co_return std::nullopt;
+        co_return Error::ErrBadRequest;
     }
 }

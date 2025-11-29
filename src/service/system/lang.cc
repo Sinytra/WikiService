@@ -36,25 +36,25 @@ namespace service {
         co_return locales;
     }
 
-    Task<std::string> LangService::getItemName(const std::optional<std::string> lang, const std::string location) {
+    Task<std::optional<std::string>> LangService::getItemName(const std::optional<std::string> lang, const std::string location) {
         const std::string mcLang = lang.value_or(DEFAULT_LOCALE);
 
         if (const auto err = co_await loadItemLanguageKeys(mcLang); err != Error::Ok) {
             if (mcLang != DEFAULT_LOCALE && err == Error::ErrNotFound) {
                 co_return co_await getItemName(std::nullopt, location);
             }
-            co_return "";
+            co_return std::nullopt;
         }
 
         const auto loc = ResourceLocation::parse(location);
         if (!loc || loc->namespace_ != ResourceLocation::DEFAULT_NAMESPACE) {
-            co_return "";
+            co_return std::nullopt;
         }
 
         const auto langCacheKey = std::format("lang:{}:minecraft:{}", mcLang, loc->path_);
         const auto cached = co_await global::cache->getFromCache(langCacheKey);
 
-        co_return cached.value_or("");
+        co_return cached;
     }
 
     Task<Error> LangService::loadItemLanguageKeys(const std::string lang) {

@@ -1,7 +1,7 @@
 #include "ingestor.h"
 
-#include <database/database.h>
-#include <database/resolved_db.h>
+#include <service/database/database.h>
+#include <service/database/project_database.h>
 #include <drogon/drogon.h>
 #include <fstream>
 
@@ -110,7 +110,7 @@ namespace content {
 
             for (const auto &item: candidateItems) {
                 projectLog.trace("Registering item '{}'", item);
-                if (const auto error = co_await project_.getProjectDatabase().addProjectItem(item); error != Error::Ok) {
+                if (const auto result = co_await project_.getProjectDatabase().addProjectItem(item); !result) {
                     // TODO add issue
                     co_return Error::ErrBadRequest;
                 }

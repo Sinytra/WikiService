@@ -60,8 +60,8 @@ namespace api::v1 {
         report.setReason(enumToStr(reason));
         report.setBody(body);
 
-        report.setVersionId(resolved.getProjectVersion().getValueOfId());
-        if (const auto projLocale = resolved.getLocale(); !projLocale.empty()) {
+        report.setVersionId(resolved->getProjectVersion().getValueOfId());
+        if (const auto projLocale = resolved->getLocale(); !projLocale.empty()) {
             report.setLocale(projLocale);
         }
 

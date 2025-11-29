@@ -2,7 +2,7 @@
 #include <fstream>
 #include <regex>
 #include <schemas/schemas.h>
-#include <service/database/resolved_db.h>
+#include <service/database/project_database.h>
 #include <service/project/resolved.h>
 #include <storage/gitops.h>
 
@@ -233,27 +233,13 @@ namespace service {
         co_return readPageFile(*contentPath);
     }
 
-    // TODO Make sure this is ordered
-    TaskResult<FileTree> ResolvedProject::getDirectoryTree() const {
-        const auto tree = getDirectoryTree(docsDir_);
-        return tree;
-    }
+    Task<TaskResult<FileTree>> ResolvedProject::getDirectoryTree() { co_return getDirectoryTree(docsDir_); }
 
-    // TODO Make sure this is ordered
-    TaskResult<FileTree> ResolvedProject::getContentDirectoryTree() const {
-        const auto contentPath = getFormat().getContentDirectoryPath();
-        if (!exists(contentPath)) {
-            return Error::ErrNotFound;
-        }
-        const auto tree = getDirectoryTree(contentPath);
-        return tree;
-    }
-
-    void validatePageFile(const FileTreeEntry &entry, const ResolvedProject &resolved, const std::shared_ptr<ProjectIssueCallback> &issues,
-                          const std::vector<std::string> &requiredAttributes) {
+    Task<> validatePageFile(const FileTreeEntry &entry, const ResolvedProject &resolved,
+                            const std::shared_ptr<ProjectIssueCallback> &issues, const std::vector<std::string> &requiredAttributes) {
         const auto path = entry.path + DOCS_FILE_EXT;
         if (const auto title = resolved.getPageTitle(path); !title) {
-            issues->addIssueAsync(ProjectIssueLevel::WARNING, ProjectIssueType::FILE, ProjectError::NO_PAGE_TITLE, "", path);
+            co_await issues->addIssue(ProjectIssueLevel::WARNING, ProjectIssueType::FILE, ProjectError::NO_PAGE_TITLE, "", path);
         }
 
         const auto frontmatter = resolved.readPageAttributes(path);
@@ -264,29 +250,29 @@ namespace service {
 
             for (const auto &attr: requiredAttributes) {
                 if (!attributes.contains(attr) || attributes.find(attr)->second.empty()) {
-                    issues->addIssueAsync(ProjectIssueLevel::WARNING, ProjectIssueType::FILE, ProjectError::MISSING_REQUIRED_ATTRIBUTE,
-                                          attr, path);
+                    co_await issues->addIssue(ProjectIssueLevel::WARNING, ProjectIssueType::FILE, ProjectError::MISSING_REQUIRED_ATTRIBUTE,
+                                              attr, path);
                 }
             }
         }
     }
 
-    void validatePagesTree(const FileTree &tree, const ResolvedProject &resolved, const std::shared_ptr<ProjectIssueCallback> &issues,
+    Task<> validatePagesTree(const FileTree &tree, const ResolvedProject &resolved, const std::shared_ptr<ProjectIssueCallback> &issues,
                            const std::vector<std::string> &requiredAttributes) {
         for (const auto &entry: tree) {
             if (entry.type == FileType::FILE) {
-                validatePageFile(entry, resolved, issues, requiredAttributes);
+                co_await validatePageFile(entry, resolved, issues, requiredAttributes);
             } else if (entry.type == FileType::DIR) {
-                validatePagesTree(entry.children, resolved, issues, requiredAttributes);
+                co_await validatePagesTree(entry.children, resolved, issues, requiredAttributes);
             }
         }
     }
 
-    void ResolvedProject::validatePages() const {
-        const auto tree(getDirectoryTree());
-        validatePagesTree(*tree, *this, issues_, {});
+    Task<> ResolvedProject::validatePages() {
+        const auto tree = co_await getDirectoryTree();
+        co_await validatePagesTree(*tree, *this, issues_, {});
 
-        const auto contentTree(getContentDirectoryTree());
-        validatePagesTree(*contentTree, *this, issues_, {"id"});
+        const auto contentTree = co_await getProjectContents();
+        co_await validatePagesTree(*contentTree, *this, issues_, {"id"});
     }
 }

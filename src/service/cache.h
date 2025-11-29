@@ -7,7 +7,6 @@
 #include <optional>
 #include <shared_mutex>
 #include <string>
-#include "log/log.h"
 
 namespace service {
     extern trantor::EventLoopThreadPool cacheAwaiterThreadPool;
@@ -45,6 +44,7 @@ namespace service {
         drogon::Task<> updateCacheSet(std::string key, std::vector<std::string> value, std::chrono::duration<long> expire) const;
 
         drogon::Task<> erase(std::string key) const;
+        drogon::Task<> eraseAll(std::string keyPrefix) const;
     };
 
     class CacheableServiceBase {

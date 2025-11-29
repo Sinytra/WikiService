@@ -12,23 +12,58 @@
 #define EXT_JSON ".json"
 #define DOCS_FILE_EXT ".mdx"
 
-template<typename T>
+template<class>
+struct WrapperInnerType;
+
+template<class T>
+struct WrapperInnerType<drogon::Task<T>> {
+    using type = T;
+};
+
+template<class T>
+using WrapperInnerType_T = WrapperInnerType<T>::type;
+
+template<typename T = std::monostate>
 struct TaskResult {
     TaskResult(const T val) : value_(val), error_(service::Error::Ok) {}
     TaskResult(const std::optional<T> &val) : value_(val), error_(service::Error::Ok) {}
     TaskResult(const service::Error err) : value_(std::nullopt), error_(err) {}
     TaskResult(const std::optional<T> &val, const service::Error err) : value_(val), error_(err) {}
+    template<class U>
+        requires std::convertible_to<U, T>
+    TaskResult(U &&value) : value_(std::forward<U>(value)), error_(service::Error::Ok) {}
 
     service::Error error() const { return error_; }
+    T value_or(T &&value) const { return value_ ? *value_ : value; }
+    [[nodiscard]] bool has_value() const noexcept { return value_.has_value(); }
 
     operator bool() const { return value_.has_value(); }
-    T const &operator*() const { return *value_; }
-    T const* operator->() const { return value_ ? &*value_ : nullptr; }
+
+    T const &operator*() const {
+        if (!value_) {
+            throw std::runtime_error("No value available");
+        }
+        return *value_;
+    }
+    T *operator->() { return value_ ? &*value_ : nullptr; }
+    T const *operator->() const { return value_ ? &*value_ : nullptr; }
 
     friend struct nlohmann::adl_serializer<TaskResult>;
 
 private:
     std::optional<T> value_;
+    service::Error error_;
+};
+
+template<>
+struct TaskResult<std::monostate> {
+    TaskResult(const service::Error err) : error_(err) {}
+
+    operator bool() const { return error_ == service::Error::Ok; }
+
+    service::Error error() const { return error_; }
+
+private:
     service::Error error_;
 };
 
@@ -149,15 +184,15 @@ bool isSuccess(const drogon::HttpStatusCode &code);
 
 drogon::HttpClientPtr createHttpClient(const std::string &url);
 
-drogon::Task<std::tuple<std::optional<Json::Value>, service::Error>> sendAuthenticatedRequest(
+drogon::Task<TaskResult<Json::Value>> sendAuthenticatedRequest(
     drogon::HttpClientPtr client, drogon::HttpMethod method, std::string path, std::string token,
     std::function<void(drogon::HttpRequestPtr &)> callback = [](drogon::HttpRequestPtr &) {});
 
-drogon::Task<std::tuple<std::optional<Json::Value>, service::Error>> sendApiRequest(
+drogon::Task<TaskResult<Json::Value>> sendApiRequest(
     drogon::HttpClientPtr client, drogon::HttpMethod method, std::string path,
     std::function<void(drogon::HttpRequestPtr &)> callback = [](drogon::HttpRequestPtr &) {});
 
-drogon::Task<std::tuple<std::optional<std::pair<drogon::HttpResponsePtr, Json::Value>>, service::Error>> sendRawApiRequest(
+drogon::Task<TaskResult<std::pair<drogon::HttpResponsePtr, Json::Value>>> sendRawApiRequest(
     drogon::HttpClientPtr client, drogon::HttpMethod method, std::string path,
     std::function<void(drogon::HttpRequestPtr &)> callback = [](drogon::HttpRequestPtr &) {});
 
@@ -183,6 +218,14 @@ Json::Value projectToJson(const drogon_model::postgres::Project &project, bool v
 std::string strToLower(std::string copy);
 
 bool isSubpath(const std::filesystem::path &path, const std::filesystem::path &base);
+
+template<typename T>
+T unwrap(TaskResult<T> opt) {
+    if (!opt) {
+        throw ApiException(service::Error::ErrInternal, "Internal server error");
+    }
+    return *opt;
+}
 
 template<typename T>
 T unwrap(std::optional<T> opt) {
