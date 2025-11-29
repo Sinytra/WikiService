@@ -61,7 +61,6 @@ namespace service {
 
         drogon::Task<TaskResult<>> addProjectItem(std::string item) const;
         drogon::Task<TaskResult<>> addTag(std::string tag) const;
-        drogon::Task<std::vector<Item>> getTagItemsFlat(int64_t tag) const;
         drogon::Task<std::vector<Item>> getProjectTagItemsFlat(int64_t tag) const;
         drogon::Task<TaskResult<>> addTagItemEntry(std::string tag, std::string item) const;
         drogon::Task<TaskResult<>> addTagTagEntry(std::string parentTag, std::string childTag) const;

@@ -33,7 +33,7 @@ namespace service {
     }
 
     Task<TaskResult<Deployment>> Database::getActiveDeployment(const std::string projectId) const {
-        return handleDatabaseOperation([projectId](const DbClientPtr &client) -> Task<Deployment> {
+        co_return co_await handleDatabaseOperation([projectId](const DbClientPtr &client) -> Task<Deployment> {
             CoroMapper<Deployment> mapper(client);
             mapper.orderBy(Deployment::Cols::_created_at, SortOrder::DESC);
             mapper.limit(1);
@@ -44,7 +44,7 @@ namespace service {
     }
 
     Task<TaskResult<Deployment>> Database::getLoadingDeployment(std::string projectId) const {
-        return handleDatabaseOperation([projectId](const DbClientPtr &client) -> Task<Deployment> {
+        co_return co_await handleDatabaseOperation([projectId](const DbClientPtr &client) -> Task<Deployment> {
             CoroMapper<Deployment> mapper(client);
             mapper.limit(1);
             co_return co_await mapper.findOne(
@@ -55,7 +55,7 @@ namespace service {
     }
 
     Task<TaskResult<>> Database::deactivateDeployments(std::string projectId) const {
-        return handleDatabaseOperation([projectId](const DbClientPtr &client) -> Task<> {
+        co_return co_await handleDatabaseOperation([projectId](const DbClientPtr &client) -> Task<> {
             CoroMapper<Deployment> mapper(client);
             co_await mapper.updateBy({Deployment::Cols::_active}, Criteria(Deployment::Cols::_project_id, CompareOperator::EQ, projectId),
                                      false);
@@ -63,7 +63,7 @@ namespace service {
     }
 
     Task<TaskResult<>> Database::deleteDeployment(const std::string id) const {
-        return handleDatabaseOperation([&id](const DbClientPtr &client) -> Task<> {
+        co_return co_await handleDatabaseOperation([&id](const DbClientPtr &client) -> Task<> {
             CoroMapper<Deployment> mapper(client);
             co_await mapper.deleteByPrimaryKey(id);
         });
@@ -82,7 +82,7 @@ namespace service {
 
     // TODO Delete failing deployments folders
     Task<TaskResult<>> Database::failLoadingDeployments() const {
-        return handleDatabaseOperation([](const DbClientPtr &client) -> Task<> {
+        co_return co_await handleDatabaseOperation([](const DbClientPtr &client) -> Task<> {
             CoroMapper<Deployment> mapper(client);
             co_await mapper.updateBy({Deployment::Cols::_status},
                                      Criteria(Deployment::Cols::_status, CompareOperator::In,

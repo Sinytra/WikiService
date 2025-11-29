@@ -21,6 +21,8 @@ namespace api::v1 {
     Task<> GameController::contents(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                     const std::string project) const {
         const auto resolved = co_await BaseProjectController::getProjectWithParamsCached(req, project);
+        requireNonVirtual(resolved);
+
         const auto contents = co_await resolved->getProjectContents();
         if (!contents) {
             throw ApiException(contents.error(), "Contents directory not found");
@@ -36,6 +38,7 @@ namespace api::v1 {
         }
 
         const auto resolved = co_await BaseProjectController::getProjectWithParams(req, project);
+        requireNonVirtual(resolved);
 
         const auto page = co_await resolved->readContentPage(id);
         if (!page) {
@@ -59,7 +62,9 @@ namespace api::v1 {
             throw ApiException(Error::ErrBadRequest, "Insufficient parameters");
         }
 
-        auto resolved = co_await BaseProjectController::getProjectWithParams(req, project);
+        const auto resolved = co_await BaseProjectController::getProjectWithParams(req, project);
+        requireNonVirtual(resolved);
+
         const auto recipeIds = co_await resolved->getProjectDatabase().getItemRecipes(item);
         nlohmann::json root(nlohmann::json::value_t::array);
         for (const auto &id: recipeIds) {
@@ -112,7 +117,10 @@ namespace api::v1 {
         if (recipe.empty()) {
             throw ApiException(Error::ErrBadRequest, "Insufficient parameters");
         }
+
         const auto resolved = co_await BaseProjectController::getProjectWithParamsCached(req, project);
+        requireNonVirtual(resolved);
+
         const auto resolvedResult = co_await resolved->getRecipe(recipe);
         if (!resolvedResult) {
             throw ApiException(Error::ErrNotFound, "not_found");

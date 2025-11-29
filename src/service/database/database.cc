@@ -45,7 +45,7 @@ namespace service {
     DbClientPtr Database::getDbClientPtr() const { return clientPtr_ ? clientPtr_ : app().getFastDbClient(); }
 
     Task<TaskResult<Project>> Database::getProjectSource(const std::string id) const {
-        return handleDatabaseOperation([id](const DbClientPtr &client) -> Task<Project> {
+        co_return co_await handleDatabaseOperation([id](const DbClientPtr &client) -> Task<Project> {
             CoroMapper<Project> mapper(client);
             co_return co_await mapper.findByPrimaryKey(id);
         });
@@ -63,28 +63,28 @@ namespace service {
     }
 
     Task<TaskResult<Project>> Database::createProject(const Project &project) const {
-        return handleDatabaseOperation([project](const DbClientPtr &client) -> Task<Project> {
+        co_return co_await handleDatabaseOperation([project](const DbClientPtr &client) -> Task<Project> {
             CoroMapper<Project> mapper(client);
             co_return co_await mapper.insert(project);
         });
     }
 
     Task<TaskResult<>> Database::removeProject(const std::string &id) const {
-        return handleDatabaseOperation([id](const DbClientPtr &client) -> Task<> {
+        co_return co_await handleDatabaseOperation([id](const DbClientPtr &client) -> Task<> {
             CoroMapper<Project> mapper(client);
             co_await mapper.deleteByPrimaryKey(id);
         });
     }
 
     Task<TaskResult<ProjectVersion>> Database::createProjectVersion(ProjectVersion version) const {
-        return handleDatabaseOperation([version](const DbClientPtr &client) -> Task<ProjectVersion> {
+        co_return co_await handleDatabaseOperation([version](const DbClientPtr &client) -> Task<ProjectVersion> {
             CoroMapper<ProjectVersion> mapper(client);
             co_return co_await mapper.insert(version);
         });
     }
 
     Task<TaskResult<ProjectVersion>> Database::getProjectVersion(const std::string project, const std::string name) const {
-        return handleDatabaseOperation([project, name](const DbClientPtr &client) -> Task<ProjectVersion> {
+        co_return co_await handleDatabaseOperation([project, name](const DbClientPtr &client) -> Task<ProjectVersion> {
             // language=postgresql
             const auto results =
                 co_await client->execSqlCoro("SELECT * FROM project_version WHERE project_id = $1 AND name = $2", project, name);
@@ -96,7 +96,7 @@ namespace service {
     }
 
     Task<TaskResult<ProjectVersion>> Database::getDefaultProjectVersion(std::string project) const {
-        return handleDatabaseOperation([project](const DbClientPtr &client) -> Task<ProjectVersion> {
+        co_return co_await handleDatabaseOperation([project](const DbClientPtr &client) -> Task<ProjectVersion> {
             // language=postgresql
             const auto results =
                 co_await client->execSqlCoro("SELECT * FROM project_version WHERE project_id = $1 AND name IS NULL", project);
@@ -108,7 +108,7 @@ namespace service {
     }
 
     Task<TaskResult<>> Database::deleteProjectVersions(std::string project) const {
-        return handleDatabaseOperation([project](const DbClientPtr &client) -> Task<> {
+        co_return co_await handleDatabaseOperation([project](const DbClientPtr &client) -> Task<> {
             CoroMapper<ProjectVersion> mapper(client);
             co_await mapper.deleteBy(Criteria(ProjectVersion::Cols::_project_id, CompareOperator::EQ, project));
         });
@@ -116,7 +116,7 @@ namespace service {
 
     Task<TaskResult<ProjectSearchResponse>> Database::findProjects(const std::string query, const std::string types, const std::string sort,
                                                                    int page) const {
-        return handleDatabaseOperation([query, types, sort, page](const DbClientPtr &client) -> Task<ProjectSearchResponse> {
+        co_return co_await handleDatabaseOperation([query, types, sort, page](const DbClientPtr &client) -> Task<ProjectSearchResponse> {
             std::string sortQuery;
             if (sort == "az")
                 sortQuery = "ORDER BY \"name\" asc";
@@ -210,7 +210,7 @@ namespace service {
     }
 
     Task<TaskResult<>> Database::deleteUserProjects(std::string username) const {
-        return handleDatabaseOperation([username](const DbClientPtr &client) -> Task<> {
+        co_return co_await handleDatabaseOperation([username](const DbClientPtr &client) -> Task<> {
             co_await client->execSqlCoro(
                 "DELETE FROM project USING user_project WHERE project.id = user_project.project_id AND user_project.user_id = $1;",
                 username);
@@ -218,21 +218,21 @@ namespace service {
     }
 
     Task<TaskResult<>> Database::deleteUser(const std::string username) const {
-        return handleDatabaseOperation([username](const DbClientPtr &client) -> Task<> {
+        co_return co_await handleDatabaseOperation([username](const DbClientPtr &client) -> Task<> {
             CoroMapper<User> mapper(client);
             co_await mapper.deleteByPrimaryKey(username);
         });
     }
 
     Task<TaskResult<>> Database::linkUserModrinthAccount(const std::string username, const std::string mrAccountId) const {
-        return handleDatabaseOperation([username, mrAccountId](const DbClientPtr &client) -> Task<> {
+        co_return co_await handleDatabaseOperation([username, mrAccountId](const DbClientPtr &client) -> Task<> {
             CoroMapper<User> mapper(client);
             co_await mapper.updateBy({User::Cols::_modrinth_id}, Criteria(User::Cols::_id, CompareOperator::EQ, username), mrAccountId);
         });
     }
 
     Task<TaskResult<>> Database::unlinkUserModrinthAccount(std::string username) const {
-        return handleDatabaseOperation([username](const DbClientPtr &client) -> Task<> {
+        co_return co_await handleDatabaseOperation([username](const DbClientPtr &client) -> Task<> {
             CoroMapper<User> mapper(client);
             co_await mapper.updateBy({User::Cols::_modrinth_id}, Criteria(User::Cols::_id, CompareOperator::EQ, username), nullptr);
         });
@@ -274,7 +274,7 @@ namespace service {
     }
 
     Task<TaskResult<>> Database::assignUserProject(const std::string username, const std::string id, const std::string role) const {
-        return handleDatabaseOperation([username, id, role](const DbClientPtr &client) -> Task<> {
+        co_return co_await handleDatabaseOperation([username, id, role](const DbClientPtr &client) -> Task<> {
             CoroMapper<UserProject> mapper(client);
             UserProject userProject;
             userProject.setUserId(username);
@@ -385,7 +385,7 @@ namespace service {
     }
 
     Task<TaskResult<DataImport>> Database::addDataImportRecord(const DataImport data) const {
-        return handleDatabaseOperation([&data](const DbClientPtr &client) -> Task<DataImport> {
+        co_return co_await handleDatabaseOperation([&data](const DbClientPtr &client) -> Task<DataImport> {
             CoroMapper<DataImport> mapper(client);
 
             co_return co_await mapper.insert(data);

@@ -5,6 +5,8 @@
 #include <service/storage/storage.h>
 
 namespace api::v1 {
+    void requireNonVirtual(const service::ProjectBasePtr &project);
+
     class BaseProjectController {
     public:
         static drogon::Task<service::ProjectBasePtr> getProjectWithParams(drogon::HttpRequestPtr req, std::string project);

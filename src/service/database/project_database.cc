@@ -1,5 +1,6 @@
 #include "project_database.h"
 #include <models/RecipeType.h>
+#include <project/virtual/virtual.h>
 
 using namespace logging;
 using namespace drogon;
@@ -30,11 +31,11 @@ namespace service {
                                        AND (name ILIKE '%' || $2 || '%' OR branch ILIKE '%' || $2 || '%') \
                                        ORDER BY name";
 
-        return handlePaginatedQuery<ProjectVersion>(query, searchQuery, page);
+        co_return co_await handlePaginatedQuery<ProjectVersion>(query, searchQuery, page);
     }
 
     Task<TaskResult<>> ProjectDatabaseAccess::deleteUnusedVersions(const std::vector<std::string> keep) const {
-        return handleDatabaseOperation([&](const DbClientPtr &client) -> Task<> {
+        co_return co_await handleDatabaseOperation([&](const DbClientPtr &client) -> Task<> {
             CoroMapper<ProjectVersion> mapper(client);
 
             Criteria criteria = Criteria(ProjectVersion::Cols::_project_id, CompareOperator::EQ, projectId_) &&
@@ -51,7 +52,7 @@ namespace service {
         static constexpr auto query = "INSERT INTO project_item (item_id, version_id) \
                                        SELECT id, $2 FROM item WHERE loc = $1 \
                                        ON CONFLICT DO NOTHING";
-        return handleDatabaseOperation([&, item](const DbClientPtr &client) -> Task<> {
+        co_return co_await handleDatabaseOperation([&, item](const DbClientPtr &client) -> Task<> {
             // language=postgresql
             co_await client->execSqlCoro("INSERT INTO item VALUES (DEFAULT, $1) ON CONFLICT DO NOTHING", item);
             co_await client->execSqlCoro(query, item, versionId_);
@@ -64,34 +65,11 @@ namespace service {
                                        SELECT id, $2 FROM tag WHERE loc = $1 \
                                        ON CONFLICT DO NOTHING";
 
-        return handleDatabaseOperation([&, tag](const DbClientPtr &client) -> Task<> {
+        co_return co_await handleDatabaseOperation([&, tag](const DbClientPtr &client) -> Task<> {
             // language=postgresql
             co_await client->execSqlCoro("INSERT INTO tag VALUES (DEFAULT, $1) ON CONFLICT DO NOTHING", tag);
             co_await client->execSqlCoro(query, tag, versionId_);
         });
-    }
-
-    // TODO How does this differ from getProjectTagItemsFlat? ptag.version_id = $2 makes it do the same
-    Task<std::vector<Item>> ProjectDatabaseAccess::getTagItemsFlat(const int64_t tag) const {
-        // language=postgresql
-        static constexpr auto query = "SELECT item.* FROM tag_item_flat \
-                                       JOIN project_item pitem ON pitem.id = child \
-                                       JOIN item ON item.id = pitem.item_id \
-                                       WHERE parent IN ( \
-                                          SELECT ptag.id FROM project_tag ptag \
-                                          JOIN tag t on ptag.tag_id = t.id \
-                                          WHERE t.id = $1 \
-                                          AND (ptag.version_id IS NULL OR ptag.version_id = $2))";
-
-        const auto res = co_await handleDatabaseOperation([&, tag](const DbClientPtr &client) -> Task<std::vector<Item>> {
-            const auto results = co_await client->execSqlCoro(query, tag, versionId_);
-            std::vector<Item> tagItems;
-            for (const auto &row: results) {
-                tagItems.emplace_back(row);
-            }
-            co_return tagItems;
-        });
-        co_return res.value_or({});
     }
 
     Task<std::vector<Item>> ProjectDatabaseAccess::getProjectTagItemsFlat(const int64_t tag) const {
@@ -100,10 +78,12 @@ namespace service {
                                        JOIN project_item pitem ON pitem.id = child \
                                        JOIN item ON item.id = pitem.item_id \
                                        WHERE parent = $1 \
-                                       AND (pitem.version_id IS NULL OR pitem.version_id = $2)";
+                                       AND (pitem.version_id = $2 OR pitem.version_id = $3)";
 
         const auto res = co_await handleDatabaseOperation([&, tag](const DbClientPtr &client) -> Task<std::vector<Item>> {
-            const auto results = co_await client->execSqlCoro(query, tag, versionId_);
+            // TODO Rework tag&item relations
+            const auto virtualVersionId = global::virtualProject->getProjectVersion().getValueOfId();
+            const auto results = co_await client->execSqlCoro(query, tag, virtualVersionId, versionId_);
             std::vector<Item> tagItems;
             for (const auto &row: results) {
                 tagItems.emplace_back(row);
@@ -123,7 +103,7 @@ namespace service {
                                                 AND pip.version_id = $1 \
                                                 AND tag.loc = $2 AND item.loc = $3 \
                                               ON CONFLICT DO NOTHING";
-        return handleDatabaseOperation(
+        co_return co_await handleDatabaseOperation(
             [&, tag, item](const DbClientPtr &client) -> Task<> { co_await client->execSqlCoro(tagItemQuery, versionId_, tag, item); });
     }
 
@@ -137,7 +117,7 @@ namespace service {
                                                AND tc.version_id = $1 \
                                                AND p.loc = $2 AND c.loc = $3 \
                                              ON CONFLICT DO NOTHING";
-        return handleDatabaseOperation([&, parentTag, childTag](const DbClientPtr &client) -> Task<> {
+        co_return co_await handleDatabaseOperation([&, parentTag, childTag](const DbClientPtr &client) -> Task<> {
             co_await client->execSqlCoro(tagTagQuery, versionId_, parentTag, childTag);
         });
     }
@@ -229,7 +209,7 @@ namespace service {
                                        JOIN item i ON pitem.item_id = i.id \
                                        WHERE pitem.version_id = $1 AND i.loc = $2";
 
-        return handleDatabaseOperation([&, id](const DbClientPtr &client) -> Task<std::string> {
+        co_return co_await handleDatabaseOperation([&, id](const DbClientPtr &client) -> Task<std::string> {
             const auto results = co_await client->execSqlCoro(query, versionId_, id);
             if (results.size() != 1) {
                 throw DrogonDbException{};
@@ -247,7 +227,7 @@ namespace service {
                                            FROM project_item pitem \
                                            JOIN item i ON pitem.item_id = i.id \
                                            WHERE i.loc = $2 AND pitem.version_id = $3";
-        return handleDatabaseOperation(
+        co_return co_await handleDatabaseOperation(
             [&, id, path](const DbClientPtr &client) -> Task<> { co_await client->execSqlCoro(pageQuery, path, id, versionId_); });
     }
 
@@ -259,7 +239,7 @@ namespace service {
                                        JOIN project_item pitem \
                                            ON pitem.item_id IN (SELECT id FROM item i WHERE $1::jsonb ? i.loc) \
                                        WHERE r.loc = $2 \
-                                       AND r.version_id = $3 AND (pitem.version_id IS NULL OR pitem.version_id = $3)";
+                                       AND r.version_id = $3";
         const auto res = co_await handleDatabaseOperation([&, recipeType, items](const DbClientPtr &client) -> Task<size_t> {
             const auto results = co_await client->execSqlCoro(query, unparkourJson(items), recipeType, versionId_);
             co_return results.affectedRows();
@@ -268,7 +248,7 @@ namespace service {
     }
 
     Task<TaskResult<Recipe>> ProjectDatabaseAccess::getProjectRecipe(std::string recipe) const {
-        return handleDatabaseOperation([&, recipe](const DbClientPtr &client) -> Task<Recipe> {
+        co_return co_await handleDatabaseOperation([&, recipe](const DbClientPtr &client) -> Task<Recipe> {
             CoroMapper<Recipe> mapper(client);
             const auto results = co_await mapper.findBy(Criteria(Recipe::Cols::_version_id, CompareOperator::EQ, versionId_) &&
                                                         Criteria(Recipe::Cols::_loc, CompareOperator::EQ, recipe));
@@ -280,11 +260,10 @@ namespace service {
     }
 
     Task<TaskResult<RecipeType>> ProjectDatabaseAccess::getRecipeType(std::string type) const {
-        return handleDatabaseOperation([&, type](const DbClientPtr &client) -> Task<RecipeType> {
+        co_return co_await handleDatabaseOperation([&, type](const DbClientPtr &client) -> Task<RecipeType> {
             CoroMapper<RecipeType> mapper(client);
             const auto results = co_await mapper.findBy(Criteria(Recipe::Cols::_loc, CompareOperator::EQ, type) &&
-                                                        (Criteria(Recipe::Cols::_version_id, CompareOperator::IsNull) ||
-                                                         Criteria(Recipe::Cols::_version_id, CompareOperator::EQ, versionId_)));
+                                                        Criteria(Recipe::Cols::_version_id, CompareOperator::EQ, versionId_));
             if (results.size() != 1) {
                 throw DrogonDbException{};
             }

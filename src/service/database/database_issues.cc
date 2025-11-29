@@ -8,7 +8,7 @@ using namespace drogon::orm;
 namespace service {
     Task<TaskResult<ProjectIssue>> Database::getProjectIssue(const std::string deploymentId, const ProjectIssueLevel level,
                                                              const ProjectIssueType type, const std::string path) const {
-        return handleDatabaseOperation([deploymentId, path, level, type](const DbClientPtr &client) -> Task<ProjectIssue> {
+        co_return co_await handleDatabaseOperation([deploymentId, path, level, type](const DbClientPtr &client) -> Task<ProjectIssue> {
             CoroMapper<ProjectIssue> mapper(client);
             mapper.limit(1);
 

@@ -80,12 +80,7 @@ namespace content {
             const auto item = co_await global::database->findByPrimaryKey<Item>(ingredient.getValueOfItemId());
             std::vector<ResolvedItem> result;
             if (item) {
-                auto sources = co_await global::database->getItemSourceProjects(item->getValueOfId());
-                if (sources.empty()) {
-                    // Vanilla
-                    sources.emplace_back("");
-                }
-
+                const auto sources = co_await global::database->getItemSourceProjects(item->getValueOfId());
                 const auto loc = item->getValueOfLoc();
                 for (const auto &source: sources) {
                     result.emplace_back(co_await resolveItem({.project_id = source, .loc = loc}));
@@ -118,7 +113,6 @@ namespace content {
         const std::optional<std::string> locale_;
     };
 
-    // TODO Cache in redis
     Task<std::optional<ResolvedGameRecipe>> resolveRecipe(const Recipe recipe, const std::optional<std::string> &locale) {
         const auto recipeId = recipe.getValueOfId();
         const auto recipeType = unwrap(co_await global::database->findByPrimaryKey<RecipeType>(recipe.getValueOfTypeId()));

@@ -19,7 +19,6 @@ namespace service {
     public:
         explicit Storage(const std::string &);
 
-        // TODO Use TaskResult
         drogon::Task<TaskResult<ProjectBasePtr>> getProject(std::string projectId, const std::optional<std::string> &version,
                                                                           const std::optional<std::string> &locale) const;
         drogon::Task<TaskResult<ProjectBasePtr>> getProject(const Project &project, const std::optional<std::string> &version,

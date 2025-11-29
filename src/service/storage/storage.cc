@@ -158,7 +158,7 @@ namespace service {
                                                          const std::optional<std::string> &locale) const {
         if (project.getValueOfIsVirtual()) {
             if (project.getValueOfId() == VIRTUAL_PROJECT_ID) {
-                co_return global::virtualProject;
+                co_return TaskResult<ProjectBasePtr>{global::virtualProject};
             }
         }
 
@@ -167,14 +167,14 @@ namespace service {
         if (defaultProject && version) {
             if (auto vProject = co_await findProject(project, version, locale); vProject) {
                 vProject->setDefaultVersion(*defaultProject);
-                co_return std::make_shared<ResolvedProject>(*vProject);
+                co_return TaskResult<ProjectBasePtr>{std::make_shared<ResolvedProject>(*vProject)};
             }
             if (!co_await defaultProject->hasVersion(*version)) {
                 logger.error("Failed to find existing version '{}' for '{}'", *version, project.getValueOfId());
             }
         }
 
-        co_return defaultProject ? std::make_shared<ResolvedProject>(*defaultProject) : nullptr;
+        co_return TaskResult<ProjectBasePtr>{defaultProject ? std::make_shared<ResolvedProject>(*defaultProject) : nullptr};
     }
 
     // TODO Cache

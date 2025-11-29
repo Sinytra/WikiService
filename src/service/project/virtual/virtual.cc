@@ -86,7 +86,6 @@ namespace service {
     Task<std::optional<content::GameRecipeType>> VirtualProject::getRecipeType(const ResourceLocation &location) { co_return std::nullopt; }
     Task<std::optional<content::ResolvedGameRecipe>> VirtualProject::getRecipe(std::string id) { co_return std::nullopt; }
 
-    // TODO
-    Task<Json::Value> VirtualProject::toJson(const bool full) const { co_return {}; }
-    Task<Json::Value> VirtualProject::toJsonVerbose() { co_return {}; }
+    Task<Json::Value> VirtualProject::toJson(const bool full) const { throw std::runtime_error("toJson not supported in virtual project"); }
+    Task<Json::Value> VirtualProject::toJsonVerbose() { throw std::runtime_error("toJsonVerbose not supported in virtual project"); }
 }

@@ -65,7 +65,7 @@ namespace service {
                     }
                     co_return json;
                 } else {
-                    co_return nlohmann::json::parse(*cached);
+                    const auto parsed = nlohmann::json::parse(*cached);
                 }
             }
 

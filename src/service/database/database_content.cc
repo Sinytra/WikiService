@@ -6,64 +6,9 @@ using namespace drogon::orm;
 
 namespace service {
     Task<TaskResult<>> Database::refreshFlatTagItemView() const {
-        return handleDatabaseOperation([](const DbClientPtr &client) -> Task<> {
+        co_return co_await handleDatabaseOperation([](const DbClientPtr &client) -> Task<> {
             // language=postgresql
             co_await client->execSqlCoro("REFRESH MATERIALIZED VIEW tag_item_flat;");
-        });
-    }
-
-    Task<TaskResult<>> Database::addItem(const std::string item) const {
-        // language=postgresql
-        static constexpr auto query = "INSERT INTO project_item (item_id, version_id) \
-                                       SELECT id, NULL FROM item WHERE loc = $1 \
-                                       ON CONFLICT DO NOTHING";
-
-        return handleDatabaseOperation([item](const DbClientPtr &client) -> Task<> {
-            // language=postgresql
-            co_await client->execSqlCoro("INSERT INTO item VALUES (DEFAULT, $1) ON CONFLICT DO NOTHING", item);
-            co_await client->execSqlCoro(query, item);
-        });
-    }
-
-    Task<TaskResult<>> Database::addTag(const std::string tag) const {
-        // language=postgresql
-        static constexpr auto query = "INSERT INTO project_tag (tag_id, version_id) \
-                                       SELECT id, NULL FROM tag WHERE loc = $1 \
-                                       ON CONFLICT DO NOTHING";
-
-        return handleDatabaseOperation([tag](const DbClientPtr &client) -> Task<> {
-            // language=postgresql
-            co_await client->execSqlCoro("INSERT INTO tag VALUES (DEFAULT, $1) ON CONFLICT DO NOTHING", tag);
-            co_await client->execSqlCoro(query, tag);
-        });
-    }
-
-    Task<TaskResult<>> Database::addTagItemEntry(const std::string tag, const std::string item) const {
-        // language=postgresql
-        static constexpr auto tagItemQuery = "INSERT INTO tag_item (tag_id, item_id) \
-                                              SELECT pt.id, pip.id FROM project_tag pt CROSS JOIN project_item pip \
-                                              JOIN tag ON tag.id = pt.tag_id \
-                                              JOIN item ON item.id = pip.item_id \
-                                              WHERE pt.version_id IS NULL \
-                                                AND pip.version_id IS NULL \
-                                                AND tag.loc = $1 AND item.loc = $2 \
-                                              ON CONFLICT DO NOTHING";
-        return handleDatabaseOperation(
-            [&, tag, item](const DbClientPtr &client) -> Task<> { co_await client->execSqlCoro(tagItemQuery, tag, item); });
-    }
-
-    Task<TaskResult<>> Database::addTagTagEntry(const std::string parentTag, const std::string childTag) const {
-        // language=postgresql
-        static constexpr auto tagTagQuery = "INSERT INTO tag_tag (parent, child) \
-                                             SELECT tp.id, tc.id FROM project_tag tp CROSS JOIN project_tag tc \
-                                             JOIN tag p ON p.id = tp.tag_id \
-                                             JOIN tag c ON c.id = tc.tag_id \
-                                             WHERE tp.version_id IS NULL \
-                                               AND tc.version_id IS NULL \
-                                               AND p.loc = $1 AND c.loc = $2 \
-                                             ON CONFLICT DO NOTHING";
-        return handleDatabaseOperation([&, parentTag, childTag](const DbClientPtr &client) -> Task<> {
-            co_await client->execSqlCoro(tagTagQuery, parentTag, childTag);
         });
     }
 
@@ -85,7 +30,7 @@ namespace service {
                                        FROM item \
                                        WHERE item.loc = $2";
 
-        return handleDatabaseOperation([&, recipe_id, item, slot, count, input](const DbClientPtr &client) -> Task<> {
+        co_return co_await handleDatabaseOperation([&, recipe_id, item, slot, count, input](const DbClientPtr &client) -> Task<> {
             co_await client->execSqlCoro(query, recipe_id, item, slot, count, input);
         });
     }
@@ -97,7 +42,7 @@ namespace service {
                                        SELECT $1 as recipe_id, id, $3 as slot, $4 as count, $5 as input \
                                        FROM tag \
                                        WHERE tag.loc = $2";
-        return handleDatabaseOperation([&, recipe_id, tag, slot, count, input](const DbClientPtr &client) -> Task<> {
+        co_return co_await handleDatabaseOperation([&, recipe_id, tag, slot, count, input](const DbClientPtr &client) -> Task<> {
             co_await client->execSqlCoro(query, recipe_id, tag, slot, count, input);
         });
     }

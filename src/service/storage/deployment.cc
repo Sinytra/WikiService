@@ -134,7 +134,7 @@ namespace service {
     }
 
     Task<TaskResult<>> setActiveDeployment(const std::string projectId, Deployment &deployment) {
-        return executeTransaction([projectId, &deployment](const Database &client) -> Task<> {
+        co_return co_await executeTransaction([projectId, &deployment](const Database &client) -> Task<> {
             if (const auto result = co_await client.deactivateDeployments(projectId); !result) {
                 throw orm::Failure("Deployment deactivation failed");
             }

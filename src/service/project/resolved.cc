@@ -213,7 +213,7 @@ namespace service {
         co_return PaginatedData{.total = total, .pages = pages, .size = size, .data = itemData};
     }
 
-    Task<PaginatedData<FullTagData>> ResolvedProject::getTags(TableQueryParams params) const {
+    Task<PaginatedData<FullTagData>> ResolvedProject::getTags(const TableQueryParams params) const {
         const auto [total, pages, size, data] = co_await projectDb_->getProjectTagsDev(params.query, params.page);
         std::vector<FullTagData> tagData;
         for (const auto &[id, loc]: data) {

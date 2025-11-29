@@ -31,7 +31,7 @@ struct TaskResult {
     TaskResult(const std::optional<T> &val, const service::Error err) : value_(val), error_(err) {}
     template<class U>
         requires std::convertible_to<U, T>
-    TaskResult(U &&value) : value_(std::forward<U>(value)), error_(service::Error::Ok) {}
+    explicit TaskResult(U &&value) : value_(std::forward<U>(value)), error_(service::Error::Ok) {}
 
     service::Error error() const { return error_; }
     T value_or(T &&value) const { return value_ ? *value_ : value; }
@@ -47,6 +47,8 @@ struct TaskResult {
     }
     T *operator->() { return value_ ? &*value_ : nullptr; }
     T const *operator->() const { return value_ ? &*value_ : nullptr; }
+
+    TaskResult operator||(TaskResult const &rhs) const { return has_value() ? *this : rhs; }
 
     friend struct nlohmann::adl_serializer<TaskResult>;
 

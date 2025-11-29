@@ -88,7 +88,7 @@ namespace service {
 
         template<typename T>
         drogon::Task<TaskResult<T>> addModel(T entity) const {
-            return handleDatabaseOperation([&entity](const drogon::orm::DbClientPtr &client) -> drogon::Task<T> {
+            co_return co_await handleDatabaseOperation([&entity](const drogon::orm::DbClientPtr &client) -> drogon::Task<T> {
                 drogon::orm::CoroMapper<T> mapper(client);
                 co_return co_await mapper.insert(entity);
             });
@@ -96,7 +96,7 @@ namespace service {
 
         template<typename T>
         drogon::Task<TaskResult<T>> updateModel(const T entity) const {
-            return handleDatabaseOperation([&entity](const drogon::orm::DbClientPtr &client) -> drogon::Task<T> {
+            co_return co_await handleDatabaseOperation([&entity](const drogon::orm::DbClientPtr &client) -> drogon::Task<T> {
                 drogon::orm::CoroMapper<T> mapper(client);
                 if (const auto rows = co_await mapper.update(entity); rows < 1) {
                     throw drogon::orm::DrogonDbException();
@@ -107,7 +107,7 @@ namespace service {
 
         template<typename T>
         drogon::Task<TaskResult<T>> findByPrimaryKey(drogon::orm::Mapper<T>::TraitsPKType id) const {
-            return handleDatabaseOperation([id](const drogon::orm::DbClientPtr &client) -> drogon::Task<T> {
+            co_return co_await handleDatabaseOperation([id](const drogon::orm::DbClientPtr &client) -> drogon::Task<T> {
                 drogon::orm::CoroMapper<T> mapper(client);
                 co_return co_await mapper.findByPrimaryKey(id);
             });
@@ -115,7 +115,7 @@ namespace service {
 
         template<typename T>
         drogon::Task<TaskResult<T>> findOne(drogon::orm::Criteria criteria) const {
-            return handleDatabaseOperation([criteria](const drogon::orm::DbClientPtr &client) -> drogon::Task<T> {
+            co_return co_await handleDatabaseOperation([criteria](const drogon::orm::DbClientPtr &client) -> drogon::Task<T> {
                 drogon::orm::CoroMapper<T> mapper(client);
                 co_return co_await mapper.findOne(criteria);
             });
@@ -156,7 +156,7 @@ namespace service {
 
         template<typename T>
         drogon::Task<TaskResult<>> deleteByPrimaryKey(int64_t id) const {
-            return handleDatabaseOperation([id](const drogon::orm::DbClientPtr &client) -> drogon::Task<> {
+            co_return co_await handleDatabaseOperation([id](const drogon::orm::DbClientPtr &client) -> drogon::Task<> {
                 drogon::orm::CoroMapper<T> mapper(client);
                 co_await mapper.deleteByPrimaryKey(id);
             });

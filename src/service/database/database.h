@@ -68,6 +68,7 @@ namespace service {
 
         drogon::orm::DbClientPtr getDbClientPtr() const override;
 
+        // Projects
         drogon::Task<std::vector<std::string>> getProjectIDs() const;
         drogon::Task<TaskResult<Project>> createProject(const Project &project) const;
         drogon::Task<TaskResult<>> removeProject(const std::string &id) const;
@@ -85,6 +86,7 @@ namespace service {
 
         drogon::Task<bool> existsForData(std::string id, nlohmann::json platforms) const;
 
+        // Users
         drogon::Task<TaskResult<>> createUserIfNotExists(std::string username) const;
         drogon::Task<TaskResult<>> deleteUserProjects(std::string username) const;
         drogon::Task<TaskResult<>> deleteUser(std::string username) const;
@@ -95,11 +97,8 @@ namespace service {
         drogon::Task<TaskResult<Project>> getUserProject(std::string username, std::string id) const;
         drogon::Task<TaskResult<>> assignUserProject(std::string username, std::string id, std::string role) const;
 
+        // Content
         drogon::Task<TaskResult<>> refreshFlatTagItemView() const;
-        drogon::Task<TaskResult<>> addItem(std::string item) const;
-        drogon::Task<TaskResult<>> addTag(std::string tag) const;
-        drogon::Task<TaskResult<>> addTagItemEntry(std::string tag, std::string item) const;
-        drogon::Task<TaskResult<>> addTagTagEntry(std::string parentTag, std::string childTag) const;
         drogon::Task<int64_t> addRecipe(std::string id, std::string type) const;
         drogon::Task<TaskResult<>> addRecipeIngredientItem(int64_t recipe_id, std::string item, int slot, int count, bool input) const;
         drogon::Task<TaskResult<>> addRecipeIngredientTag(int64_t recipe_id, std::string tag, int slot, int count, bool input) const;
@@ -110,9 +109,11 @@ namespace service {
         drogon::Task<std::vector<ContentUsage>> getObtainableItemsBy(std::string item) const;
         drogon::Task<std::vector<ContentUsage>> getRecipeTypeWorkbenches(int64_t id) const;
 
+        // System data
         drogon::Task<TaskResult<DataImport>> addDataImportRecord(DataImport data) const;
         drogon::Task<PaginatedData<DataImport>> getDataImports(std::string searchQuery, int page) const;
 
+        // Deployments
         drogon::Task<PaginatedData<DeploymentData>> getDeployments(std::string projectId, int page) const;
         drogon::Task<TaskResult<Deployment>> getActiveDeployment(std::string projectId) const;
         drogon::Task<TaskResult<Deployment>> getLoadingDeployment(std::string projectId) const;
@@ -122,6 +123,7 @@ namespace service {
         drogon::Task<TaskResult<>> failLoadingDeployments() const;
         drogon::Task<std::vector<std::string>> getUndeployedProjects() const;
 
+        // Issues
         drogon::Task<TaskResult<ProjectIssue>> getProjectIssue(std::string deploymentId, ProjectIssueLevel level, ProjectIssueType type,
                                                                std::string path) const;
         drogon::Task<std::vector<ProjectIssue>> getDeploymentIssues(std::string deploymentId) const;

@@ -9,8 +9,13 @@ using namespace drogon;
 using namespace service;
 
 namespace api::v1 {
-    Task<ProjectBasePtr> BaseProjectController::getProjectWithParamsCached(const HttpRequestPtr req,
-                                                                                         const std::string project) {
+    void requireNonVirtual(const ProjectBasePtr &project) {
+        if (project && project->getProject().getValueOfIsVirtual()) {
+            throw ApiException(Error::ErrNotFound, "Project not found");
+        }
+    }
+
+    Task<ProjectBasePtr> BaseProjectController::getProjectWithParamsCached(const HttpRequestPtr req, const std::string project) {
         const auto resolved(co_await getProjectWithParams(req, project));
         co_return std::make_shared<CachedProject>(resolved);
     }
@@ -27,9 +32,8 @@ namespace api::v1 {
         co_return co_await getProject(project, version, std::nullopt);
     }
 
-    Task<ProjectBasePtr> BaseProjectController::getProject(const std::string &project,
-                                                                         const std::optional<std::string> &version,
-                                                                         const std::optional<std::string> &locale) {
+    Task<ProjectBasePtr> BaseProjectController::getProject(const std::string &project, const std::optional<std::string> &version,
+                                                           const std::optional<std::string> &locale) {
         if (project.empty()) {
             throw ApiException(Error::ErrBadRequest, "Missing project parameter");
         }
@@ -52,8 +56,8 @@ namespace api::v1 {
     }
 
     Task<ProjectBasePtr> BaseProjectController::getUserProject(const HttpRequestPtr req, const std::string &id,
-                                                                             const std::optional<std::string> &version,
-                                                                             const std::optional<std::string> &locale) {
+                                                               const std::optional<std::string> &version,
+                                                               const std::optional<std::string> &locale) {
         const auto session{co_await global::auth->getSession(req)};
         const auto project{co_await global::database->getUserProject(session.username, id)};
         if (!project) {

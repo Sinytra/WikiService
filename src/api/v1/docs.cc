@@ -19,6 +19,7 @@ namespace api::v1 {
                                    const std::string project) const {
         const auto version = req->getOptionalParameter<std::string>("version");
         const auto resolved = co_await BaseProjectController::getProject(project, version, std::nullopt);
+        requireNonVirtual(resolved);
 
         if (version && !co_await resolved->hasVersion(*version)) {
             throw ApiException(Error::ErrNotFound, "Version not found");
@@ -38,6 +39,7 @@ namespace api::v1 {
             }
 
             const auto resolved = co_await BaseProjectController::getProjectWithParams(req, project);
+            requireNonVirtual(resolved);
 
             const auto page(resolved->readPageFile(path + DOCS_FILE_EXT));
             if (!page) {
@@ -66,7 +68,8 @@ namespace api::v1 {
 
     Task<> DocsController::tree(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                 const std::string project) const {
-        auto resolved = co_await BaseProjectController::getProjectWithParams(req, project);
+        const auto resolved = co_await BaseProjectController::getProjectWithParams(req, project);
+        requireNonVirtual(resolved);
 
         const auto tree(co_await resolved->getDirectoryTree());
         if (!tree) {
@@ -75,7 +78,7 @@ namespace api::v1 {
 
         nlohmann::json root;
         root["project"] = parkourJson(co_await resolved->toJson());
-        root["tree"] = tree;
+        root["tree"] = *tree;
 
         callback(jsonResponse(root));
     }
@@ -83,6 +86,7 @@ namespace api::v1 {
     Task<> DocsController::asset(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string project) const {
         try {
             const auto resolved = co_await BaseProjectController::getProject(project, req->getOptionalParameter<std::string>("version"), std::nullopt);
+            requireNonVirtual(resolved);
 
             std::string prefix = std::format("/api/v1/docs/{}/asset/", project);
             std::string location = req->getPath().substr(prefix.size());
