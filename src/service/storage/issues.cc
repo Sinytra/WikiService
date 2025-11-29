@@ -50,7 +50,7 @@ namespace service {
         deploymentId_(id), logger_(log), hasErrors_(false) {}
 
     Task<> ProjectIssueCallback::addIssue(const ProjectIssueLevel level, const ProjectIssueType type, const ProjectError subject,
-                                          const std::string &details, const std::string &file) {
+                                          const std::string details, const std::string file) {
         co_await service::addIssue(deploymentId_, level, type, subject, details, file);
 
         const auto logLevel = level == ProjectIssueLevel::ERROR ? spdlog::level::err : spdlog::level::warn;
@@ -80,7 +80,7 @@ namespace service {
         issues_(issues.issues_), absolutePath_(path), path_(relative(path, issues.path_)) {}
 
     Task<> ProjectFileIssueCallback::addIssue(const ProjectIssueLevel level, const ProjectIssueType type, const ProjectError subject,
-                                              const std::string &details) const {
+                                              const std::string details) const {
         co_await issues_.addIssue(level, type, subject, details, path_.string());
     }
 
@@ -112,8 +112,8 @@ namespace service {
         return json;
     }
 
-    Task<> addIssue(const std::string &deploymentId, const ProjectIssueLevel level, const ProjectIssueType type, const ProjectError subject,
-                    const std::string &details, const std::string &file) {
+    Task<> addIssue(const std::string deploymentId, const ProjectIssueLevel level, const ProjectIssueType type, const ProjectError subject,
+                    const std::string details, const std::string file) {
         ProjectIssue issue;
         issue.setDeploymentId(deploymentId);
         issue.setLevel(enumToStr(level));
