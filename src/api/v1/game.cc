@@ -2,8 +2,8 @@
 
 #include <string>
 
-#include <service/database/project_database.h>
 #include <service/content/recipe/recipe_parser.h>
+#include <service/database/project_database.h>
 #include <service/system/lang.h>
 
 #include "project/cached.h"
@@ -110,6 +110,26 @@ namespace api::v1 {
 
         const auto json = co_await resolveContentUsage(obtainable);
         callback(jsonResponse(json));
+    }
+
+    Task<> GameController::contentItemName(const HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback,
+                                           const std::string project, const std::string id) const {
+        if (id.empty()) {
+            throw ApiException(Error::ErrBadRequest, "Insufficient parameters");
+        }
+
+        const auto resolved = co_await BaseProjectController::getProjectWithParamsCached(req, project);
+        const auto [name, path] = co_await resolved->getItemName(id);
+        if (name.empty()) {
+            throw ApiException(Error::ErrNotFound, "not_found");
+        }
+
+        Json::Value root;
+        root["source"] = resolved->getId();
+        root["id"] = id;
+        root["name"] = name;
+
+        callback(HttpResponse::newHttpJsonResponse(root));
     }
 
     Task<> GameController::recipe(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
