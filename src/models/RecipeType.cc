@@ -23,7 +23,7 @@ const std::string RecipeType::tableName = "\"recipe_type\"";
 const std::vector<typename RecipeType::MetaData> RecipeType::metaData_={
 {"id","int64_t","bigint",8,1,1,1},
 {"loc","std::string","character varying",255,0,0,0},
-{"version_id","int64_t","bigint",8,0,0,0}
+{"version_id","int64_t","bigint",8,0,0,1}
 };
 const std::string &RecipeType::getColumnName(size_t index) noexcept(false)
 {
@@ -261,11 +261,6 @@ void RecipeType::setVersionId(const int64_t &pVersionId) noexcept
     versionId_ = std::make_shared<int64_t>(pVersionId);
     dirtyFlag_[2] = true;
 }
-void RecipeType::setVersionIdToNull() noexcept
-{
-    versionId_.reset();
-    dirtyFlag_[2] = true;
-}
 
 void RecipeType::updateId(const uint64_t id)
 {
@@ -461,6 +456,11 @@ bool RecipeType::validateJsonForCreation(const Json::Value &pJson, std::string &
         if(!validJsonOfField(2, "version_id", pJson["version_id"], err, true))
             return false;
     }
+    else
+    {
+        err="The version_id column cannot be null";
+        return false;
+    }
     return true;
 }
 bool RecipeType::validateMasqueradedJsonForCreation(const Json::Value &pJson,
@@ -496,6 +496,11 @@ bool RecipeType::validateMasqueradedJsonForCreation(const Json::Value &pJson,
               if(!validJsonOfField(2, pMasqueradingVector[2], pJson[pMasqueradingVector[2]], err, true))
                   return false;
           }
+        else
+        {
+            err="The " + pMasqueradingVector[2] + " column cannot be null";
+            return false;
+        }
       }
     }
     catch(const Json::LogicError &e)
@@ -614,7 +619,8 @@ bool RecipeType::validJsonOfField(size_t index,
         case 2:
             if(pJson.isNull())
             {
-                return true;
+                err="The " + fieldName + " column cannot be null";
+                return false;
             }
             if(!pJson.isInt64())
             {

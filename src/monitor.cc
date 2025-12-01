@@ -18,4 +18,14 @@ namespace monitor {
     }
 
     void closeSentry() { sentry_close(); }
+
+    void sendToSentry(const std::exception& e) {
+        const sentry_value_t event = sentry_value_new_event();
+        const sentry_value_t exc = sentry_value_new_exception("Unhandled exception", e.what());
+
+        sentry_value_set_stacktrace(exc, nullptr, 0);
+        sentry_event_add_exception(event, exc);
+
+        sentry_capture_event(event);
+    }
 }

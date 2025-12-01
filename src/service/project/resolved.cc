@@ -92,13 +92,15 @@ namespace service {
 
     const std::filesystem::path &ResolvedProject::getRootDirectory() const { return docsDir_; }
 
-    const ProjectFormat &ResolvedProject::getFormat() const { return format_; };
+    const ProjectFormat &ResolvedProject::getFormat() const { return format_; }
 
     Task<Json::Value> ResolvedProject::toJson(const bool full) const {
         const auto versions = co_await getAvailableVersions();
         const auto locales = getLocales();
 
+        logger.debug("toJson: Call projectToJson on {}", project_.getValueOfId());
         Json::Value projectJson = projectToJson(project_, full);
+        logger.debug("toJson: Complete projectToJson");
 
         if (!versions.empty()) {
             Json::Value versionsJson(Json::arrayValue);

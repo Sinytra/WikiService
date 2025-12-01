@@ -59,7 +59,7 @@ void globalExceptionHandler(const std::exception &e, const HttpRequestPtr &req, 
         return;
     }
 
-    // TODO Sentry
+    monitor::sendToSentry(e);
     logger.error("Unhandled exception: {}", e.what());
     callback(statusResponse(k500InternalServerError));
 }

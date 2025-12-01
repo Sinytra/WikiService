@@ -121,7 +121,6 @@ class ProjectItem
     const std::shared_ptr<int64_t> &getVersionId() const noexcept;
     ///Set the value of the column version_id
     void setVersionId(const int64_t &pVersionId) noexcept;
-    void setVersionIdToNull() noexcept;
 
 
     static size_t getColumnNumber() noexcept {  return 3;  }
