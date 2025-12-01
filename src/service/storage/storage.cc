@@ -174,7 +174,11 @@ namespace service {
             }
         }
 
-        co_return TaskResult<ProjectBasePtr>{defaultProject ? std::make_shared<ResolvedProject>(*defaultProject) : nullptr};
+        if (!defaultProject) {
+            co_return Error::ErrNotFound;
+        }
+
+        co_return TaskResult<ProjectBasePtr>{std::make_shared<ResolvedProject>(*defaultProject)};
     }
 
     // TODO Cache
