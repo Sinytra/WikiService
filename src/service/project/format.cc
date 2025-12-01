@@ -1,7 +1,7 @@
 #include "format.h"
 
+#include <service/project/resolved.h>
 #include <service/system/lang.h>
-#include <service/resolved.h>
 
 #define ASSETS_DIR_PATH ".assets"
 #define ASSETS_LANG_DIR_PATH "lang"

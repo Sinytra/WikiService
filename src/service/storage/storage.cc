@@ -6,6 +6,8 @@
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 
+#include "project/virtual/virtual.h"
+
 #define LATEST_VERSION "latest"
 #define LOG_FILE "project.log"
 
@@ -111,77 +113,82 @@ namespace service {
         return getProjectLoggerImpl(id, path);
     }
 
-    Task<std::tuple<std::optional<ResolvedProject>, Error>> Storage::findProject(const Project &project,
-                                                                                 const std::optional<std::string> &version,
-                                                                                 const std::optional<std::string> &locale) const {
+    Task<TaskResult<ResolvedProject>> Storage::findProject(const Project &project, const std::optional<std::string> &version,
+                                                           const std::optional<std::string> &locale) const {
         const auto branch = project.getValueOfSourceBranch();
 
         const auto activeDeployment(co_await global::database->getActiveDeployment(project.getValueOfId()));
         if (!activeDeployment) {
-            co_return {std::nullopt, Error::ErrNotFound};
+            co_return Error::ErrNotFound;
         }
 
         const auto rootDir = getDeploymentVersionedDir(*activeDeployment, version.value_or(""));
         if (!exists(rootDir)) {
-            co_return {std::nullopt, Error::ErrNotFound};
+            co_return Error::ErrNotFound;
         }
 
         if (version) {
             const auto resolvedVersion = co_await global::database->getProjectVersion(project.getValueOfId(), *version);
             if (!resolvedVersion) {
-                co_return {std::nullopt, Error::ErrNotFound};
+                co_return Error::ErrNotFound;
             }
 
             const auto logger = getProjectLogger(project, false);
-            const auto issues = std::make_shared<ProjectIssueCallback>(activeDeployment->getValueOfId(), getDeploymentLogger(*activeDeployment));
+            const auto issues =
+                std::make_shared<ProjectIssueCallback>(activeDeployment->getValueOfId(), getDeploymentLogger(*activeDeployment));
             ResolvedProject resolved{project, rootDir, *resolvedVersion, issues, logger};
             resolved.setLocale(locale);
-            co_return {resolved, Error::Ok};
+            co_return resolved;
         }
 
         const auto defaultVersion = co_await getDefaultVersion(project);
         if (!defaultVersion) {
-            co_return {std::nullopt, Error::ErrNotFound};
+            co_return Error::ErrNotFound;
         }
 
-        const auto issues = std::make_shared<ProjectIssueCallback>(activeDeployment->getValueOfId(), getDeploymentLogger(*activeDeployment));
+        const auto issues =
+            std::make_shared<ProjectIssueCallback>(activeDeployment->getValueOfId(), getDeploymentLogger(*activeDeployment));
         const auto logger = getProjectLogger(project, false);
         ResolvedProject resolved{project, rootDir, *defaultVersion, issues, logger};
         resolved.setLocale(locale);
-        co_return {resolved, Error::Ok};
+        co_return resolved;
     }
 
-    Task<std::tuple<std::optional<ResolvedProject>, Error>>
-    Storage::getProject(const Project &project, const std::optional<std::string> &version, const std::optional<std::string> &locale) const {
-        const auto [defaultProject, error] = co_await findProject(project, std::nullopt, locale);
+    Task<TaskResult<ProjectBasePtr>> Storage::getProject(const Project &project, const std::optional<std::string> &version,
+                                                         const std::optional<std::string> &locale) const {
+        if (project.getValueOfIsVirtual()) {
+            if (project.getValueOfId() == VIRTUAL_PROJECT_ID) {
+                co_return TaskResult<ProjectBasePtr>{global::virtualProject};
+            }
+        }
+
+        const auto defaultProject = co_await findProject(project, std::nullopt, locale);
 
         if (defaultProject && version) {
-            if (auto [vProject, vError] = co_await findProject(project, version, locale); vProject) {
+            if (auto vProject = co_await findProject(project, version, locale); vProject) {
                 vProject->setDefaultVersion(*defaultProject);
-                co_return {vProject, vError};
+                co_return TaskResult<ProjectBasePtr>{std::make_shared<ResolvedProject>(*vProject)};
             }
             if (!co_await defaultProject->hasVersion(*version)) {
                 logger.error("Failed to find existing version '{}' for '{}'", *version, project.getValueOfId());
             }
         }
 
-        co_return {defaultProject, error};
+        co_return TaskResult<ProjectBasePtr>{defaultProject ? std::make_shared<ResolvedProject>(*defaultProject) : nullptr};
     }
 
     // TODO Cache
-    Task<std::tuple<std::optional<ResolvedProject>, Error>> Storage::getProject(const std::string projectId,
-                                                                                const std::optional<std::string> &version,
-                                                                                const std::optional<std::string> &locale) const {
-        const auto [proj, projErr] = co_await global::database->getProjectSource(projectId);
+    Task<TaskResult<ProjectBasePtr>> Storage::getProject(const std::string projectId, const std::optional<std::string> &version,
+                                                         const std::optional<std::string> &locale) const {
+        const auto proj = co_await global::database->getProjectSource(projectId);
         if (!proj) {
-            co_return {std::nullopt, Error::ErrNotFound};
+            co_return Error::ErrNotFound;
         }
         co_return co_await getProject(*proj, version, locale);
     }
 
-    Task<std::optional<ResolvedProject>> Storage::maybeGetProject(const Project &project) const {
-        const auto [resolved, error] = co_await findProject(project, std::nullopt, std::nullopt);
-        co_return resolved;
+    Task<TaskResult<ResolvedProject>> Storage::maybeGetProject(const Project &project) const {
+        return findProject(project, std::nullopt, std::nullopt);
     }
 
     Error Storage::removeDeployment(const Deployment &deployment) const {
@@ -224,22 +231,22 @@ namespace service {
         co_return ProjectStatus::HEALTHY;
     }
 
-    Task<std::tuple<std::optional<Deployment>, Error>> Storage::deployProject(const Project &project, const std::string userId) {
+    Task<TaskResult<Deployment>> Storage::deployProject(const Project &project, const std::string userId) {
         if (hasPendingTask(createProjectSetupKey(project))) {
-            co_return {std::nullopt, Error::ErrInternal};
+            co_return Error::ErrInternal;
         }
 
         const auto [deployment, error] = co_await deployProjectCached(project, userId);
         if (error != ProjectError::OK) {
-            co_return {std::nullopt, Error::ErrInternal};
+            co_return Error::ErrInternal;
         }
 
-        co_return {deployment, Error::Ok};
+        co_return deployment;
     }
 
-    Task<Error> Storage::addProjectIssue(const ResolvedProject &resolved, const ProjectIssueLevel level, const ProjectIssueType type,
+    Task<Error> Storage::addProjectIssue(const ProjectBasePtr project, const ProjectIssueLevel level, const ProjectIssueType type,
                                          const ProjectError subject, const std::string details, const std::string path) {
-        const auto projectId = resolved.getProject().getValueOfId();
+        const auto projectId = project->getId();
 
         const auto deployment(co_await global::database->getActiveDeployment(projectId));
         if (!deployment) {
@@ -265,18 +272,12 @@ namespace service {
         if (!path.empty()) {
             issue.setFile(path);
         }
-        if (const auto versionName = resolved.getProjectVersion().getName()) {
+        if (const auto versionName = project->getProjectVersion().getName()) {
             issue.setVersionName(*versionName);
         }
 
         co_await global::database->addModel(issue);
 
         co_return co_await completeTask<Error>(taskKey, Error::Ok);
-    }
-
-    void Storage::addProjectIssueAsync(const ResolvedProject &resolved, const ProjectIssueLevel level, const ProjectIssueType type,
-                                       const ProjectError subject, const std::string &details, const std::string &path) const {
-        trantor::EventLoop::getEventLoopOfCurrentThread()->queueInLoop(
-            async_func([=]() -> Task<> { co_await global::storage->addProjectIssue(resolved, level, type, subject, details, path); }));
     }
 }

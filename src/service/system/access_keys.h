@@ -12,8 +12,8 @@ namespace service {
 
         drogon::Task<std::pair<AccessKey, std::string>> createAccessKey(std::string name, std::string user, int expiryDays) const;
         drogon::Task<PaginatedData<AccessKey>> getAccessKeys(std::string searchQuery, int page) const;
-        drogon::Task<std::optional<AccessKey>> getAccessKey(std::string value) const;
-        drogon::Task<Error> deleteAccessKey(int64_t id) const;
+        drogon::Task<TaskResult<AccessKey>> getAccessKey(std::string value) const;
+        drogon::Task<TaskResult<>> deleteAccessKey(int64_t id) const;
         bool isValidKey(const AccessKey &key) const;
     private:
         std::string salt_;

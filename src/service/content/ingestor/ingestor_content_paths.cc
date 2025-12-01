@@ -1,6 +1,6 @@
 #include "ingestor.h"
 
-#include <database/resolved_db.h>
+#include <service/database/project_database.h>
 #include <drogon/drogon.h>
 
 // TODO Use Format

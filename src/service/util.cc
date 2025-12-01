@@ -1,6 +1,6 @@
 #include "util.h"
-#include <log/log.h>
 #include <api/v1/error.h>
+#include <log/log.h>
 
 #include <fstream>
 #include <ranges>
@@ -11,10 +11,10 @@ using namespace logging;
 using namespace service;
 namespace fs = std::filesystem;
 
-TableQueryParams getTableQueryParams(const HttpRequestPtr& req) {
+TableQueryParams getTableQueryParams(const HttpRequestPtr &req) {
     const auto query = req->getOptionalParameter<std::string>("query").value_or("");
     const auto page = req->getOptionalParameter<int>("page").value_or(1);
-    return TableQueryParams{ .query = query, .page = page };
+    return TableQueryParams{.query = query, .page = page};
 }
 
 HttpResponsePtr jsonResponse(const nlohmann::json &json) {
@@ -74,7 +74,8 @@ std::optional<ResourceLocation> ResourceLocation::parse(const std::string &str) 
 
 std::string JsonValidationError::format() const {
     auto field = pointer.to_string();
-    if (field.starts_with("/")) field = field.substr(1);
+    if (field.starts_with("/"))
+        field = field.substr(1);
     return field + ": " + msg + "\n> " + value.dump(2);
 }
 
@@ -160,28 +161,27 @@ HttpClientPtr createHttpClient(const std::string &url) {
     return HttpClient::newHttpClient(url, currentLoop);
 }
 
-Task<std::tuple<std::optional<Json::Value>, Error>> sendAuthenticatedRequest(const HttpClientPtr client, const HttpMethod method,
-                                                                             const std::string path, const std::string token,
-                                                                             const std::function<void(HttpRequestPtr &)> callback) {
-    co_return co_await sendApiRequest(client, method, path, [&](HttpRequestPtr &req) {
+Task<TaskResult<Json::Value>> sendAuthenticatedRequest(const HttpClientPtr client, const HttpMethod method, const std::string path,
+                                                       const std::string token, const std::function<void(HttpRequestPtr &)> callback) {
+    // TODO Replace all "co_return co_await" with "return"
+    return sendApiRequest(client, method, path, [&](HttpRequestPtr &req) {
         req->addHeader("Authorization", "Bearer " + token);
         callback(req);
     });
 }
 
-Task<std::tuple<std::optional<Json::Value>, Error>> sendApiRequest(const HttpClientPtr client, const HttpMethod method,
-                                                                   const std::string path,
-                                                                   const std::function<void(HttpRequestPtr &)> callback) {
-    const auto [resp, err] = co_await sendRawApiRequest(client, method, path, callback);
-    if (resp) {
-        co_return {resp->second, err};
+Task<TaskResult<Json::Value>> sendApiRequest(const HttpClientPtr client, const HttpMethod method, const std::string path,
+                                             const std::function<void(HttpRequestPtr &)> callback) {
+    const auto resp = co_await sendRawApiRequest(client, method, path, callback);
+    if (!resp) {
+        co_return resp.error();
     }
-    co_return {std::nullopt, err};
+    co_return resp->second;
 }
 
-Task<std::tuple<std::optional<std::pair<HttpResponsePtr, Json::Value>>, Error>>
-sendRawApiRequest(const HttpClientPtr client, const HttpMethod method, std::string path,
-                  const std::function<void(HttpRequestPtr &)> callback) {
+Task<TaskResult<std::pair<HttpResponsePtr, Json::Value>>> sendRawApiRequest(const HttpClientPtr client, const HttpMethod method,
+                                                                            std::string path,
+                                                                            const std::function<void(HttpRequestPtr &)> callback) {
     try {
         auto httpReq = HttpRequest::newHttpRequest();
         httpReq->setMethod(method);
@@ -196,15 +196,15 @@ sendRawApiRequest(const HttpClientPtr client, const HttpMethod method, std::stri
         if (isSuccess(status)) {
             if (const auto jsonResp = response->getJsonObject()) {
                 logger.trace("<= Response ({}) from {}", std::to_string(status), path);
-                co_return {std::pair{response, *jsonResp}, Error::Ok};
+                co_return std::pair{response, *jsonResp};
             }
         }
 
         logger.trace("Unexpected api response: ({}) {}", std::to_string(status), response->getBody());
-        co_return {std::nullopt, api::v1::mapStatusCode(status)};
+        co_return api::v1::mapStatusCode(status);
     } catch (std::exception &e) {
         logger.error("Error sending HTTP request: {}", e.what());
-        co_return {std::nullopt, Error::ErrInternal};
+        co_return Error::ErrInternal;
     }
 }
 
@@ -274,6 +274,7 @@ std::string strToLower(std::string copy) {
     return copy;
 }
 
+// FIXME doesnt work if base contains trailing slash
 bool isSubpath(const fs::path &path, const fs::path &base) {
     const auto [fst, snd] = std::mismatch(path.begin(), path.end(), base.begin(), base.end());
     return snd == base.end();

@@ -2,11 +2,11 @@
 
 #include "ingestor_metadata.h"
 
+#include <service/project/resolved.h>
 #include <drogon/utils/coroutine.h>
-#include <service/error.h>
-#include <service/resolved.h>
-#include <service/storage/issues.h>
 #include <service/content/recipe/recipe_parser.h>
+#include <service/error.h>
+#include <service/storage/issues.h>
 
 namespace content {
     struct PreparationResult {

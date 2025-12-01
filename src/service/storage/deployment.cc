@@ -2,7 +2,7 @@
 
 #include <git2/repository.h>
 #include <service/content/ingestor/ingestor.h>
-#include <service/database/resolved_db.h>
+#include <service/database/project_database.h>
 #include <service/storage/deployment.h>
 #include <service/storage/gitops.h>
 #include <service/util.h>
@@ -16,32 +16,30 @@ namespace fs = std::filesystem;
 
 const std::set<std::string> allowedFileExtensions = {".mdx", ".json", ".png", ".jpg", ".jpeg", ".webp", ".gif"};
 
-Error copyProjectFiles(const fs::path &root, const fs::path &docsRoot, const fs::path &dest,
-                       const std::shared_ptr<spdlog::logger> &projectLog) {
-    const auto gitPath = root / ".git";
-
+Error copyProjectFiles(const fs::path &docsRoot, const fs::path &dest, const std::shared_ptr<spdlog::logger> &projectLog) {
     projectLog->info("Copying project files for version '{}'", dest.filename().string());
 
     try {
         create_directories(dest);
 
-        for (const auto &entry: fs::recursive_directory_iterator(root)) {
-            if (!isSubpath(entry.path(), gitPath) && entry.is_regular_file() && isSubpath(entry.path(), docsRoot)) {
-                fs::path relative_path = relative(entry.path(), docsRoot);
-
-                if (const auto extension = entry.path().extension().string(); !allowedFileExtensions.contains(extension)) {
-                    projectLog->warn("Ignoring file {}", relative_path.string());
-                    continue;
-                }
-
-                if (fs::path destination_path = dest / relative_path.parent_path(); !exists(destination_path)) {
-                    create_directories(destination_path);
-                }
-
-                copy(entry, dest / relative_path, fs::copy_options::overwrite_existing);
+        for (const auto &entry: fs::recursive_directory_iterator(docsRoot)) {
+            if (!entry.is_regular_file()) {
+                continue;
             }
+            fs::path relative_path = relative(entry.path(), docsRoot);
+
+            if (const auto extension = entry.path().extension().string(); !allowedFileExtensions.contains(extension)) {
+                projectLog->warn("Ignoring file {}", relative_path.string());
+                continue;
+            }
+
+            if (fs::path destination_path = dest / relative_path.parent_path(); !exists(destination_path)) {
+                create_directories(destination_path);
+            }
+
+            copy(entry, dest / relative_path, fs::copy_options::overwrite_existing);
         }
-    } catch (std::exception e) {
+    } catch (std::exception &e) {
         projectLog->error("FS copy error: {}", e.what());
         return Error::ErrInternal;
     }
@@ -115,7 +113,7 @@ namespace service {
                 version.setProjectId(projectId);
                 version.setName(key);
                 version.setBranch(val);
-                if (const auto [result, err] = co_await global::database->createProjectVersion(version); result) {
+                if (const auto result = co_await global::database->createProjectVersion(version); result) {
                     resolvedVersions.push_back(*result);
                 }
             }
@@ -124,32 +122,28 @@ namespace service {
         co_return resolvedVersions;
     }
 
-    Task<std::optional<ProjectVersion>> createDefaultVersion(const Project &project) {
+    Task<TaskResult<ProjectVersion>> createDefaultVersion(const Project &project) {
         logger.debug("Adding default version for project {}", project.getValueOfId());
 
         ProjectVersion defaultVersion;
         defaultVersion.setProjectId(project.getValueOfId());
         defaultVersion.setBranch(project.getValueOfSourceBranch());
-        auto [persistedDefaultVersion, dbErr] = co_await global::database->createProjectVersion(defaultVersion);
-        co_return persistedDefaultVersion;
+        return global::database->createProjectVersion(defaultVersion);
     }
 
-    Task<Error> setActiveDeployment(const std::string projectId, Deployment &deployment) {
-        const auto [res, err] = co_await executeTransaction<Error>([projectId, &deployment](const Database &client) -> Task<Error> {
-            if (const auto dbErr = co_await client.deactivateDeployments(projectId); dbErr != Error::Ok) {
-                co_return dbErr;
+    Task<TaskResult<>> setActiveDeployment(const std::string projectId, Deployment &deployment) {
+        co_return co_await executeTransaction([projectId, &deployment](const Database &client) -> Task<> {
+            if (const auto result = co_await client.deactivateDeployments(projectId); !result) {
+                throw orm::Failure("Deployment deactivation failed");
             }
 
             deployment.setActive(true);
             co_await client.updateModel(deployment);
-
-            co_return Error::Ok;
         });
-        co_return res.value_or(err);
     }
 
-    Task<std::optional<ProjectVersion>> Storage::getDefaultVersion(const Project &project) const {
-        co_return co_await global::database->getDefaultProjectVersion(project.getValueOfId());
+    Task<TaskResult<ProjectVersion>> Storage::getDefaultVersion(const Project &project) const {
+        return global::database->getDefaultProjectVersion(project.getValueOfId());
     }
 
     Task<ProjectError> Storage::deployProject(const Project &project, Deployment &deployment, const fs::path clonePath) const {
@@ -205,7 +199,7 @@ namespace service {
         }
 
         // Validate pages
-        resolved.validatePages();
+        co_await resolved.validatePages();
         if (issues.hasErrors()) {
             logger->error("Found invalid page, aborting");
             co_return ProjectError::UNKNOWN;
@@ -230,7 +224,7 @@ namespace service {
 
         // 7. Copy default version
         const auto dest = getDeploymentVersionedDir(deployment);
-        copyProjectFiles(clonePath, cloneDocsRoot, dest, logger);
+        copyProjectFiles(cloneDocsRoot, dest, logger);
 
         // 8. Copy other versions
         for (const auto &version: versions) {
@@ -244,13 +238,13 @@ namespace service {
             }
 
             const auto versionDest = getDeploymentVersionedDir(deployment, name);
-            copyProjectFiles(clonePath, cloneDocsRoot, versionDest, logger);
+            copyProjectFiles(cloneDocsRoot, versionDest, logger);
         }
 
         git_repository_free(repo);
 
         // 9. Set active
-        if (const auto err = co_await setActiveDeployment(project.getValueOfId(), deployment); err != Error::Ok) {
+        if (const auto result = co_await setActiveDeployment(project.getValueOfId(), deployment); !result) {
             logger->error("Error setting active deployment");
             co_return ProjectError::UNKNOWN;
         }
@@ -260,7 +254,7 @@ namespace service {
         for (auto &version: versions) {
             versionNames.push_back(version.getValueOfName());
         }
-        if (const auto err = co_await resolved.getProjectDatabase().deleteUnusedVersions(versionNames); err != Error::Ok) {
+        if (const auto result = co_await resolved.getProjectDatabase().deleteUnusedVersions(versionNames); !result) {
             logger->warn("Error deleting old versions");
         }
 
@@ -304,7 +298,7 @@ namespace service {
         ProjectError result;
         try {
             result = co_await deployProject(project, deployment, clonePath);
-        } catch (std::exception e) {
+        } catch (std::exception &e) {
             result = ProjectError::UNKNOWN;
             logger.error("Unexpected error during deployment: {}", e.what());
         }
@@ -325,7 +319,7 @@ namespace service {
                     deployLog->info("Cleaning up previous deployment");
                     remove_all(oldPath);
                 }
-            } catch (std::exception e) {
+            } catch (std::exception &e) {
                 const auto id = activeDeployment ? activeDeployment->getValueOfId() : "";
                 logger.error("Failed to cleanup previous deployment '{}': {}", id, e.what());
             }

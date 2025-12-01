@@ -5,12 +5,11 @@
 #include <drogon/HttpAppFramework.h>
 #include <drogon/utils/coroutine.h>
 #include <log/log.h>
-#include <models/Recipe.h>
-#include <models/RecipeType.h>
-#include <models/ProjectVersion.h>
 #include <models/DataImport.h>
 #include <models/Deployment.h>
 #include <models/ProjectIssue.h>
+#include <models/ProjectVersion.h>
+#include <models/Recipe.h>
 #include <models/Report.h>
 #include <nlohmann/json.hpp>
 #include <optional>
@@ -19,6 +18,7 @@
 
 using namespace drogon_model::postgres;
 
+// TODO Hide virtual projects
 namespace service {
     struct ProjectSearchResponse {
         int pages;
@@ -68,41 +68,40 @@ namespace service {
 
         drogon::orm::DbClientPtr getDbClientPtr() const override;
 
+        // Projects
         drogon::Task<std::vector<std::string>> getProjectIDs() const;
-        drogon::Task<std::tuple<std::optional<Project>, Error>> createProject(const Project &project) const;
-        drogon::Task<Error> removeProject(const std::string &id) const;
-        drogon::Task<std::tuple<std::optional<ProjectVersion>, Error>> createProjectVersion(ProjectVersion version) const;
-        drogon::Task<std::optional<ProjectVersion>> getProjectVersion(std::string project, std::string name) const;
-        drogon::Task<std::optional<ProjectVersion>> getDefaultProjectVersion(std::string project) const;
-        drogon::Task<Error> deleteProjectVersions(std::string project) const;
+        drogon::Task<TaskResult<Project>> createProject(const Project &project) const;
+        drogon::Task<TaskResult<>> removeProject(const std::string &id) const;
+        drogon::Task<TaskResult<ProjectVersion>> createProjectVersion(ProjectVersion version) const;
+        drogon::Task<TaskResult<ProjectVersion>> getProjectVersion(std::string project, std::string name) const;
+        drogon::Task<TaskResult<ProjectVersion>> getDefaultProjectVersion(std::string project) const;
+        drogon::Task<TaskResult<>> deleteProjectVersions(std::string project) const;
 
-        drogon::Task<std::tuple<std::optional<Project>, Error>> getProjectSource(std::string id) const;
+        drogon::Task<TaskResult<Project>> getProjectSource(std::string id) const;
 
-        drogon::Task<std::tuple<ProjectSearchResponse, Error>> findProjects(std::string query, std::string types, std::string sort,
-                                                                            int page) const;
+        drogon::Task<TaskResult<ProjectSearchResponse>> findProjects(std::string query, std::string types, std::string sort,
+                                                                     int page) const;
 
         drogon::Task<bool> existsForRepo(std::string repo, std::string branch, std::string path) const;
 
         drogon::Task<bool> existsForData(std::string id, nlohmann::json platforms) const;
 
-        drogon::Task<Error> createUserIfNotExists(std::string username) const;
-        drogon::Task<Error> deleteUserProjects(std::string username) const;
-        drogon::Task<Error> deleteUser(std::string username) const;
+        // Users
+        drogon::Task<TaskResult<>> createUserIfNotExists(std::string username) const;
+        drogon::Task<TaskResult<>> deleteUserProjects(std::string username) const;
+        drogon::Task<TaskResult<>> deleteUser(std::string username) const;
 
-        drogon::Task<Error> linkUserModrinthAccount(std::string username, std::string mrAccountId) const;
-        drogon::Task<Error> unlinkUserModrinthAccount(std::string username) const;
+        drogon::Task<TaskResult<>> linkUserModrinthAccount(std::string username, std::string mrAccountId) const;
+        drogon::Task<TaskResult<>> unlinkUserModrinthAccount(std::string username) const;
         drogon::Task<std::vector<Project>> getUserProjects(std::string username) const;
-        drogon::Task<std::optional<Project>> getUserProject(std::string username, std::string id) const;
-        drogon::Task<Error> assignUserProject(std::string username, std::string id, std::string role) const;
+        drogon::Task<TaskResult<Project>> getUserProject(std::string username, std::string id) const;
+        drogon::Task<TaskResult<>> assignUserProject(std::string username, std::string id, std::string role) const;
 
-        drogon::Task<Error> refreshFlatTagItemView() const;
-        drogon::Task<Error> addItem(std::string item) const;
-        drogon::Task<Error> addTag(std::string tag) const;
-        drogon::Task<Error> addTagItemEntry(std::string tag, std::string item) const;
-        drogon::Task<Error> addTagTagEntry(std::string parentTag, std::string childTag) const;
+        // Content
+        drogon::Task<TaskResult<>> refreshFlatTagItemView() const;
         drogon::Task<int64_t> addRecipe(std::string id, std::string type) const;
-        drogon::Task<Error> addRecipeIngredientItem(int64_t recipe_id, std::string item, int slot, int count, bool input) const;
-        drogon::Task<Error> addRecipeIngredientTag(int64_t recipe_id, std::string tag, int slot, int count, bool input) const;
+        drogon::Task<TaskResult<>> addRecipeIngredientItem(int64_t recipe_id, std::string item, int slot, int count, bool input) const;
+        drogon::Task<TaskResult<>> addRecipeIngredientTag(int64_t recipe_id, std::string tag, int slot, int count, bool input) const;
 
         drogon::Task<std::vector<std::string>> getItemSourceProjects(int64_t item) const;
         drogon::Task<std::vector<GlobalItem>> getGlobalTagItems(int64_t tagId) const;
@@ -110,43 +109,52 @@ namespace service {
         drogon::Task<std::vector<ContentUsage>> getObtainableItemsBy(std::string item) const;
         drogon::Task<std::vector<ContentUsage>> getRecipeTypeWorkbenches(int64_t id) const;
 
-        drogon::Task<std::optional<DataImport>> addDataImportRecord(DataImport data) const;
+        // System data
+        drogon::Task<TaskResult<DataImport>> addDataImportRecord(DataImport data) const;
         drogon::Task<PaginatedData<DataImport>> getDataImports(std::string searchQuery, int page) const;
 
+        // Deployments
         drogon::Task<PaginatedData<DeploymentData>> getDeployments(std::string projectId, int page) const;
-        drogon::Task<std::optional<Deployment>> getActiveDeployment(std::string projectId) const;
-        drogon::Task<std::optional<Deployment>> getLoadingDeployment(std::string projectId) const;
-        drogon::Task<Error> deactivateDeployments(std::string projectId) const;
-        drogon::Task<Error> deleteDeployment(std::string id) const;
+        drogon::Task<TaskResult<Deployment>> getActiveDeployment(std::string projectId) const;
+        drogon::Task<TaskResult<Deployment>> getLoadingDeployment(std::string projectId) const;
+        drogon::Task<TaskResult<>> deactivateDeployments(std::string projectId) const;
+        drogon::Task<TaskResult<>> deleteDeployment(std::string id) const;
         drogon::Task<bool> hasFailingDeployment(std::string projectId) const;
-        drogon::Task<Error> failLoadingDeployments() const;
+        drogon::Task<TaskResult<>> failLoadingDeployments() const;
         drogon::Task<std::vector<std::string>> getUndeployedProjects() const;
 
-        drogon::Task<std::optional<ProjectIssue>> getProjectIssue(std::string deploymentId, ProjectIssueLevel level,
-                                                                  ProjectIssueType type, std::string path) const;
+        // Issues
+        drogon::Task<TaskResult<ProjectIssue>> getProjectIssue(std::string deploymentId, ProjectIssueLevel level, ProjectIssueType type,
+                                                               std::string path) const;
         drogon::Task<std::vector<ProjectIssue>> getDeploymentIssues(std::string deploymentId) const;
         drogon::Task<std::unordered_map<std::string, int64_t>> getActiveProjectIssueStats(std::string projectId) const;
 
         drogon::Task<PaginatedData<Report>> getReports(int page) const;
+
     private:
         drogon::orm::DbClientPtr clientPtr_;
     };
 
-    template<typename Ret>
-    drogon::Task<std::tuple<std::optional<Ret>, Error>>
-    executeTransaction(const std::function<drogon::Task<Ret>(const Database &client)> &func) {
+    template<typename F, typename Ret = WrapperInnerType_T<std::invoke_result_t<F, const Database &>>,
+             typename Type = std::conditional_t<std::is_void_v<Ret>, std::monostate, Ret>>
+    drogon::Task<TaskResult<Type>> executeTransaction(F &&func) {
         try {
             const auto clientPtr = drogon::app().getFastDbClient();
             const auto transPtr = co_await clientPtr->newTransactionCoro();
             const Database transDb{transPtr};
 
-            const Ret result = co_await func(transDb);
-            co_return {result, Error::Ok};
+            if constexpr (std::is_void_v<Ret>) {
+                co_await func(transDb);
+                co_return Error::Ok;
+            } else {
+                const Ret result = co_await func(transDb);
+                co_return result;
+            }
         } catch (const drogon::orm::Failure &e) {
             logging::logger.error("Error executing transaction: {}", e.what());
-            co_return {std::nullopt, Error::ErrInternal};
+            co_return Error::ErrInternal;
         } catch ([[maybe_unused]] const drogon::orm::DrogonDbException &e) {
-            co_return {std::nullopt, Error::ErrNotFound};
+            co_return Error::ErrNotFound;
         }
     }
 }

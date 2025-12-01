@@ -24,7 +24,7 @@ WHERE r.loc IN (
                 'minecraft:crafting_shaped',
                 'minecraft:crafting_shapeless'
     )
-  AND r.version_id IS NULL;
+  AND r.version_id = (SELECT id FROM project_version WHERE project_id = 'minecraft' AND name IS NULL);
 
 INSERT INTO recipe_workbench (type_id, item_id)
 SELECT r.id, pitem.id
@@ -33,7 +33,7 @@ FROM recipe_type r
 WHERE r.loc IN (
     'minecraft:smelting'
     )
-  AND r.version_id IS NULL;
+  AND r.version_id = (SELECT id FROM project_version WHERE project_id = 'minecraft' AND name IS NULL);
 
 INSERT INTO recipe_workbench (type_id, item_id)
 SELECT r.id, pitem.id
@@ -42,7 +42,7 @@ FROM recipe_type r
 WHERE r.loc IN (
     'minecraft:blasting'
     )
-  AND r.version_id IS NULL;
+  AND r.version_id = (SELECT id FROM project_version WHERE project_id = 'minecraft' AND name IS NULL);
 
 INSERT INTO recipe_workbench (type_id, item_id)
 SELECT r.id, pitem.id
@@ -58,7 +58,7 @@ FROM recipe_type r
 WHERE r.loc IN (
     'minecraft:campfire_cooking'
     )
-  AND r.version_id IS NULL;
+  AND r.version_id = (SELECT id FROM project_version WHERE project_id = 'minecraft' AND name IS NULL);
 
 INSERT INTO recipe_workbench (type_id, item_id)
 SELECT r.id, pitem.id
@@ -67,7 +67,7 @@ FROM recipe_type r
 WHERE r.loc IN (
     'minecraft:smoking'
     )
-  AND r.version_id IS NULL;
+  AND r.version_id = (SELECT id FROM project_version WHERE project_id = 'minecraft' AND name IS NULL);
 
 INSERT INTO recipe_workbench (type_id, item_id)
 SELECT r.id, pitem.id
@@ -76,7 +76,7 @@ FROM recipe_type r
 WHERE r.loc IN (
     'minecraft:stonecutting'
     )
-  AND r.version_id IS NULL;
+  AND r.version_id = (SELECT id FROM project_version WHERE project_id = 'minecraft' AND name IS NULL);
 
 INSERT INTO recipe_workbench (type_id, item_id)
 SELECT r.id, pitem.id
@@ -85,4 +85,4 @@ FROM recipe_type r
 WHERE r.loc IN (
     'minecraft:smithing_transform'
     )
-  AND r.version_id IS NULL;
+  AND r.version_id = (SELECT id FROM project_version WHERE project_id = 'minecraft' AND name IS NULL);

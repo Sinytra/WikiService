@@ -5,6 +5,7 @@
 #include <models/Item.h>
 #include <models/RecipeIngredientItem.h>
 #include <models/RecipeIngredientTag.h>
+#include <models/RecipeType.h>
 #include <models/Tag.h>
 #include <service/database/database.h>
 #include <service/storage/storage.h>
@@ -65,16 +66,10 @@ namespace content {
         explicit RecipeResolver(const std::optional<std::string> &locale) : locale_(locale) {}
 
         Task<ResolvedItem> resolveItem(const ResolvableItem item) const {
-            // Vanilla
-            if (item.project_id.empty()) {
-                const auto name = co_await global::lang->getItemName(locale_, item.loc);
-                co_return ResolvedItem{.id = item.loc, .name = name, .project = "", .has_page = false};
-            }
-
-            // Modded
-            if (const auto [resolved, resolveErr] = co_await global::storage->getProject(item.project_id, std::nullopt, locale_); resolved)
+            // Find in other project
+            if (const auto resolved = co_await global::storage->getProject(item.project_id, std::nullopt, locale_); resolved)
             {
-                const auto [name, path] = co_await resolved->getItemName(item.loc);
+                const auto [name, path] = co_await (*resolved)->getItemName(item.loc);
                 co_return ResolvedItem{.id = item.loc, .name = name, .project = item.project_id, .has_page = !path.empty()};
             }
 
@@ -85,12 +80,7 @@ namespace content {
             const auto item = co_await global::database->findByPrimaryKey<Item>(ingredient.getValueOfItemId());
             std::vector<ResolvedItem> result;
             if (item) {
-                auto sources = co_await global::database->getItemSourceProjects(item->getValueOfId());
-                if (sources.empty()) {
-                    // Vanilla
-                    sources.emplace_back("");
-                }
-
+                const auto sources = co_await global::database->getItemSourceProjects(item->getValueOfId());
                 const auto loc = item->getValueOfLoc();
                 for (const auto &source: sources) {
                     result.emplace_back(co_await resolveItem({.project_id = source, .loc = loc}));
@@ -123,7 +113,6 @@ namespace content {
         const std::optional<std::string> locale_;
     };
 
-    // TODO Cache in redis
     Task<std::optional<ResolvedGameRecipe>> resolveRecipe(const Recipe recipe, const std::optional<std::string> &locale) {
         const auto recipeId = recipe.getValueOfId();
         const auto recipeType = unwrap(co_await global::database->findByPrimaryKey<RecipeType>(recipe.getValueOfTypeId()));

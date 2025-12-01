@@ -1,6 +1,5 @@
 #include "recipe_custom.h"
 
-#include <drogon/drogon.h>
 #include <schemas/schemas.h>
 
 using namespace drogon;
@@ -52,16 +51,16 @@ namespace content {
 
     bool CustomRecipeParser::handlesType(const ResourceLocation type) { return type.namespace_ != ResourceLocation::DEFAULT_NAMESPACE; }
 
-    std::optional<GameRecipeType> CustomRecipeParser::getType(const ResolvedProject &project, const ResourceLocation type) {
-        if (auto result = project.getRecipeType(type)) {
+    Task<std::optional<GameRecipeType>> CustomRecipeParser::getType(const ProjectBasePtr project, const ResourceLocation type) const {
+        if (auto result = co_await project->getRecipeType(type)) {
             result->id = type;
             const auto langKey = std::format("recipe_type.{}.{}", type.namespace_, type.path_);
-            if (const auto localName = project.readLangKey(type.namespace_, langKey)) {
+            if (const auto localName = co_await project->readLangKey(type.namespace_, langKey)) {
                 result->localizedName = *localName;
             }
-            return result;
+            co_return result;
         }
-        return std::nullopt;
+        co_return std::nullopt;
     }
 
     std::optional<StubRecipe> CustomRecipeParser::parseRecipe(const std::string &id, const std::string &type, const nlohmann::json &data,

@@ -17,11 +17,11 @@ using namespace drogon_model::postgres;
 namespace api::v1 {
     Task<> BrowseController::browse(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                     const std::string query, const std::string types, const std::string sort, const int page) const {
-        const auto [searchResults, searchError] = co_await global::database->findProjects(query, types, sort, page);
+        const auto searchResults = co_await global::database->findProjects(query, types, sort, page);
 
         Json::Value root;
         Json::Value data(Json::arrayValue);
-        for (const auto &item: searchResults.data) {
+        for (const auto &item: searchResults->data) {
             Json::Value itemJson;
             itemJson["id"] = item.getValueOfId();
             itemJson["name"] = item.getValueOfName();
@@ -31,8 +31,8 @@ namespace api::v1 {
             itemJson["created_at"] = item.getValueOfCreatedAt().toDbStringLocal();
             data.append(itemJson);
         }
-        root["pages"] = searchResults.pages;
-        root["total"] = searchResults.total;
+        root["pages"] = searchResults->pages;
+        root["total"] = searchResults->total;
         root["data"] = data;
 
         callback(HttpResponse::newHttpJsonResponse(root));

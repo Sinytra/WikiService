@@ -32,8 +32,8 @@ namespace service {
             projectId);
     }
 
-    Task<std::optional<Deployment>> Database::getActiveDeployment(const std::string projectId) const {
-        const auto [res, err] = co_await handleDatabaseOperation<Deployment>([projectId](const DbClientPtr &client) -> Task<Deployment> {
+    Task<TaskResult<Deployment>> Database::getActiveDeployment(const std::string projectId) const {
+        co_return co_await handleDatabaseOperation([projectId](const DbClientPtr &client) -> Task<Deployment> {
             CoroMapper<Deployment> mapper(client);
             mapper.orderBy(Deployment::Cols::_created_at, SortOrder::DESC);
             mapper.limit(1);
@@ -41,11 +41,10 @@ namespace service {
                 Criteria(Deployment::Cols::_project_id, CompareOperator::EQ, projectId) &&
                 Criteria(Deployment::Cols::_status, CompareOperator::EQ, enumToStr(DeploymentStatus::SUCCESS)));
         });
-        co_return res;
     }
 
-    Task<std::optional<Deployment>> Database::getLoadingDeployment(std::string projectId) const {
-        const auto [res, err] = co_await handleDatabaseOperation<Deployment>([projectId](const DbClientPtr &client) -> Task<Deployment> {
+    Task<TaskResult<Deployment>> Database::getLoadingDeployment(std::string projectId) const {
+        co_return co_await handleDatabaseOperation([projectId](const DbClientPtr &client) -> Task<Deployment> {
             CoroMapper<Deployment> mapper(client);
             mapper.limit(1);
             co_return co_await mapper.findOne(
@@ -53,30 +52,25 @@ namespace service {
                 Criteria(Deployment::Cols::_status, CompareOperator::In,
                          std::vector{enumToStr(DeploymentStatus::CREATED), enumToStr(DeploymentStatus::LOADING)}));
         });
-        co_return res;
     }
 
-    Task<Error> Database::deactivateDeployments(std::string projectId) const {
-        const auto [res, err] = co_await handleDatabaseOperation<Error>([projectId](const DbClientPtr &client) -> Task<Error> {
+    Task<TaskResult<>> Database::deactivateDeployments(std::string projectId) const {
+        co_return co_await handleDatabaseOperation([projectId](const DbClientPtr &client) -> Task<> {
             CoroMapper<Deployment> mapper(client);
             co_await mapper.updateBy({Deployment::Cols::_active}, Criteria(Deployment::Cols::_project_id, CompareOperator::EQ, projectId),
                                      false);
-            co_return Error::Ok;
         });
-        co_return res.value_or(err);
     }
 
-    Task<Error> Database::deleteDeployment(const std::string id) const {
-        const auto [res, err] = co_await handleDatabaseOperation<Error>([&id](const DbClientPtr &client) -> Task<Error> {
+    Task<TaskResult<>> Database::deleteDeployment(const std::string id) const {
+        co_return co_await handleDatabaseOperation([&id](const DbClientPtr &client) -> Task<> {
             CoroMapper<Deployment> mapper(client);
-            const auto rows = co_await mapper.deleteByPrimaryKey(id);
-            co_return rows < 1 ? Error::ErrInternal : Error::Ok;
+            co_await mapper.deleteByPrimaryKey(id);
         });
-        co_return res.value_or(err);
     }
 
     Task<bool> Database::hasFailingDeployment(const std::string projectId) const {
-        const auto [res, err] = co_await handleDatabaseOperation<bool>([projectId](const DbClientPtr &client) -> Task<bool> {
+        const auto res = co_await handleDatabaseOperation([projectId](const DbClientPtr &client) -> Task<bool> {
             CoroMapper<Deployment> mapper(client);
             mapper.orderBy(Deployment::Cols::_created_at, SortOrder::DESC);
             mapper.limit(1);
@@ -87,16 +81,14 @@ namespace service {
     }
 
     // TODO Delete failing deployments folders
-    Task<Error> Database::failLoadingDeployments() const {
-        const auto [res, err] = co_await handleDatabaseOperation<Error>([](const DbClientPtr &client) -> Task<Error> {
+    Task<TaskResult<>> Database::failLoadingDeployments() const {
+        co_return co_await handleDatabaseOperation([](const DbClientPtr &client) -> Task<> {
             CoroMapper<Deployment> mapper(client);
             co_await mapper.updateBy({Deployment::Cols::_status},
                                      Criteria(Deployment::Cols::_status, CompareOperator::In,
                                               std::vector{enumToStr(DeploymentStatus::CREATED), enumToStr(DeploymentStatus::LOADING)}),
                                      enumToStr(DeploymentStatus::ERROR));
-            co_return Error::Ok;
         });
-        co_return res.value_or(err);
     }
 
     Task<std::vector<std::string>> Database::getUndeployedProjects() const {
@@ -108,17 +100,17 @@ namespace service {
                                                AND active = TRUE \
                                        )";
 
-        const auto [res, err] = co_await handleDatabaseOperation<std::vector<std::string>>([](const DbClientPtr &client) -> Task<std::vector<std::string>> {
+        const auto res = co_await handleDatabaseOperation([](const DbClientPtr &client) -> Task<std::vector<std::string>> {
             std::vector<std::string> ids;
 
             const auto rows = co_await client->execSqlCoro(query);
-            for (auto &row : rows) {
+            for (auto &row: rows) {
                 const auto id = row[0].as<std::string>();
                 ids.push_back(id);
             }
 
             co_return ids;
         });
-        co_return res.value_or(std::vector<std::string>{});
+        co_return res.value_or({});
     }
 }

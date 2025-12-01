@@ -19,12 +19,13 @@ namespace api::v1 {
                                    const std::string project) const {
         const auto version = req->getOptionalParameter<std::string>("version");
         const auto resolved = co_await BaseProjectController::getProject(project, version, std::nullopt);
+        requireNonVirtual(resolved);
 
-        if (version && !co_await resolved.hasVersion(*version)) {
+        if (version && !co_await resolved->hasVersion(*version)) {
             throw ApiException(Error::ErrNotFound, "Version not found");
         }
 
-        const auto json = co_await resolved.toJsonVerbose();
+        const auto json = co_await resolved->toJsonVerbose();
         callback(HttpResponse::newHttpJsonResponse(json));
     }
 
@@ -38,20 +39,21 @@ namespace api::v1 {
             }
 
             const auto resolved = co_await BaseProjectController::getProjectWithParams(req, project);
+            requireNonVirtual(resolved);
 
-            const auto [page, pageError](resolved.readPageFile(path + DOCS_FILE_EXT));
-            if (pageError != Error::Ok) {
+            const auto page(resolved->readPageFile(path + DOCS_FILE_EXT));
+            if (!page) {
                 const auto optionalParam = req->getOptionalParameter<std::string>("optional");
                 const auto optional = optionalParam.has_value() && optionalParam == "true";
 
-                throw ApiException(optional ? Error::Ok : pageError, "File not found");
+                throw ApiException(optional ? Error::Ok : page.error(), "File not found");
             }
 
             Json::Value root;
-            root["project"] = co_await resolved.toJson();
-            root["content"] = page.content;
-            if (resolved.getProject().getValueOfIsPublic() && !page.editUrl.empty()) {
-                root["edit_url"] = page.editUrl;
+            root["project"] = co_await resolved->toJson();
+            root["content"] = page->content;
+            if (resolved->getProject().getValueOfIsPublic() && !page->editUrl.empty()) {
+                root["edit_url"] = page->editUrl;
             }
 
             callback(HttpResponse::newHttpJsonResponse(root));
@@ -67,15 +69,16 @@ namespace api::v1 {
     Task<> DocsController::tree(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                 const std::string project) const {
         const auto resolved = co_await BaseProjectController::getProjectWithParams(req, project);
+        requireNonVirtual(resolved);
 
-        const auto [tree, treeError](resolved.getDirectoryTree());
-        if (treeError != Error::Ok) {
-            throw ApiException(treeError, "Error getting directory tree");
+        const auto tree(co_await resolved->getDirectoryTree());
+        if (!tree) {
+            throw ApiException(tree.error(), "Error getting directory tree");
         }
 
         nlohmann::json root;
-        root["project"] = parkourJson(co_await resolved.toJson());
-        root["tree"] = tree;
+        root["project"] = parkourJson(co_await resolved->toJson());
+        root["tree"] = *tree;
 
         callback(jsonResponse(root));
     }
@@ -83,6 +86,7 @@ namespace api::v1 {
     Task<> DocsController::asset(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string project) const {
         try {
             const auto resolved = co_await BaseProjectController::getProject(project, req->getOptionalParameter<std::string>("version"), std::nullopt);
+            requireNonVirtual(resolved);
 
             std::string prefix = std::format("/api/v1/docs/{}/asset/", project);
             std::string location = req->getPath().substr(prefix.size());
@@ -96,7 +100,7 @@ namespace api::v1 {
                 throw ApiException(Error::ErrBadRequest, "Invalid location specified");
             }
 
-            const auto asset = resolved.getAsset(*resourceLocation);
+            const auto asset = resolved->getAsset(*resourceLocation);
             if (!asset) {
                 const auto optionalParam = req->getOptionalParameter<std::string>("optional");
                 const auto optional = optionalParam.has_value() && optionalParam == "true";

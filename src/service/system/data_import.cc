@@ -1,11 +1,13 @@
+#include "data_import.h"
 #include <drogon/HttpAppFramework.h>
 #include <log/log.h>
-#include "data_import.h"
 
-#include <database/database.h>
 #include <schemas/schemas.h>
-#include "storage/storage.h"
-#include "util.h"
+#include <service/database/database.h>
+#include <service/storage/storage.h>
+#include <service/util.h>
+
+#include "project/virtual/virtual.h"
 
 using namespace drogon;
 using namespace service;
@@ -53,17 +55,17 @@ struct GameRecipe {
     }
 };
 
-Task<Error> importSystemGameData(const Database &db, const std::vector<GameDataItem> &items, const std::vector<GameDataTag> &tags,
-                                 const std::vector<GameRecipe> &recipes) {
+Task<Error> importSystemGameData(const Database &db, const ProjectDatabaseAccess &projectDb, const std::vector<GameDataItem> &items,
+                                 const std::vector<GameDataTag> &tags, const std::vector<GameRecipe> &recipes) {
     logger.debug("Importing {} items", items.size());
     for (auto &[id]: items) {
-        co_await db.addItem(id);
+        co_await projectDb.addProjectItem(id);
     }
 
     logger.debug("Importing {} tags", tags.size());
     int entryCount = 0;
     for (auto &[tag, entries]: tags) {
-        co_await db.addTag(tag);
+        co_await projectDb.addTag(tag);
         entryCount += entries.size();
     }
 
@@ -71,9 +73,9 @@ Task<Error> importSystemGameData(const Database &db, const std::vector<GameDataI
     for (auto &[tag, entries]: tags) {
         for (auto &entry: entries) {
             if (entry.starts_with("#")) {
-                co_await db.addTagTagEntry(tag, entry.substr(1));
+                co_await projectDb.addTagTagEntry(tag, entry.substr(1));
             } else {
-                co_await db.addTagItemEntry(tag, entry);
+                co_await projectDb.addTagItemEntry(tag, entry);
             }
         }
     }
@@ -110,14 +112,18 @@ Task<Error> executeImport(const DataImport &data, const std::vector<GameDataItem
     try {
         const auto transPtr = co_await clientPtr->newTransactionCoro();
         const Database transDb{transPtr};
+        auto projectDb = global::virtualProject->getProjectDatabase();
+        projectDb.setDBClientPointer(transPtr);
 
-        const auto res = co_await importSystemGameData(transDb, items, tags, recipes);
+        const auto res = co_await importSystemGameData(transDb, projectDb, items, tags, recipes);
+
+        projectDb.setDBClientPointer(clientPtr);
         if (res == Error::Ok) {
             co_await transDb.addDataImportRecord(data);
         }
 
         co_return res;
-    } catch (std::exception e) {
+    } catch (std::exception &e) {
         logger.error("Error ingesting system data: {}", e.what());
 
         co_return Error::ErrInternal;
@@ -163,17 +169,16 @@ Task<Error> sys::runInitialDeployments() {
     logger.info("Running initial deployments on {} projects", total);
 
     int i = 0;
-    for (const auto &id : candidateProjects) {
+    for (const auto &id: candidateProjects) {
         logger.info("Deploying project {} [{}/{}]", id, ++i, total);
 
-        const auto [project, err] = co_await global::database->getProjectSource(id);
+        const auto project = co_await global::database->getProjectSource(id);
         if (!project) {
             logger.error("Project {} not found, skipping", id);
             continue;
         }
 
-        const auto [deployment, dErr] = co_await global::storage->deployProject(*project, "");
-        if (!deployment) {
+        if (const auto deployment = co_await global::storage->deployProject(*project, ""); !deployment) {
             logger.error("Failed to deploy project {}", id);
         } else {
             logger.info("Project {} deployment successful", id);

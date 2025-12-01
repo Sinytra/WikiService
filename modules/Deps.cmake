@@ -53,6 +53,15 @@ IF (WIN32 AND USE_LOCAL_DEPS)
 ENDIF ()
 
 CPMAddPackage(
+        NAME nlohmann_json
+        GITHUB_REPOSITORY nlohmann/json
+        GIT_TAG v3.12.0
+        OPTIONS
+        "JSON_BuildTests OFF"
+        "BUILD_SHARED_LIBS OFF"
+)
+
+CPMAddPackage(
         NAME nlohmann_json_schema_validator
         GITHUB_REPOSITORY pboettch/json-schema-validator
         GIT_TAG 2.3.0

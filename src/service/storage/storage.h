@@ -4,7 +4,7 @@
 #include <nlohmann/json_fwd.hpp>
 #include <service/cache.h>
 #include <service/error.h>
-#include <service/resolved.h>
+#include <service/project/resolved.h>
 #include <service/storage/realtime.h>
 
 using namespace drogon_model::postgres;
@@ -19,11 +19,11 @@ namespace service {
     public:
         explicit Storage(const std::string &);
 
-        drogon::Task<std::tuple<std::optional<ResolvedProject>, Error>>
-        getProject(std::string projectId, const std::optional<std::string> &version, const std::optional<std::string> &locale) const;
-        drogon::Task<std::tuple<std::optional<ResolvedProject>, Error>>
-        getProject(const Project &project, const std::optional<std::string> &version, const std::optional<std::string> &locale) const;
-        drogon::Task<std::optional<ResolvedProject>> maybeGetProject(const Project &project) const;
+        drogon::Task<TaskResult<ProjectBasePtr>> getProject(std::string projectId, const std::optional<std::string> &version,
+                                                                          const std::optional<std::string> &locale) const;
+        drogon::Task<TaskResult<ProjectBasePtr>> getProject(const Project &project, const std::optional<std::string> &version,
+                                                                          const std::optional<std::string> &locale) const;
+        drogon::Task<TaskResult<ResolvedProject>> maybeGetProject(const Project &project) const;
 
         [[maybe_unused]] Error invalidateProject(const Project &project) const;
         [[maybe_unused]] Error removeDeployment(const Deployment &deployment) const;
@@ -33,22 +33,19 @@ namespace service {
         drogon::Task<std::tuple<std::optional<nlohmann::json>, ProjectError, std::string>>
         setupValidateTempProject(const Project &project) const;
 
-        drogon::Task<std::tuple<std::optional<Deployment>, Error>> deployProject(const Project &project, std::string userId);
+        drogon::Task<TaskResult<Deployment>> deployProject(const Project &project, std::string userId);
 
-        drogon::Task<Error> addProjectIssue(const ResolvedProject &resolved, ProjectIssueLevel level, ProjectIssueType type,
+        drogon::Task<Error> addProjectIssue(ProjectBasePtr project, ProjectIssueLevel level, ProjectIssueType type,
                                             ProjectError subject, std::string details, std::string path);
 
-        void addProjectIssueAsync(const ResolvedProject &resolved, ProjectIssueLevel level, ProjectIssueType type, ProjectError subject,
-                                  const std::string &details, const std::string &path) const;
-
     private:
-        drogon::Task<std::optional<ProjectVersion>> getDefaultVersion(const Project &project) const;
+        drogon::Task<TaskResult<ProjectVersion>> getDefaultVersion(const Project &project) const;
 
         drogon::Task<ProjectError> deployProject(const Project &project, Deployment &deployment, std::filesystem::path clonePath) const;
         drogon::Task<std::tuple<std::optional<Deployment>, ProjectError>> deployProjectCached(const Project &project, std::string userId);
 
-        drogon::Task<std::tuple<std::optional<ResolvedProject>, Error>>
-        findProject(const Project &project, const std::optional<std::string> &version, const std::optional<std::string> &locale) const;
+        drogon::Task<TaskResult<ResolvedProject>> findProject(const Project &project, const std::optional<std::string> &version,
+                                                              const std::optional<std::string> &locale) const;
 
         std::filesystem::directory_entry getBaseDir() const;
         std::filesystem::path getDeploymentRootDir(const Deployment &deployment) const;

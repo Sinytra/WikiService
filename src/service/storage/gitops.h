@@ -1,10 +1,10 @@
 #pragma once
 
+#include <service/project/resolved.h>
 #include <drogon/utils/coroutine.h>
 #include <git2/indexer.h>
 #include <memory>
 #include <service/error.h>
-#include <service/resolved.h>
 #include <spdlog/spdlog.h>
 #include <string>
 

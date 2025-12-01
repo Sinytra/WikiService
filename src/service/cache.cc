@@ -51,7 +51,7 @@ namespace service {
         const auto expireSeconds = std::chrono::seconds(expire).count();
 
         const auto trans = co_await client->newTransactionCoro();
-        for (const auto& [field, value] : values) {
+        for (const auto &[field, value]: values) {
             co_await trans->execCommandCoro("HSET %s %s %s", key.data(), field.data(), value.data());
         }
         co_await trans->execCommandCoro("EXPIRE %s %ld", key.data(), expireSeconds);
@@ -79,5 +79,27 @@ namespace service {
     Task<> MemoryCache::erase(std::string key) const {
         const auto client = app().getFastRedisClient();
         co_await client->execCommandCoro("DEL %s", key.data());
+    }
+
+    Task<> MemoryCache::eraseAll(const std::string keyPrefix) const {
+        const auto client = app().getFastRedisClient();
+        long cursor = 0;
+        const auto matchPattern = keyPrefix + "*";
+        std::vector<std::string> deleteKeys;
+        do {
+            const auto resp = co_await client->execCommandCoro("SCAN %d MATCH %s COUNT 100", cursor, matchPattern.data());
+            const auto respData = resp.asArray();
+            cursor = std::stoi(respData[0].asString());
+
+            for (const auto results = respData[1].asArray(); const auto &res: results) {
+                const auto key = res.asString();
+                deleteKeys.push_back(key);
+            }
+        } while (cursor != 0);
+
+        const auto trans = co_await client->newTransactionCoro();
+        for (const auto &key : deleteKeys)
+            co_await trans->execCommandCoro("DEL %s", key.data());
+        co_await trans->executeCoro();
     }
 }

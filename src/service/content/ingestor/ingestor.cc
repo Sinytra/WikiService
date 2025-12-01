@@ -1,7 +1,7 @@
 #include "ingestor.h"
 
-#include <database/database.h>
-#include <database/resolved_db.h>
+#include <service/database/database.h>
+#include <service/database/project_database.h>
 #include <drogon/drogon.h>
 #include <fstream>
 
@@ -58,7 +58,7 @@ namespace content {
             project_.getProjectDatabase().setDBClientPointer(clientPtr);
 
             co_return result;
-        } catch (std::exception e) {
+        } catch (std::exception &e) {
             logger.error("Error ingesting project data: {}", e.what());
             issues_.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::UNKNOWN, e.what());
 
@@ -91,7 +91,7 @@ namespace content {
             try {
                 const auto [items] = co_await ingestor->prepare();
                 allResults.items.insert(items.begin(), items.end());
-            } catch (std::exception e) {
+            } catch (std::exception &e) {
                 issues_.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::UNKNOWN, e.what());
                 co_return Error::ErrInternal;
             }
@@ -110,7 +110,7 @@ namespace content {
 
             for (const auto &item: candidateItems) {
                 projectLog.trace("Registering item '{}'", item);
-                if (const auto error = co_await project_.getProjectDatabase().addProjectItem(item); error != Error::Ok) {
+                if (const auto result = co_await project_.getProjectDatabase().addProjectItem(item); !result) {
                     // TODO add issue
                     co_return Error::ErrBadRequest;
                 }
@@ -128,7 +128,7 @@ namespace content {
                 } else {
                     projectLog.error("Encountered error while executing ingestor");
                 }
-            } catch (std::exception e) {
+            } catch (std::exception &e) {
                 const auto details = std::format("[{}] {}", name, e.what());
                 issues_.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::UNKNOWN, details);
                 co_return Error::ErrInternal;
@@ -144,7 +144,7 @@ namespace content {
                 } else {
                     projectLog.error("Encountered error while finishing ingestor");
                 }
-            } catch (std::exception e) {
+            } catch (std::exception &e) {
                 const auto details = std::format("[{}] {}", name, e.what());
                 issues_.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::UNKNOWN, details);
                 co_return Error::ErrInternal;

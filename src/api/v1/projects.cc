@@ -1,17 +1,18 @@
 #include "projects.h"
 
-#include <database/database.h>
 #include <include/uri.h>
 #include <log/log.h>
 #include <models/UserProject.h>
 #include <schemas/schemas.h>
 #include <service/auth.h>
+#include <service/database/database.h>
 #include <service/error.h>
 #include <service/external/frontend.h>
 #include <service/storage/deployment.h>
 #include <service/util/crypto.h>
 // ReSharper disable once CppUnusedIncludeDirective
 #include <service/serializers.h>
+#include <service/project/cached.h>
 #include <service/storage/gitops.h>
 #include <service/storage/storage.h>
 #include <service/util.h>
@@ -95,7 +96,7 @@ namespace api::v1 {
 
         bool skipCheck = localEnv_;
         if (!skipCheck && checkExisting) {
-            if (const auto [proj, projErr] = co_await global::database->getProjectSource(id); proj) {
+            if (const auto proj = co_await global::database->getProjectSource(id); proj) {
                 if (const auto platforms = parseJsonString(proj->getValueOfPlatforms());
                     platforms && platforms->isMember(platform) && (*platforms)[platform] == slug)
                 {
@@ -271,8 +272,8 @@ namespace api::v1 {
         const std::vector<std::string> ids = json["ids"];
 
         Json::Value root(Json::arrayValue);
-        for (const auto &id : ids) {
-            if (const auto [project, error] = co_await global::database->getProjectSource(id); project) {
+        for (const auto &id: ids) {
+            if (const auto project = co_await global::database->getProjectSource(id); project) {
                 root.append(projectToJson(*project));
             }
         }
@@ -299,14 +300,14 @@ namespace api::v1 {
             throw ApiException(Error::ErrBadRequest, "exists");
         }
 
-        const auto [result, resultErr] = co_await global::database->createProject(project);
-        if (resultErr != Error::Ok) {
+        const auto result = co_await global::database->createProject(project);
+        if (!result) {
             logger.error("Failed to create project {} in database", project.getValueOfId());
             throw ApiException(Error::ErrInternal, "internal");
         }
 
-        if (const auto assignErr = co_await global::database->assignUserProject(session.username, result->getValueOfId(), "member");
-            assignErr != Error::Ok)
+        if (const auto assignResult = co_await global::database->assignUserProject(session.username, result->getValueOfId(), "member");
+            !assignResult)
         {
             logger.error("Failed to assign project {} to user {}", result->getValueOfId(), session.username);
             co_await global::database->removeProject(result->getValueOfId());
@@ -327,7 +328,7 @@ namespace api::v1 {
 
         auto [project, platforms] = co_await validateProjectData(json, session.user, true);
 
-        if (const auto [proj, projErr] = co_await global::database->getProjectSource(project.getValueOfId()); !proj) {
+        if (const auto proj = co_await global::database->getProjectSource(project.getValueOfId()); !proj) {
             throw ApiException(Error::ErrNotFound, "not_found");
         }
 
@@ -348,13 +349,14 @@ namespace api::v1 {
                                       const std::string id) const {
         const auto project = co_await BaseProjectController::getUserProject(req, id);
 
-        if (const auto error = co_await global::database->removeProject(project.getValueOfId()); error != Error::Ok) {
+        if (const auto result = co_await global::database->removeProject(project.getValueOfId()); !result) {
             logger.error("Failed to delete project {} in database", id);
             throw ApiException(Error::ErrInternal, "internal");
         }
 
         global::storage->invalidateProject(project);
         co_await global::database->refreshFlatTagItemView();
+        co_await clearProjectCache(project.getValueOfId());
 
         callback(simpleResponse("Project deleted successfully"));
     }
@@ -394,9 +396,10 @@ namespace api::v1 {
         currentLoop->queueInLoop(async_func([project, userId]() -> Task<> {
             logger.debug("Deploying project '{}' from branch '{}'", project.getValueOfId(), project.getValueOfSourceBranch());
 
-            if (const auto [resolved, resErr](co_await global::storage->deployProject(project, userId)); resErr == Error::Ok) {
+            if (const auto result = co_await global::storage->deployProject(project, userId); result) {
                 logger.debug("Project '{}' deployed successfully", project.getValueOfId());
 
+                co_await clearProjectCache(project.getValueOfId());
                 co_await global::frontend->revalidateProject(project.getValueOfId());
             } else {
                 logger.error("Encountered error while deploying project '{}'", project.getValueOfId());
@@ -408,7 +411,7 @@ namespace api::v1 {
                                                const std::string id) const {
         const auto version = req->getOptionalParameter<std::string>("version");
         const auto resolved = co_await BaseProjectController::getUserProject(req, id, version, std::nullopt);
-        const auto items{co_await resolved.getItemContentPages(getTableQueryParams(req))};
+        const auto items{co_await resolved->getItemContentPages(getTableQueryParams(req))};
         callback(jsonResponse(items));
     }
 
@@ -416,7 +419,7 @@ namespace api::v1 {
                                               const std::string id) const {
         const auto version = req->getOptionalParameter<std::string>("version");
         const auto resolved = co_await BaseProjectController::getUserProject(req, id, version, std::nullopt);
-        const auto tags{co_await resolved.getTags(getTableQueryParams(req))};
+        const auto tags{co_await resolved->getTags(getTableQueryParams(req))};
         callback(jsonResponse(tags));
     }
 
@@ -430,21 +433,21 @@ namespace api::v1 {
 
         const auto version = req->getOptionalParameter<std::string>("version");
         const auto resolved = co_await BaseProjectController::getUserProject(req, id, version, std::nullopt);
-        const auto items{co_await resolved.getTagItems(tag, getTableQueryParams(req))};
+        const auto items{co_await resolved->getTagItems(tag, getTableQueryParams(req))};
         callback(jsonResponse(items));
     }
 
     Task<> ProjectsController::getRecipes(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                           const std::string id) const {
         const auto resolved = co_await BaseProjectController::getProjectWithParams(req, id);
-        const auto recipes{co_await resolved.getRecipes(getTableQueryParams(req))};
+        const auto recipes{co_await resolved->getRecipes(getTableQueryParams(req))};
         callback(jsonResponse(recipes));
     }
 
     Task<> ProjectsController::getVersions(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                            const std::string id) const {
         const auto resolved = co_await BaseProjectController::getUserProject(req, id, std::nullopt, std::nullopt);
-        const auto versions{co_await resolved.getVersions(getTableQueryParams(req))};
+        const auto versions{co_await resolved->getVersions(getTableQueryParams(req))};
         callback(jsonResponse(versions));
     }
 
@@ -497,7 +500,7 @@ namespace api::v1 {
 
         const auto project(co_await BaseProjectController::getUserProject(req, deployment->getValueOfProjectId()));
 
-        if (const auto error = co_await global::database->deleteDeployment(id); error != Error::Ok) {
+        if (const auto result = co_await global::database->deleteDeployment(id); !result) {
             logger.error("Failed to delete deployment {} in database", id);
             throw ApiException(Error::ErrInternal, "internal");
         }
@@ -505,6 +508,7 @@ namespace api::v1 {
         if (deployment->getValueOfActive()) {
             logger.debug("Invalidating project after active deployment was removed");
             global::storage->removeDeployment(*deployment);
+            co_await clearProjectCache(project.getValueOfId());
         }
 
         callback(jsonResponse(parkourJson(deployment->toJson())));
@@ -524,7 +528,6 @@ namespace api::v1 {
     Task<> ProjectsController::addIssue(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                         const std::string id) const {
         const auto json(BaseProjectController::validatedBody(req, schemas::projectIssue));
-
         const auto resolved(co_await BaseProjectController::getProjectWithParams(req, id));
 
         const auto parsedLevel = parseProjectIssueLevel(json["level"]);
@@ -546,7 +549,7 @@ namespace api::v1 {
         const auto path = json["path"];
         auto resolvedPath = path;
         if (!path.empty()) {
-            const auto filePath = resolved.getPagePath(path);
+            const auto filePath = resolved->getPagePath(path);
             if (!filePath) {
                 throw ApiException(Error::ErrBadRequest, "invalid_path");
             }

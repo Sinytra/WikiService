@@ -1,8 +1,10 @@
 #include "ingestor.h"
 
-#include <database/database.h>
-#include <database/resolved_db.h>
 #include <drogon/drogon.h>
+#include <service/database/database.h>
+#include <service/database/project_database.h>
+
+#include "project/virtual/virtual.h"
 
 using namespace drogon;
 using namespace drogon::orm;
@@ -75,7 +77,8 @@ namespace content {
         const auto [id, type, ingredients] = recipe.data;
         const auto versionId = project_.getProjectVersion().getValueOfId();
 
-        const auto recipeType = co_await project_.getProjectDatabase().getRecipeType(type);
+        const TaskResult<RecipeType> recipeType = co_await project_.getProjectDatabase().getRecipeType(type) ||
+                                                  co_await global::virtualProject->getProjectDatabase().getRecipeType(type);
         if (!recipeType) {
             recipe.issues.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::UNKNOWN_RECIPE_TYPE, type);
             co_return Error::ErrNotFound;
@@ -109,7 +112,8 @@ namespace content {
             } catch ([[maybe_unused]] const std::exception &e) {
                 const auto ingredientName = isTag ? "#" + ingredientId : ingredientId;
                 logger_->warn("Skipping recipe '{}' due to missing ingredient '{}'", id, ingredientName);
-                recipe.issues.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::INVALID_INGREDIENT, ingredientName);
+                recipe.issues.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::INVALID_INGREDIENT,
+                                            ingredientName);
             }
             co_await recipeMapper.deleteByPrimaryKey(recipeId);
             co_return Error::ErrNotFound;

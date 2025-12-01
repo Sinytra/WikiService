@@ -2,7 +2,6 @@
 #include "recipe_builtin.h"
 #include "recipe_custom.h"
 
-#include <drogon/drogon.h>
 #include <schemas/schemas.h>
 #include <service/content/ingestor/ingestor.h>
 
@@ -24,9 +23,9 @@ namespace content {
         return nullptr;
     }
 
-    std::optional<GameRecipeType> getRecipeType(const ResolvedProject &project, const ResourceLocation &type) {
+    Task<std::optional<GameRecipeType>> getRecipeType(const ProjectBasePtr project, const ResourceLocation &type) {
         const auto parser = getRecipeParser(type);
-        return !parser ? std::nullopt : parser->getType(project, type);
+        co_return !parser ? std::nullopt : co_await parser->getType(project, type);
     }
 
     std::optional<PreparedData<StubRecipeType>> RecipesSubIngestor::readRecipeType(const std::string &namespace_,

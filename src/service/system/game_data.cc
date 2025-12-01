@@ -32,7 +32,7 @@ namespace service {
         try {
             co_await downloadAssets(langDir);
             logger.info("Game data setup complete");
-        } catch (std::exception err) {
+        } catch (std::exception &err) {
             logger.critical("Error downloading game assets: {}", err.what());
             remove_all(langDir);
             throw;
