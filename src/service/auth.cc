@@ -173,7 +173,7 @@ namespace service {
     }
 
     Task<TaskResult<>> Auth::unlinkModrinthAccount(const std::string username) const {
-        return global::database->unlinkUserModrinthAccount(username);
+        co_return co_await global::database->unlinkUserModrinthAccount(username);
     }
 
     Task<TaskResult<User>> Auth::getGitHubTokenUser(const std::string token) const {

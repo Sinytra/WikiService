@@ -98,9 +98,7 @@ namespace service {
         const auto versions = co_await getAvailableVersions();
         const auto locales = getLocales();
 
-        logger.debug("toJson: Call projectToJson on {}", project_.getValueOfId());
         Json::Value projectJson = projectToJson(project_, full);
-        logger.debug("toJson: Complete projectToJson");
 
         if (!versions.empty()) {
             Json::Value versionsJson(Json::arrayValue);

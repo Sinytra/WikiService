@@ -238,9 +238,7 @@ namespace api::v1 {
 
         Json::Value projectsJson(Json::arrayValue);
         for (const auto &project: projects) {
-            logger.debug("Call projectToJson on {}", project.getValueOfId());
             Json::Value json = projectToJson(project, true);
-            logger.debug("Complete projectToJson");
             json["status"] = enumToStr(co_await global::storage->getProjectStatus(project));
             projectsJson.append(json);
         }

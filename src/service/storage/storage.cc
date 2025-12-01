@@ -188,7 +188,7 @@ namespace service {
     }
 
     Task<TaskResult<ResolvedProject>> Storage::maybeGetProject(const Project &project) const {
-        return findProject(project, std::nullopt, std::nullopt);
+        co_return co_await findProject(project, std::nullopt, std::nullopt);
     }
 
     Error Storage::removeDeployment(const Deployment &deployment) const {

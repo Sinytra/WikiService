@@ -64,7 +64,7 @@ namespace service {
         co_return {.total = 0, .pages = 0, .size = 0};
     }
 
-    Task<ItemData> VirtualProject::getItemName(const Item item) const { return getItemName(item.getValueOfLoc()); }
+    Task<ItemData> VirtualProject::getItemName(const Item item) const { co_return co_await getItemName(item.getValueOfLoc()); }
     Task<ItemData> VirtualProject::getItemName(const std::string loc) const {
         const auto name = co_await global::lang->getItemName(DEFAULT_LOCALE, loc);
         co_return ItemData{name.value_or(""), ""};
@@ -76,7 +76,7 @@ namespace service {
 
     Task<std::optional<std::string>> VirtualProject::readLangKey(const std::string &namespace_, const std::string &key) const {
         const ResourceLocation location{namespace_, key};
-        return global::lang->getItemName(std::nullopt, location);
+        co_return co_await global::lang->getItemName(std::nullopt, location);
     }
 
     std::optional<std::filesystem::path> VirtualProject::getAsset(const ResourceLocation &location) const {

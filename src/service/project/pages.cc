@@ -258,7 +258,7 @@ namespace service {
     }
 
     Task<> validatePagesTree(const FileTree &tree, const ResolvedProject &resolved, const std::shared_ptr<ProjectIssueCallback> &issues,
-                           const std::vector<std::string> &requiredAttributes) {
+                             const std::vector<std::string> &requiredAttributes) {
         for (const auto &entry: tree) {
             if (entry.type == FileType::FILE) {
                 co_await validatePageFile(entry, resolved, issues, requiredAttributes);

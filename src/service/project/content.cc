@@ -53,7 +53,7 @@ namespace service {
         co_return (*json)[key].get<std::string>();
     }
 
-    Task<ItemData> ResolvedProject::getItemName(const Item item) const { return getItemName(item.getValueOfLoc()); }
+    Task<ItemData> ResolvedProject::getItemName(const Item item) const { co_return co_await getItemName(item.getValueOfLoc()); }
 
     Task<ItemData> ResolvedProject::getItemName(const std::string loc) const {
         const auto projectId = project_.getValueOfId();

@@ -49,7 +49,7 @@ namespace service {
     }
 
     Task<TaskResult<>> AccessKeys::deleteAccessKey(const int64_t id) const {
-        return global::database->deleteByPrimaryKey<AccessKey>(id);
+        co_return co_await global::database->deleteByPrimaryKey<AccessKey>(id);
     }
 
     bool AccessKeys::isValidKey(const AccessKey &key) const {

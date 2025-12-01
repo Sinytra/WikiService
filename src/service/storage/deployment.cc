@@ -128,7 +128,7 @@ namespace service {
         ProjectVersion defaultVersion;
         defaultVersion.setProjectId(project.getValueOfId());
         defaultVersion.setBranch(project.getValueOfSourceBranch());
-        return global::database->createProjectVersion(defaultVersion);
+        co_return co_await global::database->createProjectVersion(defaultVersion);
     }
 
     Task<TaskResult<>> setActiveDeployment(const std::string projectId, Deployment &deployment) {
@@ -143,7 +143,7 @@ namespace service {
     }
 
     Task<TaskResult<ProjectVersion>> Storage::getDefaultVersion(const Project &project) const {
-        return global::database->getDefaultProjectVersion(project.getValueOfId());
+        co_return co_await global::database->getDefaultProjectVersion(project.getValueOfId());
     }
 
     Task<ProjectError> Storage::deployProject(const Project &project, Deployment &deployment, const fs::path clonePath) const {
