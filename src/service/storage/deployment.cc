@@ -16,32 +16,30 @@ namespace fs = std::filesystem;
 
 const std::set<std::string> allowedFileExtensions = {".mdx", ".json", ".png", ".jpg", ".jpeg", ".webp", ".gif"};
 
-Error copyProjectFiles(const fs::path &root, const fs::path &docsRoot, const fs::path &dest,
-                       const std::shared_ptr<spdlog::logger> &projectLog) {
-    const auto gitPath = root / ".git";
-
+Error copyProjectFiles(const fs::path &docsRoot, const fs::path &dest, const std::shared_ptr<spdlog::logger> &projectLog) {
     projectLog->info("Copying project files for version '{}'", dest.filename().string());
 
     try {
         create_directories(dest);
 
-        for (const auto &entry: fs::recursive_directory_iterator(root)) {
-            if (!isSubpath(entry.path(), gitPath) && entry.is_regular_file() && isSubpath(entry.path(), docsRoot)) {
-                fs::path relative_path = relative(entry.path(), docsRoot);
-
-                if (const auto extension = entry.path().extension().string(); !allowedFileExtensions.contains(extension)) {
-                    projectLog->warn("Ignoring file {}", relative_path.string());
-                    continue;
-                }
-
-                if (fs::path destination_path = dest / relative_path.parent_path(); !exists(destination_path)) {
-                    create_directories(destination_path);
-                }
-
-                copy(entry, dest / relative_path, fs::copy_options::overwrite_existing);
+        for (const auto &entry: fs::recursive_directory_iterator(docsRoot)) {
+            if (!entry.is_regular_file()) {
+                continue;
             }
+            fs::path relative_path = relative(entry.path(), docsRoot);
+
+            if (const auto extension = entry.path().extension().string(); !allowedFileExtensions.contains(extension)) {
+                projectLog->warn("Ignoring file {}", relative_path.string());
+                continue;
+            }
+
+            if (fs::path destination_path = dest / relative_path.parent_path(); !exists(destination_path)) {
+                create_directories(destination_path);
+            }
+
+            copy(entry, dest / relative_path, fs::copy_options::overwrite_existing);
         }
-    } catch (std::exception e) {
+    } catch (std::exception &e) {
         projectLog->error("FS copy error: {}", e.what());
         return Error::ErrInternal;
     }
@@ -226,7 +224,7 @@ namespace service {
 
         // 7. Copy default version
         const auto dest = getDeploymentVersionedDir(deployment);
-        copyProjectFiles(clonePath, cloneDocsRoot, dest, logger);
+        copyProjectFiles(cloneDocsRoot, dest, logger);
 
         // 8. Copy other versions
         for (const auto &version: versions) {
@@ -240,7 +238,7 @@ namespace service {
             }
 
             const auto versionDest = getDeploymentVersionedDir(deployment, name);
-            copyProjectFiles(clonePath, cloneDocsRoot, versionDest, logger);
+            copyProjectFiles(cloneDocsRoot, versionDest, logger);
         }
 
         git_repository_free(repo);
@@ -300,7 +298,7 @@ namespace service {
         ProjectError result;
         try {
             result = co_await deployProject(project, deployment, clonePath);
-        } catch (std::exception e) {
+        } catch (std::exception &e) {
             result = ProjectError::UNKNOWN;
             logger.error("Unexpected error during deployment: {}", e.what());
         }
@@ -321,7 +319,7 @@ namespace service {
                     deployLog->info("Cleaning up previous deployment");
                     remove_all(oldPath);
                 }
-            } catch (std::exception e) {
+            } catch (std::exception &e) {
                 const auto id = activeDeployment ? activeDeployment->getValueOfId() : "";
                 logger.error("Failed to cleanup previous deployment '{}': {}", id, e.what());
             }

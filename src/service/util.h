@@ -221,6 +221,17 @@ std::string strToLower(std::string copy);
 
 bool isSubpath(const std::filesystem::path &path, const std::filesystem::path &base);
 
+template<class CharT, class Traits, class Allocator>
+std::basic_istream<CharT, Traits> &getLineSafe(std::basic_istream<CharT, Traits> &is, std::basic_string<CharT, Traits, Allocator> &s) {
+    auto &ret = std::getline(is, s, is.widen('\n'));
+
+    // Handle CRLF
+    s.erase(std::remove(s.begin(), s.end(), '\r'), s.end());
+    s.erase(std::remove(s.begin(), s.end(), '\n'), s.end());
+
+    return ret;
+}
+
 template<typename T>
 T unwrap(TaskResult<T> opt) {
     if (!opt) {

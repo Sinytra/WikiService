@@ -45,7 +45,7 @@ namespace git {
             const uri url{str};
             const auto scheme = url.get_scheme();
             return scheme == "file";
-        } catch (std::exception e) {
+        } catch (std::exception &e) {
             return false;
         }
     }

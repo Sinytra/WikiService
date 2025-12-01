@@ -90,7 +90,7 @@ namespace service {
             co_await global::cache->updateCache(cacheKey, "_", 0s);
 
             co_return co_await completeTask<Error>(cacheKey, Error::Ok);
-        } catch (std::exception e) {
+        } catch (std::exception &e) {
             logging::logger.error("Error loading langues keys for {}: {}", lang, e.what());
         }
 

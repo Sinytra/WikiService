@@ -17,14 +17,14 @@ namespace service {
         // Check first delimiter
         std::string frontmatter;
         std::string line;
-        std::getline(ifs, line);
+        getLineSafe(ifs, line);
         if (line != DELIMITER) {
             ifs.close();
             return std::nullopt;
         }
         // Read YAML contents
         bool valid = false;
-        while (std::getline(ifs, line)) {
+        while (getLineSafe(ifs, line)) {
             if (line == DELIMITER) {
                 valid = true;
                 break;
@@ -50,7 +50,7 @@ namespace service {
             const auto icon = root["icon"] ? root["icon"].as<std::string>() : "";
 
             return Frontmatter{.id = id, .title = title, .icon = icon};
-        } catch (YAML::Exception e) {
+        } catch (YAML::Exception &e) {
             const auto msg = std::format("{} ({}:{})", e.msg, e.mark.line + 2, e.mark.column);
             issues_->addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::PAGE, ProjectError::INVALID_FRONTMATTER, msg, path);
             logger_->error("Error parsing page metadata at path {}: {}", path, msg);

@@ -274,6 +274,7 @@ std::string strToLower(std::string copy) {
     return copy;
 }
 
+// FIXME doesnt work if base contains trailing slash
 bool isSubpath(const fs::path &path, const fs::path &base) {
     const auto [fst, snd] = std::mismatch(path.begin(), path.end(), base.begin(), base.end());
     return snd == base.end();

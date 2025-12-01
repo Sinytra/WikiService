@@ -39,7 +39,7 @@ namespace service {
             locales = co_await computeLanguages();
 
             logger.info("Loaded {} languages", locales.size());
-        } catch (std::exception err) {
+        } catch (std::exception &err) {
             logger.error("Error loading locale list from Crowdin: {}", err.what());
         }
 

@@ -54,7 +54,7 @@ std::optional<std::string> readPageHeading(const std::string &filePath) {
     }
 
     std::string line;
-    while (std::getline(ifs, line)) {
+    while (getLineSafe(ifs, line)) {
         if (line.starts_with("# ")) {
             if (std::smatch match; std::regex_search(line, match, headingRegex)) {
                 if (match.size() > 1) {
@@ -269,10 +269,12 @@ namespace service {
     }
 
     Task<> ResolvedProject::validatePages() {
-        const auto tree = co_await getDirectoryTree();
-        co_await validatePagesTree(*tree, *this, issues_, {});
+        if (const auto tree = co_await getDirectoryTree()) {
+            co_await validatePagesTree(*tree, *this, issues_, {});
+        }
 
-        const auto contentTree = co_await getProjectContents();
-        co_await validatePagesTree(*contentTree, *this, issues_, {"id"});
+        if (const auto contentTree = co_await getProjectContents()) {
+            co_await validatePagesTree(*contentTree, *this, issues_, {"id"});
+        }
     }
 }

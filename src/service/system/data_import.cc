@@ -123,7 +123,7 @@ Task<Error> executeImport(const DataImport &data, const std::vector<GameDataItem
         }
 
         co_return res;
-    } catch (std::exception e) {
+    } catch (std::exception &e) {
         logger.error("Error ingesting system data: {}", e.what());
 
         co_return Error::ErrInternal;
