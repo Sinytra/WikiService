@@ -2,8 +2,6 @@
 
 #include <drogon/HttpController.h>
 
-#include <service/database/database.h>
-
 namespace api::v1 {
     class BrowseController final : public drogon::HttpController<BrowseController, false> {
     public:

@@ -69,7 +69,7 @@ Task<> runStartupTaks() {
 
     co_await global::database->failLoadingDeployments();
     co_await global::gameData->setupGameData();
-    co_await global::crowdin->getAvailableLocales(); // TODO Reload in production
+    co_await global::crowdin->getAvailableLocales();
 }
 
 int main() {

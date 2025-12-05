@@ -78,6 +78,9 @@ namespace service {
         drogon::Task<TaskResult<RecipeType>> getRecipeType(std::string type) const;
         drogon::Task<std::vector<std::string>> getItemRecipes(std::string item) const;
 
+        // Recipe usage
+        drogon::Task<std::vector<ContentUsage>> getObtainableItemsBy(std::string item) const;
+
     private:
         const ProjectBase &project_;
         const std::string projectId_;

@@ -1,9 +1,9 @@
 #include "game.h"
 
-#include <string>
 #include <service/database/project_database.h>
-#include <service/system/lang.h>
 #include <service/storage/ingestor/recipe/recipe_parser.h>
+#include <service/system/lang.h>
+#include <string>
 
 using namespace std;
 using namespace drogon;
@@ -20,26 +20,18 @@ namespace api::v1 {
         requireNonVirtual(resolved);
 
         const auto contents = co_await resolved->getProjectContents();
-        if (!contents) {
-            throw ApiException(contents.error(), "Contents directory not found");
-        }
+        assertFound(contents);
 
         callback(jsonResponse(*contents));
     }
 
     Task<> GameController::contentItem(const HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback,
                                        const std::string project, const std::string id) const {
-        if (id.empty()) {
-            throw ApiException(Error::ErrBadRequest, "Insufficient parameters");
-        }
-
         const auto resolved = co_await BaseProjectController::getProjectWithParams(req, project);
         requireNonVirtual(resolved);
 
         const auto page = co_await resolved->readContentPage(id);
-        if (!page) {
-            throw ApiException(Error::ErrNotFound, "Content ID not found");
-        }
+        assertFound(page, "Content ID not found");
 
         Json::Value root;
         root["project"] = co_await resolved->toJson();
@@ -54,9 +46,7 @@ namespace api::v1 {
 
     Task<> GameController::contentItemRecipe(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                              const std::string project, const std::string item) const {
-        if (item.empty()) {
-            throw ApiException(Error::ErrBadRequest, "Insufficient parameters");
-        }
+        assertNonEmptyParam(item);
 
         const auto resolved = co_await BaseProjectController::getProjectWithParams(req, project);
         requireNonVirtual(resolved);
@@ -70,6 +60,7 @@ namespace api::v1 {
                 logger.error("Missing recipe {} for item {} / {}", id, project, item);
             }
         }
+
         callback(jsonResponse(root));
     }
 
@@ -81,13 +72,13 @@ namespace api::v1 {
                 logger.error("Missing project for item {}:{}:{}", id, loc, project);
                 continue;
             }
-            const auto name = co_await (*resolved)->getItemName(loc);
+            const auto itemName = co_await (*resolved)->getItemName(loc);
 
             nlohmann::json itemJson;
             itemJson["project"] = project.empty() ? nlohmann::json(nullptr) : nlohmann::json(project);
             itemJson["id"] = loc;
-            if (!name.name.empty()) {
-                itemJson["name"] = name.name;
+            if (itemName) {
+                itemJson["name"] = itemName->name;
             }
             itemJson["has_page"] = !path.empty();
             root.push_back(itemJson);
@@ -95,14 +86,12 @@ namespace api::v1 {
         co_return root;
     }
 
-    // TODO Remove unused param
     Task<> GameController::contentItemUsage(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                             const std::string project, const std::string item) const {
-        if (item.empty()) {
-            throw ApiException(Error::ErrBadRequest, "Insufficient parameters");
-        }
+        assertNonEmptyParam(item);
 
-        const auto obtainable = co_await global::database->getObtainableItemsBy(item);
+        const auto resolved = co_await BaseProjectController::getProjectWithParamsCached(req, project);
+        const auto obtainable = co_await resolved->getProjectDatabase().getObtainableItemsBy(item);
 
         const auto json = co_await resolveContentUsage(obtainable);
         callback(jsonResponse(json));
@@ -110,58 +99,43 @@ namespace api::v1 {
 
     Task<> GameController::contentItemName(const HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback,
                                            const std::string project, const std::string id) const {
-        if (id.empty()) {
-            throw ApiException(Error::ErrBadRequest, "Insufficient parameters");
-        }
+        assertNonEmptyParam(id);
 
         const auto resolved = co_await BaseProjectController::getProjectWithParamsCached(req, project);
-        const auto [name, path] = co_await resolved->getItemName(id);
-        if (name.empty()) {
-            throw ApiException(Error::ErrNotFound, "not_found");
-        }
+        const auto itemName = co_await resolved->getItemName(id);
+        assertFound(itemName);
 
         Json::Value root;
         root["source"] = resolved->getId();
         root["id"] = id;
-        root["name"] = name;
+        root["name"] = itemName->name;
 
         callback(HttpResponse::newHttpJsonResponse(root));
     }
 
     Task<> GameController::recipe(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                   const std::string project, const std::string recipe) const {
-        if (recipe.empty()) {
-            throw ApiException(Error::ErrBadRequest, "Insufficient parameters");
-        }
+        assertNonEmptyParam(recipe);
 
         const auto resolved = co_await BaseProjectController::getProjectWithParamsCached(req, project);
         requireNonVirtual(resolved);
 
         const auto resolvedResult = co_await resolved->getRecipe(recipe);
-        if (!resolvedResult) {
-            throw ApiException(Error::ErrNotFound, "not_found");
-        }
+        assertFound(resolvedResult);
 
         callback(jsonResponse(*resolvedResult));
     }
 
     Task<> GameController::recipeType(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                       const std::string project, const std::string type) const {
-        if (type.empty()) {
-            throw ApiException(Error::ErrBadRequest, "Insufficient parameters");
-        }
+        assertNonEmptyParam(type);
 
-        // TODO Use cached + move type getter to project
-        const auto resolved = co_await BaseProjectController::getProjectWithParams(req, project);
+        const auto resolved = co_await BaseProjectController::getProjectWithParamsCached(req, project);
         const auto recipeType = co_await resolved->getProjectDatabase().getRecipeType(type);
-        if (!recipeType) {
-            throw ApiException(Error::ErrNotFound, "not_found"); // TODO Shorthand
-        }
+        assertFound(recipeType);
 
         const auto layout = co_await content::getRecipeType(resolved, unwrap(ResourceLocation::parse(type)));
-        if (!layout) {
-            throw ApiException(Error::ErrNotFound, "not_found");
-        }
+        assertFound(layout);
 
         const auto workbenches = co_await global::database->getRecipeTypeWorkbenches(recipeType->getValueOfId());
         const auto workbenchItems = co_await resolveContentUsage(workbenches);

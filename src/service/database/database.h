@@ -105,7 +105,6 @@ namespace service {
         drogon::Task<std::vector<std::string>> getItemSourceProjects(int64_t item) const;
         drogon::Task<std::vector<GlobalItem>> getGlobalTagItems(int64_t tagId) const;
         drogon::Task<std::vector<Recipe>> getItemUsageInRecipes(std::string item) const;
-        drogon::Task<std::vector<ContentUsage>> getObtainableItemsBy(std::string item) const;
         drogon::Task<std::vector<ContentUsage>> getRecipeTypeWorkbenches(int64_t id) const;
 
         // System data

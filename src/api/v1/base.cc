@@ -2,8 +2,7 @@
 
 #include <auth.h>
 #include <service/system/lang.h>
-
-#include "../../service/project/cached/cached.h"
+#include <service/project/cached/cached.h>
 
 using namespace drogon;
 using namespace service;
@@ -13,6 +12,16 @@ namespace api::v1 {
         if (project && project->getProject().getValueOfIsVirtual()) {
             throw ApiException(Error::ErrNotFound, "Project not found");
         }
+    }
+
+    void assertNonEmptyParam(const std::string& str) {
+        if (str.empty()) {
+            throw ApiException(Error::ErrBadRequest, "Insufficient parameters");
+        }
+    }
+
+    void notFound(const std::string &msg) {
+        throw ApiException(Error::ErrNotFound, msg);
     }
 
     Task<ProjectBasePtr> BaseProjectController::getProjectWithParamsCached(const HttpRequestPtr req, const std::string project) {
@@ -34,9 +43,7 @@ namespace api::v1 {
 
     Task<ProjectBasePtr> BaseProjectController::getProject(const std::string &project, const std::optional<std::string> &version,
                                                            const std::optional<std::string> &locale) {
-        if (project.empty()) {
-            throw ApiException(Error::ErrBadRequest, "Missing project parameter");
-        }
+        assertNonEmptyParam(project);
 
         const auto resolved = co_await global::storage->getProject(project, version, locale);
         if (!resolved) {

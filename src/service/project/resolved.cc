@@ -204,7 +204,9 @@ namespace service {
         const auto [total, pages, size, data] = co_await projectDb_->getProjectItemsDev(params.query, params.page);
         std::vector<ItemContentPage> itemData;
         for (const auto &[id, path]: data) {
-            const auto [name, _] = co_await getItemName(id);
+            const auto itemName = co_await getItemName(id);
+            const auto name = itemName ? itemName->name : "";
+
             const auto frontmatter = readPageAttributes(path);
             const auto icon = frontmatter ? frontmatter->icon : "";
             itemData.emplace_back(id, name, icon, path);
@@ -230,7 +232,9 @@ namespace service {
         const auto [total, pages, size, data] = co_await projectDb_->getProjectTagItemsDev(tag, params.query, params.page);
         std::vector<FullItemData> itemData;
         for (const auto &[id, path]: data) {
-            const auto [name, _] = co_await getItemName(id);
+            const auto itemName = co_await getItemName(id);
+            const auto name = itemName ? itemName->name : "";
+
             itemData.emplace_back(id, name, path);
         }
         co_return PaginatedData{.total = total, .pages = pages, .size = size, .data = itemData};

@@ -43,6 +43,7 @@ add_library(service STATIC
         storage/ingestor/recipe/recipe_builtin.cc
         storage/ingestor/recipe/recipe_custom.cc
         storage/ingestor/recipe/recipe_parser.cc
+        storage/management/project_management.cc
         storage/deployment.cc
         storage/issues.cc
         storage/storage.cc

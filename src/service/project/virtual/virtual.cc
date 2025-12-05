@@ -64,10 +64,13 @@ namespace service {
         co_return {.total = 0, .pages = 0, .size = 0};
     }
 
-    Task<ItemData> VirtualProject::getItemName(const Item item) const { co_return co_await getItemName(item.getValueOfLoc()); }
-    Task<ItemData> VirtualProject::getItemName(const std::string loc) const {
+    Task<TaskResult<ItemData>> VirtualProject::getItemName(const Item item) const { co_return co_await getItemName(item.getValueOfLoc()); }
+    Task<TaskResult<ItemData>> VirtualProject::getItemName(const std::string loc) const {
         const auto name = co_await global::lang->getItemName(DEFAULT_LOCALE, loc);
-        co_return ItemData{name.value_or(""), ""};
+        if (!name) {
+            co_return Error::ErrNotFound;
+        }
+        co_return ItemData{*name, ""};
     }
     Task<nlohmann::json> VirtualProject::readItemProperties(std::string id) const { co_return {}; }
 

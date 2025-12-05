@@ -288,4 +288,43 @@ namespace service {
         });
         co_return res.value_or({});
     }
+
+    Task<std::vector<ContentUsage>> ProjectDatabaseAccess::getObtainableItemsBy(std::string item) const {
+        // language=postgresql
+        static constexpr auto query = "SELECT ver.project_id, item.id, item.loc, pip.path FROM recipe r \
+                                       JOIN recipe_ingredient_item ri ON r.id = ri.recipe_id \
+                                       JOIN project_item pitem ON ri.item_id = pitem.item_id \
+                                       JOIN project_version ver ON pitem.version_id = ver.id \
+                                       JOIN item ON pitem.item_id = item.id \
+                                       LEFT JOIN project_item_page pip ON pitem.id = pip.item_id \
+                                       WHERE r.version_id = $1 AND NOT ri.input AND ( \
+                                           EXISTS ( \
+                                               SELECT 1 FROM recipe_ingredient_item ri_sub \
+                                               JOIN item i ON ri_sub.item_id = i.id \
+                                               WHERE ri_sub.recipe_id = r.id AND i.loc = $1 AND ri_sub.input \
+                                           ) \
+                                           OR EXISTS( \
+                                               SELECT 1 FROM recipe_ingredient_tag rt_sub \
+                                               JOIN project_tag pt ON pt.tag_id = rt_sub.tag_id \
+                                               JOIN tag_item_flat flat ON flat.parent = pt.id \
+                                               JOIN project_item pit on pit.id = flat.child \
+                                               JOIN item i ON pit.item_id = i.id \
+                                               WHERE rt_sub.recipe_id = r.id AND i.loc = $2 AND rt_sub.input \
+                                           ) \
+                                       )";
+
+        const auto res = co_await handleDatabaseOperation([&, item](const DbClientPtr &client) -> Task<std::vector<ContentUsage>> {
+            const auto results = co_await client->execSqlCoro(query, versionId_, item);
+            std::vector<ContentUsage> usages;
+            for (const auto &row: results) {
+                const auto projectId = row[0].as<std::string>();
+                const auto itemId = row[1].as<int64_t>();
+                const auto loc = row[2].as<std::string>();
+                const auto path = row[3].isNull() ? "" : row[3].as<std::string>();
+                usages.emplace_back(itemId, loc, projectId, path);
+            }
+            co_return usages;
+        });
+        co_return res.value_or({});
+    }
 }

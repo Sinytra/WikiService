@@ -8,11 +8,6 @@
 using namespace drogon_model::postgres;
 
 namespace api::v1 {
-    struct ValidatedProjectData {
-        Project project;
-        nlohmann::json platforms;
-    };
-
     class ProjectsController final : public drogon::HttpController<ProjectsController, false> {
     public:
         explicit ProjectsController(bool localEnv);
@@ -67,7 +62,7 @@ namespace api::v1 {
                               std::string id) const;
 
         drogon::Task<> deployProject(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
-                                       std::string id) const;
+                                     std::string id) const;
 
         drogon::Task<> getContentPages(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
                                        std::string id) const;
@@ -100,15 +95,6 @@ namespace api::v1 {
                                 std::string id) const;
 
     private:
-        nlohmann::json processPlatforms(const nlohmann::json &metadata) const;
-
-        drogon::Task<service::PlatformProject> validatePlatform(const std::string &id, const std::string &repo, const std::string &platform,
-                                                                const std::string &slug, bool checkExisting, User user) const;
-
-        drogon::Task<ValidatedProjectData> validateProjectData(const nlohmann::json &json, User user, bool checkExisting) const;
-
-        void enqueueDeploy(const Project &project, const std::string &userId) const;
-
         bool localEnv_;
     };
 }

@@ -1,7 +1,7 @@
 #include <schemas/schemas.h>
-#include <service/project/recipe_resolver.h>
 #include <service/database/project_database.h>
 #include <service/project/properties.h>
+#include <service/project/recipe_resolver.h>
 #include <service/project/resolved.h>
 
 using namespace logging;
@@ -53,9 +53,9 @@ namespace service {
         co_return (*json)[key].get<std::string>();
     }
 
-    Task<ItemData> ResolvedProject::getItemName(const Item item) const { co_return co_await getItemName(item.getValueOfLoc()); }
+    Task<TaskResult<ItemData>> ResolvedProject::getItemName(const Item item) const { co_return co_await getItemName(item.getValueOfLoc()); }
 
-    Task<ItemData> ResolvedProject::getItemName(const std::string loc) const {
+    Task<TaskResult<ItemData>> ResolvedProject::getItemName(const std::string loc) const {
         const auto projectId = project_.getValueOfId();
         const auto parsed = ResourceLocation::parse(loc);
 
@@ -65,14 +65,15 @@ namespace service {
         }
 
         const auto path = co_await projectDb_->getProjectContentPath(loc);
-
-        // Use page title instead
-        if (!localized && path) {
-            const auto title = getPageTitle(*path);
-            co_return ItemData{.name = title.value_or(""), .path = *path};
+        if (!localized) {
+            // Use page title instead
+            if (const auto title = getPageTitle(*path)) {
+                co_return ItemData{.name = *title, .path = *path};
+            }
+            co_return Error::ErrNotFound;
         }
 
-        co_return ItemData{.name = localized.value_or(""), .path = path.value_or("")};
+        co_return ItemData{.name = *localized, .path = path.value_or("")};
     }
 
     Task<std::optional<content::GameRecipeType>> ResolvedProject::getRecipeType(const ResourceLocation &location) {

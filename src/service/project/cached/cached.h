@@ -45,8 +45,8 @@ namespace service {
         drogon::Task<PaginatedData<FullItemData>> getTagItems(std::string tag, TableQueryParams params) const override;
         drogon::Task<PaginatedData<FullRecipeData>> getRecipes(TableQueryParams params) const override;
         drogon::Task<PaginatedData<ProjectVersion>> getVersions(TableQueryParams params) const override;
-        drogon::Task<ItemData> getItemName(Item item) const override;
-        drogon::Task<ItemData> getItemName(std::string loc) const override;
+        drogon::Task<TaskResult<ItemData>> getItemName(Item item) const override;
+        drogon::Task<TaskResult<ItemData>> getItemName(std::string loc) const override;
         drogon::Task<nlohmann::json> readItemProperties(std::string id) const override;
         drogon::Task<std::optional<std::string>> readLangKey(const std::string &namespace_, const std::string &key) const override;
         std::optional<std::filesystem::path> getAsset(const ResourceLocation &location) const override;

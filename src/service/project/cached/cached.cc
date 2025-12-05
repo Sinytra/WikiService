@@ -72,8 +72,8 @@ namespace service {
     Task<PaginatedData<ProjectVersion>> CachedProject::getVersions(const TableQueryParams params) const {
         co_return co_await wrapped_->getVersions(params);
     }
-    Task<ItemData> CachedProject::getItemName(const Item item) const { co_return co_await wrapped_->getItemName(item); }
-    Task<ItemData> CachedProject::getItemName(const std::string loc) const { co_return co_await wrapped_->getItemName(loc); }
+    Task<TaskResult<ItemData>> CachedProject::getItemName(const Item item) const { co_return co_await wrapped_->getItemName(item); }
+    Task<TaskResult<ItemData>> CachedProject::getItemName(const std::string loc) const { co_return co_await wrapped_->getItemName(loc); }
     Task<nlohmann::json> CachedProject::readItemProperties(const std::string id) const {
         co_return co_await wrapped_->readItemProperties(id);
     }

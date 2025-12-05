@@ -141,8 +141,8 @@ namespace service {
         virtual drogon::Task<PaginatedData<FullRecipeData>> getRecipes(TableQueryParams params) const = 0;
         virtual drogon::Task<PaginatedData<ProjectVersion>> getVersions(TableQueryParams params) const = 0;
 
-        virtual drogon::Task<ItemData> getItemName(Item item) const = 0;
-        virtual drogon::Task<ItemData> getItemName(std::string loc) const = 0;
+        virtual drogon::Task<TaskResult<ItemData>> getItemName(Item item) const = 0;
+        virtual drogon::Task<TaskResult<ItemData>> getItemName(std::string loc) const = 0;
 
         // Files
         virtual drogon::Task<nlohmann::json> readItemProperties(std::string id) const = 0;

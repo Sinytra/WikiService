@@ -5,6 +5,7 @@
 #include <log/log.h>
 #include <models/Project.h>
 #include <service/util.h>
+#include <service/database/database.h>
 
 using namespace std;
 using namespace drogon;

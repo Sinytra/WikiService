@@ -109,10 +109,7 @@ namespace api::v1 {
     Task<> SystemController::runDataMigration(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                               const std::string id) const {
         co_await global::auth->ensurePrivilegedAccess(req);
-
-        if (id.empty()) {
-            throw ApiException(Error::ErrBadRequest, "Missing id parameter");
-        }
+        assertNonEmptyParam(id);
 
         const auto migration = ranges::find_if(dataMigrations, [&id](const DataMigration &x) { return x.id == id; });
         if (migration == dataMigrations.end()) {

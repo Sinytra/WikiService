@@ -7,6 +7,17 @@
 namespace api::v1 {
     void requireNonVirtual(const service::ProjectBasePtr &project);
 
+    void assertNonEmptyParam(const std::string &str);
+
+    void notFound(const std::string &msg = "not_found");
+
+    template<typename T>
+    void assertFound(T &&t, const std::string &&msg = "not_found") {
+        if (!t) {
+            notFound(std::move(msg));
+        }
+    }
+
     class BaseProjectController {
     public:
         static drogon::Task<service::ProjectBasePtr> getProjectWithParams(drogon::HttpRequestPtr req, std::string project);

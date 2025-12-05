@@ -68,7 +68,7 @@ namespace content {
             // Find in other project
             if (const auto resolved = co_await global::storage->getProject(item.project_id, std::nullopt, locale_); resolved)
             {
-                const auto [name, path] = co_await (*resolved)->getItemName(item.loc);
+                const auto [name, path] = (co_await (*resolved)->getItemName(item.loc)).value_or({});
                 co_return ResolvedItem{.id = item.loc, .name = name, .project = item.project_id, .has_page = !path.empty()};
             }
 

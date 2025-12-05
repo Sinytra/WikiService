@@ -78,9 +78,7 @@ namespace api::v1 {
         co_await global::auth->ensurePrivilegedAccess(req);
 
         const auto report(co_await global::database->findByPrimaryKey<Report>(id));
-        if (!report) {
-            throw ApiException(Error::ErrNotFound, "not_found");
-        }
+        assertFound(report);
 
         nlohmann::json root(*report);
         if (const auto versionId = report->getVersionId()) {
@@ -98,9 +96,7 @@ namespace api::v1 {
         const auto json(BaseProjectController::validatedBody(req, schemas::ruleReport));
 
         auto report(co_await global::database->findByPrimaryKey<Report>(id));
-        if (!report) {
-            throw ApiException(Error::ErrNotFound, "not_found");
-        }
+        assertFound(report);
 
         const auto resolution = json["resolution"];
         const auto status = resolution == "accept" ? ReportStatus::ACCEPTED : ReportStatus::DISMISSED;
