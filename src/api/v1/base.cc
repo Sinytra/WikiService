@@ -3,7 +3,7 @@
 #include <auth.h>
 #include <service/system/lang.h>
 
-#include "project/cached.h"
+#include "../../service/project/cached/cached.h"
 
 using namespace drogon;
 using namespace service;

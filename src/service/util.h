@@ -219,8 +219,6 @@ Json::Value projectToJson(const drogon_model::postgres::Project &project, bool v
 
 std::string strToLower(std::string copy);
 
-bool isSubpath(const std::filesystem::path &path, const std::filesystem::path &base);
-
 template<class CharT, class Traits, class Allocator>
 std::basic_istream<CharT, Traits> &getLineSafe(std::basic_istream<CharT, Traits> &is, std::basic_string<CharT, Traits, Allocator> &s) {
     auto &ret = std::getline(is, s, is.widen('\n'));

@@ -23,7 +23,7 @@
 #include <service/external/frontend.h>
 #include <service/system/access_keys.h>
 #include <service/system/game_data.h>
-#include <service/content/recipe/recipe_builtin.h>
+#include <service/storage/ingestor/recipe/recipe_builtin.h>
 #include <service/project/virtual/virtual.h>
 
 using namespace drogon;

@@ -1,12 +1,9 @@
 #include "game.h"
 
 #include <string>
-
-#include <service/content/recipe/recipe_parser.h>
 #include <service/database/project_database.h>
 #include <service/system/lang.h>
-
-#include "project/cached.h"
+#include <service/storage/ingestor/recipe/recipe_parser.h>
 
 using namespace std;
 using namespace drogon;
@@ -16,7 +13,6 @@ using namespace logging;
 using namespace drogon::orm;
 using namespace drogon_model::postgres;
 
-// TODO Have projects include game version info (merge with versions?)
 namespace api::v1 {
     Task<> GameController::contents(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                     const std::string project) const {

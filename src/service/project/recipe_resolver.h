@@ -1,37 +1,13 @@
 #pragma once
 
 #include <nlohmann/json.hpp>
+#include <drogon/utils/coroutine.h>
+#include <models/Recipe.h>
+#include <optional>
+
+using namespace drogon_model::postgres;
 
 namespace content {
-    struct ItemSlot {
-        int32_t x;
-        int32_t y;
-
-        NLOHMANN_DEFINE_TYPE_INTRUSIVE(ItemSlot, x, y)
-    };
-
-    struct GameRecipeType {
-        std::string id;
-        std::string localizedName;
-        std::string background;
-        std::unordered_map<std::string, ItemSlot> inputSlots;
-        std::unordered_map<std::string, ItemSlot> outputSlots;
-
-        friend void to_json(nlohmann::json &j, const GameRecipeType &obj) {
-            j = nlohmann::json{{"id", obj.id.empty() ? nlohmann::json(nullptr) : nlohmann::json(obj.id)},
-                               {"localizedName", obj.localizedName.empty() ? nlohmann::json(nullptr) : nlohmann::json(obj.localizedName)},
-                               {"background", obj.background},
-                               {"inputSlots", obj.inputSlots},
-                               {"outputSlots", obj.outputSlots}};
-        }
-
-        friend void from_json(const nlohmann::json &j, GameRecipeType &obj) {
-            j.at("background").get_to(obj.background);
-            j.at("inputSlots").get_to(obj.inputSlots);
-            j.at("outputSlots").get_to(obj.outputSlots);
-        }
-    };
-
     struct ResolvedItem {
         std::string id;
         std::string name;
@@ -65,13 +41,11 @@ namespace content {
         std::string tag;
 
         friend void to_json(nlohmann::json &j, const ResolvedSlot &obj) {
-            j = nlohmann::json{
-                    {"input", obj.input},
-                    {"slot", obj.slot},
-                    {"count", obj.count},
-                    {"items", obj.items},
-                    {"tag", obj.tag.empty() ? nlohmann::json(nullptr) : nlohmann::json(obj.tag)}
-            };
+            j = nlohmann::json{{"input", obj.input},
+                               {"slot", obj.slot},
+                               {"count", obj.count},
+                               {"items", obj.items},
+                               {"tag", obj.tag.empty() ? nlohmann::json(nullptr) : nlohmann::json(obj.tag)}};
         }
 
         friend void from_json(const nlohmann::json &j, ResolvedSlot &obj) {
@@ -92,10 +66,7 @@ namespace content {
 
         friend void to_json(nlohmann::json &j, const RecipeIngredientSummary &obj) {
             j = nlohmann::json{
-                {"count", obj.count},
-                {"item", obj.item},
-                {"tag", obj.tag.empty() ? nlohmann::json(nullptr) : nlohmann::json(obj.tag)}
-            };
+                {"count", obj.count}, {"item", obj.item}, {"tag", obj.tag.empty() ? nlohmann::json(nullptr) : nlohmann::json(obj.tag)}};
         }
 
         friend void from_json(const nlohmann::json &j, RecipeIngredientSummary &obj) {
@@ -123,4 +94,6 @@ namespace content {
 
         NLOHMANN_DEFINE_TYPE_INTRUSIVE(ResolvedGameRecipe, id, type, inputs, outputs, summary)
     };
+
+    drogon::Task<std::optional<ResolvedGameRecipe>> resolveRecipe(Recipe recipe, const std::optional<std::string> &locale);
 }

@@ -1,7 +1,7 @@
 #include "recipe_builtin.h"
 
 #include <schemas/schemas.h>
-#include <service/content/recipe/builtin_recipe_type.h>
+#include <service/storage/ingestor/recipe/builtin_recipe_type.h>
 
 using namespace drogon;
 using namespace drogon::orm;

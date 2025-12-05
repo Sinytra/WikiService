@@ -2,7 +2,6 @@
 
 #include <service/database/database.h>
 #include <service/database/project_database.h>
-#include <drogon/drogon.h>
 #include <schemas/schemas.h>
 
 #define CONTENT_DIR ".content/"

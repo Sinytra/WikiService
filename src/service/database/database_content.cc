@@ -47,6 +47,7 @@ namespace service {
         });
     }
 
+    // TODO Bind to project
     Task<std::vector<GlobalItem>> Database::getGlobalTagItems(int64_t tagId) const {
         // language=postgresql
         static constexpr auto query = "SELECT ver.id, ver.name, ver.project_id, item.loc \

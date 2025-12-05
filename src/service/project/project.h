@@ -2,7 +2,8 @@
 
 #include <drogon/drogon.h>
 #include <models/Item.h>
-#include <service/content/recipe/game_recipes.h>
+#include <service/project/recipe_resolver.h>
+#include <service/storage/ingestor/recipe/game_recipes.h>
 #include <service/database/database.h>
 
 using namespace drogon_model::postgres;

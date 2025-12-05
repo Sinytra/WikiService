@@ -163,7 +163,6 @@ HttpClientPtr createHttpClient(const std::string &url) {
 
 Task<TaskResult<Json::Value>> sendAuthenticatedRequest(const HttpClientPtr client, const HttpMethod method, const std::string path,
                                                        const std::string token, const std::function<void(HttpRequestPtr &)> callback) {
-    // TODO Replace all "co_return co_await" with "return"
     co_return co_await sendApiRequest(client, method, path, [&](HttpRequestPtr &req) {
         req->addHeader("Authorization", "Bearer " + token);
         callback(req);
@@ -272,12 +271,6 @@ Json::Value projectToJson(const drogon_model::postgres::Project &project, const 
 std::string strToLower(std::string copy) {
     std::ranges::transform(copy, copy.begin(), [](const unsigned char c) { return std::tolower(c); });
     return copy;
-}
-
-// FIXME doesnt work if base contains trailing slash
-bool isSubpath(const fs::path &path, const fs::path &base) {
-    const auto [fst, snd] = std::mismatch(path.begin(), path.end(), base.begin(), base.end());
-    return snd == base.end();
 }
 
 std::string formatDateTime(const std::string &databaseData) {

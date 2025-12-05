@@ -6,22 +6,12 @@ read_and_escape_schema("../../builtin/minecraft/recipe_type/smoking.json" SMOKIN
 read_and_escape_schema("../../builtin/minecraft/recipe_type/stonecutting.json" STONECUTTING)
 read_and_escape_schema("../../builtin/minecraft/recipe_type/smithing_transform.json" SMITHING_TRANSFORM)
 
-configure_file(content/recipe/builtin_recipe_type.h.in
-        ${CMAKE_CURRENT_BINARY_DIR}/service/content/recipe/builtin_recipe_type.h
+configure_file(storage/ingestor/recipe/builtin_recipe_type.h.in
+        ${CMAKE_CURRENT_BINARY_DIR}/service/storage/ingestor/recipe/builtin_recipe_type.h
         @ONLY
 )
 
 add_library(service STATIC
-        content/ingestor/ingestor.cc
-        content/ingestor/ingestor_content_paths.cc
-        content/ingestor/ingestor_metadata.cc
-        content/ingestor/ingestor_recipes.cc
-        content/ingestor/ingestor_tags.cc
-        content/recipe/recipe_builtin.cc
-        content/recipe/recipe_custom.cc
-        content/recipe/recipe_parser.cc
-        content/recipe/recipe_resolver.cc
-
         database/database.cc
         database/database_content.cc
         database/database_system.cc
@@ -35,15 +25,24 @@ add_library(service STATIC
         external/github.cc
 
         project/virtual/virtual.cc
-        project/cached.cc
+        project/cached/cached.cc
         project/content.cc
         project/format.cc
         project/frontmatter.cc
         project/pages.cc
         project/properties.cc
+        project/recipe_resolver.cc
         project/reports.cc
         project/resolved.cc
 
+        storage/ingestor/ingestor.cc
+        storage/ingestor/ingestor_content_paths.cc
+        storage/ingestor/ingestor_metadata.cc
+        storage/ingestor/ingestor_recipes.cc
+        storage/ingestor/ingestor_tags.cc
+        storage/ingestor/recipe/recipe_builtin.cc
+        storage/ingestor/recipe/recipe_custom.cc
+        storage/ingestor/recipe/recipe_parser.cc
         storage/deployment.cc
         storage/issues.cc
         storage/storage.cc

@@ -3,7 +3,7 @@
 #include "recipe_custom.h"
 
 #include <schemas/schemas.h>
-#include <service/content/ingestor/ingestor.h>
+#include <service/storage/ingestor/ingestor.h>
 
 using namespace drogon;
 using namespace drogon::orm;

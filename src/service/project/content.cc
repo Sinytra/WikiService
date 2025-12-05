@@ -1,5 +1,5 @@
 #include <schemas/schemas.h>
-#include <service/content/recipe/recipe_resolver.h>
+#include <service/project/recipe_resolver.h>
 #include <service/database/project_database.h>
 #include <service/project/properties.h>
 #include <service/project/resolved.h>

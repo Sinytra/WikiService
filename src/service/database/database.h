@@ -12,7 +12,6 @@
 #include <models/Recipe.h>
 #include <models/Report.h>
 #include <nlohmann/json.hpp>
-#include <optional>
 #include <service/error.h>
 #include <service/storage/issues.h>
 

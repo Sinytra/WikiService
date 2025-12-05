@@ -6,7 +6,6 @@
 #include <nlohmann/json_fwd.hpp>
 #include <service/project/project.h>
 #include <service/cache.h>
-#include <service/content/recipe/game_recipes.h>
 #include <service/database/database.h>
 #include <service/util.h>
 #include <service/project/format.h>

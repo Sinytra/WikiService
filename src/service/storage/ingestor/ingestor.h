@@ -4,7 +4,7 @@
 
 #include <service/project/resolved.h>
 #include <drogon/utils/coroutine.h>
-#include <service/content/recipe/recipe_parser.h>
+#include <service/storage/ingestor/recipe/recipe_parser.h>
 #include <service/error.h>
 #include <service/storage/issues.h>
 

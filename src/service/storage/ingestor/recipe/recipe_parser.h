@@ -1,7 +1,7 @@
 #pragma once
 
+#include "game_recipes.h"
 #include <service/project/resolved.h>
-#include <service/content/recipe/game_recipes.h>
 #include <service/storage/issues.h>
 #include <service/util.h>
 

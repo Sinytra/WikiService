@@ -1,7 +1,7 @@
 #include "storage.h"
 
 #include <git2/repository.h>
-#include <service/content/ingestor/ingestor.h>
+#include <service/storage/ingestor/ingestor.h>
 #include <service/database/project_database.h>
 #include <service/storage/deployment.h>
 #include <service/storage/gitops.h>
@@ -227,6 +227,7 @@ namespace service {
         copyProjectFiles(cloneDocsRoot, dest, logger);
 
         // 8. Copy other versions
+        // FIXME Error if wiki metadata does not exist in version / has errors
         for (const auto &version: versions) {
             const auto name = version.getValueOfName();
             const auto branch = version.getValueOfBranch();

@@ -13,7 +13,6 @@
 #include <fmt/args.h>
 #include <models/Item.h>
 #include <models/ProjectItem.h>
-#include <service/content/recipe/recipe_resolver.h>
 
 using namespace logging;
 using namespace drogon;

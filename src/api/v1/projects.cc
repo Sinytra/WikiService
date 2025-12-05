@@ -10,9 +10,9 @@
 #include <service/external/frontend.h>
 #include <service/storage/deployment.h>
 #include <service/util/crypto.h>
+#include <service/project/cached/cached.h>
 // ReSharper disable once CppUnusedIncludeDirective
 #include <service/serializers.h>
-#include <service/project/cached.h>
 #include <service/storage/gitops.h>
 #include <service/storage/storage.h>
 #include <service/util.h>

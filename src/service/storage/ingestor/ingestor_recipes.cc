@@ -3,8 +3,7 @@
 #include <drogon/drogon.h>
 #include <service/database/database.h>
 #include <service/database/project_database.h>
-
-#include "project/virtual/virtual.h"
+#include <service/project/virtual/virtual.h>
 
 using namespace drogon;
 using namespace drogon::orm;
