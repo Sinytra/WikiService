@@ -55,8 +55,7 @@ namespace service {
                                        JOIN project_item pitem ON pitem.id = child \
                                        JOIN item ON item.id = pitem.item_id \
                                        LEFT JOIN project_version ver ON ver.id = pitem.version_id \
-                                       WHERE parent IN (SELECT ptag.id \
-                                           FROM project_tag ptag \
+                                       WHERE parent IN (SELECT ptag.id FROM project_tag ptag \
                                            JOIN tag t on ptag.tag_id = t.id \
                                            WHERE t.id = $1)";
         const auto res = co_await handleDatabaseOperation([&, tagId](const DbClientPtr &client) -> Task<std::vector<GlobalItem>> {

@@ -276,3 +276,18 @@ std::string strToLower(std::string copy) {
 std::string formatDateTime(const std::string &databaseData) {
     return trantor::Date::fromDbString(databaseData).toCustomFormattedString("%Y-%m-%dT%H:%M:%SZ");
 }
+
+bool isSubpath(fs::path path, fs::path base) {
+    try {
+        path = fs::canonical(path);
+        base = fs::canonical(base);
+
+        const auto [it_base, it_path] = std::mismatch(
+            base.begin(), base.end(),
+            path.begin(), path.end()
+        );
+        return it_base == base.end();
+    } catch (const fs::filesystem_error& e) {
+        return false;
+    }
+}

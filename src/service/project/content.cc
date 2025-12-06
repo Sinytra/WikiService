@@ -1,6 +1,5 @@
 #include <schemas/schemas.h>
 #include <service/database/project_database.h>
-#include <service/project/properties.h>
 #include <service/project/recipe_resolver.h>
 #include <service/project/resolved.h>
 
@@ -10,6 +9,28 @@ using namespace drogon_model::postgres;
 namespace fs = std::filesystem;
 
 namespace service {
+    nlohmann::json parseItemProperties(const std::filesystem::path &path, const std::string &id) {
+        const auto json = parseJsonFile(path);
+        if (!json) {
+            return nullptr;
+        }
+
+        if (const auto error = validateJson(schemas::properties, *json)) {
+            return nullptr;
+        }
+
+        if (!json->contains(id)) {
+            return nullptr;
+        }
+
+        return (*json)[id];
+    }
+
+    Task<nlohmann::json> ResolvedProject::readItemProperties(const std::string id) const {
+        const auto filePath = format_.getItemPropertiesPath();
+        co_return parseItemProperties(filePath, id);
+    }
+
     void ResolvedProject::addPageMetadata(FileTree &tree) const {
         for (auto it = tree.begin(); it != tree.end();) {
             auto entry = it;
@@ -37,11 +58,6 @@ namespace service {
         auto tree = getDirectoryTree(contentPath);
         addPageMetadata(tree);
         co_return tree;
-    }
-
-    Task<nlohmann::json> ResolvedProject::readItemProperties(const std::string id) const {
-        const auto filePath = format_.getItemPropertiesPath();
-        co_return content::parseItemProperties(filePath, id);
     }
 
     Task<std::optional<std::string>> ResolvedProject::readLangKey(const std::string &namespace_, const std::string &key) const {

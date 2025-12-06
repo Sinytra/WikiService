@@ -80,7 +80,14 @@ namespace service {
         co_return res.value_or(false);
     }
 
-    // TODO Delete failing deployments folders
+    Task<std::vector<Deployment>> Database::getLoadingDeployments() const {
+        const auto res = co_await handleDatabaseOperation([](const DbClientPtr &client) -> Task<std::vector<Deployment>> {
+            CoroMapper<Deployment> mapper(client);
+            co_return co_await mapper.findBy(Criteria(Deployment::Cols::_status, CompareOperator::In, std::vector{enumToStr(DeploymentStatus::CREATED), enumToStr(DeploymentStatus::LOADING)}));
+        });
+        co_return res.value_or({});
+    }
+
     Task<TaskResult<>> Database::failLoadingDeployments() const {
         co_return co_await handleDatabaseOperation([](const DbClientPtr &client) -> Task<> {
             CoroMapper<Deployment> mapper(client);

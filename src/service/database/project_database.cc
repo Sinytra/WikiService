@@ -7,6 +7,10 @@ using namespace drogon;
 using namespace drogon::orm;
 
 namespace service {
+    inline int64_t mcVersionId() {
+        return global::virtualProject->getProjectVersion().getValueOfId();
+    }
+
     ProjectDatabaseAccess::ProjectDatabaseAccess(const ProjectBase &p) :
         project_(p), projectId_(p.getId()), versionId_(p.getProjectVersion().getValueOfId()) {}
 
@@ -271,13 +275,12 @@ namespace service {
         });
     }
 
-    Task<std::vector<std::string>> ProjectDatabaseAccess::getItemRecipes(std::string item) const {
+    Task<std::vector<std::string>> ProjectDatabaseAccess::getRecipesForItem(std::string item) const {
         // language=postgresql
-        static constexpr auto query = "SELECT recipe.loc FROM recipe \
-                                       JOIN project_version ver ON ver.id = version_id \
-                                       JOIN recipe_ingredient_item ritem ON ritem.recipe_id = recipe.id \
+        static constexpr auto query = "SELECT r.loc FROM recipe r \
+                                       JOIN recipe_ingredient_item ritem ON ritem.recipe_id = r.id \
                                        JOIN item ON item.id = ritem.item_id \
-                                       WHERE NOT ritem.input AND version_id = $1 AND item.loc = $2";
+                                       WHERE NOT ritem.input AND r.version_id = $1 AND item.loc = $2";
         const auto res = co_await handleDatabaseOperation([&, item](const DbClientPtr &client) -> Task<std::vector<std::string>> {
             const auto results = co_await client->execSqlCoro(query, versionId_, item);
             std::vector<std::string> ids;
@@ -297,7 +300,9 @@ namespace service {
                                        JOIN project_version ver ON pitem.version_id = ver.id \
                                        JOIN item ON pitem.item_id = item.id \
                                        LEFT JOIN project_item_page pip ON pitem.id = pip.item_id \
-                                       WHERE r.version_id = $1 AND NOT ri.input AND ( \
+                                       WHERE (r.version_id = $1 OR r.version_id = $2) \
+                                       AND NOT ri.input \
+                                       AND ( \
                                            EXISTS ( \
                                                SELECT 1 FROM recipe_ingredient_item ri_sub \
                                                JOIN item i ON ri_sub.item_id = i.id \
@@ -309,12 +314,36 @@ namespace service {
                                                JOIN tag_item_flat flat ON flat.parent = pt.id \
                                                JOIN project_item pit on pit.id = flat.child \
                                                JOIN item i ON pit.item_id = i.id \
-                                               WHERE rt_sub.recipe_id = r.id AND i.loc = $2 AND rt_sub.input \
+                                               WHERE rt_sub.recipe_id = r.id AND i.loc = $3 AND rt_sub.input \
                                            ) \
                                        )";
 
         const auto res = co_await handleDatabaseOperation([&, item](const DbClientPtr &client) -> Task<std::vector<ContentUsage>> {
-            const auto results = co_await client->execSqlCoro(query, versionId_, item);
+            const auto results = co_await client->execSqlCoro(query, versionId_, mcVersionId(), item);
+            std::vector<ContentUsage> usages;
+            for (const auto &row: results) {
+                const auto projectId = row[0].as<std::string>();
+                const auto itemId = row[1].as<int64_t>();
+                const auto loc = row[2].as<std::string>();
+                const auto path = row[3].isNull() ? "" : row[3].as<std::string>();
+                usages.emplace_back(itemId, loc, projectId, path);
+            }
+            co_return usages;
+        });
+        co_return res.value_or({});
+    }
+
+    Task<std::vector<ContentUsage>> ProjectDatabaseAccess::getRecipeTypeWorkbenches(const int64_t id) const {
+        // language=postgresql
+        static constexpr auto query = "SELECT ver.project_id, item.id, item.loc, pip.path FROM recipe_workbench \
+                                       JOIN project_item pitem ON recipe_workbench.item_id = pitem.id \
+                                       JOIN item ON pitem.item_id = item.id \
+                                       JOIN project_version ver ON pitem.version_id = ver.id \
+                                       LEFT JOIN project_item_page pip ON pitem.id = pip.item_id \
+                                       WHERE (ver.id = $1 OR ver.id = $2) AND type_id = $3";
+
+        const auto res = co_await handleDatabaseOperation([&, id](const DbClientPtr &client) -> Task<std::vector<ContentUsage>> {
+            const auto results = co_await client->execSqlCoro(query, versionId_, mcVersionId(), id);
             std::vector<ContentUsage> usages;
             for (const auto &row: results) {
                 const auto projectId = row[0].as<std::string>();

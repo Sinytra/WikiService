@@ -26,7 +26,7 @@ namespace service {
         drogon::Task<TaskResult<ResolvedProject>> maybeGetProject(const Project &project) const;
 
         [[maybe_unused]] Error invalidateProject(const Project &project) const;
-        [[maybe_unused]] Error removeDeployment(const Deployment &deployment) const;
+        void removeDeployment(const Deployment &deployment) const;
 
         drogon::Task<ProjectStatus> getProjectStatus(const Project &project) const;
 

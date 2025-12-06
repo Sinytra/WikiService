@@ -1,9 +1,10 @@
 #include "websocket.h"
-#include "error.h"
-#include "auth.h"
+#include "../auth.h"
+#include "../error.h"
 
-#include <service/database/database.h>
 #include <log/log.h>
+#include <service/database/database.h>
+#include <service/storage/storage.h>
 
 #define WS_DEPLOYMENT "<<hello<<"
 

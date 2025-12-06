@@ -1,10 +1,7 @@
 #include "ingestor.h"
 
-#include <service/database/project_database.h>
 #include <drogon/drogon.h>
-
-// TODO Use Format
-#define CONTENT_DIR ".content/"
+#include <service/database/project_database.h>
 
 using namespace drogon;
 using namespace drogon::orm;
@@ -16,14 +13,19 @@ namespace content {
     ContentPathsSubIngestor::ContentPathsSubIngestor(const ResolvedProject &proj, const std::shared_ptr<spdlog::logger> &log,
                                                      ProjectFileIssueCallback &issues) : SubIngestor(proj, log, issues) {}
 
+    bool shouldIncludeFile(const fs::path &contentDirRoot, const fs::directory_entry &entry) {
+        const auto fileName = entry.path().filename().string();
+
+        return entry.is_regular_file() && entry.path().extension() == DOCS_FILE_EXT &&
+            (!fileName.starts_with(".") || isSubpath(fileName, contentDirRoot));
+    }
+
     Task<PreparationResult> ContentPathsSubIngestor::prepare() {
         PreparationResult result;
 
+        const auto contentRoot = project_.getFormat().getContentDirectoryPath();
         for (const auto docsRoot = project_.getRootDirectory(); const auto &entry: fs::recursive_directory_iterator(docsRoot)) {
-            if (const auto fileName = entry.path().filename().string(); !entry.is_regular_file() ||
-                                                                        entry.path().extension() != DOCS_FILE_EXT ||
-                                                                        fileName.starts_with(".") && !fileName.starts_with(CONTENT_DIR))
-            {
+            if (!shouldIncludeFile(contentRoot, entry)) {
                 continue;
             }
             const auto relativePath = relative(entry.path(), docsRoot);

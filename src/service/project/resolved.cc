@@ -3,7 +3,6 @@
 #include <schemas/schemas.h>
 #include <service/database/database.h>
 #include <service/database/project_database.h>
-#include <service/project/properties.h>
 #include <service/storage/gitops.h>
 #include <service/util.h>
 

@@ -55,31 +55,36 @@ namespace service {
 
         void setDBClientPointer(const drogon::orm::DbClientPtr &client);
 
+        // Versions
         drogon::Task<std::vector<ProjectVersion>> getVersions() const;
         drogon::Task<PaginatedData<ProjectVersion>> getVersionsDev(std::string query, int page) const;
         drogon::Task<TaskResult<>> deleteUnusedVersions(std::vector<std::string> keep) const;
 
+        // Project content registration
         drogon::Task<TaskResult<>> addProjectItem(std::string item) const;
         drogon::Task<TaskResult<>> addTag(std::string tag) const;
         drogon::Task<std::vector<Item>> getProjectTagItemsFlat(int64_t tag) const;
         drogon::Task<TaskResult<>> addTagItemEntry(std::string tag, std::string item) const;
         drogon::Task<TaskResult<>> addTagTagEntry(std::string parentTag, std::string childTag) const;
+        drogon::Task<TaskResult<>> addProjectContentPage(std::string id, std::string path) const;
+        drogon::Task<size_t> addRecipeWorkbenches(std::string recipeType, std::vector<std::string> items) const;
 
+        // Dev tables
         drogon::Task<PaginatedData<ProjectContent>> getProjectItemsDev(std::string searchQuery, int page) const;
         drogon::Task<PaginatedData<ProjectContent>> getProjectTagItemsDev(std::string tag, std::string searchQuery, int page) const;
         drogon::Task<PaginatedData<ProjectTag>> getProjectTagsDev(std::string searchQuery, int page) const;
         drogon::Task<PaginatedData<Recipe>> getProjectRecipesDev(std::string searchQuery, int page) const;
         drogon::Task<int> getProjectContentCount() const;
         drogon::Task<TaskResult<std::string>> getProjectContentPath(std::string id) const;
-        drogon::Task<TaskResult<>> addProjectContentPage(std::string id, std::string path) const;
-        drogon::Task<size_t> addRecipeWorkbenches(std::string recipeType, std::vector<std::string> items) const;
 
+        // Recipes
         drogon::Task<TaskResult<Recipe>> getProjectRecipe(std::string recipe) const;
         drogon::Task<TaskResult<RecipeType>> getRecipeType(std::string type) const;
-        drogon::Task<std::vector<std::string>> getItemRecipes(std::string item) const;
 
-        // Recipe usage
+        // Recipe item usage
+        drogon::Task<std::vector<std::string>> getRecipesForItem(std::string item) const;
         drogon::Task<std::vector<ContentUsage>> getObtainableItemsBy(std::string item) const;
+        drogon::Task<std::vector<ContentUsage>> getRecipeTypeWorkbenches(int64_t id) const;
 
     private:
         const ProjectBase &project_;

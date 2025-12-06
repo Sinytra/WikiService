@@ -3,15 +3,15 @@
 #include "monitor.h"
 #include "version.h"
 
+#include <api/v1/auth.h>
+#include <api/v1/authors/projects.h>
+#include <api/v1/authors/websocket.h>
+#include <api/v1/browse.h>
 #include <api/v1/error.h>
 #include <api/v1/moderation.h>
-#include <api/v1/auth.h>
-#include <api/v1/browse.h>
-#include <api/v1/docs.h>
-#include <api/v1/game.h>
-#include <api/v1/projects.h>
+#include <api/v1/projects/docs.h>
+#include <api/v1/projects/game.h>
 #include <api/v1/system.h>
-#include <api/v1/websocket.h>
 #include <git2.h>
 #include <log/log.h>
 
@@ -25,6 +25,7 @@
 #include <service/system/game_data.h>
 #include <service/storage/ingestor/recipe/recipe_builtin.h>
 #include <service/project/virtual/virtual.h>
+#include <service/system/startup.h>
 
 using namespace drogon;
 using namespace logging;
@@ -67,7 +68,7 @@ void globalExceptionHandler(const std::exception &e, const HttpRequestPtr &req, 
 Task<> runStartupTaks() {
     global::virtualProject = co_await createVirtualProject();
 
-    co_await global::database->failLoadingDeployments();
+    co_await cleanupLoadingDeployments();
     co_await global::gameData->setupGameData();
     co_await global::crowdin->getAvailableLocales();
 }

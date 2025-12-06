@@ -303,48 +303,6 @@ namespace service {
         co_return res.value_or({});
     }
 
-    Task<std::vector<Recipe>> Database::getItemUsageInRecipes(std::string item) const {
-        // language=postgresql
-        static constexpr auto query = "SELECT * FROM recipe \
-                                       JOIN recipe_ingredient_item ri ON recipe.id = ri.recipe_id \
-                                       JOIN item i ON ri.item_id = i.id \
-                                       WHERE i.loc = $1";
-
-        const auto res = co_await handleDatabaseOperation([item](const DbClientPtr &client) -> Task<std::vector<Recipe>> {
-            const auto results = co_await client->execSqlCoro(query, item);
-            std::vector<Recipe> recipes;
-            for (const auto &row: results) {
-                recipes.emplace_back(Recipe{row});
-            }
-            co_return recipes;
-        });
-        co_return res.value_or({});
-    }
-
-    Task<std::vector<ContentUsage>> Database::getRecipeTypeWorkbenches(const int64_t id) const {
-        // language=postgresql
-        static constexpr auto query = "SELECT ver.project_id, item.id, item.loc, pip.path FROM recipe_workbench \
-                                       JOIN project_item pitem ON recipe_workbench.item_id = pitem.id \
-                                       JOIN item ON pitem.item_id = item.id \
-                                       LEFT JOIN project_version ver ON pitem.version_id = ver.id \
-                                       LEFT JOIN project_item_page pip ON pitem.id = pip.item_id \
-                                       WHERE type_id = $1";
-
-        const auto res = co_await handleDatabaseOperation([id](const DbClientPtr &client) -> Task<std::vector<ContentUsage>> {
-            const auto results = co_await client->execSqlCoro(query, id);
-            std::vector<ContentUsage> usages;
-            for (const auto &row: results) {
-                const auto projectId = row[0].as<std::string>();
-                const auto itemId = row[1].as<int64_t>();
-                const auto loc = row[2].as<std::string>();
-                const auto path = row[3].isNull() ? "" : row[3].as<std::string>();
-                usages.emplace_back(itemId, loc, projectId, path);
-            }
-            co_return usages;
-        });
-        co_return res.value_or({});
-    }
-
     Task<TaskResult<DataImport>> Database::addDataImportRecord(const DataImport data) const {
         co_return co_await handleDatabaseOperation([&data](const DbClientPtr &client) -> Task<DataImport> {
             CoroMapper<DataImport> mapper(client);

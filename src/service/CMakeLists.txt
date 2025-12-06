@@ -30,7 +30,6 @@ add_library(service STATIC
         project/format.cc
         project/frontmatter.cc
         project/pages.cc
-        project/properties.cc
         project/recipe_resolver.cc
         project/reports.cc
         project/resolved.cc
@@ -54,6 +53,7 @@ add_library(service STATIC
         system/data_import.cc
         system/game_data.cc
         system/lang.cc
+        system/startup.cc
 
         util/crypto.cc
 

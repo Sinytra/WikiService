@@ -27,7 +27,7 @@ namespace api::v1 {
 
     Task<> GameController::contentItem(const HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback,
                                        const std::string project, const std::string id) const {
-        const auto resolved = co_await BaseProjectController::getProjectWithParams(req, project);
+        const auto resolved = co_await BaseProjectController::getProjectWithParamsCached(req, project);
         requireNonVirtual(resolved);
 
         const auto page = co_await resolved->readContentPage(id);
@@ -51,7 +51,7 @@ namespace api::v1 {
         const auto resolved = co_await BaseProjectController::getProjectWithParams(req, project);
         requireNonVirtual(resolved);
 
-        const auto recipeIds = co_await resolved->getProjectDatabase().getItemRecipes(item);
+        const auto recipeIds = co_await resolved->getProjectDatabase().getRecipesForItem(item);
         nlohmann::json root(nlohmann::json::value_t::array);
         for (const auto &id: recipeIds) {
             if (const auto recipe = co_await resolved->getRecipe(id)) {
@@ -137,7 +137,7 @@ namespace api::v1 {
         const auto layout = co_await content::getRecipeType(resolved, unwrap(ResourceLocation::parse(type)));
         assertFound(layout);
 
-        const auto workbenches = co_await global::database->getRecipeTypeWorkbenches(recipeType->getValueOfId());
+        const auto workbenches = co_await resolved->getProjectDatabase().getRecipeTypeWorkbenches(recipeType->getValueOfId());
         const auto workbenchItems = co_await resolveContentUsage(workbenches);
 
         nlohmann::json root;

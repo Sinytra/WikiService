@@ -2,7 +2,7 @@
 
 #include <drogon/HttpController.h>
 
-#include "base.h"
+#include "../base.h"
 
 namespace api::v1 {
     class GameController final : public drogon::HttpController<GameController, false> {

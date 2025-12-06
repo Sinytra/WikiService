@@ -17,7 +17,6 @@
 
 using namespace drogon_model::postgres;
 
-// TODO Hide virtual projects
 namespace service {
     struct ProjectSearchResponse {
         int pages;
@@ -98,14 +97,13 @@ namespace service {
 
         // Content
         drogon::Task<TaskResult<>> refreshFlatTagItemView() const;
+        // TODO Remove after data imports are reworked
         drogon::Task<int64_t> addRecipe(std::string id, std::string type) const;
         drogon::Task<TaskResult<>> addRecipeIngredientItem(int64_t recipe_id, std::string item, int slot, int count, bool input) const;
         drogon::Task<TaskResult<>> addRecipeIngredientTag(int64_t recipe_id, std::string tag, int slot, int count, bool input) const;
 
         drogon::Task<std::vector<std::string>> getItemSourceProjects(int64_t item) const;
         drogon::Task<std::vector<GlobalItem>> getGlobalTagItems(int64_t tagId) const;
-        drogon::Task<std::vector<Recipe>> getItemUsageInRecipes(std::string item) const;
-        drogon::Task<std::vector<ContentUsage>> getRecipeTypeWorkbenches(int64_t id) const;
 
         // System data
         drogon::Task<TaskResult<DataImport>> addDataImportRecord(DataImport data) const;
@@ -118,6 +116,7 @@ namespace service {
         drogon::Task<TaskResult<>> deactivateDeployments(std::string projectId) const;
         drogon::Task<TaskResult<>> deleteDeployment(std::string id) const;
         drogon::Task<bool> hasFailingDeployment(std::string projectId) const;
+        drogon::Task<std::vector<Deployment>> getLoadingDeployments() const;
         drogon::Task<TaskResult<>> failLoadingDeployments() const;
         drogon::Task<std::vector<std::string>> getUndeployedProjects() const;
 

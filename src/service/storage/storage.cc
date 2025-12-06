@@ -195,13 +195,11 @@ namespace service {
         co_return co_await findProject(project, std::nullopt, std::nullopt);
     }
 
-    Error Storage::removeDeployment(const Deployment &deployment) const {
+    void Storage::removeDeployment(const Deployment &deployment) const {
         logger.debug("Deleting deployment dir '{}'", deployment.getValueOfId());
 
         const auto path = getDeploymentRootDir(deployment);
         remove_all(path);
-
-        return Error::Ok;
     }
 
     Error Storage::invalidateProject(const Project &project) const {
