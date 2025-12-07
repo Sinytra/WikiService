@@ -35,8 +35,8 @@ namespace service {
         drogon::Task<> addIssue(ProjectIssueLevel level, ProjectIssueType type, ProjectError subject, std::string details = "",
                                 std::string file = "");
 
-        void addIssueAsync(ProjectIssueLevel level, ProjectIssueType type, ProjectError subject, const std::string &details = "",
-                           const std::string &file = "");
+        void addIssueAsync(ProjectIssueLevel level, ProjectIssueType type, ProjectError subject, std::string details = "",
+                           std::string file = "");
 
         bool hasErrors() const;
 
