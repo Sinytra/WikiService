@@ -16,20 +16,21 @@
 #include <log/log.h>
 
 #include <service/database/database.h>
-#include <service/external/github.h>
-#include <service/storage/realtime.h>
-#include <service/system/lang.h>
 #include <service/external/crowdin.h>
 #include <service/external/frontend.h>
+#include <service/external/github.h>
+#include <service/project/virtual/virtual.h>
+#include <service/storage/ingestor/recipe/recipe_builtin.h>
+#include <service/storage/realtime.h>
 #include <service/system/access_keys.h>
 #include <service/system/game_data.h>
-#include <service/storage/ingestor/recipe/recipe_builtin.h>
-#include <service/project/virtual/virtual.h>
+#include <service/system/lang.h>
 #include <service/system/startup.h>
 
 using namespace drogon;
 using namespace logging;
 using namespace service;
+namespace fs = std::filesystem;
 
 namespace service {
     trantor::EventLoopThreadPool cacheAwaiterThreadPool{10};
@@ -65,11 +66,11 @@ void globalExceptionHandler(const std::exception &e, const HttpRequestPtr &req, 
     callback(statusResponse(k500InternalServerError));
 }
 
-Task<> runStartupTaks() {
-    global::virtualProject = co_await createVirtualProject();
+Task<> runStartupTaks(const fs::path gameFilesPath) {
+    global::virtualProject = co_await createVirtualProject(gameFilesPath);
 
     co_await cleanupLoadingDeployments();
-    co_await global::gameData->setupGameData();
+    co_await global::gameData->importGameData(false);
     co_await global::crowdin->getAvailableLocales();
 }
 
@@ -82,12 +83,15 @@ int main() {
         app().setLogLevel(level).addListener("0.0.0.0", port).setThreadNum(16);
         configureLoggingLevel();
 
-        const auto [authConfig, githubAppConfig, mrApp, crowdinConfig, sentryConfig, appUrl, curseForgeKey, storagePath,
-                    salt, local] = config::configure();
+        const auto [authConfig, githubAppConfig, mrApp, crowdinConfig, sentryConfig, appUrl, curseForgeKey, storagePath, salt, local] =
+            config::configure();
 
         if (!sentryConfig.dsn.empty()) {
             monitor::initSentry(sentryConfig.dsn);
         }
+
+        const auto gameFilesPath = fs::path(storagePath) / ".game";
+        fs::create_directories(gameFilesPath);
 
         global::database = std::make_shared<Database>();
         global::cache = std::make_shared<MemoryCache>();
@@ -97,7 +101,7 @@ int main() {
         global::auth = std::make_shared<Auth>(appUrl, OAuthApp{githubAppConfig.clientId, githubAppConfig.clientSecret},
                                               OAuthApp{mrApp.clientId, mrApp.clientSecret});
         global::lang = std::make_shared<LangService>();
-        global::gameData = std::make_shared<GameDataService>(storagePath);
+        global::gameData = std::make_shared<GameDataService>();
         global::crowdin = std::make_shared<Crowdin>(crowdinConfig);
         global::accessKeys = std::make_shared<AccessKeys>(salt);
         global::frontend = std::make_shared<FrontendService>(authConfig.frontendUrl, authConfig.frontendApiKey);
@@ -131,7 +135,7 @@ int main() {
 
         content::loadBuiltinRecipeTypes();
 
-        app().getLoop()->queueInLoop(async_func([]() -> Task<> { co_await runStartupTaks(); }));
+        app().getLoop()->queueInLoop(async_func([=]() -> Task<> { co_await runStartupTaks(gameFilesPath); }));
 
         app().run();
 

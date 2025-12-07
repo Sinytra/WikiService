@@ -5,7 +5,6 @@
 #include <models/Project.h>
 #include <service/auth.h>
 #include <service/serializers.h>
-#include <service/system/data_import.h>
 #include <service/util.h>
 #include <version.h>
 
@@ -14,6 +13,7 @@
 #include <service/system/access_keys.h>
 #include <service/system/lang.h>
 #include "base.h"
+#include "system/game_data.h"
 
 using namespace std;
 using namespace drogon;
@@ -33,8 +33,7 @@ namespace api::v1 {
         NLOHMANN_DEFINE_TYPE_INTRUSIVE(DataMigration, id, title, desc)
     };
 
-    std::vector<DataMigration> dataMigrations = {
-        {"deployments", "Project deployments", "Run initial project deployments", sys::runInitialDeployments}};
+    std::vector<DataMigration> dataMigrations = {};
 
     Task<bool> authAccessKey(const HttpRequestPtr req) {
         const auto authHeader = req->getHeader("Authorization");
@@ -89,12 +88,11 @@ namespace api::v1 {
             co_await global::auth->ensurePrivilegedAccess(req);
         }
 
-        const auto json(BaseProjectController::jsonBody(req));
+        const auto body(BaseProjectController::jsonBody(req));
+        const auto updateLoader = body.contains("update_loader") ? body["update_loader"].get<bool>() : false;
+        const auto result = co_await global::gameData->importGameData(updateLoader);
 
-        constexpr sys::SystemDataImporter importer;
-        const auto result = co_await importer.importData(json);
-
-        callback(statusResponse(result == Error::Ok ? k200OK : k500InternalServerError));
+        callback(statusResponse(result ? k200OK : k500InternalServerError));
     }
 
     Task<> SystemController::getAvailableMigrations(const HttpRequestPtr req,

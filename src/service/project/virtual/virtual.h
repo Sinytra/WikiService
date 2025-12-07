@@ -3,19 +3,23 @@
 #include <models/Item.h>
 #include <service/database/project_database.h>
 #include <service/project/project.h>
+#include <service/project/virtual/format.h>
 
 #define VIRTUAL_PROJECT_ID "minecraft"
 
 namespace service {
     class VirtualProject final : public ProjectBase {
     public:
-        explicit VirtualProject(const Project &, const ProjectVersion &);
+        explicit VirtualProject(const Project &, const ProjectVersion &, const std::filesystem::path &);
 
         // Basic info
         std::string getId() const override;
         const Project &getProject() const override;
         const ProjectVersion &getProjectVersion() const override;
         ProjectDatabaseAccess &getProjectDatabase() const override;
+
+        // Access
+        const ProjectFormat &getFormat() const override;
 
         // Parameters
         std::string getLocale() const override;
@@ -60,9 +64,10 @@ namespace service {
         Project project_;
         ProjectVersion version_;
         std::shared_ptr<ProjectDatabaseAccess> projectDb_;
+        VirtualProjectFormat format_;
     };
 
-    drogon::Task<std::shared_ptr<VirtualProject>> createVirtualProject();
+    drogon::Task<std::shared_ptr<VirtualProject>> createVirtualProject(std::filesystem::path rootDir);
 }
 
 namespace global {

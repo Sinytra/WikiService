@@ -303,11 +303,7 @@ namespace service {
         co_return res.value_or({});
     }
 
-    Task<TaskResult<DataImport>> Database::addDataImportRecord(const DataImport data) const {
-        co_return co_await handleDatabaseOperation([&data](const DbClientPtr &client) -> Task<DataImport> {
-            CoroMapper<DataImport> mapper(client);
-
-            co_return co_await mapper.insert(data);
-        });
+    Task<TaskResult<DataImport>> Database::getDataImport(std::string gameVersion) const {
+        co_return co_await findOne<DataImport>(Criteria(DataImport::Cols::_game_version, CompareOperator::EQ, gameVersion));
     }
 }

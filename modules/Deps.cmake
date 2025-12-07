@@ -101,3 +101,11 @@ CPMAddPackage(
 if (sentry_ADDED)
     set_target_properties(sentry PROPERTIES C_STANDARD 11 C_EXTENSIONS ON)
 endif()
+
+CPMAddPackage(
+        NAME pugixml
+        GITHUB_REPOSITORY zeux/pugixml
+        GIT_TAG v1.15
+        OPTIONS
+        "BUILD_SHARED_LIBS OFF"
+)

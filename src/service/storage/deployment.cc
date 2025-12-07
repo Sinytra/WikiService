@@ -207,7 +207,7 @@ namespace service {
 
         // TODO Ingest from other versions?
         // TODO Move transaction scope up
-        content::Ingestor ingestor{resolved, logger, issues};
+        content::Ingestor ingestor{resolved, logger, issues, {}, true};
         if (const auto result = co_await ingestor.runIngestor(); result != Error::Ok) {
             logger->error("Error ingesting project data");
             co_return ProjectError::UNKNOWN;

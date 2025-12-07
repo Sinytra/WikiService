@@ -9,7 +9,6 @@
 #include <models/Deployment.h>
 #include <models/ProjectIssue.h>
 #include <models/ProjectVersion.h>
-#include <models/Recipe.h>
 #include <models/Report.h>
 #include <nlohmann/json.hpp>
 #include <service/error.h>
@@ -97,16 +96,11 @@ namespace service {
 
         // Content
         drogon::Task<TaskResult<>> refreshFlatTagItemView() const;
-        // TODO Remove after data imports are reworked
-        drogon::Task<int64_t> addRecipe(std::string id, std::string type) const;
-        drogon::Task<TaskResult<>> addRecipeIngredientItem(int64_t recipe_id, std::string item, int slot, int count, bool input) const;
-        drogon::Task<TaskResult<>> addRecipeIngredientTag(int64_t recipe_id, std::string tag, int slot, int count, bool input) const;
-
         drogon::Task<std::vector<std::string>> getItemSourceProjects(int64_t item) const;
         drogon::Task<std::vector<GlobalItem>> getGlobalTagItems(int64_t tagId) const;
 
         // System data
-        drogon::Task<TaskResult<DataImport>> addDataImportRecord(DataImport data) const;
+        drogon::Task<TaskResult<DataImport>> getDataImport(std::string gameVersion) const;
         drogon::Task<PaginatedData<DataImport>> getDataImports(std::string searchQuery, int page) const;
 
         // Deployments

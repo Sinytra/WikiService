@@ -93,7 +93,8 @@ namespace service {
     }
 
     Task<std::optional<content::GameRecipeType>> ResolvedProject::getRecipeType(const ResourceLocation &location) {
-        const auto path = docsDir_ / ".data" / location.namespace_ / "recipe_type" / (location.path_ + ".json");
+        const auto dataRoot = format_.getDataRoot();
+        const auto path = dataRoot / location.namespace_ / "recipe_type" / (location.path_ + ".json");
         const auto json = parseJsonFile(path);
         if (!json) {
             co_return std::nullopt;

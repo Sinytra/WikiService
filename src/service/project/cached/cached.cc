@@ -83,4 +83,7 @@ namespace service {
     std::optional<std::filesystem::path> CachedProject::getAsset(const ResourceLocation &location) const {
         return wrapped_->getAsset(location);
     }
+    const ProjectFormat &CachedProject::getFormat() const {
+        return wrapped_->getFormat();
+    }
 }

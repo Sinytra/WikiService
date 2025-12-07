@@ -52,6 +52,7 @@ namespace service {
         std::optional<std::filesystem::path> getAsset(const ResourceLocation &location) const override;
         drogon::Task<Json::Value> toJson(bool full) const override;
         drogon::Task<Json::Value> toJsonVerbose() override;
+        const ProjectFormat &getFormat() const override;
 
     private:
         template<typename Supplier, typename T = WrapperInnerType_T<std::invoke_result_t<Supplier>>>

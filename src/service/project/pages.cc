@@ -196,7 +196,8 @@ namespace service {
         const auto filePath = format_.getLocalizedFilePath(removeLeadingSlash(path) + DOCS_FILE_EXT);
         if (!exists(filePath))
             return std::nullopt;
-        return relative(filePath, docsDir_).string();
+        const auto root = format_.getRoot();
+        return relative(filePath, root).string();
     }
 
     std::optional<std::string> ResolvedProject::getPageTitle(const std::string &path) const {
@@ -233,7 +234,7 @@ namespace service {
         co_return readPageFile(*contentPath);
     }
 
-    Task<TaskResult<FileTree>> ResolvedProject::getDirectoryTree() { co_return getDirectoryTree(docsDir_); }
+    Task<TaskResult<FileTree>> ResolvedProject::getDirectoryTree() { co_return getDirectoryTree(format_.getRoot()); }
 
     Task<> validatePageFile(const FileTreeEntry &entry, const ResolvedProject &resolved,
                             const std::shared_ptr<ProjectIssueCallback> &issues, const std::vector<std::string> &requiredAttributes) {

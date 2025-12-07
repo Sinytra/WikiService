@@ -11,16 +11,16 @@ using namespace service;
 namespace fs = std::filesystem;
 
 namespace content {
-    RecipesSubIngestor::RecipesSubIngestor(const ResolvedProject &proj, const std::shared_ptr<spdlog::logger> &log,
+    RecipesSubIngestor::RecipesSubIngestor(const ProjectBase &proj, const std::shared_ptr<spdlog::logger> &log,
                                            ProjectFileIssueCallback &issues) : SubIngestor(proj, log, issues) {}
 
     Task<PreparationResult> RecipesSubIngestor::prepare() {
         PreparationResult result;
 
-        const auto docsRoot = project_.getRootDirectory();
+        const auto dataRoot = project_.getFormat().getDataRoot();
         const auto modid = project_.getProject().getValueOfModid();
 
-        if (const auto recipesRoot = docsRoot / ".data" / modid / "recipe"; exists(recipesRoot)) {
+        if (const auto recipesRoot = dataRoot / modid / "recipe"; exists(recipesRoot)) {
             for (const auto &entry: fs::recursive_directory_iterator(recipesRoot)) {
                 if (!entry.is_regular_file() || entry.path().extension() != EXT_JSON) {
                     continue;
@@ -38,7 +38,7 @@ namespace content {
             }
         }
 
-        if (const auto recipeTypesRoot = docsRoot / ".data" / modid / "recipe_type"; exists(recipeTypesRoot)) {
+        if (const auto recipeTypesRoot = dataRoot / modid / "recipe_type"; exists(recipeTypesRoot)) {
             for (const auto &entry: fs::recursive_directory_iterator(recipeTypesRoot)) {
                 if (!entry.is_regular_file() || entry.path().extension() != EXT_JSON) {
                     continue;

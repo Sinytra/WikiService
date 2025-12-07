@@ -10,7 +10,7 @@ using namespace service;
 namespace fs = std::filesystem;
 
 namespace content {
-    ContentPathsSubIngestor::ContentPathsSubIngestor(const ResolvedProject &proj, const std::shared_ptr<spdlog::logger> &log,
+    ContentPathsSubIngestor::ContentPathsSubIngestor(const ProjectBase &proj, const std::shared_ptr<spdlog::logger> &log,
                                                      ProjectFileIssueCallback &issues) : SubIngestor(proj, log, issues) {}
 
     bool shouldIncludeFile(const fs::path &contentDirRoot, const fs::directory_entry &entry) {
@@ -24,7 +24,7 @@ namespace content {
         PreparationResult result;
 
         const auto contentRoot = project_.getFormat().getContentDirectoryPath();
-        for (const auto docsRoot = project_.getRootDirectory(); const auto &entry: fs::recursive_directory_iterator(docsRoot)) {
+        for (const auto docsRoot = project_.getFormat().getRoot(); const auto &entry: fs::recursive_directory_iterator(docsRoot)) {
             if (!shouldIncludeFile(contentRoot, entry)) {
                 continue;
             }

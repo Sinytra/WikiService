@@ -377,7 +377,8 @@
           "description": "An item ID.",
           "type": "string"
         }
-      }
+      },
+      "required": ["id"]
     }
   },
   "description": "Configuration file defining a recipe for a data pack for Minecraft.",

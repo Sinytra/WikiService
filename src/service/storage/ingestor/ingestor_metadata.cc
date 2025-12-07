@@ -10,11 +10,11 @@ using namespace service;
 namespace fs = std::filesystem;
 
 namespace content {
-    MetadataSubIngestor::MetadataSubIngestor(const ResolvedProject &proj, const std::shared_ptr<spdlog::logger> &log,
+    MetadataSubIngestor::MetadataSubIngestor(const ProjectBase &proj, const std::shared_ptr<spdlog::logger> &log,
                                              ProjectFileIssueCallback &issues) : SubIngestor(proj, log, issues) {}
 
     Task<PreparationResult> MetadataSubIngestor::prepare() {
-        const auto docsRoot = project_.getRootDirectory();
+        const auto docsRoot = project_.getFormat().getRoot();
         const auto workbenchesFile = project_.getFormat().getWorkbenchesPath();
 
         if (exists(workbenchesFile)) {

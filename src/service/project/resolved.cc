@@ -21,8 +21,8 @@ namespace fs = std::filesystem;
 namespace service {
     ResolvedProject::ResolvedProject(const Project &p, const std::filesystem::path &d, const ProjectVersion &v,
                                      const std::shared_ptr<ProjectIssueCallback> &issues, const std::shared_ptr<spdlog::logger> &log) :
-        project_(p), defaultVersion_(nullptr), docsDir_(d), version_(v), projectDb_(std::make_shared<ProjectDatabaseAccess>(*this)),
-        format_(ProjectFormat{d, ""}), issues_(issues), logger_(log) {}
+        project_(p), defaultVersion_(nullptr), version_(v), projectDb_(std::make_shared<ProjectDatabaseAccess>(*this)),
+        format_(V0ProjectFormat{d, ""}), issues_(issues), logger_(log) {}
 
     std::string ResolvedProject::getId() const { return project_.getValueOfId(); }
 
@@ -74,12 +74,12 @@ namespace service {
     }
 
     std::optional<std::filesystem::path> ResolvedProject::getAsset(const ResourceLocation &location) const {
-        if (const auto filePath = format_.getAssetPath(location); exists(filePath)) {
+        if (const auto filePath = format_.getAssetsPath(location); exists(filePath)) {
             return filePath;
         }
 
         // Legacy asset path fallback
-        if (const auto legacyFilePath = format_.getAssetPath({.namespace_ = "item", .path_ = location.namespace_ + '/' + location.path_});
+        if (const auto legacyFilePath = format_.getAssetsPath({.namespace_ = "item", .path_ = location.namespace_ + '/' + location.path_});
             exists(legacyFilePath))
         {
             return legacyFilePath;
@@ -87,8 +87,6 @@ namespace service {
 
         return std::nullopt;
     }
-
-    const std::filesystem::path &ResolvedProject::getRootDirectory() const { return docsDir_; }
 
     const ProjectFormat &ResolvedProject::getFormat() const { return format_; }
 

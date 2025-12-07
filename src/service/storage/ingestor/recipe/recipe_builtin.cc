@@ -68,7 +68,7 @@ namespace content {
 
     StubRecipeIngredient parseResult(nlohmann::json json, const std::string &slot) {
         const auto resultId = json["id"].get<std::string>();
-        const auto count = json["count"].get<int>();
+        const auto count = json.contains("count") ? json["count"].get<int>() : 1;
         return {resultId, slot, count, false, false};
     }
 
@@ -88,20 +88,10 @@ namespace content {
                 continue;
             }
 
-            if (const auto keyValue = keys[key]; keyValue.is_array()) {
-                for (const auto &item: keyValue) {
-                    if (const auto ingredient = parseRecipeIngredient(item, std::to_string(i + 1), issues)) {
-                        recipe.ingredients.push_back(*ingredient);
-                    } else {
-                        return std::nullopt;
-                    }
-                }
+            if (const auto subIngredients = parseArrayIngredient(keys[key], std::to_string(i + 1), issues); !subIngredients.empty()) {
+                recipe.ingredients.insert(recipe.ingredients.end(), subIngredients.begin(), subIngredients.end());
             } else {
-                if (const auto ingredient = parseRecipeIngredient(keyValue, std::to_string(i + 1), issues)) {
-                    recipe.ingredients.push_back(*ingredient);
-                } else {
-                    return std::nullopt;
-                }
+                return std::nullopt;
             }
         }
 
@@ -116,11 +106,11 @@ namespace content {
 
         const auto ingredients = json["ingredients"];
         for (int i = 0; i < ingredients.size(); ++i) {
-            const auto ingredient = parseRecipeIngredient(ingredients[i], std::to_string(i + 1), issues);
-            if (!ingredient) {
+            const auto subIngredients = parseArrayIngredient(ingredients[i], std::to_string(i + 1), issues);
+            if (subIngredients.empty()) {
                 return std::nullopt;
             }
-            recipe.ingredients.push_back(*ingredient);
+            recipe.ingredients.insert(recipe.ingredients.end(), subIngredients.begin(), subIngredients.end());
         }
 
         recipe.ingredients.push_back(parseResult(json["result"], "1"));
@@ -206,8 +196,7 @@ namespace content {
 
     bool VanillaRecipeParser::handlesType(const ResourceLocation type) { return type.namespace_ == ResourceLocation::DEFAULT_NAMESPACE; }
 
-    Task<std::optional<GameRecipeType>> VanillaRecipeParser::getType(ProjectBasePtr project,
-                                                                     const ResourceLocation type) const {
+    Task<std::optional<GameRecipeType>> VanillaRecipeParser::getType(ProjectBasePtr project, const ResourceLocation type) const {
         const auto it = builtinRecipeTypes.find(type);
         co_return it == builtinRecipeTypes.end() ? std::nullopt : std::make_optional(it->second.displaySchema);
     }

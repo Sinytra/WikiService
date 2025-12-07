@@ -2,11 +2,16 @@
 
 #include "ingestor_metadata.h"
 
-#include <service/project/resolved.h>
 #include <drogon/utils/coroutine.h>
-#include <service/storage/ingestor/recipe/recipe_parser.h>
 #include <service/error.h>
+#include <service/project/resolved.h>
+#include <service/storage/ingestor/recipe/recipe_parser.h>
 #include <service/storage/issues.h>
+
+#define INGESTOR_CONTENT_PATHS "Content paths"
+#define INGESTOR_TAGS "Tags"
+#define INGESTOR_RECIPES "Recipes"
+#define INGESTOR_METADATA "Metadata"
 
 namespace content {
     struct PreparationResult {
@@ -21,7 +26,7 @@ namespace content {
 
     class SubIngestor {
     public:
-        explicit SubIngestor(const service::ResolvedProject &, const std::shared_ptr<spdlog::logger> &, service::ProjectFileIssueCallback &);
+        explicit SubIngestor(const service::ProjectBase &, const std::shared_ptr<spdlog::logger> &, service::ProjectFileIssueCallback &);
         virtual ~SubIngestor() = default;
 
         virtual drogon::Task<PreparationResult> prepare() = 0;
@@ -29,28 +34,40 @@ namespace content {
         virtual drogon::Task<service::Error> finish();
 
     protected:
-        const service::ResolvedProject &project_;
+        const service::ProjectBase &project_;
         const std::shared_ptr<spdlog::logger> &logger_;
         service::ProjectFileIssueCallback &issues_;
     };
 
     class Ingestor {
     public:
-        explicit Ingestor(service::ResolvedProject &, const std::shared_ptr<spdlog::logger> &, service::ProjectIssueCallback &);
+        explicit Ingestor(service::ProjectBase &, const std::shared_ptr<spdlog::logger> &, service::ProjectIssueCallback &,
+                          const std::set<std::string> &enableModules, bool deleteExisting);
 
         drogon::Task<service::Error> runIngestor() const;
 
     private:
         drogon::Task<service::Error> ingestGameContentData() const;
+        bool enableModule(const std::string &name) const;
 
-        const service::ResolvedProject &project_;
+        template<typename T>
+        void addSubModule(std::vector<std::pair<std::string, std::unique_ptr<SubIngestor>>> &ingestors, const std::string &name,
+                          service::ProjectFileIssueCallback &issues) const {
+            if (enableModule(name)) {
+                ingestors.emplace_back(name, std::make_unique<T>(project_, logger_, issues));
+            }
+        }
+
+        const service::ProjectBase &project_;
         const std::shared_ptr<spdlog::logger> &logger_;
         service::ProjectIssueCallback &issues_;
+        const std::set<std::string> enableModules_;
+        const bool deleteExisting_;
     };
 
     class ContentPathsSubIngestor final : public SubIngestor {
     public:
-        explicit ContentPathsSubIngestor(const service::ResolvedProject &, const std::shared_ptr<spdlog::logger> &,
+        explicit ContentPathsSubIngestor(const service::ProjectBase &, const std::shared_ptr<spdlog::logger> &,
                                          service::ProjectFileIssueCallback &);
 
         drogon::Task<PreparationResult> prepare() override;
@@ -62,7 +79,7 @@ namespace content {
 
     class TagsSubIngestor final : public SubIngestor {
     public:
-        explicit TagsSubIngestor(const service::ResolvedProject &, const std::shared_ptr<spdlog::logger> &,
+        explicit TagsSubIngestor(const service::ProjectBase &, const std::shared_ptr<spdlog::logger> &,
                                  service::ProjectFileIssueCallback &);
 
         drogon::Task<PreparationResult> prepare() override;
@@ -76,7 +93,7 @@ namespace content {
 
     class RecipesSubIngestor final : public SubIngestor {
     public:
-        explicit RecipesSubIngestor(const service::ResolvedProject &, const std::shared_ptr<spdlog::logger> &,
+        explicit RecipesSubIngestor(const service::ProjectBase &, const std::shared_ptr<spdlog::logger> &,
                                     service::ProjectFileIssueCallback &);
 
         drogon::Task<PreparationResult> prepare() override;
@@ -97,11 +114,12 @@ namespace content {
 
     class MetadataSubIngestor final : public SubIngestor {
     public:
-        explicit MetadataSubIngestor(const service::ResolvedProject &, const std::shared_ptr<spdlog::logger> &,
+        explicit MetadataSubIngestor(const service::ProjectBase &, const std::shared_ptr<spdlog::logger> &,
                                      service::ProjectFileIssueCallback &);
 
         drogon::Task<PreparationResult> prepare() override;
         drogon::Task<service::Error> execute() override;
+
     private:
         drogon::Task<service::Error> addWorkbenches(PreparedData<StubWorkbenches> workbenches) const;
 

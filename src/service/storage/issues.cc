@@ -51,7 +51,9 @@ namespace service {
 
     Task<> ProjectIssueCallback::addIssue(const ProjectIssueLevel level, const ProjectIssueType type, const ProjectError subject,
                                           const std::string details, const std::string file) {
-        co_await service::addIssue(deploymentId_, level, type, subject, details, file);
+        if (!deploymentId_.empty()) {
+            co_await service::addIssue(deploymentId_, level, type, subject, details, file);
+        }
 
         const auto logLevel = level == ProjectIssueLevel::ERROR ? spdlog::level::err : spdlog::level::warn;
         const auto logDetail = details.empty() ? "" : " '" + details + "' ";

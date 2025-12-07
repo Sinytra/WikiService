@@ -51,6 +51,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
         libzip::zip
         sentry::sentry
         yaml-cpp::yaml-cpp
+        pugixml::pugixml
 )
 
 # ##############################################################################

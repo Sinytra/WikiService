@@ -78,8 +78,13 @@ namespace content {
             return std::nullopt;
         }
 
-        if (const auto recipe = parser->parseRecipe(id, type, *json, fileIssues)) {
-            return PreparedData{.data = *recipe, .issues = fileIssues};
+        try {
+            if (const auto recipe = parser->parseRecipe(id, type, *json, fileIssues)) {
+                return PreparedData{.data = *recipe, .issues = fileIssues};
+            }
+        } catch (std::exception &err) {
+            logger_->error("Error parsing recipe {} ({}): {}", id, type, err.what());
+            throw;
         }
 
         return std::nullopt;

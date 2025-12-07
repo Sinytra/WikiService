@@ -1,9 +1,9 @@
 #include "ingestor.h"
 
-#include <service/database/database.h>
-#include <service/database/project_database.h>
 #include <drogon/drogon.h>
 #include <fstream>
+#include <service/database/database.h>
+#include <service/database/project_database.h>
 
 #define CONTENT_DIR ".content/"
 
@@ -14,13 +14,14 @@ using namespace service;
 namespace fs = std::filesystem;
 
 namespace content {
-    SubIngestor::SubIngestor(const ResolvedProject &proj, const std::shared_ptr<spdlog::logger> &log, ProjectFileIssueCallback &issues) :
+    SubIngestor::SubIngestor(const ProjectBase &proj, const std::shared_ptr<spdlog::logger> &log, ProjectFileIssueCallback &issues) :
         project_(proj), logger_(log), issues_(issues) {}
 
     Task<Error> SubIngestor::finish() { co_return Error::Ok; }
 
-    Ingestor::Ingestor(ResolvedProject &proj, const std::shared_ptr<spdlog::logger> &log, ProjectIssueCallback &issues) :
-        project_(proj), logger_(log), issues_(issues) {}
+    Ingestor::Ingestor(ProjectBase &proj, const std::shared_ptr<spdlog::logger> &log, ProjectIssueCallback &issues,
+                       const std::set<std::string> &enableModules, const bool deleteExisting) :
+        project_(proj), logger_(log), issues_(issues), enableModules_(enableModules), deleteExisting_(deleteExisting) {}
 
     Task<Error> wipeExistingData(const DbClientPtr clientPtr, const std::string id) {
         logger.info("Wiping existing data for project {}", id);
@@ -67,6 +68,8 @@ namespace content {
         }
     }
 
+    bool Ingestor::enableModule(const std::string &name) const { return enableModules_.empty() || enableModules_.contains(name); }
+
     Task<Error> Ingestor::ingestGameContentData() const {
         auto projectLog = *logger_;
 
@@ -75,14 +78,17 @@ namespace content {
         projectLog.info("====================================");
         projectLog.info("Ingesting game data for project {}", projectId);
 
-        co_await wipeExistingData(project_.getProjectDatabase().getDbClientPtr(), projectId);
+        if (deleteExisting_) {
+            co_await wipeExistingData(project_.getProjectDatabase().getDbClientPtr(), projectId);
+        }
 
-        ProjectFileIssueCallback rootFileIssues{issues_, project_.getRootDirectory()};
+        ProjectFileIssueCallback rootFileIssues{issues_, project_.getFormat().getRoot()};
         std::vector<std::pair<std::string, std::unique_ptr<SubIngestor>>> ingestors;
-        ingestors.emplace_back("Content paths", std::make_unique<ContentPathsSubIngestor>(project_, logger_, rootFileIssues));
-        ingestors.emplace_back("Tags", std::make_unique<TagsSubIngestor>(project_, logger_, rootFileIssues));
-        ingestors.emplace_back("Recipes", std::make_unique<RecipesSubIngestor>(project_, logger_, rootFileIssues));
-        ingestors.emplace_back("Metadata", std::make_unique<MetadataSubIngestor>(project_, logger_, rootFileIssues));
+
+        addSubModule<ContentPathsSubIngestor>(ingestors, INGESTOR_CONTENT_PATHS, rootFileIssues);
+        addSubModule<TagsSubIngestor>(ingestors, INGESTOR_TAGS, rootFileIssues);
+        addSubModule<RecipesSubIngestor>(ingestors, INGESTOR_RECIPES, rootFileIssues);
+        addSubModule<MetadataSubIngestor>(ingestors, INGESTOR_METADATA, rootFileIssues);
 
         // Prepare ingestors
         PreparationResult allResults;

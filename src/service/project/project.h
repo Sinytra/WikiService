@@ -2,6 +2,7 @@
 
 #include <drogon/drogon.h>
 #include <models/Item.h>
+#include <service/project/format.h>
 #include <service/project/recipe_resolver.h>
 #include <service/storage/ingestor/recipe/game_recipes.h>
 #include <service/database/database.h>
@@ -118,6 +119,9 @@ namespace service {
         virtual const Project &getProject() const = 0;
         virtual const ProjectVersion &getProjectVersion() const = 0;
         virtual ProjectDatabaseAccess &getProjectDatabase() const = 0;
+
+        // Access
+        virtual const ProjectFormat &getFormat() const = 0;
 
         // Parameters
         virtual std::string getLocale() const = 0;

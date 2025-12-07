@@ -38,6 +38,7 @@ namespace service {
         drogon::Task<Error> addProjectIssue(ProjectBasePtr project, ProjectIssueLevel level, ProjectIssueType type,
                                             ProjectError subject, std::string details, std::string path);
 
+        std::shared_ptr<spdlog::logger> getProjectLogger(const Project &project, bool file = true) const;
     private:
         drogon::Task<TaskResult<ProjectVersion>> getDefaultVersion(const Project &project) const;
 
@@ -50,7 +51,6 @@ namespace service {
         std::filesystem::directory_entry getBaseDir() const;
         std::filesystem::path getDeploymentRootDir(const Deployment &deployment) const;
         std::filesystem::path getDeploymentVersionedDir(const Deployment &deployment, const std::string &version = "") const;
-        std::shared_ptr<spdlog::logger> getProjectLogger(const Project &project, bool file = true) const;
         std::shared_ptr<spdlog::logger> getDeploymentLogger(const Deployment &deployment) const;
         std::shared_ptr<spdlog::logger> getProjectLoggerImpl(const std::string &id, const std::optional<std::filesystem::path> &file) const;
 

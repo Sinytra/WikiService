@@ -1,6 +1,5 @@
 #pragma once
 
-#include <drogon/HttpAppFramework.h>
 #include <drogon/orm/CoroMapper.h>
 #include <drogon/utils/coroutine.h>
 #include <log/log.h>

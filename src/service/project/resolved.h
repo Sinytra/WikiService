@@ -85,8 +85,7 @@ namespace service {
         std::tuple<std::optional<nlohmann::json>, ProjectError, std::string> validateProjectMetadata() const;
 
         // Access
-        const std::filesystem::path &getRootDirectory() const;
-        const ProjectFormat &getFormat() const;
+        const ProjectFormat &getFormat() const override;
 
         // Serialization
         drogon::Task<Json::Value> toJson(bool full = false) const override;
@@ -98,8 +97,7 @@ namespace service {
         void addPageMetadata(FileTree &tree) const;
 
         Project project_;
-        std::filesystem::path docsDir_;
-        ProjectFormat format_;
+        V0ProjectFormat format_;
         std::shared_ptr<ResolvedProject> defaultVersion_;
         ProjectVersion version_;
         std::shared_ptr<ProjectDatabaseAccess> projectDb_;

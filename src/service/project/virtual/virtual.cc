@@ -6,7 +6,7 @@ using namespace drogon;
 using namespace logging;
 
 namespace service {
-    Task<std::shared_ptr<VirtualProject>> createVirtualProject() {
+    Task<std::shared_ptr<VirtualProject>> createVirtualProject(const std::filesystem::path rootDir) {
         const auto proj = co_await global::database->getProjectSource(VIRTUAL_PROJECT_ID);
         if (!proj) {
             logger.error("Default virtual project not found");
@@ -19,17 +19,23 @@ namespace service {
             throw std::runtime_error("Error creating virtual project");
         }
 
-        co_return std::make_shared<VirtualProject>(*proj, *projectVersion);
+        co_return std::make_shared<VirtualProject>(*proj, *projectVersion, rootDir);
     }
 
-    VirtualProject::VirtualProject(const Project &project, const ProjectVersion &version) :
-        project_(project), version_(version), projectDb_(std::make_shared<ProjectDatabaseAccess>(*this)) {}
+    VirtualProject::VirtualProject(const Project &project, const ProjectVersion &version, const std::filesystem::path &root) :
+        project_(project), version_(version), projectDb_(std::make_shared<ProjectDatabaseAccess>(*this)),
+        format_(VirtualProjectFormat{root}) {}
 
     // Basic info
     std::string VirtualProject::getId() const { return VIRTUAL_PROJECT_ID; }
     const Project &VirtualProject::getProject() const { return project_; }
     const ProjectVersion &VirtualProject::getProjectVersion() const { return version_; }
     ProjectDatabaseAccess &VirtualProject::getProjectDatabase() const { return *projectDb_; }
+
+    // Access
+    const ProjectFormat &VirtualProject::getFormat() const {
+        return format_;
+    }
 
     // Locales TODO
     std::string VirtualProject::getLocale() const { return DEFAULT_LOCALE; }

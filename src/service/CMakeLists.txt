@@ -24,6 +24,7 @@ add_library(service STATIC
         external/frontend.cc
         external/github.cc
 
+        project/virtual/format.cc
         project/virtual/virtual.cc
         project/cached/cached.cc
         project/content.cc
@@ -50,7 +51,6 @@ add_library(service STATIC
         storage/realtime.cc
 
         system/access_keys.cc
-        system/data_import.cc
         system/game_data.cc
         system/lang.cc
         system/startup.cc
@@ -73,6 +73,7 @@ target_link_libraries(service PRIVATE
         OpenSSL::Crypto
         libzip::zip
         yaml-cpp::yaml-cpp
+        pugixml::pugixml
 )
 
 target_include_directories(service PUBLIC

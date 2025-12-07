@@ -4,8 +4,6 @@
 #include <service/database/project_database.h>
 #include <schemas/schemas.h>
 
-#define CONTENT_DIR ".content/"
-
 using namespace drogon;
 using namespace drogon::orm;
 using namespace logging;
@@ -13,7 +11,7 @@ using namespace service;
 namespace fs = std::filesystem;
 
 namespace content {
-    TagsSubIngestor::TagsSubIngestor(const ResolvedProject &proj, const std::shared_ptr<spdlog::logger> &log,
+    TagsSubIngestor::TagsSubIngestor(const ProjectBase &proj, const std::shared_ptr<spdlog::logger> &log,
                                      ProjectFileIssueCallback &issues) : SubIngestor(proj, log, issues) {}
 
     Task<PreparationResult> TagsSubIngestor::prepare() {
@@ -21,8 +19,7 @@ namespace content {
 
         static const std::set<std::string> allowedTypes{"item"};
 
-        const auto docsRoot = project_.getRootDirectory();
-        const auto dataRoot = docsRoot / ".data";
+        const auto dataRoot = project_.getFormat().getDataRoot();
         if (!exists(dataRoot)) {
             co_return result;
         }
