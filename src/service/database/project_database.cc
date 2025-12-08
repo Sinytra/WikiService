@@ -306,7 +306,7 @@ namespace service {
                                            EXISTS ( \
                                                SELECT 1 FROM recipe_ingredient_item ri_sub \
                                                JOIN item i ON ri_sub.item_id = i.id \
-                                               WHERE ri_sub.recipe_id = r.id AND i.loc = $1 AND ri_sub.input \
+                                               WHERE ri_sub.recipe_id = r.id AND i.loc = $3 AND ri_sub.input \
                                            ) \
                                            OR EXISTS( \
                                                SELECT 1 FROM recipe_ingredient_tag rt_sub \

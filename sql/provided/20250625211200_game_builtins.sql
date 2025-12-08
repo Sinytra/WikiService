@@ -1,13 +1,16 @@
 -- Vanilla recipe types
-INSERT INTO recipe_type (loc)
-VALUES ('minecraft:crafting_shaped'),
-       ('minecraft:crafting_shapeless'),
-       ('minecraft:smelting'),
-       ('minecraft:blasting'),
-       ('minecraft:campfire_cooking'),
-       ('minecraft:smoking'),
-       ('minecraft:stonecutting'),
-       ('minecraft:smithing_transform');
+INSERT INTO recipe_type (loc, version_id)
+SELECT v.loc, ver.id
+FROM (VALUES ('minecraft:crafting_shaped'),
+             ('minecraft:crafting_shapeless'),
+             ('minecraft:smelting'),
+             ('minecraft:blasting'),
+             ('minecraft:campfire_cooking'),
+             ('minecraft:smoking'),
+             ('minecraft:stonecutting'),
+             ('minecraft:smithing_transform')) AS v(loc)
+         CROSS JOIN
+     (SELECT id FROM project_version WHERE project_id = 'minecraft' AND name IS NULL) AS ver;
 
 -- Vanilla recipe workbenches
 INSERT INTO recipe_workbench (type_id, item_id)

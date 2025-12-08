@@ -83,8 +83,10 @@ namespace service {
         const auto path = co_await projectDb_->getProjectContentPath(loc);
         if (!localized) {
             // Use page title instead
-            if (const auto title = getPageTitle(*path)) {
-                co_return ItemData{.name = *title, .path = *path};
+            if (path) {
+                if (const auto title = getPageTitle(*path)) {
+                    co_return ItemData{.name = *title, .path = *path};
+                }
             }
             co_return Error::ErrNotFound;
         }
