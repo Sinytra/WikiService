@@ -27,7 +27,7 @@ namespace content {
         if (data.is_string()) {
             results.push_back(readSingleIngredient(slot, input, data, 1));
         } else if (data.is_object()) {
-            const int count = data["count"];
+            const int count = data.contains("count") ? data["count"].get<int>() : 1;
             if (data["id"].is_array()) {
                 readIngredientArray(results, slot, input, data["id"], count);
             } else {
