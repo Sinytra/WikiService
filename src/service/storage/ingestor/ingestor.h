@@ -41,7 +41,7 @@ namespace content {
 
     class Ingestor {
     public:
-        explicit Ingestor(service::ProjectBase &, const std::shared_ptr<spdlog::logger> &, service::ProjectIssueCallback &,
+        explicit Ingestor(service::ProjectBase &, const std::shared_ptr<spdlog::logger> &, const std::shared_ptr<service::ProjectIssueCallback> &,
                           const std::set<std::string> &enableModules, bool deleteExisting);
 
         drogon::Task<service::Error> runIngestor() const;
@@ -60,7 +60,7 @@ namespace content {
 
         const service::ProjectBase &project_;
         const std::shared_ptr<spdlog::logger> &logger_;
-        service::ProjectIssueCallback &issues_;
+        std::shared_ptr<service::ProjectIssueCallback> issues_;
         const std::set<std::string> enableModules_;
         const bool deleteExisting_;
     };

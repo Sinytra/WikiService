@@ -28,7 +28,7 @@ namespace service {
     std::string enumToStr(ProjectError status);
     ProjectError parseProjectError(const std::string &str);
 
-    class ProjectIssueCallback {
+    class ProjectIssueCallback : public std::enable_shared_from_this<ProjectIssueCallback> {
     public:
         explicit ProjectIssueCallback(const std::string &, const std::shared_ptr<spdlog::logger> &);
 
@@ -49,7 +49,7 @@ namespace service {
 
     class ProjectFileIssueCallback {
     public:
-        explicit ProjectFileIssueCallback(ProjectIssueCallback &, const std::filesystem::path &);
+        explicit ProjectFileIssueCallback(const std::shared_ptr<ProjectIssueCallback> &, const std::filesystem::path &);
 
         explicit ProjectFileIssueCallback(const ProjectFileIssueCallback &, const std::filesystem::path &);
 
@@ -62,7 +62,7 @@ namespace service {
         std::optional<nlohmann::json> readAndValidateJson(const nlohmann::json &schema) const;
 
     private:
-        ProjectIssueCallback &issues_;
+        std::shared_ptr<ProjectIssueCallback> issues_;
         const std::filesystem::path absolutePath_;
         const std::filesystem::path path_;
     };

@@ -69,15 +69,15 @@ namespace service {
         if (level == ProjectIssueLevel::ERROR)
             hasErrors_ = true;
 
-        app().getLoop()->queueInLoop(
-            async_func([*this, level, type, subject, details = std::string(details), file = std::string(file)]() mutable -> Task<> {
-                co_await addIssue(level, type, subject, details, file);
-            }));
+        app().getLoop()->queueInLoop(async_func([self = shared_from_this(), level, type, subject, details, file]() -> Task<> {
+            co_await self->addIssue(level, type, subject, details, file);
+        }));
     }
 
     bool ProjectIssueCallback::hasErrors() const { return hasErrors_; }
 
-    ProjectFileIssueCallback::ProjectFileIssueCallback(ProjectIssueCallback &issues, const std::filesystem::path &path) :
+    ProjectFileIssueCallback::ProjectFileIssueCallback(const std::shared_ptr<ProjectIssueCallback> &issues,
+                                                       const std::filesystem::path &path) :
         issues_(issues), absolutePath_(path), path_(path) {}
 
     ProjectFileIssueCallback::ProjectFileIssueCallback(const ProjectFileIssueCallback &issues, const std::filesystem::path &path) :
@@ -85,12 +85,12 @@ namespace service {
 
     Task<> ProjectFileIssueCallback::addIssue(const ProjectIssueLevel level, const ProjectIssueType type, const ProjectError subject,
                                               const std::string details) const {
-        co_await issues_.addIssue(level, type, subject, details, path_.string());
+        co_await issues_->addIssue(level, type, subject, details, path_.string());
     }
 
     void ProjectFileIssueCallback::addIssueAsync(const ProjectIssueLevel level, const ProjectIssueType type, const ProjectError subject,
                                                  const std::string &details) const {
-        issues_.addIssueAsync(level, type, subject, details, path_.string());
+        issues_->addIssueAsync(level, type, subject, details, path_.string());
     }
 
     std::optional<ResourceLocation> ProjectFileIssueCallback::validateResourceLocation(const std::string &str) const {

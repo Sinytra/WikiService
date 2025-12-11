@@ -76,7 +76,7 @@ namespace service {
 
     Task<std::vector<ProjectVersion>> setupProjectVersions(const ResolvedProject &resolved,
                                                            const std::unordered_map<std::string, std::string> &branches,
-                                                           const std::shared_ptr<spdlog::logger> logger, ProjectIssueCallback &issues) {
+                                                           const std::shared_ptr<spdlog::logger> logger, const std::shared_ptr<ProjectIssueCallback> &issues) {
         const auto path = resolved.getFormat().getWikiMetadataPath();
         const ProjectFileIssueCallback fileIssues(issues, path);
 
@@ -153,13 +153,13 @@ namespace service {
         deployment.setStatus(enumToStr(DeploymentStatus::LOADING));
         co_await global::database->updateModel(deployment);
 
-        ProjectIssueCallback issues{deployment.getValueOfId(), logger};
+        const auto issues = std::make_shared<ProjectIssueCallback>(deployment.getValueOfId(), logger);
 
         // 1. Clone repository
         const auto [repo, cloneError] =
             co_await git::cloneRepository(project.getValueOfSourceRepo(), clonePath, project.getValueOfSourceBranch(), logger);
         if (!repo || cloneError.error != ProjectError::OK) {
-            co_await issues.addIssue(ProjectIssueLevel::ERROR, ProjectIssueType::GIT_CLONE, cloneError.error, cloneError.message);
+            co_await issues->addIssue(ProjectIssueLevel::ERROR, ProjectIssueType::GIT_CLONE, cloneError.error, cloneError.message);
             co_return cloneError.error;
         }
 
@@ -170,7 +170,7 @@ namespace service {
 
             if (!defaultVersion) {
                 logger->error("Project version creation database error.");
-                co_await issues.addIssue(ProjectIssueLevel::ERROR, ProjectIssueType::INTERNAL, ProjectError::UNKNOWN);
+                co_await issues->addIssue(ProjectIssueLevel::ERROR, ProjectIssueType::INTERNAL, ProjectError::UNKNOWN);
                 co_return ProjectError::UNKNOWN;
             }
         }
@@ -179,7 +179,7 @@ namespace service {
         const auto revision = git::getLatestRevision(repo);
         if (!revision) {
             logger->error("Error getting commit information");
-            co_await issues.addIssue(ProjectIssueLevel::ERROR, ProjectIssueType::GIT_INFO, ProjectError::UNKNOWN);
+            co_await issues->addIssue(ProjectIssueLevel::ERROR, ProjectIssueType::GIT_INFO, ProjectError::UNKNOWN);
             co_return ProjectError::UNKNOWN;
         }
         deployment.setRevision(nlohmann::json(*revision).dump());
@@ -188,19 +188,18 @@ namespace service {
         // 4. Ingest game content
         const auto projectLog = getProjectLogger(project, false);
         const auto cloneDocsRoot = clonePath / removeLeadingSlash(project.getValueOfSourcePath());
-        const auto sharedIssues = std::make_shared<ProjectIssueCallback>(issues);
-        ResolvedProject resolved{project, cloneDocsRoot, *defaultVersion, sharedIssues, projectLog};
+        ResolvedProject resolved{project, cloneDocsRoot, *defaultVersion, issues, projectLog};
 
         // 5. Validate metadata
         if (const auto [c, e, details] = resolved.validateProjectMetadata(); !details.empty()) {
             logger->error("Invalid project metadata found.");
-            co_await issues.addIssue(ProjectIssueLevel::ERROR, ProjectIssueType::META, ProjectError::INVALID_META, details);
+            co_await issues->addIssue(ProjectIssueLevel::ERROR, ProjectIssueType::META, ProjectError::INVALID_META, details);
             co_return ProjectError::INVALID_META;
         }
 
         // Validate pages
         co_await resolved.validatePages();
-        if (issues.hasErrors()) {
+        if (issues->hasErrors()) {
             logger->error("Found invalid page, aborting");
             co_return ProjectError::UNKNOWN;
         }
@@ -213,7 +212,7 @@ namespace service {
             co_return ProjectError::UNKNOWN;
         }
 
-        if (issues.hasErrors()) {
+        if (issues->hasErrors()) {
             logger->error("Encountered issues during project setup, aborting");
             co_return ProjectError::UNKNOWN;
         }

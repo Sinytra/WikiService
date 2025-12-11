@@ -216,7 +216,7 @@ namespace service {
         logger.info("Ingesting game data");
         ProjectBase &project = *global::virtualProject;
         const auto projectLogger = global::storage->getProjectLogger(project.getProject(), false);
-        ProjectIssueCallback issues{"", projectLogger};
+        const auto issues = std::make_shared<ProjectIssueCallback>("", projectLogger);
         const content::Ingestor ingestor{project, projectLogger, issues, enabledModules, false};
 
         if (const auto result = co_await ingestor.runIngestor(); result != Error::Ok) {
@@ -224,7 +224,7 @@ namespace service {
             co_return Error::ErrInternal;
         }
 
-        if (issues.hasErrors()) {
+        if (issues->hasErrors()) {
             projectLogger->error("Encountered issues during game data ingestion");
             co_return Error::ErrInternal;
         }

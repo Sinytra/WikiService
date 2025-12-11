@@ -19,7 +19,7 @@ namespace content {
 
     Task<Error> SubIngestor::finish() { co_return Error::Ok; }
 
-    Ingestor::Ingestor(ProjectBase &proj, const std::shared_ptr<spdlog::logger> &log, ProjectIssueCallback &issues,
+    Ingestor::Ingestor(ProjectBase &proj, const std::shared_ptr<spdlog::logger> &log, const std::shared_ptr<ProjectIssueCallback> &issues,
                        const std::set<std::string> &enableModules, const bool deleteExisting) :
         project_(proj), logger_(log), issues_(issues), enableModules_(enableModules), deleteExisting_(deleteExisting) {}
 
@@ -61,7 +61,7 @@ namespace content {
             co_return result;
         } catch (std::exception &e) {
             logger.error("Error ingesting project data: {}", e.what());
-            issues_.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::UNKNOWN, e.what());
+            issues_->addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::UNKNOWN, e.what());
 
             project_.getProjectDatabase().setDBClientPointer(clientPtr);
             co_return Error::ErrInternal;
@@ -98,7 +98,7 @@ namespace content {
                 const auto [items] = co_await ingestor->prepare();
                 allResults.items.insert(items.begin(), items.end());
             } catch (std::exception &e) {
-                issues_.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::UNKNOWN, e.what());
+                issues_->addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::UNKNOWN, e.what());
                 co_return Error::ErrInternal;
             }
         }
@@ -136,7 +136,7 @@ namespace content {
                 }
             } catch (std::exception &e) {
                 const auto details = std::format("[{}] {}", name, e.what());
-                issues_.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::UNKNOWN, details);
+                issues_->addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::UNKNOWN, details);
                 co_return Error::ErrInternal;
             }
         }
@@ -152,7 +152,7 @@ namespace content {
                 }
             } catch (std::exception &e) {
                 const auto details = std::format("[{}] {}", name, e.what());
-                issues_.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::UNKNOWN, details);
+                issues_->addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::UNKNOWN, details);
                 co_return Error::ErrInternal;
             }
         }

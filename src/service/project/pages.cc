@@ -237,7 +237,7 @@ namespace service {
     Task<TaskResult<FileTree>> ResolvedProject::getDirectoryTree() { co_return getDirectoryTree(format_.getRoot()); }
 
     Task<> validatePageFile(const FileTreeEntry &entry, const ResolvedProject &resolved,
-                            const std::shared_ptr<ProjectIssueCallback> &issues, const std::vector<std::string> &requiredAttributes) {
+                            const std::shared_ptr<ProjectIssueCallback> issues, const std::vector<std::string> &requiredAttributes) {
         const auto path = entry.path + DOCS_FILE_EXT;
         if (const auto title = resolved.getPageTitle(path); !title) {
             co_await issues->addIssue(ProjectIssueLevel::WARNING, ProjectIssueType::FILE, ProjectError::NO_PAGE_TITLE, "", path);
@@ -258,7 +258,7 @@ namespace service {
         }
     }
 
-    Task<> validatePagesTree(const FileTree &tree, const ResolvedProject &resolved, const std::shared_ptr<ProjectIssueCallback> &issues,
+    Task<> validatePagesTree(const FileTree &tree, const ResolvedProject &resolved, const std::shared_ptr<ProjectIssueCallback> issues,
                              const std::vector<std::string> &requiredAttributes) {
         for (const auto &entry: tree) {
             if (entry.type == FileType::FILE) {
