@@ -202,7 +202,7 @@ Task<TaskResult<std::pair<HttpResponsePtr, Json::Value>>> sendRawApiRequest(cons
         logger.trace("Unexpected api response: ({}) {}", std::to_string(status), response->getBody());
         co_return api::v1::mapStatusCode(status);
     } catch (std::exception &e) {
-        logger.error("Error sending HTTP request: {}", e.what());
+        logger.error("Error sending HTTP request to {}: {}", client->getHost(), e.what());
         co_return Error::ErrInternal;
     }
 }

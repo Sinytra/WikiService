@@ -31,9 +31,11 @@ namespace content {
             if (json.contains("item")) {
                 itemId = json["item"];
                 isTag = false;
-            } else {
+            } else if (json.contains("tag")) {
                 itemId = json["tag"];
                 isTag = true;
+            } else {
+                return std::nullopt;
             }
         } else {
             return std::nullopt;
@@ -66,10 +68,20 @@ namespace content {
         return result;
     }
 
-    StubRecipeIngredient parseResult(nlohmann::json json, const std::string &slot) {
-        const auto resultId = json["id"].get<std::string>();
-        const auto count = json.contains("count") ? json["count"].get<int>() : 1;
-        return {resultId, slot, count, false, false};
+    std::optional<StubRecipeIngredient> parseResult(nlohmann::json json, const std::string &slot, const ProjectFileIssueCallback &issues) {
+        if (json.is_string()) {
+            const auto id = json.get<std::string>();
+            return StubRecipeIngredient{id, slot, 1, false, false};
+        }
+
+        if (json.is_object()) {
+            const auto resultId = json["id"].get<std::string>();
+            const auto count = json.contains("count") ? json["count"].get<int>() : 1;
+            return StubRecipeIngredient{resultId, slot, count, false, false};
+        }
+
+        issues.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::INVALID_INGREDIENT, json.dump());
+        return std::nullopt;
     }
 
     std::optional<StubRecipe> readShapedCraftingRecipe(const std::string &id, const std::string &type, const nlohmann::json &json,
@@ -95,7 +107,9 @@ namespace content {
             }
         }
 
-        recipe.ingredients.push_back(parseResult(json["result"], "1"));
+        if (const auto result = parseResult(json["result"], "1", issues)) {
+            recipe.ingredients.push_back(*result);
+        }
 
         return recipe;
     }
@@ -113,7 +127,9 @@ namespace content {
             recipe.ingredients.insert(recipe.ingredients.end(), subIngredients.begin(), subIngredients.end());
         }
 
-        recipe.ingredients.push_back(parseResult(json["result"], "1"));
+        if (const auto result = parseResult(json["result"], "1", issues)) {
+            recipe.ingredients.push_back(*result);
+        }
 
         return recipe;
     }
@@ -129,7 +145,9 @@ namespace content {
         }
         recipe.ingredients = ingredients;
 
-        recipe.ingredients.push_back(parseResult(json["result"], "1"));
+        if (const auto result = parseResult(json["result"], "1", issues)) {
+            recipe.ingredients.push_back(*result);
+        }
 
         return recipe;
     }
@@ -145,7 +163,9 @@ namespace content {
         }
         recipe.ingredients = ingredients;
 
-        recipe.ingredients.push_back(parseResult(json["result"], "1"));
+        if (const auto result = parseResult(json["result"], "1", issues)) {
+            recipe.ingredients.push_back(*result);
+        }
 
         return recipe;
     }
@@ -164,7 +184,9 @@ namespace content {
             recipe.ingredients.insert(recipe.ingredients.end(), ingredients.begin(), ingredients.end());
         }
 
-        recipe.ingredients.push_back(parseResult(json["result"], "1"));
+        if (const auto result = parseResult(json["result"], "1", issues)) {
+            recipe.ingredients.push_back(*result);
+        }
 
         return recipe;
     }
