@@ -28,7 +28,7 @@ namespace service {
     std::string enumToStr(ProjectError status);
     ProjectError parseProjectError(const std::string &str);
 
-    class ProjectIssueCallback : public std::enable_shared_from_this<ProjectIssueCallback> {
+    class ProjectIssueCallback {
     public:
         explicit ProjectIssueCallback(const std::string &, const std::shared_ptr<spdlog::logger> &);
 
@@ -41,7 +41,7 @@ namespace service {
         bool hasErrors() const;
 
     private:
-        const std::string &deploymentId_;
+        const std::string deploymentId_;
         const std::shared_ptr<spdlog::logger> logger_;
 
         bool hasErrors_;

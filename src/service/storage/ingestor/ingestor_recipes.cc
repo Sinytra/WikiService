@@ -79,7 +79,7 @@ namespace content {
         const TaskResult<RecipeType> recipeType = co_await project_.getProjectDatabase().getRecipeType(type) ||
                                                   co_await global::virtualProject->getProjectDatabase().getRecipeType(type);
         if (!recipeType) {
-            recipe.issues.addIssueAsync(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::UNKNOWN_RECIPE_TYPE, type);
+            co_await recipe.issues.addIssue(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::UNKNOWN_RECIPE_TYPE, type);
             co_return Error::ErrNotFound;
         }
 

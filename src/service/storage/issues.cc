@@ -49,19 +49,24 @@ namespace service {
     ProjectIssueCallback::ProjectIssueCallback(const std::string &id, const std::shared_ptr<spdlog::logger> &log) :
         deploymentId_(id), logger_(log), hasErrors_(false) {}
 
-    Task<> ProjectIssueCallback::addIssue(const ProjectIssueLevel level, const ProjectIssueType type, const ProjectError subject,
-                                          const std::string details, const std::string file) {
-        if (!deploymentId_.empty()) {
-            co_await service::addIssue(deploymentId_, level, type, subject, details, file);
+    Task<> addIssueStatic(const ProjectIssueLevel level, const ProjectIssueType type, const ProjectError subject, const std::string details,
+                          const std::string file, const std::string deploymentId, const std::shared_ptr<spdlog::logger> logger) {
+        if (!deploymentId.empty()) {
+            co_await addIssue(deploymentId, level, type, subject, details, file);
         }
 
         const auto logLevel = level == ProjectIssueLevel::ERROR ? spdlog::level::err : spdlog::level::warn;
         const auto logDetail = details.empty() ? "" : " '" + details + "' ";
         const auto logFile = file.empty() ? "" : " in file " + file;
-        logger_->log(logLevel, "[Issue] {} / {}{}{}", enumToStr(type), enumToStr(subject), logDetail, logFile);
+        logger->log(logLevel, "[Issue] {} / {}{}{}", enumToStr(type), enumToStr(subject), logDetail, logFile);
+    }
 
+    Task<> ProjectIssueCallback::addIssue(const ProjectIssueLevel level, const ProjectIssueType type, const ProjectError subject,
+                                          const std::string details, const std::string file) {
         if (level == ProjectIssueLevel::ERROR)
             hasErrors_ = true;
+
+        co_await addIssueStatic(level, type, subject, details, file, deploymentId_, logger_);
     }
 
     void ProjectIssueCallback::addIssueAsync(const ProjectIssueLevel level, const ProjectIssueType type, const ProjectError subject,
@@ -69,9 +74,11 @@ namespace service {
         if (level == ProjectIssueLevel::ERROR)
             hasErrors_ = true;
 
-        app().getLoop()->queueInLoop(async_func([self = shared_from_this(), level, type, subject, details, file]() -> Task<> {
-            co_await self->addIssue(level, type, subject, details, file);
-        }));
+        const auto currentLoop = trantor::EventLoop::getEventLoopOfCurrentThread();
+        currentLoop->queueInLoop(
+            async_func([level, type, subject, details, file, deploymentId = std::string(deploymentId_), logger = logger_]() -> Task<> {
+                co_await addIssueStatic(level, type, subject, details, file, deploymentId, logger);
+            }));
     }
 
     bool ProjectIssueCallback::hasErrors() const { return hasErrors_; }
