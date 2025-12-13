@@ -1,13 +1,4 @@
-FROM debian:sid-slim AS build
-
-ARG MANUAL_VERSIONING=false
-ENV MANUAL_VERSIONING=${MANUAL_VERSIONING}
-ARG GIT_VERSION=0.0.0
-ENV GIT_VERSION=${GIT_VERSION}
-ARG GIT_HASH_FULL=unknown
-ENV GIT_HASH_FULL=${GIT_HASH_FULL}
-ARG GIT_HASH_SHORT=unknown
-ENV GIT_HASH_SHORT=${GIT_HASH_SHORT}
+FROM debian:sid-slim AS base
 
 WORKDIR /build
 
@@ -31,13 +22,28 @@ RUN git clone https://github.com/drogonframework/drogon && cd drogon && git subm
     && cmake -S . -B build -G "Ninja" -DBUILD_CTL=OFF -DBUILD_SHARED_LIBS=OFF -DBUILD_EXAMPLES=OFF -DCMAKE_CXX_STANDARD=20 \
     && cmake --build build --config Release --target install
 
-# Build app
+FROM base AS build
+
+# Prepare dir
 WORKDIR /build/src
 
-COPY $PWD/builtin /build/src/builtin
-COPY $PWD/modules /build/src/modules
-COPY $PWD/src /build/src/src
+# Prepare deps
 COPY $PWD/CMakeLists.txt /build/src/
+COPY $PWD/modules /build/src/modules
+RUN mkdir /build/src/src && touch /build/src/src/CMakeLists.txt && cmake -S . -B build -G "Ninja"
+
+# Build app
+ARG MANUAL_VERSIONING=false
+ENV MANUAL_VERSIONING=${MANUAL_VERSIONING}
+ARG GIT_VERSION=0.0.0
+ENV GIT_VERSION=${GIT_VERSION}
+ARG GIT_HASH_FULL=unknown
+ENV GIT_HASH_FULL=${GIT_HASH_FULL}
+ARG GIT_HASH_SHORT=unknown
+ENV GIT_HASH_SHORT=${GIT_HASH_SHORT}
+
+COPY $PWD/builtin /build/src/builtin
+COPY $PWD/src /build/src/src
 
 RUN cmake -S . -B build -G "Ninja" && cmake --build build --config RelWithDebInfo
 
