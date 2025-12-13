@@ -97,7 +97,8 @@
                     "result": {
                         "$ref": "#/definitions/result"
                     }
-                }
+                },
+                "required": ["key", "pattern", "result"]
             }
         },
         {
@@ -144,7 +145,8 @@
                     "result": {
                         "$ref": "#/definitions/result"
                     }
-                }
+                },
+                "required": ["ingredients", "result"]
             }
         },
         {
@@ -263,30 +265,36 @@
                 }
             },
             "then": {
-                "$ref": "#/definitions/tagsCommonToAllRecipes",
                 "description": "Represents a recipe in a stonecutter.",
-                "oneOf": [
+                "allOf": [
                     {
-                        "$ref": "#/definitions/item",
-                        "title": "ingredient",
-                        "description": "The ingredient for the recipe."
-                    },
-                    {
-                        "title": "ingredient",
-                        "description": "The list of ingredients for the recipe.",
-                        "type": "array",
-                        "items": {
-                            "$ref": "#/definitions/item",
-                            "title": "ingredient"
-                        }
+                        "$ref": "#/definitions/tagsCommonToAllRecipes"
                     }
                 ],
                 "properties": {
+                    "ingredient": {
+                        "title": "ingredient",
+                        "oneOf": [
+                            {
+                                "$ref": "#/definitions/item",
+                                "description": "The ingredient for the recipe."
+                            },
+                            {
+                                "description": "The list of ingredients for the recipe.",
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/definitions/item",
+                                    "title": "ingredient"
+                                }
+                            }
+                        ]
+                    },
                     "result": {
                         "title": "result",
                         "$ref": "#/definitions/result"
                     }
-                }
+                },
+                "required": ["ingredient", "result"]
             }
         }
     ],
@@ -327,14 +335,7 @@
         "ingredient": {
             "title": "ingredient",
             "description": "An acceptable ingredient.",
-            "allOf": [
-                {
-                    "$ref": "#/definitions/item"
-                },
-                {
-                    "type": "object"
-                }
-            ]
+            "$ref": "#/definitions/item"
         },
         "tagsCommonToAllRecipes": {
             "type": "object",
@@ -380,7 +381,8 @@
                     "description": "The cook time of the recipe in ticks.",
                     "type": "integer"
                 }
-            }
+            },
+            "required": ["ingredient", "result"]
         },
         "commonRecipeCategory": {
             "title": "category",
