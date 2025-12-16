@@ -57,7 +57,7 @@ namespace content {
                                                            const ProjectFileIssueCallback &issues) {
         std::vector<StubRecipeIngredient> result;
 
-        for (const auto items = json.is_array() ? json : nlohmann::json{json}; const auto &item: items) {
+        for (const auto items = json.is_array() ? json : nlohmann::json::array({json}); const auto &item: items) {
             const auto parsed = parseRecipeIngredient(item, slot, issues);
             if (!parsed) {
                 return {};

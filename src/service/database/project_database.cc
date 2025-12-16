@@ -104,11 +104,13 @@ namespace service {
                                               JOIN tag ON tag.id = pt.tag_id \
                                               JOIN item ON item.id = pip.item_id \
                                               WHERE pt.version_id = $1 \
-                                                AND pip.version_id = $1 \
-                                                AND tag.loc = $2 AND item.loc = $3 \
+                                                AND (pip.version_id = $1 OR pip.version_id = $2) \
+                                                AND tag.loc = $3 AND item.loc = $4 \
                                               ON CONFLICT DO NOTHING";
-        co_return co_await handleDatabaseOperation(
-            [&, tag, item](const DbClientPtr &client) -> Task<> { co_await client->execSqlCoro(tagItemQuery, versionId_, tag, item); });
+        co_return co_await handleDatabaseOperation([&, tag, item](const DbClientPtr &client) -> Task<> {
+            const auto virtualVersionId = global::virtualProject->getProjectVersion().getValueOfId();
+            co_await client->execSqlCoro(tagItemQuery, versionId_, virtualVersionId, tag, item);
+        });
     }
 
     Task<TaskResult<>> ProjectDatabaseAccess::addTagTagEntry(const std::string parentTag, const std::string childTag) const {
@@ -118,11 +120,12 @@ namespace service {
                                              JOIN tag p ON p.id = tp.tag_id \
                                              JOIN tag c ON c.id = tc.tag_id \
                                              WHERE tp.version_id = $1 \
-                                               AND tc.version_id = $1 \
-                                               AND p.loc = $2 AND c.loc = $3 \
+                                               AND (tc.version_id = $1 OR tc.version_id = $2) \
+                                               AND p.loc = $3 AND c.loc = $4 \
                                              ON CONFLICT DO NOTHING";
         co_return co_await handleDatabaseOperation([&, parentTag, childTag](const DbClientPtr &client) -> Task<> {
-            co_await client->execSqlCoro(tagTagQuery, versionId_, parentTag, childTag);
+            const auto virtualVersionId = global::virtualProject->getProjectVersion().getValueOfId();
+            co_await client->execSqlCoro(tagTagQuery, versionId_, virtualVersionId, parentTag, childTag);
         });
     }
 
