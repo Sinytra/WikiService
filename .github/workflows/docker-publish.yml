@@ -96,18 +96,3 @@ jobs:
             LIBS=\$(ldd build/bin/wiki_service | awk '/=>/ {print \$3}' | grep '^/')
             sentry-cli debug-files upload --include-sources \$LIBS
           "
-
-  deploy:
-    if: ${{ github.ref_name == 'master' || github.ref_name == 'deploy/staging' }}
-    name: Deploy to server
-    runs-on: ubuntu-latest
-    needs: build
-    environment: ${{ github.event_name == 'push' && github.ref_name == 'deploy/staging' && 'staging' || 'production' }}
-    steps:
-      - name: Execute remote SSH call
-        uses: appleboy/ssh-action@v1.2.2
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          script: ${{ secrets.DEPLOY_SCRIPT }}
