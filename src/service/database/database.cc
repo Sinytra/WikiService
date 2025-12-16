@@ -14,7 +14,22 @@ using namespace drogon::orm;
 std::string buildSearchVectorQuery(std::string query) {
     auto result = query | std::views::split(' ') |
                   std::views::filter([](auto const &str) { return !std::all_of(str.begin(), str.end(), isspace); }) |
-                  std::views::transform([](auto rng) { return std::string(rng.data(), rng.size()) + ":*"; });
+                  std::views::transform([](auto rng) {
+                      const std::string token(rng.data(), rng.size());
+
+                      std::string escaped_token;
+                      escaped_token.reserve(token.size() + 2);
+                      for (const char c: token) {
+                          if (c == '\'') {
+                              escaped_token += "''";
+                          } else {
+                              escaped_token += c;
+                          }
+                      }
+
+                      return "'" + escaped_token + "':*";
+                  });
+
     std::ostringstream result_stream;
     for (auto it = result.begin(); it != result.end(); ++it) {
         if (it != result.begin())
