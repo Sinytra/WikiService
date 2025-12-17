@@ -308,8 +308,6 @@ namespace service {
             deployLog->info("==   Project deployment complete  ==");
             deployLog->info("====================================");
 
-            global::connections->complete(projectId, true);
-
             deployment.setStatus(enumToStr(DeploymentStatus::SUCCESS));
 
             // Cleanup previous data
@@ -328,8 +326,6 @@ namespace service {
             deployLog->error("!!   Project deployment failed    !!");
             deployLog->error("!!================================!!");
 
-            global::connections->complete(projectId, false);
-
             deployment.setStatus(enumToStr(DeploymentStatus::ERROR));
 
             remove_all(deploymentDir);
@@ -337,6 +333,8 @@ namespace service {
 
         remove_all(clonePath);
         co_await global::database->updateModel(deployment);
+
+        global::connections->complete(projectId, result == ProjectError::OK);
 
         co_return co_await completeTask<std::tuple<std::optional<Deployment>, ProjectError>>(taskKey, {deployment, result});
     }

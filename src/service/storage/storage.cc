@@ -169,9 +169,6 @@ namespace service {
                 vProject->setDefaultVersion(*defaultProject);
                 co_return TaskResult<ProjectBasePtr>{std::make_shared<ResolvedProject>(*vProject)};
             }
-            if (!co_await defaultProject->hasVersion(*version)) {
-                logger.error("Failed to find existing version '{}' for '{}'", *version, project.getValueOfId());
-            }
         }
 
         if (!defaultProject) {
