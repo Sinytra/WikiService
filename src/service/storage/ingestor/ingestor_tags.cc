@@ -1,8 +1,8 @@
 #include "ingestor.h"
 
+#include <schemas/schemas.h>
 #include <service/database/database.h>
 #include <service/database/project_database.h>
-#include <schemas/schemas.h>
 
 using namespace drogon;
 using namespace drogon::orm;
@@ -83,16 +83,26 @@ namespace content {
                     tagIds_.insert(id);
 
                     for (const auto values = (*json)["values"]; const auto &value: values) {
-                        if (!value.is_string()) {
-                            continue; // TODO optional values
-                        }
-                        if (const auto str = value.get<std::string>(); !str.starts_with("#")) {
-                            if (const auto resloc = ResourceLocation::parse(str); resloc && resloc->namespace_ == projectModid) {
-                                result.items.insert(str);
-                            }
+                        std::string valueId;
+
+                        if (value.is_object()) {
+                            valueId = value["id"];
+                        } else if (value.is_string()) {
+                            valueId = value;
+                        } else {
+                            logger.error("Unexpected tag value format in {}: {}", tagFile.path().string(), value.dump());
+                            co_await fileIssues.addIssue(ProjectIssueLevel::ERROR, ProjectIssueType::INGESTOR, ProjectError::INVALID_FORMAT,
+                                                         std::format("Unexpected tag entry: {}", value.dump()));
+                            continue;
                         }
 
-                        tagEntries_[id].insert(value);
+                        if (valueId.starts_with("#")) {
+                            tagIds_.insert(valueId);
+                        } else if (const auto resloc = ResourceLocation::parse(valueId); resloc && resloc->namespace_ == projectModid) {
+                            result.items.insert(valueId);
+                        }
+
+                        tagEntries_[id].insert(valueId);
                     }
                 }
             }

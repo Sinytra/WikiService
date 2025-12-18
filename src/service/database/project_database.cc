@@ -7,9 +7,7 @@ using namespace drogon;
 using namespace drogon::orm;
 
 namespace service {
-    inline int64_t mcVersionId() {
-        return global::virtualProject->getProjectVersion().getValueOfId();
-    }
+    inline int64_t mcVersionId() { return global::virtualProject->getProjectVersion().getValueOfId(); }
 
     ProjectDatabaseAccess::ProjectDatabaseAccess(const ProjectBase &p) :
         project_(p), projectId_(p.getId()), versionId_(p.getProjectVersion().getValueOfId()) {}
@@ -131,41 +129,50 @@ namespace service {
 
     Task<PaginatedData<ProjectContent>> ProjectDatabaseAccess::getProjectItemsDev(const std::string searchQuery, const int page) const {
         // language=postgresql
-        static constexpr auto query = "SELECT item.loc, path FROM project_item pitem \
+        static constexpr auto query = "SELECT pver.project_id, item.loc, path FROM project_item pitem \
                                        LEFT JOIN project_item_page pip ON pitem.id = pip.item_id \
                                        JOIN item ON item.id = pitem.item_id \
+                                       JOIN project_version pver on pitem.version_id = pver.id \
                                        WHERE pitem.version_id = $1 AND (pip IS NULL OR starts_with(pip.path, '.content/')) \
                                        AND item.loc ILIKE '%' || $2 || '%' \
                                        ORDER BY item.loc";
 
         co_return co_await handlePaginatedQuery<ProjectContent>(query, searchQuery, page, [](const Row &row) {
-            const auto id = row[0].as<std::string>();
-            const auto path = row[1].isNull() ? "" : row[1].as<std::string>();
-            return ProjectContent{id, path};
+            const auto projectId = row[0].as<std::string>();
+            const auto loc = row[1].as<std::string>();
+            const auto path = row[2].isNull() ? "" : row[2].as<std::string>();
+            return ProjectContent{projectId, loc, path};
         });
     }
 
     Task<PaginatedData<ProjectContent>> ProjectDatabaseAccess::getProjectTagItemsDev(const std::string tag, const std::string searchQuery,
                                                                                      const int page) const {
         // language=postgresql
-        static constexpr auto query = "SELECT item.loc, path "
-                                      "FROM project_tag ptag "
-                                      "    JOIN tag t ON ptag.tag_id = t.id "
-                                      "    JOIN tag_item_flat flat ON flat.parent = ptag.id "
-                                      "    JOIN project_item pitem ON pitem.id = flat.child "
-                                      "    JOIN item ON item.id = pitem.item_id "
-                                      "    LEFT JOIN project_item_page pip ON pitem.id = pip.item_id "
-                                      " WHERE ptag.version_id = $1 "
-                                      "     AND pitem.version_id = $1 AND t.loc = '{}' "
-                                      "     AND (pip IS NULL OR starts_with(pip.path, '.content/')) "
-                                      "     AND item.loc ILIKE '%' || $2 || '%' "
-                                      " ORDER BY item.loc";
+        static constexpr auto query = "SELECT pver.project_id, item.loc, path \
+                                       FROM project_tag ptag \
+                                           JOIN tag t ON ptag.tag_id = t.id \
+                                           JOIN tag_item_flat flat ON flat.parent = ptag.id \
+                                           JOIN project_item pitem ON pitem.id = flat.child \
+                                           JOIN project_version pver on pitem.version_id = pver.id \
+                                           JOIN item ON item.id = pitem.item_id \
+                                           LEFT JOIN project_item_page pip ON pitem.id = pip.item_id \
+                                        WHERE ptag.version_id = $1 \
+                                            AND (pitem.version_id = $1 OR pitem.version_id = $3) AND t.loc = '{}' \
+                                            AND (pip IS NULL OR starts_with(pip.path, '.content/')) \
+                                            AND item.loc ILIKE '%' || $2 || '%' \
+                                        ORDER BY item.loc";
 
-        co_return co_await handlePaginatedQuery<ProjectContent>(std::format(query, tag), searchQuery, page, [](const Row &row) {
-            const auto id = row[0].as<std::string>();
-            const auto path = row[1].isNull() ? "" : row[1].as<std::string>();
-            return ProjectContent{id, path};
-        });
+        const auto virtualVersionId = global::virtualProject->getProjectVersion().getValueOfId();
+
+        co_return co_await handlePaginatedQuery<ProjectContent>(
+            std::format(query, tag), searchQuery, page,
+            [](const Row &row) {
+                const auto projectId = row[0].as<std::string>();
+                const auto loc = row[1].as<std::string>();
+                const auto path = row[2].isNull() ? "" : row[2].as<std::string>();
+                return ProjectContent{projectId, loc, path};
+            },
+            virtualVersionId);
     }
 
     Task<PaginatedData<ProjectTag>> ProjectDatabaseAccess::getProjectTagsDev(const std::string searchQuery, const int page) const {

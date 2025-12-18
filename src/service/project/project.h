@@ -125,6 +125,7 @@ namespace service {
 
         // Parameters
         virtual std::string getLocale() const = 0;
+        // TODO Why is this never checked/called?
         virtual bool hasLocale(const std::string &locale) const = 0;
         virtual std::set<std::string> getLocales() const = 0;
 

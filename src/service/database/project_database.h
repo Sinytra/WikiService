@@ -1,9 +1,9 @@
 #pragma once
 
-#include <service/project/resolved.h>
-#include <models/RecipeType.h>
 #include <models/Item.h>
 #include <models/ProjectVersion.h>
+#include <models/RecipeType.h>
+#include <service/project/resolved.h>
 #include "database.h"
 #include "database_base.h"
 
@@ -11,7 +11,8 @@ using namespace drogon_model::postgres;
 
 namespace service {
     struct ProjectContent {
-        std::string id;
+        std::string projectId;
+        std::string loc;
         std::string path;
     };
     struct ProjectTag {
@@ -23,16 +24,16 @@ namespace service {
     public:
         explicit ProjectDatabaseAccess(const ProjectBase &);
 
-        template<typename Ret>
+        template<typename Ret, typename... Args>
         drogon::Task<PaginatedData<Ret>> handlePaginatedQuery(const std::string query, const std::string searchQuery, const int page,
-                                                              const std::function<Ret(const drogon::orm::Row &)> callback =
-                                                              [](const drogon::orm::Row &row) { return Ret(row); }) const {
+                                                              const std::function<Ret(const drogon::orm::Row &)> callback = DEFAULT_ROW_CB,
+                                                              Args &&...args) const {
             const auto res = co_await handleDatabaseOperation(
-                [&](const drogon::orm::DbClientPtr &client) -> drogon::Task<PaginatedData<Ret>> {
+                [&, ... args = std::forward<Args>(args)](const drogon::orm::DbClientPtr &client) -> drogon::Task<PaginatedData<Ret>> {
                     constexpr int size = 20;
                     const auto actualQuery = paginatedQuery(query, size, page);
 
-                    const auto results = co_await client->execSqlCoro(actualQuery, versionId_, searchQuery);
+                    const auto results = co_await client->execSqlCoro(actualQuery, versionId_, searchQuery, std::forward<Args>(args)...);
 
                     if (results.empty()) {
                         throw drogon::orm::DrogonDbException{};
@@ -46,9 +47,9 @@ namespace service {
                         contents.emplace_back(callback(row));
                     }
 
-                    co_return PaginatedData{.total = totalRows, .pages = totalPages, .size = size, .data = contents};
+                    co_return PaginatedData<Ret>{.total = totalRows, .pages = totalPages, .size = size, .data = contents};
                 });
-            co_return res.value_or({});
+            co_return res.value_or(PaginatedData<Ret>{});
         }
 
         drogon::orm::DbClientPtr getDbClientPtr() const override;

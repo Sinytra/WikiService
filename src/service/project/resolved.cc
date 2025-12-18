@@ -3,6 +3,7 @@
 #include <schemas/schemas.h>
 #include <service/database/database.h>
 #include <service/database/project_database.h>
+#include <storage/storage.h>
 #include <service/storage/gitops.h>
 #include <service/util.h>
 
@@ -19,6 +20,16 @@ using namespace drogon_model::postgres;
 namespace fs = std::filesystem;
 
 namespace service {
+    Task<std::string> resolveItemName(const std::string projectId, const std::string itemId, const std::string locale) {
+        if (const auto resolved = co_await global::storage->getProject(projectId, std::nullopt, locale); resolved)
+        {
+            if (const auto result = co_await (*resolved)->getItemName(itemId)) {
+                co_return result->name;
+            }
+        }
+        co_return "";
+    }
+
     ResolvedProject::ResolvedProject(const Project &p, const std::filesystem::path &d, const ProjectVersion &v,
                                      const std::shared_ptr<ProjectIssueCallback> &issues, const std::shared_ptr<spdlog::logger> &log) :
         project_(p), defaultVersion_(nullptr), version_(v), projectDb_(std::make_shared<ProjectDatabaseAccess>(*this)),
@@ -200,13 +211,12 @@ namespace service {
     Task<PaginatedData<ItemContentPage>> ResolvedProject::getItemContentPages(const TableQueryParams params) const {
         const auto [total, pages, size, data] = co_await projectDb_->getProjectItemsDev(params.query, params.page);
         std::vector<ItemContentPage> itemData;
-        for (const auto &[id, path]: data) {
-            const auto itemName = co_await getItemName(id);
-            const auto name = itemName ? itemName->name : "";
+        for (const auto &[projectId, loc, path]: data) {
+            const auto name = co_await resolveItemName(projectId, loc, getLocale());
 
             const auto frontmatter = readPageAttributes(path);
             const auto icon = frontmatter ? frontmatter->icon : "";
-            itemData.emplace_back(id, name, icon, path);
+            itemData.emplace_back(loc, name, icon, path);
         }
         co_return PaginatedData{.total = total, .pages = pages, .size = size, .data = itemData};
     }
@@ -228,11 +238,10 @@ namespace service {
     Task<PaginatedData<FullItemData>> ResolvedProject::getTagItems(const std::string tag, const TableQueryParams params) const {
         const auto [total, pages, size, data] = co_await projectDb_->getProjectTagItemsDev(tag, params.query, params.page);
         std::vector<FullItemData> itemData;
-        for (const auto &[id, path]: data) {
-            const auto itemName = co_await getItemName(id);
-            const auto name = itemName ? itemName->name : "";
+        for (const auto &[projectId, loc, path]: data) {
+            const auto name = co_await resolveItemName(projectId, loc, getLocale());
 
-            itemData.emplace_back(id, name, path);
+            itemData.emplace_back(loc, name, path);
         }
         co_return PaginatedData{.total = total, .pages = pages, .size = size, .data = itemData};
     }

@@ -7,6 +7,8 @@
 #include <service/error.h>
 #include <service/util.h>
 
+#define DEFAULT_ROW_CB [](const drogon::orm::Row &row) { return Ret(row); }
+
 namespace service {
     template<class T>
     struct PaginatedData {
@@ -52,15 +54,13 @@ namespace service {
 
         template<typename Ret, typename... Arguments>
         drogon::Task<PaginatedData<Ret>> handlePaginatedQueryWithArgs(const std::string query, const int page, Arguments &&...args) const {
-            co_return co_await handlePaginatedQuery<Ret, Arguments...>(
-                query, page, [](const drogon::orm::Row &row) { return Ret(row); }, std::forward<Arguments>(args)...);
+            co_return co_await handlePaginatedQuery<Ret, Arguments...>(query, page, DEFAULT_ROW_CB, std::forward<Arguments>(args)...);
         }
 
         template<typename Ret, typename... Arguments>
-        drogon::Task<PaginatedData<Ret>> handlePaginatedQuery(
-            const std::string query, const int page,
-            const std::function<Ret(const drogon::orm::Row &)> callback = [](const drogon::orm::Row &row) { return Ret(row); },
-            Arguments &&...args) const {
+        drogon::Task<PaginatedData<Ret>> handlePaginatedQuery(const std::string query, const int page,
+                                                              const std::function<Ret(const drogon::orm::Row &)> callback = DEFAULT_ROW_CB,
+                                                              Arguments &&...args) const {
             const auto res =
                 co_await handleDatabaseOperation([&](const drogon::orm::DbClientPtr &client) -> drogon::Task<PaginatedData<Ret>> {
                     constexpr int size = 20;
