@@ -179,7 +179,7 @@ FROM (WITH RECURSIVE tag_hierarchy AS (SELECT tp.id                            A
       -- Combine tag relationships with direct tag-to-item mappings
       SELECT th.parent AS parent, project_item.id AS child
       FROM tag_hierarchy th
-               JOIN project_tag ON project_tag.tag_id = th.child
+               JOIN project_tag ON project_tag.id = th.child
                JOIN tag_item ti ON project_tag.id = ti.tag_id
                JOIN project_item ON project_item.id = ti.item_id
 

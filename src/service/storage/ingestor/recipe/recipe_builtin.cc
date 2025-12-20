@@ -86,24 +86,27 @@ namespace content {
 
     std::optional<StubRecipe> readShapedCraftingRecipe(const std::string &id, const std::string &type, const nlohmann::json &json,
                                                        const ProjectFileIssueCallback &issues) {
-        const auto keys = json.at("key");
-        const auto pattern = json.at("pattern");
-        std::string concat = "";
-        for (auto &row: pattern) {
-            concat += row;
-        }
         StubRecipe recipe{.id = id, .type = type};
 
-        for (int i = 0; i < concat.size(); ++i) {
-            std::string key{concat[i]};
-            if (key.empty() || !keys.contains(key)) {
-                continue;
-            }
+        const auto keys = json.at("key");
+        const std::vector<std::string> pattern = json.at("pattern");
 
-            if (const auto subIngredients = parseArrayIngredient(keys[key], std::to_string(i + 1), issues); !subIngredients.empty()) {
-                recipe.ingredients.insert(recipe.ingredients.end(), subIngredients.begin(), subIngredients.end());
-            } else {
-                return std::nullopt;
+        for (int rowIdx = 0; rowIdx < pattern.size(); ++rowIdx) {
+            const auto row = pattern[rowIdx];
+
+            for (int colIdx = 0; colIdx < row.size(); ++colIdx) {
+                const std::string key{row[colIdx]};
+                const auto slot = std::to_string(rowIdx * 3 + colIdx + 1);
+
+                if (key.empty() || !keys.contains(key)) {
+                    continue;
+                }
+
+                if (const auto subIngredients = parseArrayIngredient(keys[key], slot, issues); !subIngredients.empty()) {
+                    recipe.ingredients.insert(recipe.ingredients.end(), subIngredients.begin(), subIngredients.end());
+                } else {
+                    return std::nullopt;
+                }
             }
         }
 
