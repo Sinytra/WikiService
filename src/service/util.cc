@@ -291,3 +291,7 @@ bool isSubpath(fs::path path, fs::path base) {
         return false;
     }
 }
+
+bool contains(const std::string& text, const std::string& pattern) {
+    return text.find(pattern) != std::string::npos;
+}

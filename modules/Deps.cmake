@@ -54,12 +54,15 @@ ENDIF ()
 
 CPMAddPackage(
         NAME nlohmann_json
-        GITHUB_REPOSITORY nlohmann/json
-        GIT_TAG v3.12.0
-        OPTIONS
-        "JSON_BuildTests OFF"
-        "BUILD_SHARED_LIBS OFF"
+        VERSION 3.12.0
+        # the git repo is incredibly large, so we download the archived include directory
+        URL https://github.com/nlohmann/json/releases/download/v3.12.0/include.zip
+        URL_HASH SHA256=b8cb0ef2dd7f57f18933997c9934bb1fa962594f701cd5a8d3c2c80541559372
 )
+if (nlohmann_json_ADDED)
+    add_library(nlohmann_json::nlohmann_json INTERFACE IMPORTED)
+    target_include_directories(nlohmann_json::nlohmann_json INTERFACE ${nlohmann_json_SOURCE_DIR}/include)
+endif()
 
 CPMAddPackage(
         NAME nlohmann_json_schema_validator
@@ -108,4 +111,10 @@ CPMAddPackage(
         GIT_TAG v1.15
         OPTIONS
         "BUILD_SHARED_LIBS OFF"
+)
+
+CPMAddPackage(
+        NAME tiny-process-library
+        GIT_REPOSITORY https://gitlab.com/eidheim/tiny-process-library
+        GIT_TAG 8bbb5a211c5c9df8ee69301da9d22fb977b27dc1
 )

@@ -47,6 +47,7 @@ add_library(service STATIC
         storage/deployment.cc
         storage/issues.cc
         storage/storage.cc
+        storage/gitclone.cc
         storage/gitops.cc
         storage/realtime.cc
 
@@ -74,6 +75,7 @@ target_link_libraries(service PRIVATE
         libzip::zip
         yaml-cpp::yaml-cpp
         pugixml::pugixml
+        tiny-process-library::tiny-process-library
 )
 
 target_include_directories(service PUBLIC

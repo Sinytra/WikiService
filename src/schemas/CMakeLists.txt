@@ -21,7 +21,7 @@ add_library(schemas STATIC
 )
 
 target_link_libraries(schemas PRIVATE
-        nlohmann_json
+        nlohmann_json::nlohmann_json
 )
 
 target_include_directories(schemas PUBLIC

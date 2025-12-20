@@ -249,3 +249,5 @@ T unwrap(std::optional<T> opt) {
 std::string formatDateTime(const std::string &databaseData);
 
 bool isSubpath(std::filesystem::path path, std::filesystem::path base);
+
+bool contains(const std::string& text, const std::string& pattern);

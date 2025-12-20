@@ -4,8 +4,6 @@
 #include <git2.h>
 #include <include/uri.h>
 
-#define BYTE_RECEIVE_LIMIT 5.0e+8
-
 using namespace logging;
 using namespace service;
 using namespace drogon;
@@ -40,16 +38,6 @@ namespace git {
         return removeTrailingSlash(project.getValueOfSourceRepo()) + "/" + result;
     }
 
-    bool is_local_url(const std::string &str) {
-        try {
-            const uri url{str};
-            const auto scheme = url.get_scheme();
-            return scheme == "file";
-        } catch (std::exception &e) {
-            return false;
-        }
-    }
-
     std::string formatISOTime(const git_time_t &time) {
         const std::time_t utc_time = time;
         const std::tm *tm_ptr = std::gmtime(&utc_time);
@@ -57,34 +45,6 @@ namespace git {
         std::ostringstream oss;
         oss << std::put_time(tm_ptr, "%Y-%m-%dT%H:%M:%SZ");
         return oss.str();
-    }
-
-    int fetch_progress(const git_indexer_progress *stats, void *payload) {
-        const auto pd = static_cast<GitProgressData *>(payload);
-
-        if (stats->received_bytes > BYTE_RECEIVE_LIMIT) {
-            if (pd->tick != -1) {
-                pd->tick = -1;
-                pd->error = "size";
-                pd->logger->error("Terminating fetch as it exceeded maximum size limit of 500MB");
-            }
-            return -1;
-        }
-
-        const auto progress = stats->received_objects / static_cast<double>(stats->total_objects) * 100;
-        const auto done = stats->received_objects == stats->total_objects;
-        double megabytes = stats->received_bytes / (1024.0 * 1024.0);
-
-        if (const auto mark = static_cast<long>(progress); pd->tick != -1 && (done || mark % 5 == 0 && mark > pd->tick)) {
-            if (done) {
-                pd->tick = -1;
-            } else {
-                pd->tick = mark;
-            }
-
-            pd->logger->trace("Fetch progress: {0:.2f}% ({1:.2f} MB)", progress, megabytes);
-        }
-        return 0;
     }
 
     // ReSharper disable once CppParameterNeverUsed
@@ -196,54 +156,5 @@ namespace git {
                            .authorName = author_name,
                            .authorEmail = author_email,
                            .date = commitDate};
-    }
-
-    Task<std::tuple<git_repository *, ProjectErrorInstance>> cloneRepository(const std::string url, const fs::path projectPath,
-                                                                             const std::string branch,
-                                                                             const std::shared_ptr<spdlog::logger> logger) {
-        const auto path = absolute(projectPath);
-
-        logger->info("Cloning git repository at {}", url);
-
-        GitProgressData d = {.tick = 0, .error = "", .logger = logger};
-        git_clone_options clone_opts = GIT_CLONE_OPTIONS_INIT;
-        clone_opts.checkout_opts.checkout_strategy = GIT_CHECKOUT_SAFE;
-        clone_opts.checkout_opts.progress_cb = checkout_progress;
-        clone_opts.checkout_opts.progress_payload = &d;
-        clone_opts.fetch_opts.callbacks.transfer_progress = fetch_progress;
-        clone_opts.fetch_opts.callbacks.payload = &d;
-        clone_opts.checkout_branch = branch.c_str();
-        if (!is_local_url(url)) {
-            clone_opts.fetch_opts.depth = 1;
-        }
-
-        git_repository *repo = nullptr;
-        const int error = co_await supplyAsync<int>(
-            [&repo, &url, &path, &clone_opts]() -> int { return git_clone(&repo, url.c_str(), path.c_str(), &clone_opts); });
-
-        if (error < 0) {
-            const git_error *e = git_error_last();
-            logger->error("Git clone error: {}/{}: {}", error, e->klass, e->message);
-
-            git_repository_free(repo);
-
-            if (error == GIT_EAUTH) {
-                logger->error("Authentication required but none was provided", branch);
-                co_return {nullptr, {ProjectError::REQUIRES_AUTH, e->message}};
-            }
-            if (e->klass == GIT_ERROR_REFERENCE) {
-                logger->error("Requested branch '{}' does not exist!", branch);
-                co_return {nullptr, {ProjectError::NO_BRANCH, e->message}};
-            }
-            if (d.error == "size") {
-                co_return {nullptr, {ProjectError::REPO_TOO_LARGE, ""}};
-            }
-
-            co_return {nullptr, {ProjectError::UNKNOWN, e->message}};
-        }
-
-        logger->info("Git clone successful");
-
-        co_return {repo, {ProjectError::OK}};
     }
 }
