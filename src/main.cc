@@ -66,12 +66,14 @@ void globalExceptionHandler(const std::exception &e, const HttpRequestPtr &req, 
     callback(statusResponse(k500InternalServerError));
 }
 
-Task<> runStartupTaks(const fs::path gameFilesPath) {
+Task<> runStartupTaks(const bool isLocal, const fs::path gameFilesPath) {
     global::virtualProject = co_await createVirtualProject(gameFilesPath);
 
     co_await cleanupLoadingDeployments();
-    co_await global::gameData->importGameData(false);
-    co_await global::crowdin->getAvailableLocales();
+    if (!isLocal) {
+        co_await global::gameData->importGameData(false);
+        co_await global::crowdin->getAvailableLocales();
+    }
 }
 
 int main() {
@@ -135,7 +137,7 @@ int main() {
 
         content::loadBuiltinRecipeTypes();
 
-        app().getLoop()->queueInLoop(async_func([=]() -> Task<> { co_await runStartupTaks(gameFilesPath); }));
+        app().getLoop()->queueInLoop(async_func([=]() -> Task<> { co_await runStartupTaks(local, gameFilesPath); }));
 
         app().run();
 

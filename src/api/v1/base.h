@@ -4,6 +4,8 @@
 #include <service/auth.h>
 #include <service/storage/storage.h>
 
+#define ADMIN_AUTH "AuthFilter", "AdminFilter"
+
 namespace api::v1 {
     void requireNonVirtual(const service::ProjectBasePtr &project);
 

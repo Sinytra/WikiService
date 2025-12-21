@@ -35,27 +35,18 @@ namespace api::v1 {
 
     std::vector<DataMigration> dataMigrations = {};
 
-    Task<bool> authAccessKey(const HttpRequestPtr req) {
-        const auto authHeader = req->getHeader("Authorization");
-        if (authHeader.empty()) {
-            co_return false;
-        }
-        const auto token = authHeader.substr(7);
-        const auto key = co_await global::accessKeys->getAccessKey(token);
-        co_return key && global::accessKeys->isValidKey(*key);
-    }
-
     Task<> SystemController::getLocales(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
+        constexpr Locale LOCALE_EN{"en", "English", DEFAULT_LOCALE};
+
         auto locales = co_await global::lang->getAvailableLocales();
         std::ranges::sort(locales, [](const Locale &a, const Locale &b) { return a.id < b.id; });
-        locales.insert(locales.begin(), {"en", "English", DEFAULT_LOCALE});
+        locales.insert(locales.begin(), LOCALE_EN);
+
         callback(jsonResponse(locales));
     }
 
     Task<> SystemController::getSystemInformation(const HttpRequestPtr req,
                                                   const std::function<void(const HttpResponsePtr &)> callback) const {
-        co_await global::auth->ensurePrivilegedAccess(req);
-
         const auto imports{co_await global::database->getDataImports("", 1)};
         const auto latestImport = imports.size > 0 ? imports.data.front() : nlohmann::json{nullptr};
         const auto projectCount{co_await global::database->getTotalModelCount<Project>()};
@@ -76,26 +67,18 @@ namespace api::v1 {
     }
 
     Task<> SystemController::listAllProjects(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
-        co_await global::auth->ensurePrivilegedAccess(req); // TODO Admin filter
-
         const auto [query, page] = getTableQueryParams(req);
         const auto projects(co_await global::database->getAllProjects(query, page));
         callback(jsonResponse(projects));
     }
 
     Task<> SystemController::getDataImports(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
-        co_await global::auth->ensurePrivilegedAccess(req);
-
         const auto [query, page] = getTableQueryParams(req);
         const auto imports{co_await global::database->getDataImports(query, page)};
         callback(jsonResponse(imports));
     }
 
     Task<> SystemController::importData(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
-        if (!co_await authAccessKey(req)) {
-            co_await global::auth->ensurePrivilegedAccess(req);
-        }
-
         const auto body(BaseProjectController::jsonBody(req));
         const auto updateLoader = body.contains("update_loader") ? body["update_loader"].get<bool>() : false;
         const auto result = co_await global::gameData->importGameData(updateLoader);
@@ -105,16 +88,14 @@ namespace api::v1 {
 
     Task<> SystemController::getAvailableMigrations(const HttpRequestPtr req,
                                                     const std::function<void(const HttpResponsePtr &)> callback) const {
-        co_await global::auth->ensurePrivilegedAccess(req);
-
         const nlohmann::json root = dataMigrations;
 
         callback(jsonResponse(root));
+        co_return;
     }
 
     Task<> SystemController::runDataMigration(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                               const std::string id) const {
-        co_await global::auth->ensurePrivilegedAccess(req);
         assertNonEmptyParam(id);
 
         const auto migration = ranges::find_if(dataMigrations, [&id](const DataMigration &x) { return x.id == id; });
@@ -122,11 +103,10 @@ namespace api::v1 {
             throw ApiException(Error::ErrNotFound, "not_found");
         }
 
-        app().getLoop()->queueInLoop(async_func([&]() -> Task<> {
-            co_await executeDataMigration(id, migration->runner);
-        }));
+        app().getLoop()->queueInLoop(async_func([&]() -> Task<> { co_await executeDataMigration(id, migration->runner); }));
 
         callback(statusResponse(k200OK));
+        co_return;
     }
 
     Task<> SystemController::executeDataMigration(const std::string id, const std::function<Task<Error>()> runner) const {
@@ -139,15 +119,12 @@ namespace api::v1 {
     }
 
     Task<> SystemController::getAccessKeys(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
-        co_await global::auth->ensurePrivilegedAccess(req);
-
         const auto [query, page] = getTableQueryParams(req);
         const auto keys{co_await global::accessKeys->getAccessKeys(query, page)};
         callback(jsonResponse(keys));
     }
 
     Task<> SystemController::createAccessKey(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
-        co_await global::auth->ensurePrivilegedAccess(req);
         const auto session{co_await global::auth->getSession(req)};
         const auto json(BaseProjectController::validatedBody(req, schemas::accessKey));
 
@@ -163,9 +140,8 @@ namespace api::v1 {
         callback(jsonResponse(root));
     }
 
-    Task<> SystemController::deleteAccessKey(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback, const int64_t id) const {
-        co_await global::auth->ensurePrivilegedAccess(req);
-
+    Task<> SystemController::deleteAccessKey(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+                                             const int64_t id) const {
         co_await global::accessKeys->deleteAccessKey(id);
 
         callback(statusResponse(k200OK));

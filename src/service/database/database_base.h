@@ -121,6 +121,15 @@ namespace service {
         }
 
         template<typename T>
+        drogon::Task<std::vector<T>> findBy(drogon::orm::Criteria criteria) const {
+            const auto result = co_await handleDatabaseOperation([criteria](const drogon::orm::DbClientPtr &client) -> drogon::Task<std::vector<T>> {
+                drogon::orm::CoroMapper<T> mapper(client);
+                co_return co_await mapper.findBy(criteria);
+            });
+            co_return result.value_or({});
+        }
+
+        template<typename T>
         drogon::Task<size_t> getTotalModelCount() const {
             const auto res = co_await handleDatabaseOperation([](const drogon::orm::DbClientPtr &client) -> drogon::Task<size_t> {
                 drogon::orm::CoroMapper<T> mapper(client);
@@ -154,7 +163,7 @@ namespace service {
         }
 
         template<typename T>
-        drogon::Task<TaskResult<>> deleteByPrimaryKey(int64_t id) const {
+        drogon::Task<TaskResult<>> deleteByPrimaryKey(T::PrimaryKeyType id) const {
             co_return co_await handleDatabaseOperation([id](const drogon::orm::DbClientPtr &client) -> drogon::Task<> {
                 drogon::orm::CoroMapper<T> mapper(client);
                 co_await mapper.deleteByPrimaryKey(id);

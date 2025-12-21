@@ -106,6 +106,31 @@ nlohmann::json schemas::accessKey = R"(
 }
 )"_json;
 
+nlohmann::json schemas::addProjectMember = R"(
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Add Project Member",
+    "type": "object",
+    "properties": {
+        "username": { "type": "string" },
+        "role": { "type": "string", "enum": [ "owner", "member" ] }
+    },
+    "required": ["username", "role"]
+}
+)"_json;
+
+nlohmann::json schemas::removeProjectMember = R"(
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Remove Project Member",
+    "type": "object",
+    "properties": {
+        "username": { "type": "string" }
+    },
+    "required": ["username"]
+}
+)"_json;
+
 nlohmann::json schemas::projectMetadata = R"(@PROJECT_META_SCHEMA@)"_json;
 
 nlohmann::json schemas::folderMetadata = R"(@FOLDER_META_SCHEMA@)"_json;

@@ -8,6 +8,7 @@
 #include <service/error.h>
 #include <service/project/cached/cached.h>
 #include <service/storage/deployment.h>
+#include <service/storage/management/project_access.h>
 #include <service/storage/management/project_management.h>
 // ReSharper disable once CppUnusedIncludeDirective
 #include <service/serializers.h>
@@ -61,6 +62,7 @@ namespace api::v1 {
 
     Task<> ProjectsController::getProject(const HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback,
                                           const std::string id) const {
+        const auto session(co_await global::auth->getSession(req));
         const auto project{co_await BaseProjectController::getUserProject(req, id)};
 
         Json::Value root;
@@ -71,6 +73,7 @@ namespace api::v1 {
         }
         root["status"] = enumToStr(co_await global::storage->getProjectStatus(project));
         root["has_active_deployment"] = (co_await global::database->getActiveDeployment(id)).has_value();
+        root["access_level"] = enumToStr(co_await getUserAccessLevel(project, session));
 
         callback(HttpResponse::newHttpJsonResponse(root));
     }
@@ -155,7 +158,12 @@ namespace api::v1 {
 
     Task<> ProjectsController::remove(const HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback,
                                       const std::string id) const {
-        const auto project = co_await BaseProjectController::getUserProject(req, id);
+        const auto session(co_await global::auth->getSession(req));
+        const auto project(co_await BaseProjectController::getUserProject(req, id));
+
+        if (const auto member(co_await getUserAccessLevel(project, session)); member != ProjectMemberRole::OWNER) {
+            throw ApiException(Error::ErrForbidden, "insufficient_permissions");
+        }
 
         if (const auto result = co_await global::database->removeProject(project.getValueOfId()); !result) {
             logger.error("Failed to delete project {} in database", id);
@@ -185,6 +193,55 @@ namespace api::v1 {
         Json::Value root;
         root["message"] = "Project deploy started successfully";
         callback(HttpResponse::newHttpJsonResponse(root));
+    }
+
+    Task<> ProjectsController::listMembers(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+                                           const std::string id) const {
+        const auto session(co_await global::auth->getSession(req));
+        const auto project(co_await BaseProjectController::getUserProject(session, id));
+        assertFound(project);
+
+        const auto members(co_await getProjectMembers(*project, session));
+        callback(jsonResponse(members));
+    }
+
+    Task<> ProjectsController::addMember(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+                                         const std::string id) const {
+        const auto session(co_await global::auth->getSession(req));
+        const auto json(BaseProjectController::validatedBody(req, schemas::addProjectMember));
+
+        const auto project(co_await BaseProjectController::getUserProject(session, id));
+        assertFound(project);
+
+        UserProject member;
+        member.setProjectId(project->getValueOfId());
+        member.setRole(json["role"]);
+        member.setUserId(json["username"]);
+
+        if (const auto result = co_await addProjectMember(*project, session, member); !result) {
+            throw ApiException{Error::ErrInternal, "Error adding member"};
+        }
+
+        callback(statusResponse(k200OK));
+    }
+
+    Task<> ProjectsController::removeMember(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+                                            const std::string id) const {
+        const auto session(co_await global::auth->getSession(req));
+        const auto json(BaseProjectController::validatedBody(req, schemas::removeProjectMember));
+
+        const auto project(co_await BaseProjectController::getUserProject(session, id));
+        assertFound(project);
+
+        const auto userId = json["username"];
+        const auto subjectMember(co_await global::database->getProjectMember(id, userId));
+        assertFound(subjectMember);
+
+        if (const auto result = co_await removeProjectMember(*project, session, *subjectMember); !result) {
+            throw ApiException{result.error(), "Error removing member"};
+        }
+
+        callback(statusResponse(k200OK));
     }
 
     Task<> ProjectsController::getContentPages(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,

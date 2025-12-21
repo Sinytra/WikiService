@@ -92,12 +92,15 @@ namespace service {
         drogon::Task<TaskResult<>> deleteProjectVersions(std::string project) const;
 
         drogon::Task<TaskResult<Project>> getProjectSource(std::string id) const;
-
         drogon::Task<TaskResult<ProjectSearchResponse>> findProjects(std::string query, std::string types, std::string sort,
                                                                      int page) const;
 
-        drogon::Task<bool> existsForRepo(std::string repo, std::string branch, std::string path) const;
+        // Project members
+        drogon::Task<TaskResult<UserProject>> getProjectMember(std::string project, std::string username) const;
+        drogon::Task<std::vector<UserProject>> getProjectMembers(std::string project) const;
+        drogon::Task<bool> canUserLeaveProject(std::string project, std::string username) const;
 
+        drogon::Task<bool> existsForRepo(std::string repo, std::string branch, std::string path) const;
         drogon::Task<bool> existsForData(std::string id, nlohmann::json platforms) const;
 
         // Users

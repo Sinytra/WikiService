@@ -26,6 +26,9 @@ namespace api::v1 {
         ADD_METHOD_TO(ProjectsController::getProject,       "/api/v1/dev/projects/{1:id}",                      drogon::Get,    "AuthFilter");
         ADD_METHOD_TO(ProjectsController::remove,           "/api/v1/dev/projects/{1:id}",                      drogon::Delete, "AuthFilter");
         ADD_METHOD_TO(ProjectsController::deployProject,    "/api/v1/dev/projects/{1:id}/deploy",               drogon::Post,   "AuthFilter");
+        ADD_METHOD_TO(ProjectsController::listMembers,      "/api/v1/dev/projects/{1:id}/members",              drogon::Get,    "AuthFilter");
+        ADD_METHOD_TO(ProjectsController::addMember,        "/api/v1/dev/projects/{1:id}/members",              drogon::Post,   "AuthFilter");
+        ADD_METHOD_TO(ProjectsController::removeMember,     "/api/v1/dev/projects/{1:id}/members",              drogon::Delete, "AuthFilter");
         // Content
         ADD_METHOD_TO(ProjectsController::getContentPages,  "/api/v1/dev/projects/{1:id}/content/pages",        drogon::Get,    "AuthFilter");
         ADD_METHOD_TO(ProjectsController::getContentTags,   "/api/v1/dev/projects/{1:id}/content/tags",         drogon::Get,    "AuthFilter");
@@ -43,25 +46,26 @@ namespace api::v1 {
         // clang-format on
 
         drogon::Task<> greet(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback) const;
-
-        drogon::Task<> listIDs(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback) const;
-
-        drogon::Task<> listUserProjects(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback) const;
-
-        drogon::Task<> getProject(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
-                                  std::string id) const;
-
-        drogon::Task<> getProjects(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback) const;
-
         drogon::Task<> create(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback) const;
-
         drogon::Task<> update(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback) const;
 
+        drogon::Task<> listIDs(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback) const;
+        drogon::Task<> getProjects(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback) const;
+
+        drogon::Task<> listUserProjects(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback) const;
+        drogon::Task<> getProject(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
+                                  std::string id) const;
         drogon::Task<> remove(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
                               std::string id) const;
-
         drogon::Task<> deployProject(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
                                      std::string id) const;
+
+        drogon::Task<> listMembers(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
+                                   std::string id) const;
+        drogon::Task<> addMember(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
+                                 std::string id) const;
+        drogon::Task<> removeMember(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
+                                    std::string id) const;
 
         drogon::Task<> getContentPages(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
                                        std::string id) const;

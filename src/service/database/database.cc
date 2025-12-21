@@ -67,9 +67,12 @@ namespace service {
     }
 
     Task<std::vector<std::string>> Database::getProjectIDs() const {
+        // language=postgresql
+        static constexpr auto query = "SELECT id FROM project";
+
         const auto res = co_await handleDatabaseOperation([](const DbClientPtr &client) -> Task<std::vector<std::string>> {
             std::vector<std::string> ids;
-            for (const auto result = co_await client->execSqlCoro("SELECT id FROM project"); const auto &row: result) {
+            for (const auto result = co_await client->execSqlCoro(query); const auto &row: result) {
                 ids.push_back(row["id"].as<std::string>());
             }
             co_return ids;
@@ -120,27 +123,13 @@ namespace service {
     }
 
     Task<TaskResult<ProjectVersion>> Database::getProjectVersion(const std::string project, const std::string name) const {
-        co_return co_await handleDatabaseOperation([project, name](const DbClientPtr &client) -> Task<ProjectVersion> {
-            // language=postgresql
-            const auto results =
-                co_await client->execSqlCoro("SELECT * FROM project_version WHERE project_id = $1 AND name = $2", project, name);
-            if (results.size() != 1) {
-                throw DrogonDbException{};
-            }
-            co_return ProjectVersion(results.front());
-        });
+        co_return co_await findOne<ProjectVersion>(Criteria(ProjectVersion::Cols::_project_id, CompareOperator::EQ, project) &&
+                                                   Criteria(ProjectVersion::Cols::_name, CompareOperator::EQ, name));
     }
 
     Task<TaskResult<ProjectVersion>> Database::getDefaultProjectVersion(std::string project) const {
-        co_return co_await handleDatabaseOperation([project](const DbClientPtr &client) -> Task<ProjectVersion> {
-            // language=postgresql
-            const auto results =
-                co_await client->execSqlCoro("SELECT * FROM project_version WHERE project_id = $1 AND name IS NULL", project);
-            if (results.size() != 1) {
-                throw DrogonDbException{};
-            }
-            co_return ProjectVersion(results.front());
-        });
+        co_return co_await findOne<ProjectVersion>(Criteria(ProjectVersion::Cols::_project_id, CompareOperator::EQ, project) &&
+                                                   Criteria(ProjectVersion::Cols::_name, CompareOperator::IsNull));
     }
 
     Task<TaskResult<>> Database::deleteProjectVersions(std::string project) const {
@@ -201,6 +190,34 @@ namespace service {
 
             co_return ProjectSearchResponse{.pages = totalPages, .total = totalRows, .data = projects};
         });
+    }
+
+    Task<TaskResult<UserProject>> Database::getProjectMember(const std::string project, const std::string username) const {
+        co_return co_await findOne<UserProject>(Criteria(UserProject::Cols::_project_id, CompareOperator::EQ, project) &&
+                                                Criteria(UserProject::Cols::_user_id, CompareOperator::EQ, username));
+    }
+
+    Task<std::vector<UserProject>> Database::getProjectMembers(const std::string project) const {
+        co_return co_await findBy<UserProject>(Criteria(UserProject::Cols::_project_id, CompareOperator::EQ, project));
+    }
+
+    Task<bool> Database::canUserLeaveProject(const std::string project, const std::string username) const {
+        // language=postgresql
+        static constexpr auto query = "SELECT (role != 'owner' OR \
+                                           EXISTS(SELECT * FROM user_project WHERE project_id = $1 AND user_id != $2 AND role = 'owner') \
+                                       ) as can_leave \
+                                       FROM user_project \
+                                       WHERE project_id = $1 AND user_id = $2";
+        const auto result = co_await handleDatabaseOperation([project, username](const DbClientPtr &client) -> Task<bool> {
+            const auto results = co_await client->execSqlCoro(query, project, username);
+            if (results.empty()) {
+                co_return false;
+            }
+
+            const auto canLeave = results[0]["can_leave"].as<bool>();
+            co_return canLeave;
+        });
+        co_return result.value_or(false);
     }
 
     Task<bool> Database::existsForRepo(const std::string repo, const std::string branch, const std::string path) const {
@@ -282,7 +299,6 @@ namespace service {
                                        WHERE user_id = $1";
 
         const auto res = co_await handleDatabaseOperation([username](const DbClientPtr &client) -> Task<std::vector<Project>> {
-            CoroMapper<User> mapper(client);
             const auto results = co_await client->execSqlCoro(query, username);
 
             std::vector<Project> projects;
