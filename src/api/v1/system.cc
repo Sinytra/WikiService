@@ -36,7 +36,7 @@ namespace api::v1 {
     std::vector<DataMigration> dataMigrations = {};
 
     Task<> SystemController::getLocales(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
-        constexpr Locale LOCALE_EN{"en", "English", DEFAULT_LOCALE};
+        static const Locale LOCALE_EN{"en", "English", DEFAULT_LOCALE};
 
         auto locales = co_await global::lang->getAvailableLocales();
         std::ranges::sort(locales, [](const Locale &a, const Locale &b) { return a.id < b.id; });
