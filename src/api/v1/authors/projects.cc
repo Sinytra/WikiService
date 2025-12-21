@@ -117,7 +117,7 @@ namespace api::v1 {
             throw ApiException(Error::ErrInternal, "internal");
         }
 
-        if (const auto assignResult = co_await global::database->assignUserProject(session.username, result->getValueOfId(), "member");
+        if (const auto assignResult = co_await assignUserProject(session.username, result->getValueOfId(), ProjectMemberRole::OWNER);
             !assignResult)
         {
             logger.error("Failed to assign project {} to user {}", result->getValueOfId(), session.username);

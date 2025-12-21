@@ -331,18 +331,6 @@ namespace service {
         co_return res;
     }
 
-    Task<TaskResult<>> Database::assignUserProject(const std::string username, const std::string id, const std::string role) const {
-        co_return co_await handleDatabaseOperation([username, id, role](const DbClientPtr &client) -> Task<> {
-            CoroMapper<UserProject> mapper(client);
-            UserProject userProject;
-            userProject.setUserId(username);
-            userProject.setProjectId(id);
-            userProject.setRole(role);
-
-            co_await mapper.insert(userProject);
-        });
-    }
-
     Task<std::vector<std::string>> Database::getItemSourceProjects(int64_t item) const {
         // language=postgresql
         static constexpr auto query = "SELECT pv.project_id FROM project_item pitem \

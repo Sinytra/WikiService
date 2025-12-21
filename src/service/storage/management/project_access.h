@@ -30,6 +30,7 @@ namespace service {
         NLOHMANN_DEFINE_TYPE_INTRUSIVE(ProjectMembersData, members, canEdit, canLeave);
     };
 
+    drogon::Task<TaskResult<>> assignUserProject(std::string username, std::string id, ProjectMemberRole role);
     drogon::Task<ProjectMemberRole> getUserAccessLevel(Project project, UserSession actor);
     drogon::Task<ProjectMembersData> getProjectMembers(Project project, UserSession actor);
     drogon::Task<TaskResult<>> addProjectMember(Project project, UserSession actor, UserProject member);

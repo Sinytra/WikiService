@@ -11,6 +11,16 @@ namespace service {
     void to_json(nlohmann::json &j, const ProjectMemberRole &obj) { j = enumToStr(obj); }
     void from_json(const nlohmann::json &j, ProjectMemberRole &obj) { obj = parseProjectMemberRole(j); }
 
+    Task<TaskResult<>> assignUserProject(const std::string username, const std::string id, const ProjectMemberRole role) {
+        UserProject userProject;
+        userProject.setUserId(username);
+        userProject.setProjectId(id);
+        userProject.setRole(enumToStr(role));
+
+        const auto result = co_await global::database->addModel(userProject);
+        co_return result.error();
+    }
+
     Task<ProjectMemberRole> getUserAccessLevel(const Project project, const UserSession actor) {
         if (actor.user.getValueOfRole() == ROLE_ADMIN) {
             co_return ProjectMemberRole::OWNER;

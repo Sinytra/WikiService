@@ -112,7 +112,6 @@ namespace service {
         drogon::Task<TaskResult<>> unlinkUserModrinthAccount(std::string username) const;
         drogon::Task<std::vector<Project>> getUserProjects(std::string username) const;
         drogon::Task<TaskResult<Project>> getUserProject(std::string username, std::string id) const;
-        drogon::Task<TaskResult<>> assignUserProject(std::string username, std::string id, std::string role) const;
 
         // Content
         drogon::Task<TaskResult<>> refreshFlatTagItemView() const;
