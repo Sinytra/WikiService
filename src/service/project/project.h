@@ -2,10 +2,10 @@
 
 #include <drogon/drogon.h>
 #include <models/Item.h>
+#include <service/database/database.h>
 #include <service/project/format.h>
 #include <service/project/recipe_resolver.h>
 #include <service/storage/ingestor/recipe/game_recipes.h>
-#include <service/database/database.h>
 
 using namespace drogon_model::postgres;
 
@@ -28,9 +28,9 @@ namespace service {
         std::vector<FileTreeEntry> children;
 
         friend void to_json(nlohmann::json &j, const FileTreeEntry &obj) {
-            j = {{"id", obj.id.empty() ? nlohmann::json(nullptr) : nlohmann::json(obj.id)},
+            j = {{"id", emptyStrNullable(obj.id)},
                  {"name", obj.name},
-                 {"icon", obj.icon.empty() ? nlohmann::json(nullptr) : nlohmann::json(obj.icon)},
+                 {"icon", emptyStrNullable(obj.icon)},
                  {"path", obj.path},
                  {"type", obj.type},
                  {"children", obj.children}};
@@ -68,10 +68,8 @@ namespace service {
         std::string path;
 
         friend void to_json(nlohmann::json &j, const ItemContentPage &obj) {
-            j = nlohmann::json{{"id", obj.id},
-                               {"name", obj.name},
-                               {"icon", obj.icon.empty() ? nlohmann::json(nullptr) : nlohmann::json(obj.icon)},
-                               {"path", obj.path.empty() ? nlohmann::json(nullptr) : nlohmann::json(obj.path)}};
+            j = nlohmann::json{
+                {"id", obj.id}, {"name", obj.name}, {"icon", emptyStrNullable(obj.icon)}, {"path", emptyStrNullable(obj.path)}};
         }
     };
 
@@ -81,8 +79,7 @@ namespace service {
         std::string path;
 
         friend void to_json(nlohmann::json &j, const FullItemData &obj) {
-            j = nlohmann::json{
-                {"id", obj.id}, {"name", obj.name}, {"path", obj.path.empty() ? nlohmann::json(nullptr) : nlohmann::json(obj.path)}};
+            j = nlohmann::json{{"id", obj.id}, {"name", obj.name}, {"path", emptyStrNullable(obj.path)}};
         }
     };
 

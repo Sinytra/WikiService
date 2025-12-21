@@ -171,26 +171,16 @@ namespace api::v1 {
 
     Task<> ProjectsController::deployProject(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                              const std::string id) const {
-        std::string username = "";
+        const auto session(co_await global::auth->getExternalSession(req));
 
-        const auto token = req->getParameter("token");
-        if (const auto user = co_await global::auth->getGitHubTokenUser(token)) {
-            username = user->getValueOfId();
-        }
-
-        if (username.empty()) {
-            const auto session{co_await global::auth->getSession(req)};
-            username = session.username;
-        }
-
-        const auto project = co_await global::database->getUserProject(username, id);
+        const auto project = co_await BaseProjectController::getUserProject(session, id);
         assertFound(project);
 
         if (co_await global::storage->getProjectStatus(*project) == ProjectStatus::LOADING) {
             throw ApiException(Error::ErrBadRequest, "pending_deployment");
         }
 
-        enqueueDeploy(*project, username);
+        enqueueDeploy(*project, session.username);
 
         Json::Value root;
         root["message"] = "Project deploy started successfully";

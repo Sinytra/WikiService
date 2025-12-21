@@ -273,7 +273,15 @@ std::string strToLower(std::string copy) {
     return copy;
 }
 
-std::string formatDateTime(const std::string &databaseData) {
+std::string formatDate(const trantor::Date &date) {
+    return date.toCustomFormattedString("%Y-%m-%d");
+}
+
+std::string formatDateTime(const trantor::Date &date) {
+    return date.toCustomFormattedString("%Y-%m-%d %H:%M:%S");
+}
+
+std::string formatDateTimeISO(const std::string &databaseData) {
     return trantor::Date::fromDbString(databaseData).toCustomFormattedString("%Y-%m-%dT%H:%M:%SZ");
 }
 
@@ -294,4 +302,8 @@ bool isSubpath(fs::path path, fs::path base) {
 
 bool contains(const std::string& text, const std::string& pattern) {
     return text.find(pattern) != std::string::npos;
+}
+
+nlohmann::json emptyStrNullable(const std::string &str) {
+    return str.empty() ? nlohmann::json(nullptr) : nlohmann::json(str);
 }

@@ -52,9 +52,25 @@ namespace service {
                                {"commit_hash", d.commit_hash},
                                {"commit_message", d.commit_message},
                                {"status", d.status},
-                               {"user_id", d.user_id.empty() ? nlohmann::json(nullptr) : nlohmann::json(d.user_id)},
+                               {"user_id", emptyStrNullable(d.user_id)},
                                {"created_at", d.created_at},
                                {"active", d.active}};
+        }
+    };
+
+    struct AdminProjectData {
+        std::string id;
+        std::string name;
+        std::string type;
+        std::string modid;
+        std::string createdAt;
+
+        friend void to_json(nlohmann::json &j, const AdminProjectData &d) {
+            j = nlohmann::json{{"id", d.id},
+                               {"name", d.name},
+                               {"type", d.type},
+                               {"modid", emptyStrNullable(d.modid)},
+                               {"created_at", d.createdAt}};
         }
     };
 
@@ -67,6 +83,7 @@ namespace service {
 
         // Projects
         drogon::Task<std::vector<std::string>> getProjectIDs() const;
+        drogon::Task<PaginatedData<AdminProjectData>> getAllProjects(std::string searchQuery, int page) const;
         drogon::Task<TaskResult<Project>> createProject(const Project &project) const;
         drogon::Task<TaskResult<>> removeProject(const std::string &id) const;
         drogon::Task<TaskResult<ProjectVersion>> createProjectVersion(ProjectVersion version) const;

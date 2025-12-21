@@ -77,6 +77,27 @@ namespace service {
         co_return res.value_or({});
     }
 
+    Task<PaginatedData<AdminProjectData>> Database::getAllProjects(std::string searchQuery, const int page) const {
+        // language=postgresql
+        static constexpr auto query = "SELECT id, name, type, modid, created_at FROM project \
+                                       WHERE name ILIKE '%' || $1 || '%' \
+                                       ORDER BY id";
+
+        co_return co_await handlePaginatedQuery<AdminProjectData>(
+            query, page,
+            [](const Row &row) {
+                AdminProjectData data;
+                data.id = row.at(Project::Cols::_id).as<std::string>();
+                data.name = row.at(Project::Cols::_name).as<std::string>();
+                data.type = row.at(Project::Cols::_type).as<std::string>();
+                data.modid = row.at(Project::Cols::_modid).as<std::string>();
+                const auto createdAt = row.at(Project::Cols::_created_at).as<std::string>();
+                data.createdAt = formatDateTimeISO(createdAt);
+                return data;
+            },
+            searchQuery);
+    }
+
     Task<TaskResult<Project>> Database::createProject(const Project &project) const {
         co_return co_await handleDatabaseOperation([project](const DbClientPtr &client) -> Task<Project> {
             CoroMapper<Project> mapper(client);
@@ -225,11 +246,12 @@ namespace service {
     }
 
     Task<TaskResult<>> Database::deleteUserProjects(std::string username) const {
-        co_return co_await handleDatabaseOperation([username](const DbClientPtr &client) -> Task<> {
-            co_await client->execSqlCoro(
-                "DELETE FROM project USING user_project WHERE project.id = user_project.project_id AND user_project.user_id = $1;",
-                username);
-        });
+        // language=postgresql
+        static constexpr auto query = "DELETE FROM project USING user_project \
+                                       WHERE project.id = user_project.project_id AND user_project.user_id = $1";
+
+        co_return co_await handleDatabaseOperation(
+            [username](const DbClientPtr &client) -> Task<> { co_await client->execSqlCoro(query, username); });
     }
 
     Task<TaskResult<>> Database::deleteUser(const std::string username) const {
@@ -254,11 +276,14 @@ namespace service {
     }
 
     Task<std::vector<Project>> Database::getUserProjects(std::string username) const {
+        // language=postgresql
+        static constexpr auto query = "SELECT * FROM project \
+                                       JOIN user_project ON project.id = user_project.project_id \
+                                       WHERE user_id = $1";
+
         const auto res = co_await handleDatabaseOperation([username](const DbClientPtr &client) -> Task<std::vector<Project>> {
             CoroMapper<User> mapper(client);
-
-            const auto results = co_await client->execSqlCoro(
-                "SELECT * FROM project JOIN user_project ON project.id = user_project.project_id WHERE user_id = $1;", username);
+            const auto results = co_await client->execSqlCoro(query, username);
 
             std::vector<Project> projects;
             for (const auto &row: results) {
@@ -271,11 +296,13 @@ namespace service {
     }
 
     Task<TaskResult<Project>> Database::getUserProject(std::string username, std::string id) const {
+        // language=postgresql
+        static constexpr auto query = "SELECT * FROM project \
+                                       JOIN user_project ON project.id = user_project.project_id \
+                                       WHERE user_id = $1 AND project_id = $2";
+
         const auto res = co_await handleDatabaseOperation([username, id](const DbClientPtr &client) -> Task<Project> {
-            const auto results = co_await client->execSqlCoro("SELECT * FROM project "
-                                                              "JOIN user_project ON project.id = user_project.project_id "
-                                                              "WHERE user_id = $1 AND project_id = $2;",
-                                                              username, id);
+            const auto results = co_await client->execSqlCoro(query, username, id);
             if (results.empty()) {
                 throw DrogonDbException{};
             }

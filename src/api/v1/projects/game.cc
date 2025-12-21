@@ -75,7 +75,7 @@ namespace api::v1 {
             const auto itemName = co_await (*resolved)->getItemName(loc);
 
             nlohmann::json itemJson;
-            itemJson["project"] = project.empty() ? nlohmann::json(nullptr) : nlohmann::json(project);
+            itemJson["project"] = emptyStrNullable(project);
             itemJson["id"] = loc;
             if (itemName) {
                 itemJson["name"] = itemName->name;

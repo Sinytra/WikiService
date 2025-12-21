@@ -4,6 +4,7 @@
 #include <drogon/utils/coroutine.h>
 #include <models/Recipe.h>
 #include <optional>
+#include <util.h>
 
 using namespace drogon_model::postgres;
 
@@ -16,8 +17,8 @@ namespace content {
 
         friend void to_json(nlohmann::json &j, const ResolvedItem &obj) {
             j = nlohmann::json{{"id", obj.id},
-                               {"name", obj.name.empty() ? nlohmann::json(nullptr) : nlohmann::json(obj.name)},
-                               {"project", obj.project.empty() ? nlohmann::json(nullptr) : nlohmann::json(obj.project)},
+                               {"name", emptyStrNullable(obj.name)},
+                               {"project", emptyStrNullable(obj.project)},
                                {"has_page", obj.has_page}};
         }
 
@@ -45,7 +46,7 @@ namespace content {
                                {"slot", obj.slot},
                                {"count", obj.count},
                                {"items", obj.items},
-                               {"tag", obj.tag.empty() ? nlohmann::json(nullptr) : nlohmann::json(obj.tag)}};
+                               {"tag", emptyStrNullable(obj.tag)}};
         }
 
         friend void from_json(const nlohmann::json &j, ResolvedSlot &obj) {
@@ -66,7 +67,7 @@ namespace content {
 
         friend void to_json(nlohmann::json &j, const RecipeIngredientSummary &obj) {
             j = nlohmann::json{
-                {"count", obj.count}, {"item", obj.item}, {"tag", obj.tag.empty() ? nlohmann::json(nullptr) : nlohmann::json(obj.tag)}};
+                {"count", obj.count}, {"item", obj.item}, {"tag", emptyStrNullable(obj.tag)}};
         }
 
         friend void from_json(const nlohmann::json &j, RecipeIngredientSummary &obj) {

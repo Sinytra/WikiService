@@ -246,8 +246,12 @@ T unwrap(std::optional<T> opt) {
     return opt.value();
 }
 
-std::string formatDateTime(const std::string &databaseData);
+std::string formatDate(const trantor::Date &date);
+std::string formatDateTime(const trantor::Date &date);
+std::string formatDateTimeISO(const std::string &databaseData);
 
 bool isSubpath(std::filesystem::path path, std::filesystem::path base);
 
 bool contains(const std::string& text, const std::string& pattern);
+
+nlohmann::json emptyStrNullable(const std::string &str);

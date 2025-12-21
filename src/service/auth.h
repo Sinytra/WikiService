@@ -5,6 +5,8 @@
 #include <service/cache.h>
 #include <service/util.h>
 
+#define ROLE_ADMIN "admin"
+
 using namespace drogon_model::postgres;
 
 namespace service {
@@ -30,6 +32,7 @@ namespace service {
         drogon::Task<UserSession> getSession(drogon::HttpRequestPtr req) const;
         drogon::Task<> ensurePrivilegedAccess(drogon::HttpRequestPtr req) const;
         drogon::Task<std::optional<UserSession>> getSession(std::string id) const;
+        drogon::Task<UserSession> getExternalSession(drogon::HttpRequestPtr req) const;
         drogon::Task<> expireSession(std::string id) const;
 
         std::string getModrinthOAuthInitURL(std::string state) const;

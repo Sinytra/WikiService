@@ -1,7 +1,7 @@
 #pragma once
 
 #include <drogon/HttpController.h>
-
+#include <service/auth.h>
 #include <service/storage/storage.h>
 
 namespace api::v1 {
@@ -34,6 +34,8 @@ namespace api::v1 {
         static drogon::Task<service::ProjectBasePtr> getUserProject(drogon::HttpRequestPtr req, const std::string &project,
                                                                     const std::optional<std::string> &version,
                                                                     const std::optional<std::string> &locale);
+
+        static drogon::Task<TaskResult<Project>> getUserProject(service::UserSession session, std::string id);
 
         static nlohmann::json jsonBody(const drogon::HttpRequestPtr &req);
         static nlohmann::json validatedBody(const drogon::HttpRequestPtr &req, const nlohmann::json &schema);

@@ -1,7 +1,7 @@
 #include "websocket.h"
-#include "../auth.h"
 #include "../error.h"
 
+#include <api/v1/base.h>
 #include <log/log.h>
 #include <service/database/database.h>
 #include <service/storage/storage.h>
@@ -42,8 +42,7 @@ namespace api::v1 {
                 co_return;
             }
 
-            const auto project = co_await global::database->getUserProject(session->username, projectId);
-            if (!project) {
+            if (const auto project = co_await BaseProjectController::getUserProject(*session, projectId); !project) {
                 if (wsConnPtr) wsConnPtr->shutdown(CloseCode::kViolation);
                 co_return;
             }

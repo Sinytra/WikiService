@@ -75,6 +75,14 @@ namespace api::v1 {
         callback(jsonResponse(root));
     }
 
+    Task<> SystemController::listAllProjects(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
+        co_await global::auth->ensurePrivilegedAccess(req); // TODO Admin filter
+
+        const auto [query, page] = getTableQueryParams(req);
+        const auto projects(co_await global::database->getAllProjects(query, page));
+        callback(jsonResponse(projects));
+    }
+
     Task<> SystemController::getDataImports(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
         co_await global::auth->ensurePrivilegedAccess(req);
 

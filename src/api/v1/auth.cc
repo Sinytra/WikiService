@@ -132,7 +132,7 @@ namespace api::v1 {
     Task<> AuthController::userProfile(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
         const auto session{co_await global::auth->getSession(req)};
         Json::Value root = session.profile;
-        root["created_at"] = session.user.getValueOfCreatedAt().toCustomFormattedString("%Y-%m-%d");
+        root["created_at"] = formatDate(session.user.getValueOfCreatedAt());
 
         callback(HttpResponse::newHttpJsonResponse(root));
     }

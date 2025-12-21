@@ -18,7 +18,6 @@
 #define MR_OAUTH_TOKEN_PATH "/_internal/oauth/token"
 
 #define SESSION_ID_LEN 64
-#define ROLE_ADMIN "admin"
 
 using namespace logging;
 using namespace drogon;
@@ -131,6 +130,16 @@ namespace service {
     }
 
     Task<> Auth::expireSession(const std::string id) const { co_await global::cache->erase(createSessionCacheKey(id)); }
+
+    Task<UserSession> Auth::getExternalSession(HttpRequestPtr req) const {
+        const auto token = req->getParameter("token");
+        if (const auto user = co_await global::auth->getGitHubTokenUser(token)) {
+            const auto username = user->getValueOfId();
+            co_return { "", username, *user, Json::nullValue };
+        }
+
+        co_return co_await global::auth->getSession(req);
+    }
 
     std::string Auth::getModrinthOAuthInitURL(std::string state) const {
         const auto callbackUrl = appUrl_ + "/api/v1/auth/callback/modrinth";

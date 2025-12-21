@@ -18,8 +18,8 @@ namespace content {
         std::unordered_map<std::string, ItemSlot> outputSlots;
 
         friend void to_json(nlohmann::json &j, const GameRecipeType &obj) {
-            j = nlohmann::json{{"id", obj.id.empty() ? nlohmann::json(nullptr) : nlohmann::json(obj.id)},
-                               {"localizedName", obj.localizedName.empty() ? nlohmann::json(nullptr) : nlohmann::json(obj.localizedName)},
+            j = nlohmann::json{{"id", emptyStrNullable(obj.id)},
+                               {"localizedName", emptyStrNullable(obj.localizedName)},
                                {"background", obj.background},
                                {"inputSlots", obj.inputSlots},
                                {"outputSlots", obj.outputSlots}};
