@@ -4,7 +4,7 @@
 #include <drogon/utils/coroutine.h>
 #include <models/Recipe.h>
 #include <optional>
-#include <util.h>
+#include <service/util.h>
 
 using namespace drogon_model::postgres;
 
