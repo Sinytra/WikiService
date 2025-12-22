@@ -216,7 +216,8 @@ namespace api::v1 {
         UserProject member;
         member.setProjectId(project->getValueOfId());
         member.setRole(json["role"]);
-        member.setUserId(json["username"]);
+        const std::string username = json["username"];
+        member.setUserId(strToLower(username));
 
         if (const auto result = co_await addProjectMember(*project, session, member); !result) {
             throw ApiException{Error::ErrInternal, "Error adding member"};

@@ -121,7 +121,8 @@ namespace service {
         }
 
         Json::Value root;
-        root["username"] = (*profileJson)["login"].asString();
+        root["name"] = (*profileJson)["login"].asString();
+        root["username"] = user->getValueOfId();
         root["avatar_url"] = (*profileJson)["avatar_url"].asString();
         root["modrinth_id"] = user->getModrinthId() ? user->getValueOfModrinthId() : Json::Value::null;
         root["role"] = user->getValueOfRole();
