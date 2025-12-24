@@ -378,7 +378,7 @@ namespace api::v1 {
         }
 
         const auto details = json["details"];
-        const auto path = json["path"];
+        const std::string path = json.contains("path") ? json["path"] : "";
         auto resolvedPath = path;
         if (!path.empty()) {
             const auto filePath = resolved->getPagePath(path);
