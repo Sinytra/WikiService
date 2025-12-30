@@ -28,10 +28,16 @@
             {
               "type": "object",
               "properties": {
-                "id": {"type": "string"},
-                "count": {"type": "integer"}
+                "id": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "integer"
+                }
               },
-              "required": ["id"]
+              "required": [
+                "id"
+              ]
             }
           ]
         }

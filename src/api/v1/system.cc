@@ -34,6 +34,14 @@ namespace api::v1 {
     };
 
     std::vector<DataMigration> dataMigrations = {};
+    std::unordered_map<std::string, nlohmann::json &> publicSchemas = {
+        {"_meta", schemas::folderMetadata},
+        {"sinytra-wiki", schemas::projectMetadata},
+        {"properties", schemas::properties},
+        {"workbenches", schemas::recipeWorkbenches},
+        {"game-recipe-custom", schemas::gameRecipeCustom},
+        {"game-recipe-type", schemas::gameRecipeType}
+    };
 
     Task<> SystemController::getLocales(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
         static const Locale LOCALE_EN{"en", "English", DEFAULT_LOCALE};
@@ -43,6 +51,16 @@ namespace api::v1 {
         locales.insert(locales.begin(), LOCALE_EN);
 
         callback(jsonResponse(locales));
+    }
+
+    Task<> SystemController::getJsonSchema(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+                                           const std::string id) const {
+        if (const auto it = publicSchemas.find(id); it != publicSchemas.end()) {
+            callback(jsonResponse(it->second));
+        } else {
+            callback(statusResponse(k404NotFound));
+        }
+        co_return;
     }
 
     Task<> SystemController::getSystemInformation(const HttpRequestPtr req,

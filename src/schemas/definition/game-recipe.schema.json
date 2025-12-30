@@ -1,458 +1,471 @@
 {
-    "$schema": "http://json-schema.org/draft-07/schema#",
-    "$id": "https://json.schemastore.org/minecraft-recipe.json",
-    "$comment": "https://minecraft.wiki/w/Recipe#JSON_format",
-    "title": "Limited Minecraft datapack recipe",
-    "type": "object",
-    "allOf": [
-        {
-            "if": {
-                "properties": {
-                    "type": {
-                        "const": "minecraft:campfire_cooking"
-                    }
-                }
-            },
-            "then": {
-                "description": "Represents a recipe in a campfire.",
-                "allOf": [
-                    {
-                        "$ref": "#/definitions/tagsCommonToAllRecipes"
-                    },
-                    {
-                        "$ref": "#/definitions/tagsCommonToAllCookingRecipes"
-                    },
-                    {
-                        "$ref": "#/definitions/cookingRecipeCategory"
-                    }
-                ]
-            }
-        },
-        {
-            "if": {
-                "properties": {
-                    "type": {
-                        "const": "minecraft:crafting_shaped"
-                    }
-                }
-            },
-            "then": {
-                "description": "Represents a shaped crafting recipe in a crafting table.",
-                "allOf": [
-                    {
-                        "$ref": "#/definitions/tagsCommonToAllRecipes"
-                    },
-                    {
-                        "$ref": "#/definitions/commonRecipeCategory"
-                    }
-                ],
-                "properties": {
-                    "pattern": {
-                        "description": "A list of single-character keys used to describe a pattern for shaped crafting.",
-                        "type": "array",
-                        "items": {
-                            "type": "string",
-                            "maxLength": 3
-                        },
-                        "maxItems": 3
-                    },
-                    "key": {
-                        "title": "key",
-                        "description": "All keys used for this shaped crafting recipe.",
-                        "additionalProperties": {
-                            "type": [
-                                "object",
-                                "array",
-                                "string"
-                            ],
-                            "description": "The ingredient corresponding to this key.",
-                            "properties": {
-                                "item": {
-                                    "description": "An item ID.",
-                                    "type": "string"
-                                },
-                                "tag": {
-                                    "description": "An item tag.",
-                                    "type": "string"
-                                }
-                            },
-                            "items": {
-                                "type": [
-                                    "object",
-                                    "string"
-                                ],
-                                "properties": {
-                                    "item": {
-                                        "description": "An item ID.",
-                                        "type": "string"
-                                    },
-                                    "tag": {
-                                        "description": "An item tag.",
-                                        "type": "string"
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    "result": {
-                        "$ref": "#/definitions/result"
-                    }
-                },
-                "required": ["key", "pattern", "result"]
-            }
-        },
-        {
-            "if": {
-                "properties": {
-                    "type": {
-                        "const": "minecraft:crafting_shapeless"
-                    }
-                }
-            },
-            "then": {
-                "description": "Represents a shapeless crafting recipe in a crafting table.",
-                "allOf": [
-                    {
-                        "$ref": "#/definitions/tagsCommonToAllRecipes"
-                    },
-                    {
-                        "$ref": "#/definitions/commonRecipeCategory"
-                    }
-                ],
-                "properties": {
-                    "ingredients": {
-                        "description": "A list of entries for this shapeless crafting recipe.",
-                        "type": "array",
-                        "minItems": 1,
-                        "maxItems": 9,
-                        "items": {
-                            "oneOf": [
-                                {
-                                    "$ref": "#/definitions/ingredient",
-                                    "title": "ingredient",
-                                    "description": "An entry made of a single ingredient."
-                                },
-                                {
-                                    "description": "An entry made of a list of acceptable ingredients.",
-                                    "type": "array",
-                                    "items": {
-                                        "$ref": "#/definitions/ingredient"
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "result": {
-                        "$ref": "#/definitions/result"
-                    }
-                },
-                "required": ["ingredients", "result"]
-            }
-        },
-        {
-            "if": {
-                "properties": {
-                    "type": {
-                        "const": "minecraft:smelting"
-                    }
-                }
-            },
-            "then": {
-                "description": "Represents a recipe in a furnace.",
-                "allOf": [
-                    {
-                        "$ref": "#/definitions/tagsCommonToAllRecipes"
-                    },
-                    {
-                        "$ref": "#/definitions/tagsCommonToAllCookingRecipes"
-                    },
-                    {
-                        "$ref": "#/definitions/cookingRecipeCategory"
-                    }
-                ]
-            }
-        },
-        {
-            "if": {
-                "properties": {
-                    "type": {
-                        "const": "minecraft:blasting"
-                    }
-                }
-            },
-            "then": {
-                "description": "Represents a recipe in a blast furnace.",
-                "allOf": [
-                    {
-                        "$ref": "#/definitions/tagsCommonToAllRecipes"
-                    },
-                    {
-                        "$ref": "#/definitions/tagsCommonToAllCookingRecipes"
-                    },
-                    {
-                        "$ref": "#/definitions/cookingRecipeCategory"
-                    }
-                ]
-            }
-        },
-        {
-            "if": {
-                "properties": {
-                    "type": {
-                        "const": "minecraft:smithing_transform"
-                    }
-                }
-            },
-            "then": {
-                "$ref": "#/definitions/tagsCommonToAllRecipes",
-                "description": "Represents a recipe in a smithing table.",
-                "properties": {
-                    "base": {
-                        "$ref": "#/definitions/item",
-                        "title": "base",
-                        "description": "Ingredient specifying an item to be upgraded."
-                    },
-                    "addition": {
-                        "$ref": "#/definitions/item",
-                        "title": "addition"
-                    },
-                    "template": {
-                        "$ref": "#/definitions/item",
-                        "title": "template"
-                    },
-                    "result": {
-                        "title": "result",
-                        "$ref": "#/definitions/result"
-                    }
-                },
-                "required": [
-                    "base",
-                    "addition",
-                    "template",
-                    "result"
-                ]
-            }
-        },
-        {
-            "if": {
-                "properties": {
-                    "type": {
-                        "const": "minecraft:smoking"
-                    }
-                }
-            },
-            "then": {
-                "description": "Represents a recipe in a smoker.",
-                "allOf": [
-                    {
-                        "$ref": "#/definitions/tagsCommonToAllRecipes"
-                    },
-                    {
-                        "$ref": "#/definitions/tagsCommonToAllCookingRecipes"
-                    },
-                    {
-                        "$ref": "#/definitions/cookingRecipeCategory"
-                    }
-                ]
-            }
-        },
-        {
-            "if": {
-                "properties": {
-                    "type": {
-                        "const": "minecraft:stonecutting"
-                    }
-                }
-            },
-            "then": {
-                "description": "Represents a recipe in a stonecutter.",
-                "allOf": [
-                    {
-                        "$ref": "#/definitions/tagsCommonToAllRecipes"
-                    }
-                ],
-                "properties": {
-                    "ingredient": {
-                        "title": "ingredient",
-                        "oneOf": [
-                            {
-                                "$ref": "#/definitions/item",
-                                "description": "The ingredient for the recipe."
-                            },
-                            {
-                                "description": "The list of ingredients for the recipe.",
-                                "type": "array",
-                                "items": {
-                                    "$ref": "#/definitions/item",
-                                    "title": "ingredient"
-                                }
-                            }
-                        ]
-                    },
-                    "result": {
-                        "title": "result",
-                        "$ref": "#/definitions/result"
-                    }
-                },
-                "required": ["ingredient", "result"]
-            }
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://json.schemastore.org/minecraft-recipe.json",
+  "$comment": "https://minecraft.wiki/w/Recipe#JSON_format",
+  "title": "Limited Minecraft datapack recipe",
+  "type": "object",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "minecraft:campfire_cooking"
+          }
         }
-    ],
-    "definitions": {
-        "item": {
-            "type": [
+      },
+      "then": {
+        "description": "Represents a recipe in a campfire.",
+        "allOf": [
+          {
+            "$ref": "#/definitions/tagsCommonToAllRecipes"
+          },
+          {
+            "$ref": "#/definitions/tagsCommonToAllCookingRecipes"
+          },
+          {
+            "$ref": "#/definitions/cookingRecipeCategory"
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "minecraft:crafting_shaped"
+          }
+        }
+      },
+      "then": {
+        "description": "Represents a shaped crafting recipe in a crafting table.",
+        "allOf": [
+          {
+            "$ref": "#/definitions/tagsCommonToAllRecipes"
+          },
+          {
+            "$ref": "#/definitions/commonRecipeCategory"
+          }
+        ],
+        "properties": {
+          "pattern": {
+            "description": "A list of single-character keys used to describe a pattern for shaped crafting.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 3
+            },
+            "maxItems": 3
+          },
+          "key": {
+            "title": "key",
+            "description": "All keys used for this shaped crafting recipe.",
+            "additionalProperties": {
+              "type": [
                 "object",
+                "array",
                 "string"
-            ],
-            "properties": {
+              ],
+              "description": "The ingredient corresponding to this key.",
+              "properties": {
                 "item": {
-                    "description": "An item ID.",
-                    "type": "string"
+                  "description": "An item ID.",
+                  "type": "string"
                 },
                 "tag": {
-                    "description": "An item tag.",
-                    "type": "string"
+                  "description": "An item tag.",
+                  "type": "string"
                 }
-            },
-            "oneOf": [
-                {
-                    "type": "string"
-                },
-                {
-                    "type": "object",
-                    "required": [
-                        "item"
-                    ]
-                },
-                {
-                    "type": "object",
-                    "required": [
-                        "tag"
-                    ]
-                }
-            ]
-        },
-        "ingredient": {
-            "title": "ingredient",
-            "description": "An acceptable ingredient.",
-            "$ref": "#/definitions/item"
-        },
-        "tagsCommonToAllRecipes": {
-            "type": "object",
-            "properties": {
-                "type": {
-                    "description": "A namespaced ID indicating the type of serializer of the recipe.",
-                    "type": "string"
-                },
-                "group": {
-                    "description": "A string identifier. Used to group multiple recipes together in the recipe book.",
-                    "type": "string"
-                },
-                "show_notification": {
-                    "description": "If a notification is shown when the recipe is unlocked.",
-                    "type": "boolean"
-                }
-            }
-        },
-        "tagsCommonToAllCookingRecipes": {
-            "type": "object",
-            "properties": {
-                "ingredient": {
-                    "$ref": "#/definitions/ingredient",
-                    "title": "ingredients",
-                    "description": "The ingredients.",
-                    "type": [
-                        "object",
-                        "array"
-                    ],
-                    "items": {
-                        "$ref": "#/definitions/ingredient"
-                    }
-                },
-                "result": {
-                    "description": "An item ID. The output item of the recipe.",
-                    "$ref": "#/definitions/result"
-                },
-                "experience": {
-                    "description": "The output experience of the recipe.",
-                    "type": "number"
-                },
-                "cookingtime": {
-                    "description": "The cook time of the recipe in ticks.",
-                    "type": "integer"
-                }
-            },
-            "required": ["ingredient", "result"]
-        },
-        "commonRecipeCategory": {
-            "title": "category",
-            "description": "Category of common recipes (in recipe book).",
-            "type": "object",
-            "properties": {
-                "category": {
-                    "type": "string",
-                    "enum": [
-                        "building",
-                        "redstone",
-                        "equipment",
-                        "misc"
-                    ]
-                }
-            }
-        },
-        "cookingRecipeCategory": {
-            "title": "category",
-            "description": "Category of cooking recipes (in recipe book).",
-            "type": "object",
-            "properties": {
-                "category": {
-                    "type": "string",
-                    "enum": [
-                        "food",
-                        "blocks",
-                        "misc"
-                    ]
-                }
-            }
-        },
-        "result": {
-            "title": "result",
-            "description": "The output item of the recipe.",
-            "type": [
-                "object",
-                "string"
-            ],
-            "properties": {
-                "count": {
-                    "description": "The amount of the item.",
-                    "type": "integer",
-                    "default": 1
-                },
-                "id": {
+              },
+              "items": {
+                "type": [
+                  "object",
+                  "string"
+                ],
+                "properties": {
+                  "item": {
                     "description": "An item ID.",
                     "type": "string"
+                  },
+                  "tag": {
+                    "description": "An item tag.",
+                    "type": "string"
+                  }
                 }
-            },
-            "required": [
-                "id"
-            ]
-        }
+              }
+            }
+          },
+          "result": {
+            "$ref": "#/definitions/result"
+          }
+        },
+        "required": [
+          "key",
+          "pattern",
+          "result"
+        ]
+      }
     },
-    "description": "Configuration file defining a recipe for a data pack for Minecraft.",
-    "properties": {
-        "type": {
-            "description": "The type of recipe.",
-            "type": "string",
-            "enum": [
-                "minecraft:blasting",
-                "minecraft:campfire_cooking",
-                "minecraft:crafting_shaped",
-                "minecraft:crafting_shapeless",
-                "minecraft:smelting",
-                "minecraft:smithing_transform",
-                "minecraft:smoking",
-                "minecraft:stonecutting"
-            ]
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "minecraft:crafting_shapeless"
+          }
         }
+      },
+      "then": {
+        "description": "Represents a shapeless crafting recipe in a crafting table.",
+        "allOf": [
+          {
+            "$ref": "#/definitions/tagsCommonToAllRecipes"
+          },
+          {
+            "$ref": "#/definitions/commonRecipeCategory"
+          }
+        ],
+        "properties": {
+          "ingredients": {
+            "description": "A list of entries for this shapeless crafting recipe.",
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 9,
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/definitions/ingredient",
+                  "title": "ingredient",
+                  "description": "An entry made of a single ingredient."
+                },
+                {
+                  "description": "An entry made of a list of acceptable ingredients.",
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/ingredient"
+                  }
+                }
+              ]
+            }
+          },
+          "result": {
+            "$ref": "#/definitions/result"
+          }
+        },
+        "required": [
+          "ingredients",
+          "result"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "minecraft:smelting"
+          }
+        }
+      },
+      "then": {
+        "description": "Represents a recipe in a furnace.",
+        "allOf": [
+          {
+            "$ref": "#/definitions/tagsCommonToAllRecipes"
+          },
+          {
+            "$ref": "#/definitions/tagsCommonToAllCookingRecipes"
+          },
+          {
+            "$ref": "#/definitions/cookingRecipeCategory"
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "minecraft:blasting"
+          }
+        }
+      },
+      "then": {
+        "description": "Represents a recipe in a blast furnace.",
+        "allOf": [
+          {
+            "$ref": "#/definitions/tagsCommonToAllRecipes"
+          },
+          {
+            "$ref": "#/definitions/tagsCommonToAllCookingRecipes"
+          },
+          {
+            "$ref": "#/definitions/cookingRecipeCategory"
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "minecraft:smithing_transform"
+          }
+        }
+      },
+      "then": {
+        "$ref": "#/definitions/tagsCommonToAllRecipes",
+        "description": "Represents a recipe in a smithing table.",
+        "properties": {
+          "base": {
+            "$ref": "#/definitions/item",
+            "title": "base",
+            "description": "Ingredient specifying an item to be upgraded."
+          },
+          "addition": {
+            "$ref": "#/definitions/item",
+            "title": "addition"
+          },
+          "template": {
+            "$ref": "#/definitions/item",
+            "title": "template"
+          },
+          "result": {
+            "title": "result",
+            "$ref": "#/definitions/result"
+          }
+        },
+        "required": [
+          "base",
+          "addition",
+          "template",
+          "result"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "minecraft:smoking"
+          }
+        }
+      },
+      "then": {
+        "description": "Represents a recipe in a smoker.",
+        "allOf": [
+          {
+            "$ref": "#/definitions/tagsCommonToAllRecipes"
+          },
+          {
+            "$ref": "#/definitions/tagsCommonToAllCookingRecipes"
+          },
+          {
+            "$ref": "#/definitions/cookingRecipeCategory"
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "minecraft:stonecutting"
+          }
+        }
+      },
+      "then": {
+        "description": "Represents a recipe in a stonecutter.",
+        "allOf": [
+          {
+            "$ref": "#/definitions/tagsCommonToAllRecipes"
+          }
+        ],
+        "properties": {
+          "ingredient": {
+            "title": "ingredient",
+            "oneOf": [
+              {
+                "$ref": "#/definitions/item",
+                "description": "The ingredient for the recipe."
+              },
+              {
+                "description": "The list of ingredients for the recipe.",
+                "type": "array",
+                "items": {
+                  "$ref": "#/definitions/item",
+                  "title": "ingredient"
+                }
+              }
+            ]
+          },
+          "result": {
+            "title": "result",
+            "$ref": "#/definitions/result"
+          }
+        },
+        "required": [
+          "ingredient",
+          "result"
+        ]
+      }
     }
+  ],
+  "definitions": {
+    "item": {
+      "type": [
+        "object",
+        "string"
+      ],
+      "properties": {
+        "item": {
+          "description": "An item ID.",
+          "type": "string"
+        },
+        "tag": {
+          "description": "An item tag.",
+          "type": "string"
+        }
+      },
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "object",
+          "required": [
+            "item"
+          ]
+        },
+        {
+          "type": "object",
+          "required": [
+            "tag"
+          ]
+        }
+      ]
+    },
+    "ingredient": {
+      "title": "ingredient",
+      "description": "An acceptable ingredient.",
+      "$ref": "#/definitions/item"
+    },
+    "tagsCommonToAllRecipes": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "description": "A namespaced ID indicating the type of serializer of the recipe.",
+          "type": "string"
+        },
+        "group": {
+          "description": "A string identifier. Used to group multiple recipes together in the recipe book.",
+          "type": "string"
+        },
+        "show_notification": {
+          "description": "If a notification is shown when the recipe is unlocked.",
+          "type": "boolean"
+        }
+      }
+    },
+    "tagsCommonToAllCookingRecipes": {
+      "type": "object",
+      "properties": {
+        "ingredient": {
+          "$ref": "#/definitions/ingredient",
+          "title": "ingredients",
+          "description": "The ingredients.",
+          "type": [
+            "object",
+            "array"
+          ],
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "result": {
+          "description": "An item ID. The output item of the recipe.",
+          "$ref": "#/definitions/result"
+        },
+        "experience": {
+          "description": "The output experience of the recipe.",
+          "type": "number"
+        },
+        "cookingtime": {
+          "description": "The cook time of the recipe in ticks.",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "ingredient",
+        "result"
+      ]
+    },
+    "commonRecipeCategory": {
+      "title": "category",
+      "description": "Category of common recipes (in recipe book).",
+      "type": "object",
+      "properties": {
+        "category": {
+          "type": "string",
+          "enum": [
+            "building",
+            "redstone",
+            "equipment",
+            "misc"
+          ]
+        }
+      }
+    },
+    "cookingRecipeCategory": {
+      "title": "category",
+      "description": "Category of cooking recipes (in recipe book).",
+      "type": "object",
+      "properties": {
+        "category": {
+          "type": "string",
+          "enum": [
+            "food",
+            "blocks",
+            "misc"
+          ]
+        }
+      }
+    },
+    "result": {
+      "title": "result",
+      "description": "The output item of the recipe.",
+      "type": [
+        "object",
+        "string"
+      ],
+      "properties": {
+        "count": {
+          "description": "The amount of the item.",
+          "type": "integer",
+          "default": 1
+        },
+        "id": {
+          "description": "An item ID.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  "description": "Configuration file defining a recipe for a data pack for Minecraft.",
+  "properties": {
+    "type": {
+      "description": "The type of recipe.",
+      "type": "string",
+      "enum": [
+        "minecraft:blasting",
+        "minecraft:campfire_cooking",
+        "minecraft:crafting_shaped",
+        "minecraft:crafting_shapeless",
+        "minecraft:smelting",
+        "minecraft:smithing_transform",
+        "minecraft:smoking",
+        "minecraft:stonecutting"
+      ]
+    }
+  }
 }

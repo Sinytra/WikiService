@@ -6,21 +6,40 @@
     "github_app": {
       "type": "object",
       "properties": {
-        "client_id": { "type": "string" },
-        "client_secret": { "type": "string" }
+        "client_id": {
+          "type": "string"
+        },
+        "client_secret": {
+          "type": "string"
+        }
       },
-      "required": ["client_id", "client_secret"]
+      "required": [
+        "client_id",
+        "client_secret"
+      ]
     },
     "modrinth_app": {
       "type": "object",
       "properties": {
-        "client_id": { "type": "string" },
-        "client_secret": { "type": "string" },
-        "redirect_url": { "type": "string" }
+        "client_id": {
+          "type": "string"
+        },
+        "client_secret": {
+          "type": "string"
+        },
+        "redirect_url": {
+          "type": "string"
+        }
       }
     },
-    "curseforge_key": { "type": "string" },
-    "api_key": { "type": "string" }
+    "curseforge_key": {
+      "type": "string"
+    },
+    "api_key": {
+      "type": "string"
+    }
   },
-  "required": ["github_app"]
+  "required": [
+    "github_app"
+  ]
 }

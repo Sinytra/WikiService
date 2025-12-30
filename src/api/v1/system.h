@@ -9,6 +9,7 @@ namespace api::v1 {
         METHOD_LIST_BEGIN
         // Public
         ADD_METHOD_TO(SystemController::getLocales, "/api/v1/system/locales", drogon::Get, "AuthFilter");
+        ADD_METHOD_TO(SystemController::getJsonSchema, "/static/schemas/{1:id}.schema.json", drogon::Get);
         // Internal
         ADD_METHOD_TO(SystemController::getSystemInformation, "/api/v1/system/info", drogon::Get, ADMIN_AUTH);
         ADD_METHOD_TO(SystemController::getDataImports, "/api/v1/system/imports", drogon::Get, ADMIN_AUTH);
@@ -23,6 +24,7 @@ namespace api::v1 {
         METHOD_LIST_END
 
         drogon::Task<> getLocales(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback) const;
+        drogon::Task<> getJsonSchema(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback, std::string id) const;
 
         drogon::Task<> getSystemInformation(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback) const;
         drogon::Task<> listAllProjects(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback) const;
