@@ -1,58 +1,17 @@
-#include "issues.h"
+#include "issue_callback.h"
 
-#include <service/database/database.h>
-#include <service/util.h>
-#include "models/ProjectIssue.h"
+#include "issue_service.h"
 
 using namespace drogon;
 
 namespace service {
-    // clang-format off
-    ENUM_FROM_TO_STR(ProjectIssueLevel,
-        {ProjectIssueLevel::WARNING, "warning"},
-        {ProjectIssueLevel::ERROR, "error"}
-    )
-
-    ENUM_FROM_TO_STR(ProjectIssueType,
-        {ProjectIssueType::META, "meta"},
-        {ProjectIssueType::FILE, "file"},
-        {ProjectIssueType::GIT_CLONE, "git_clone"},
-        {ProjectIssueType::GIT_INFO, "git_info"},
-        {ProjectIssueType::INGESTOR, "ingestor"},
-        {ProjectIssueType::PAGE, "page"},
-        {ProjectIssueType::INTERNAL, "internal"}
-    )
-
-    ENUM_FROM_TO_STR(ProjectError,
-        {ProjectError::OK, "ok"},
-        {ProjectError::REQUIRES_AUTH, "requires_auth"},
-        {ProjectError::NO_REPOSITORY, "no_repository"},
-        {ProjectError::REPO_TOO_LARGE, "repo_too_large"},
-        {ProjectError::NO_BRANCH, "no_branch"},
-        {ProjectError::NO_PATH, "no_path"},
-        {ProjectError::INVALID_META, "invalid_meta"},
-        {ProjectError::PAGE_RENDER, "page_render"},
-        {ProjectError::DUPLICATE_PAGE, "duplicate_page"},
-        {ProjectError::UNKNOWN_RECIPE_TYPE, "unknown_recipe_type"},
-        {ProjectError::INVALID_INGREDIENT, "invalid_ingredient"},
-        {ProjectError::INVALID_FILE, "invalid_file"},
-        {ProjectError::INVALID_FORMAT, "invalid_format"},
-        {ProjectError::INVALID_RESLOC, "invalid_resloc"},
-        {ProjectError::INVALID_VERSION_BRANCH, "invalid_version_branch"},
-        {ProjectError::MISSING_PLATFORM_PROJECT, "missing_platform_project"},
-        {ProjectError::NO_PAGE_TITLE, "no_page_title"},
-        {ProjectError::INVALID_FRONTMATTER, "invalid_frontmatter"},
-        {ProjectError::MISSING_REQUIRED_ATTRIBUTE, "missing_required_attribute"}
-    )
-    // clang-format on
-
     ProjectIssueCallback::ProjectIssueCallback(const std::string &id, const std::shared_ptr<spdlog::logger> &log) :
         deploymentId_(id), logger_(log), hasErrors_(false) {}
 
     Task<> addIssueStatic(const ProjectIssueLevel level, const ProjectIssueType type, const ProjectError subject, const std::string details,
                           const std::string file, const std::string deploymentId, const std::shared_ptr<spdlog::logger> logger) {
         if (!deploymentId.empty()) {
-            co_await addIssue(deploymentId, level, type, subject, details, file);
+            co_await global::issues->addProjectIssueInternal(deploymentId, level, type, subject, details, file);
         }
 
         const auto logLevel = level == ProjectIssueLevel::ERROR ? spdlog::level::err : spdlog::level::warn;
@@ -121,18 +80,5 @@ namespace service {
         }
 
         return json;
-    }
-
-    Task<> addIssue(const std::string deploymentId, const ProjectIssueLevel level, const ProjectIssueType type, const ProjectError subject,
-                    const std::string details, const std::string file) {
-        ProjectIssue issue;
-        issue.setDeploymentId(deploymentId);
-        issue.setLevel(enumToStr(level));
-        issue.setType(enumToStr(type));
-        issue.setSubject(enumToStr(subject));
-        issue.setDetails(details);
-        issue.setFile(file);
-
-        co_await global::database->addModel(issue);
     }
 }

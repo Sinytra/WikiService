@@ -12,7 +12,7 @@
 #include <models/Report.h>
 #include <nlohmann/json.hpp>
 #include <service/error.h>
-#include <service/storage/issues.h>
+#include <service/storage/issues/issues.h>
 
 using namespace drogon_model::postgres;
 
@@ -135,7 +135,7 @@ namespace service {
 
         // Issues
         drogon::Task<TaskResult<ProjectIssue>> getProjectIssue(std::string deploymentId, ProjectIssueLevel level, ProjectIssueType type,
-                                                               std::string path) const;
+                                                               std::string file) const;
         drogon::Task<std::vector<ProjectIssue>> getDeploymentIssues(std::string deploymentId) const;
         drogon::Task<std::unordered_map<std::string, int64_t>> getActiveProjectIssueStats(std::string projectId) const;
 

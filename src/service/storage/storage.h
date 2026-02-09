@@ -35,9 +35,6 @@ namespace service {
 
         drogon::Task<TaskResult<Deployment>> deployProject(const Project &project, std::string userId);
 
-        drogon::Task<Error> addProjectIssue(ProjectBasePtr project, ProjectIssueLevel level, ProjectIssueType type,
-                                            ProjectError subject, std::string details, std::string path);
-
         std::shared_ptr<spdlog::logger> getProjectLogger(const Project &project, bool file = true) const;
     private:
         drogon::Task<TaskResult<ProjectVersion>> getDefaultVersion(const Project &project) const;

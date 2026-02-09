@@ -24,6 +24,21 @@ template<class T>
 using WrapperInnerType_T = WrapperInnerType<T>::type;
 
 template<typename T = std::monostate>
+struct TaskResult;
+
+template<>
+struct TaskResult<std::monostate> {
+    TaskResult(const service::Error err) : error_(err) {}
+
+    operator bool() const { return error_ == service::Error::Ok; }
+
+    service::Error error() const { return error_; }
+
+private:
+    service::Error error_;
+};
+
+template<typename T>
 struct TaskResult {
     TaskResult(const T val) : value_(val), error_(service::Error::Ok) {}
     TaskResult(const std::optional<T> &val) : value_(val), error_(service::Error::Ok) {}
@@ -50,6 +65,8 @@ struct TaskResult {
 
     TaskResult operator||(TaskResult const &rhs) const { return has_value() ? *this : rhs; }
 
+    operator TaskResult<>() const {return TaskResult(error_);}
+
     friend struct nlohmann::adl_serializer<TaskResult>;
 
 private:
@@ -57,17 +74,8 @@ private:
     service::Error error_;
 };
 
-template<>
-struct TaskResult<std::monostate> {
-    TaskResult(const service::Error err) : error_(err) {}
-
-    operator bool() const { return error_ == service::Error::Ok; }
-
-    service::Error error() const { return error_; }
-
-private:
-    service::Error error_;
-};
+template<typename T = std::monostate>
+using ComputableTask = drogon::Task<TaskResult<T>>;
 
 template<typename T>
 struct nlohmann::adl_serializer<TaskResult<T>> {
@@ -110,9 +118,7 @@ static std::unordered_map<V, K> reverse_map(const std::unordered_map<K, V> &m) {
 
 template<typename T>
 concept JsonSerializable = requires(nlohmann::json &j, const T &obj) {
-    {
-        to_json(j, obj)
-    };
+    { to_json(j, obj) };
 };
 
 struct TableQueryParams {
@@ -252,6 +258,6 @@ std::string formatDateTimeISO(const std::string &databaseData);
 
 bool isSubpath(std::filesystem::path path, std::filesystem::path base);
 
-bool contains(const std::string& text, const std::string& pattern);
+bool contains(const std::string &text, const std::string &pattern);
 
 nlohmann::json emptyStrNullable(const std::string &str);

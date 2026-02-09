@@ -1,4 +1,4 @@
-#include <service/storage/issues.h>
+#include <service/storage/issues/issues.h>
 #include "database.h"
 
 using namespace logging;
@@ -7,16 +7,16 @@ using namespace drogon::orm;
 
 namespace service {
     Task<TaskResult<ProjectIssue>> Database::getProjectIssue(const std::string deploymentId, const ProjectIssueLevel level,
-                                                             const ProjectIssueType type, const std::string path) const {
-        co_return co_await handleDatabaseOperation([deploymentId, path, level, type](const DbClientPtr &client) -> Task<ProjectIssue> {
+                                                             const ProjectIssueType type, const std::string file) const {
+        co_return co_await handleDatabaseOperation([deploymentId, file, level, type](const DbClientPtr &client) -> Task<ProjectIssue> {
             CoroMapper<ProjectIssue> mapper(client);
             mapper.limit(1);
 
             auto criteria{Criteria(ProjectIssue::Cols::_deployment_id, CompareOperator::EQ, deploymentId) &&
                           Criteria(ProjectIssue::Cols::_level, CompareOperator::EQ, enumToStr(level)) &&
                           Criteria(ProjectIssue::Cols::_type, CompareOperator::EQ, enumToStr(type))};
-            if (!path.empty()) {
-                criteria = criteria && Criteria(ProjectIssue::Cols::_file, CompareOperator::EQ, path);
+            if (!file.empty()) {
+                criteria = criteria && Criteria(ProjectIssue::Cols::_file, CompareOperator::EQ, file);
             }
 
             co_return co_await mapper.findOne(criteria);

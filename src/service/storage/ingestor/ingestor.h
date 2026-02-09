@@ -6,7 +6,7 @@
 #include <service/error.h>
 #include <service/project/resolved.h>
 #include <service/storage/ingestor/recipe/recipe_parser.h>
-#include <service/storage/issues.h>
+#include <service/storage/issues/issue_callback.h>
 
 #define INGESTOR_CONTENT_PATHS "Content paths"
 #define INGESTOR_TAGS "Tags"

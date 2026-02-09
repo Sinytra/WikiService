@@ -13,6 +13,7 @@
 // ReSharper disable once CppUnusedIncludeDirective
 #include <service/serializers.h>
 #include <service/storage/gitops.h>
+#include <service/storage/issues/issue_service.h>
 #include <service/util.h>
 #include <version.h>
 
@@ -387,11 +388,11 @@ namespace api::v1 {
             }
             resolvedPath = *filePath;
         }
-        const auto res = co_await global::storage->addProjectIssue(resolved, parsedLevel, parsedType, parsedSubject, details, resolvedPath);
-        if (res == Error::ErrNotFound) {
+        const auto res = co_await global::issues->addProjectIssueExternal(resolved, parsedLevel, parsedType, parsedSubject, details, resolvedPath);
+        if (res.error() == Error::ErrNotFound) {
             throw ApiException(Error::ErrNotFound, "not_found");
         }
 
-        callback(statusResponse(res == Error::Ok ? k201Created : k409Conflict));
+        callback(statusResponse(res.error() == Error::Ok ? k201Created : k409Conflict));
     }
 }

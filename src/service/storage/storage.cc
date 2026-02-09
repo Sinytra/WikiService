@@ -1,12 +1,10 @@
 #include "storage.h"
 
 #include <fstream>
-#include <service/storage/deployment.h>
-#include <service/util.h>
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
-
-#include "project/virtual/virtual.h"
+#include <service/project/virtual/virtual.h>
+#include <service/util.h>
 
 #define LATEST_VERSION "latest"
 #define LOG_FILE "project.log"
@@ -15,11 +13,6 @@ using namespace logging;
 using namespace drogon;
 using namespace service;
 namespace fs = std::filesystem;
-
-inline std::string createProjectIssueKey(const std::string &project, const std::string &level, const std::string &type,
-                                         const std::string &subject, const std::string &path) {
-    return std::format("project_issue:{}:{}:{}:{}:[{}]", project, level, type, subject, path);
-}
 
 namespace service {
     inline std::string createProjectSetupKey(const Project &project) { return "setup:" + project.getValueOfId(); }
@@ -241,42 +234,5 @@ namespace service {
         }
 
         co_return deployment;
-    }
-
-    Task<Error> Storage::addProjectIssue(const ProjectBasePtr project, const ProjectIssueLevel level, const ProjectIssueType type,
-                                         const ProjectError subject, const std::string details, const std::string path) {
-        const auto projectId = project->getId();
-
-        const auto deployment(co_await global::database->getActiveDeployment(projectId));
-        if (!deployment) {
-            co_return Error::ErrNotFound;
-        }
-
-        const auto taskKey = createProjectIssueKey(projectId, enumToStr(level), enumToStr(type), enumToStr(subject), path);
-
-        if (const auto pending = co_await getOrStartTask<Error>(taskKey)) {
-            co_return co_await patientlyAwaitTaskResult(*pending);
-        }
-
-        if (const auto existing = co_await global::database->getProjectIssue(deployment->getValueOfId(), level, type, path)) {
-            co_return co_await completeTask<Error>(taskKey, Error::ErrBadRequest);
-        }
-
-        ProjectIssue issue;
-        issue.setDeploymentId(deployment->getValueOfId());
-        issue.setLevel(enumToStr(level));
-        issue.setType(enumToStr(type));
-        issue.setSubject(enumToStr(subject));
-        issue.setDetails(details);
-        if (!path.empty()) {
-            issue.setFile(path);
-        }
-        if (const auto versionName = project->getProjectVersion().getName()) {
-            issue.setVersionName(*versionName);
-        }
-
-        co_await global::database->addModel(issue);
-
-        co_return co_await completeTask<Error>(taskKey, Error::Ok);
     }
 }

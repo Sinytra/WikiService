@@ -1,14 +1,15 @@
 #pragma once
 
+#include <nlohmann/json_fwd.hpp>
 #include <models/Item.h>
 #include <models/Project.h>
 #include <models/ProjectVersion.h>
-#include <nlohmann/json_fwd.hpp>
-#include <service/project/project.h>
 #include <service/cache.h>
 #include <service/database/database.h>
-#include <service/util.h>
+#include <service/project/project.h>
 #include <service/project/format.h>
+#include <service/storage/issues/issue_callback.h>
+#include <service/util.h>
 
 namespace service {
     struct FolderMetadataEntry {

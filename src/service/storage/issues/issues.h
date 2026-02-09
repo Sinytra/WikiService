@@ -1,0 +1,28 @@
+#pragma once
+
+#include <string>
+
+namespace service {
+    enum class ProjectIssueLevel { WARNING, ERROR, UNKNOWN };
+    std::string enumToStr(ProjectIssueLevel level);
+    ProjectIssueLevel parseProjectIssueLevel(const std::string &level);
+
+    enum class ProjectIssueType { META, FILE, GIT_CLONE, GIT_INFO, PAGE, INGESTOR, INTERNAL, UNKNOWN };
+    std::string enumToStr(ProjectIssueType type);
+    ProjectIssueType parseProjectIssueType(const std::string &level);
+
+    // clang-format off
+    enum class ProjectError {
+        OK,
+        REQUIRES_AUTH, NO_REPOSITORY, REPO_TOO_LARGE, NO_BRANCH, NO_PATH,
+        INVALID_META, PAGE_RENDER,
+        DUPLICATE_PAGE, UNKNOWN_RECIPE_TYPE, INVALID_INGREDIENT,
+        INVALID_FILE, INVALID_FORMAT, INVALID_RESLOC, INVALID_VERSION_BRANCH,
+        INVALID_FRONTMATTER,
+        MISSING_PLATFORM_PROJECT, NO_PAGE_TITLE, MISSING_REQUIRED_ATTRIBUTE,
+        UNKNOWN
+    };
+    // clang-format on
+    std::string enumToStr(ProjectError status);
+    ProjectError parseProjectError(const std::string &str);
+}

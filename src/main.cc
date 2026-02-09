@@ -22,6 +22,7 @@
 #include <service/project/virtual/virtual.h>
 #include <service/storage/ingestor/recipe/recipe_builtin.h>
 #include <service/storage/realtime.h>
+#include <service/storage/issues/issue_service.h>
 #include <service/system/access_keys.h>
 #include <service/system/game_data.h>
 #include <service/system/lang.h>
@@ -42,6 +43,7 @@ namespace global {
     std::shared_ptr<GitHub> github;
     std::shared_ptr<realtime::ConnectionManager> connections;
     std::shared_ptr<Storage> storage;
+    std::shared_ptr<IssueService> issues;
     std::shared_ptr<Auth> auth;
     std::shared_ptr<LangService> lang;
     std::shared_ptr<GameDataService> gameData;
@@ -100,6 +102,7 @@ int main() {
         global::github = std::make_shared<GitHub>();
         global::connections = std::make_shared<realtime::ConnectionManager>();
         global::storage = std::make_shared<Storage>(storagePath);
+        global::issues = std::make_shared<IssueService>();
         global::auth = std::make_shared<Auth>(appUrl, OAuthApp{githubAppConfig.clientId, githubAppConfig.clientSecret},
                                               OAuthApp{mrApp.clientId, mrApp.clientSecret});
         global::lang = std::make_shared<LangService>();
