@@ -31,6 +31,7 @@ add_library(service STATIC
         project/format.cc
         project/frontmatter.cc
         project/pages.cc
+        project/project.cc
         project/recipe_resolver.cc
         project/reports.cc
         project/resolved.cc

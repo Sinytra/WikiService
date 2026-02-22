@@ -22,6 +22,8 @@ namespace service {
         std::string clientSecret;
     };
 
+    bool isAdmin(const UserSession &session);
+
     class Auth : public CacheableServiceBase {
     public:
         explicit Auth(const std::string &, const OAuthApp &, const OAuthApp &);
@@ -30,6 +32,7 @@ namespace service {
         drogon::Task<std::string> createUserSession(std::string username, std::string profile) const;
         drogon::Task<std::optional<std::string>> requestUserAccessToken(std::string code) const;
         drogon::Task<UserSession> getSession(drogon::HttpRequestPtr req) const;
+        drogon::Task<TaskResult<UserSession>> maybeGetSession(drogon::HttpRequestPtr req) const;
         drogon::Task<> ensurePrivilegedAccess(drogon::HttpRequestPtr req) const;
         drogon::Task<std::optional<UserSession>> getSession(std::string id) const;
         drogon::Task<UserSession> getExternalSession(drogon::HttpRequestPtr req) const;

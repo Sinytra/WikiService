@@ -118,7 +118,7 @@ namespace api::v1 {
 
         const auto migration = ranges::find_if(dataMigrations, [&id](const DataMigration &x) { return x.id == id; });
         if (migration == dataMigrations.end()) {
-            throw ApiException(Error::ErrNotFound, "not_found");
+            notFound();
         }
 
         app().getLoop()->queueInLoop(async_func([&]() -> Task<> { co_await executeDataMigration(id, migration->runner); }));

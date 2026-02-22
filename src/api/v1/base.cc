@@ -6,6 +6,7 @@
 
 using namespace drogon;
 using namespace service;
+using namespace logging;
 
 namespace api::v1 {
     void requireNonVirtual(const ProjectBasePtr &project) {
@@ -22,6 +23,25 @@ namespace api::v1 {
 
     void notFound(const std::string &msg) { throw ApiException(Error::ErrNotFound, msg); }
 
+    Task<> checkUserAccess(const HttpRequestPtr req, const Project project) {
+        auto visibility = parseProjectVisibility(project.getValueOfVisibility());
+        if (visibility == ProjectVisibility::UNKNOWN) {
+            logger.error("Project {} has unknown visiibility. Bug?", project.getValueOfId());
+            visibility = ProjectVisibility::PRIVATE;
+        }
+
+        // Non-private: Everyone can access
+        if (visibility != ProjectVisibility::PRIVATE) {
+            co_return;
+        }
+
+        // Private: User must be authenticated and part of project members
+        const auto session(co_await global::auth->maybeGetSession(req));
+        if (!session || !isAdmin(*session) || !co_await global::database->getUserProject(session->username, project.getValueOfId())) {
+            notFound();
+        }
+    }
+
     Task<ProjectBasePtr> BaseProjectController::getProjectWithParamsCached(const HttpRequestPtr req, const std::string project) {
         const auto resolved(co_await getProjectWithParams(req, project));
         co_return std::make_shared<CachedProject>(resolved);
@@ -31,22 +51,20 @@ namespace api::v1 {
         const auto version = req->getOptionalParameter<std::string>("version");
         const auto locale = req->getOptionalParameter<std::string>("locale");
         const auto validatedLocale = co_await validateLocale(locale);
-        co_return co_await getProject(project, version, validatedLocale);
+        co_return co_await getProject(req, project, version, validatedLocale);
     }
 
-    Task<ProjectBasePtr> BaseProjectController::getVersionedProject(const HttpRequestPtr req, const std::string project) {
-        const auto version = req->getOptionalParameter<std::string>("version");
-        co_return co_await getProject(project, version, std::nullopt);
-    }
-
-    Task<ProjectBasePtr> BaseProjectController::getProject(const std::string &project, const std::optional<std::string> &version,
-                                                           const std::optional<std::string> &locale) {
+    Task<ProjectBasePtr> BaseProjectController::getProject(const HttpRequestPtr req, const std::string project,
+                                                           const std::optional<std::string> version,
+                                                           const std::optional<std::string> locale) {
         assertNonEmptyParam(project);
 
         const auto resolved = co_await global::storage->getProject(project, version, locale);
         if (!resolved) {
             throw ApiException(resolved.error(), "Resolution failure");
         }
+
+        co_await checkUserAccess(req, (*resolved)->getProject());
 
         co_return *resolved;
     }
@@ -55,34 +73,33 @@ namespace api::v1 {
         const auto session(co_await global::auth->getSession(req));
         const auto project = co_await getUserProject(session, id);
         if (!project) {
-            throw ApiException(Error::ErrNotFound, "not_found");
+            notFound();
         }
         co_return *project;
     }
 
-    Task<ProjectBasePtr> BaseProjectController::getUserProject(const HttpRequestPtr req, const std::string &id,
-                                                               const std::optional<std::string> &version,
-                                                               const std::optional<std::string> &locale) {
+    Task<ProjectBasePtr> BaseProjectController::getUserProject(const HttpRequestPtr req, const std::string id,
+                                                               const std::optional<std::string> version,
+                                                               const std::optional<std::string> locale) {
         const auto session(co_await global::auth->getSession(req));
         const auto project = co_await getUserProject(session, id);
         if (!project) {
-            throw ApiException(Error::ErrNotFound, "not_found");
+            notFound();
         }
 
         const auto resolved(co_await global::storage->getProject(*project, version, locale));
         if (!resolved) {
-            throw ApiException(Error::ErrNotFound, "not_found");
+            notFound();
         }
 
         co_return *resolved;
     }
 
     Task<TaskResult<Project>> BaseProjectController::getUserProject(const UserSession session, const std::string id) {
-        const auto isAdmin = session.user.getValueOfRole() == ROLE_ADMIN;
-        const auto project =
-            isAdmin ? co_await global::database->getProjectSource(id) : co_await global::database->getUserProject(session.username, id);
+        const auto project = isAdmin(session) ? co_await global::database->getProjectSource(id)
+                                              : co_await global::database->getUserProject(session.username, id);
         if (!project) {
-            throw ApiException(Error::ErrNotFound, "not_found");
+            notFound();
         }
         co_return *project;
     }

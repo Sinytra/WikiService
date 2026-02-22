@@ -27,6 +27,10 @@ using namespace std::chrono_literals;
 std::string createSessionCacheKey(const std::string &sessionId) { return "session:" + sessionId; }
 
 namespace service {
+    bool isAdmin(const UserSession &session) {
+        return session.user.getValueOfRole() == ROLE_ADMIN;
+    }
+
     Auth::Auth(const std::string &appUrl, const OAuthApp &ghApp, const OAuthApp &mrApp) :
         appUrl_(appUrl), githubApp_(ghApp), modrinthApp_(mrApp) {}
 
@@ -80,12 +84,16 @@ namespace service {
     }
 
     Task<UserSession> Auth::getSession(const HttpRequestPtr req) const {
-        const auto token = req->getParameter("token");
-        const auto session = co_await getSession(token);
+        const auto session = co_await maybeGetSession(req);
         if (!session) {
             throw ApiException(Error::ErrUnauthorized, "unauthorized");
         }
         co_return *session;
+    }
+
+    Task<TaskResult<UserSession>> Auth::maybeGetSession(const HttpRequestPtr req) const {
+        const auto token = req->getParameter("token");
+        co_return co_await getSession(token);
     }
 
     Task<> Auth::ensurePrivilegedAccess(const HttpRequestPtr req) const {

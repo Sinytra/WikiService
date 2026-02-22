@@ -34,7 +34,7 @@ namespace api::v1 {
         const auto projectId = json["project_id"];
         const auto version = json.contains("version") ? std::make_optional(json["version"].get<std::string>()) : std::nullopt;
         const auto locale = json.contains("locale") ? std::make_optional(json["locale"].get<std::string>()) : std::nullopt;
-        const auto resolved = co_await BaseProjectController::getProject(projectId, version, locale);
+        const auto resolved = co_await BaseProjectController::getProject(req, projectId, version, locale);
 
         const auto type = parseReportType(json["type"]);
         if (type == ReportType::UNKNOWN) {

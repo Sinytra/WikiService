@@ -26,16 +26,13 @@ namespace api::v1 {
 
         static drogon::Task<service::ProjectBasePtr> getProjectWithParamsCached(drogon::HttpRequestPtr req, std::string project);
 
-        static drogon::Task<service::ProjectBasePtr> getVersionedProject(drogon::HttpRequestPtr req, std::string project);
-
-        static drogon::Task<service::ProjectBasePtr> getProject(const std::string &project, const std::optional<std::string> &version,
-                                                                const std::optional<std::string> &locale);
+        static drogon::Task<service::ProjectBasePtr> getProject(drogon::HttpRequestPtr req, std::string project,
+                                                                std::optional<std::string> version, std::optional<std::string> locale);
 
         static drogon::Task<Project> getUserProject(drogon::HttpRequestPtr req, std::string id);
 
-        static drogon::Task<service::ProjectBasePtr> getUserProject(drogon::HttpRequestPtr req, const std::string &project,
-                                                                    const std::optional<std::string> &version,
-                                                                    const std::optional<std::string> &locale);
+        static drogon::Task<service::ProjectBasePtr> getUserProject(drogon::HttpRequestPtr req, std::string project,
+                                                                    std::optional<std::string> version, std::optional<std::string> locale);
 
         static drogon::Task<TaskResult<Project>> getUserProject(service::UserSession session, std::string id);
 

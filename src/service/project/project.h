@@ -19,6 +19,12 @@ namespace service {
     void to_json(nlohmann::json &j, const FileType &obj);
     void from_json(const nlohmann::json &j, FileType &obj);
 
+    enum class ProjectVisibility { PUBLIC, UNLISTED, PRIVATE, UNKNOWN };
+    std::string enumToStr(ProjectVisibility type);
+    ProjectVisibility parseProjectVisibility(const std::string &type);
+    void to_json(nlohmann::json &j, const ProjectVisibility &obj);
+    void from_json(const nlohmann::json &j, ProjectVisibility &obj);
+
     struct FileTreeEntry {
         std::string id;
         std::string name;

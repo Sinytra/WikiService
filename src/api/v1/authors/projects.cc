@@ -134,9 +134,9 @@ namespace api::v1 {
         enqueueDeploy(*result, session.username);
     }
 
-    Task<> ProjectsController::update(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
+    Task<> ProjectsController::updateSource(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
         const auto session{co_await global::auth->getSession(req)};
-        const auto json(BaseProjectController::validatedBody(req, schemas::projectRegister));
+        const auto json(BaseProjectController::validatedBody(req, schemas::projectUpdateSource));
 
         auto [project, platforms] = co_await validateProjectData(json, session.user, true, localEnv_);
 
@@ -155,6 +155,30 @@ namespace api::v1 {
         callback(HttpResponse::newHttpJsonResponse(root));
 
         enqueueDeploy(project, session.username);
+    }
+
+    Task<> ProjectsController::update(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+                                      const std::string id) const {
+        const auto session(co_await global::auth->getSession(req));
+        const auto json(BaseProjectController::validatedBody(req, schemas::projectUpdate));
+
+        auto project(co_await BaseProjectController::getUserProject(req, id));
+
+        if (const auto member(co_await getUserAccessLevel(project, session)); member != ProjectMemberRole::OWNER) {
+            throw ApiException(Error::ErrForbidden, "insufficient_permissions");
+        }
+
+        // Process form body
+        if (json.contains("visibility")) {
+            project.setVisibility(json["visibility"]);
+        }
+
+        if (const auto result = co_await global::database->updateModel(project); !result) {
+            logger.error("Failed to update project {} in database", id);
+            throw ApiException(Error::ErrInternal, "internal");
+        }
+
+        callback(simpleResponse("Project updated successfully"));
     }
 
     Task<> ProjectsController::remove(const HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback,
@@ -388,9 +412,10 @@ namespace api::v1 {
             }
             resolvedPath = *filePath;
         }
-        const auto res = co_await global::issues->addProjectIssueExternal(resolved, parsedLevel, parsedType, parsedSubject, details, resolvedPath);
+        const auto res =
+            co_await global::issues->addProjectIssueExternal(resolved, parsedLevel, parsedType, parsedSubject, details, resolvedPath);
         if (res.error() == Error::ErrNotFound) {
-            throw ApiException(Error::ErrNotFound, "not_found");
+            notFound();
         }
 
         callback(statusResponse(res.error() == Error::Ok ? k201Created : k409Conflict));

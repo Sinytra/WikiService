@@ -165,6 +165,7 @@ namespace service {
         Json::Value infoJson;
 
         if (const auto [meta, err, detail] = validateProjectMetadata(); meta) {
+            // TODO Rework
             if (meta->contains("links")) {
                 if (const auto links = (*meta)["links"]; links.contains("website")) {
                     infoJson["website"] = links["website"].get<std::string>();

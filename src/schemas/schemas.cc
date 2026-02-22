@@ -33,10 +33,10 @@ nlohmann::json schemas::projectRegister = R"(
 }
 )"_json;
 
-nlohmann::json schemas::projectUpdate = R"(
+nlohmann::json schemas::projectUpdateSource = R"(
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "title": "Project update",
+    "title": "Project source update",
     "type": "object",
     "properties": {
         "repo": { "type": "string" },
@@ -44,6 +44,17 @@ nlohmann::json schemas::projectUpdate = R"(
         "path": { "type": "string" }
     },
     "required": ["repo", "branch", "path"]
+}
+)"_json;
+
+nlohmann::json schemas::projectUpdate = R"(
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Project update",
+    "type": "object",
+    "properties": {
+        "visibility": { "type": "string", "enum": [ "public", "private", "unlisted" ] }
+    }
 }
 )"_json;
 

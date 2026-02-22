@@ -22,7 +22,7 @@ namespace service {
     }
 
     Task<ProjectMemberRole> getUserAccessLevel(const Project project, const UserSession actor) {
-        if (actor.user.getValueOfRole() == ROLE_ADMIN) {
+        if (isAdmin(actor)) {
             co_return ProjectMemberRole::OWNER;
         }
         const auto actorMember = co_await global::database->getProjectMember(project.getValueOfId(), actor.username);
@@ -47,7 +47,7 @@ namespace service {
         // Move actor to first place
         std::ranges::stable_partition(results, [&](const ProjectMember &a) { return a.username == username; });
 
-        const auto canEdit = actor.user.getValueOfRole() == ROLE_ADMIN ||
+        const auto canEdit = isAdmin(actor) ||
                              actorMember && parseProjectMemberRole(actorMember->getValueOfRole()) == ProjectMemberRole::OWNER;
         const auto canLeave = co_await global::database->canUserLeaveProject(projectId, username);
 
@@ -55,7 +55,7 @@ namespace service {
     }
 
     Task<TaskResult<>> addProjectMember(const Project project, const UserSession actor, const UserProject member) {
-        if (actor.user.getValueOfRole() != ROLE_ADMIN) {
+        if (!isAdmin(actor)) {
             const auto actorMember(co_await global::database->getProjectMember(project.getValueOfId(), actor.username));
             if (!actorMember || parseProjectMemberRole(actorMember->getValueOfRole()) != ProjectMemberRole::OWNER) {
                 // TODO PermissionDenied exception
@@ -76,7 +76,7 @@ namespace service {
     }
 
     Task<TaskResult<>> removeProjectMember(const Project project, const UserSession actor, const UserProject member) {
-        if (actor.user.getValueOfRole() != ROLE_ADMIN && actor.username != member.getValueOfUserId()) {
+        if (!isAdmin(actor) && actor.username != member.getValueOfUserId()) {
             const auto actorMember(co_await global::database->getProjectMember(project.getValueOfId(), actor.username));
             if (!actorMember || parseProjectMemberRole(actorMember->getValueOfRole()) != ProjectMemberRole::OWNER) {
                 throw ApiException{Error::ErrForbidden, "insufficient_permissions"};

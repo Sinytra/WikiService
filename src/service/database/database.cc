@@ -163,6 +163,7 @@ namespace service {
                 "    AND ((cast($2 as varchar) IS NULL OR $2 = '' OR type = ANY (STRING_TO_ARRAY($2, ',')))))"
                 "    AND EXISTS(SELECT * FROM deployment WHERE project_id = project.id AND active = true)"
                 "    AND NOT is_virtual"
+                "    AND visibility = 'public'"
                 "    " + sortQuery +
                 "),"
                 "     total_count AS ("

@@ -7,6 +7,7 @@ namespace schemas {
 
     extern nlohmann::json systemConfig;
     extern nlohmann::json projectRegister;
+    extern nlohmann::json projectUpdateSource;
     extern nlohmann::json projectUpdate;
     extern nlohmann::json projectMetadata;
     extern nlohmann::json folderMetadata;

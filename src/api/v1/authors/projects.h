@@ -17,13 +17,14 @@ namespace api::v1 {
         // Public
         ADD_METHOD_TO(ProjectsController::greet,                "/",                        drogon::Get);
         ADD_METHOD_TO(ProjectsController::create,               "/api/v1/dev/projects",     drogon::Post, drogon::Options,   "PublicFilter");
-        ADD_METHOD_TO(ProjectsController::update,               "/api/v1/dev/projects",     drogon::Put, drogon::Options,    "PublicFilter");
+        ADD_METHOD_TO(ProjectsController::updateSource,         "/api/v1/dev/projects",     drogon::Put, drogon::Options,    "PublicFilter");
         // Internal
         ADD_METHOD_TO(ProjectsController::listIDs,              "/api/v1/projects",         drogon::Get,  "AuthFilter");
         ADD_METHOD_TO(ProjectsController::getProjects,          "/api/v1/projects/bulk",    drogon::Post, "AuthFilter");
         // Private
         ADD_METHOD_TO(ProjectsController::listUserProjects, "/api/v1/dev/projects",                             drogon::Get,    "AuthFilter");
         ADD_METHOD_TO(ProjectsController::getProject,       "/api/v1/dev/projects/{1:id}",                      drogon::Get,    "AuthFilter");
+        ADD_METHOD_TO(ProjectsController::update,           "/api/v1/dev/projects/{1:id}",                      drogon::Put,    "AuthFilter");
         ADD_METHOD_TO(ProjectsController::remove,           "/api/v1/dev/projects/{1:id}",                      drogon::Delete, "AuthFilter");
         ADD_METHOD_TO(ProjectsController::deployProject,    "/api/v1/dev/projects/{1:id}/deploy",               drogon::Post,   "AuthFilter");
         ADD_METHOD_TO(ProjectsController::listMembers,      "/api/v1/dev/projects/{1:id}/members",              drogon::Get,    "AuthFilter");
@@ -47,7 +48,7 @@ namespace api::v1 {
 
         drogon::Task<> greet(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback) const;
         drogon::Task<> create(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback) const;
-        drogon::Task<> update(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback) const;
+        drogon::Task<> updateSource(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback) const;
 
         drogon::Task<> listIDs(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback) const;
         drogon::Task<> getProjects(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback) const;
@@ -55,6 +56,8 @@ namespace api::v1 {
         drogon::Task<> listUserProjects(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback) const;
         drogon::Task<> getProject(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
                                   std::string id) const;
+        drogon::Task<> update(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
+                              std::string id) const;
         drogon::Task<> remove(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
                               std::string id) const;
         drogon::Task<> deployProject(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,

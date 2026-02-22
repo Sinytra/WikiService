@@ -1,7 +1,6 @@
 #include "docs.h"
 #include "../error.h"
 
-#include <drogon/HttpClient.h>
 #include <models/Project.h>
 #include <service/util.h>
 #include <string>
@@ -18,7 +17,7 @@ namespace api::v1 {
     Task<> DocsController::project(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
                                    const std::string project) const {
         const auto version = req->getOptionalParameter<std::string>("version");
-        const auto resolved = co_await BaseProjectController::getProject(project, version, std::nullopt);
+        const auto resolved = co_await BaseProjectController::getProject(req, project, version, std::nullopt);
         requireNonVirtual(resolved);
 
         if (version && !co_await resolved->hasVersion(*version)) {
@@ -73,7 +72,7 @@ namespace api::v1 {
     }
 
     Task<> DocsController::asset(HttpRequestPtr req, std::function<void(const HttpResponsePtr &)> callback, std::string project) const {
-        const auto resolved = co_await BaseProjectController::getProject(project, req->getOptionalParameter<std::string>("version"), std::nullopt);
+        const auto resolved = co_await BaseProjectController::getProject(req, project, req->getOptionalParameter<std::string>("version"), std::nullopt);
         requireNonVirtual(resolved);
 
         std::string prefix = std::format("/api/v1/docs/{}/asset/", project);
