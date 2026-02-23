@@ -66,9 +66,9 @@ namespace service {
         });
     }
 
-    Task<std::vector<std::string>> Database::getProjectIDs() const {
+    Task<std::vector<std::string>> Database::getPublicProjectIDs() const {
         // language=postgresql
-        static constexpr auto query = "SELECT id FROM project";
+        static constexpr auto query = "SELECT id FROM project WHERE visibility = 'public'";
 
         const auto res = co_await handleDatabaseOperation([](const DbClientPtr &client) -> Task<std::vector<std::string>> {
             std::vector<std::string> ids;

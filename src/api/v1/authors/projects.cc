@@ -38,7 +38,7 @@ namespace api::v1 {
     }
 
     Task<> ProjectsController::listIDs(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback) const {
-        const auto ids = co_await global::database->getProjectIDs();
+        const auto ids = co_await global::database->getPublicProjectIDs();
 
         callback(jsonResponse(ids));
     }

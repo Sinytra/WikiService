@@ -82,7 +82,7 @@ namespace service {
         drogon::orm::DbClientPtr getDbClientPtr() const override;
 
         // Projects
-        drogon::Task<std::vector<std::string>> getProjectIDs() const;
+        drogon::Task<std::vector<std::string>> getPublicProjectIDs() const;
         drogon::Task<PaginatedData<AdminProjectData>> getAllProjects(std::string searchQuery, int page) const;
         drogon::Task<TaskResult<Project>> createProject(const Project &project) const;
         drogon::Task<TaskResult<>> removeProject(const std::string &id) const;

@@ -60,7 +60,7 @@ namespace git {
 
             // Log the clean line
             if (!line.empty()) {
-                logger->debug("{}: {}", logProgram, line);
+                logger->trace("{}: {}", logProgram, line);
             }
 
             // Remove line from buffer
