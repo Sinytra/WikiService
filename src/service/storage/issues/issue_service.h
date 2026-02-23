@@ -1,7 +1,7 @@
 #pragma once
 
 #include "issues.h"
-#include <cache.h>
+#include <service/cache.h>
 #include <service/project/project.h>
 
 namespace service {
