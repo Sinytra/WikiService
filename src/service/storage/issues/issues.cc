@@ -6,12 +6,12 @@ using namespace drogon;
 
 namespace service {
     // clang-format off
-    ENUM_FROM_TO_STR(ProjectIssueLevel,
+    DEFINE_ENUM(ProjectIssueLevel,
         {ProjectIssueLevel::WARNING, "warning"},
         {ProjectIssueLevel::ERROR, "error"}
     )
 
-    ENUM_FROM_TO_STR(ProjectIssueType,
+    DEFINE_ENUM(ProjectIssueType,
         {ProjectIssueType::META, "meta"},
         {ProjectIssueType::FILE, "file"},
         {ProjectIssueType::GIT_CLONE, "git_clone"},
@@ -21,7 +21,7 @@ namespace service {
         {ProjectIssueType::INTERNAL, "internal"}
     )
 
-    ENUM_FROM_TO_STR(ProjectError,
+    DEFINE_ENUM(ProjectError,
         {ProjectError::OK, "ok"},
         {ProjectError::REQUIRES_AUTH, "requires_auth"},
         {ProjectError::NO_REPOSITORY, "no_repository"},

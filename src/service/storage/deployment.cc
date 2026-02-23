@@ -51,7 +51,7 @@ Error copyProjectFiles(const fs::path &docsRoot, const fs::path &dest, const std
 
 namespace service {
     // clang-format off
-    ENUM_TO_STR(DeploymentStatus,
+    DEFINE_ENUM(DeploymentStatus,
         {DeploymentStatus::CREATED, "created"},
         {DeploymentStatus::LOADING, "loading"},
         {DeploymentStatus::SUCCESS, "success"},

@@ -7,6 +7,7 @@
 #include <regex>
 
 using namespace drogon;
+using namespace drogon_model::postgres;
 using namespace logging;
 using namespace service;
 namespace fs = std::filesystem;
@@ -254,16 +255,20 @@ std::optional<JsonValidationError> validateJson(const nlohmann::json &schema, co
     }
 }
 
-Json::Value projectToJson(const drogon_model::postgres::Project &project, const bool verbose) {
+Json::Value projectToJson(const Project &project, const bool verbose) {
     Json::Value json = project.toJson();
     json["platforms"] = parseJsonString(project.getValueOfPlatforms()).value_or(Json::Value());
     json.removeMember("search_vector");
-    if (!verbose) {
+    if (verbose) {
+        json["flags"] =
+            project.getFlags() ? parseJsonString(project.getValueOfFlags()).value_or(Json::Value()) : Json::Value(Json::arrayValue);
+    } else {
         if (!project.getValueOfIsPublic()) {
             json.removeMember("source_repo");
         }
         json.removeMember("source_path");
         json.removeMember("source_branch");
+        json.removeMember("flags");
     }
     return json;
 }
@@ -273,13 +278,9 @@ std::string strToLower(std::string copy) {
     return copy;
 }
 
-std::string formatDate(const trantor::Date &date) {
-    return date.toCustomFormattedString("%Y-%m-%d");
-}
+std::string formatDate(const trantor::Date &date) { return date.toCustomFormattedString("%Y-%m-%d"); }
 
-std::string formatDateTime(const trantor::Date &date) {
-    return date.toCustomFormattedString("%Y-%m-%d %H:%M:%S");
-}
+std::string formatDateTime(const trantor::Date &date) { return date.toCustomFormattedString("%Y-%m-%d %H:%M:%S"); }
 
 std::string formatDateTimeISO(const std::string &databaseData) {
     return trantor::Date::fromDbString(databaseData).toCustomFormattedString("%Y-%m-%dT%H:%M:%SZ");
@@ -290,20 +291,13 @@ bool isSubpath(fs::path path, fs::path base) {
         path = fs::canonical(path);
         base = fs::canonical(base);
 
-        const auto [it_base, it_path] = std::mismatch(
-            base.begin(), base.end(),
-            path.begin(), path.end()
-        );
+        const auto [it_base, it_path] = std::mismatch(base.begin(), base.end(), path.begin(), path.end());
         return it_base == base.end();
-    } catch (const fs::filesystem_error& e) {
+    } catch (const fs::filesystem_error &e) {
         return false;
     }
 }
 
-bool contains(const std::string& text, const std::string& pattern) {
-    return text.find(pattern) != std::string::npos;
-}
+bool contains(const std::string &text, const std::string &pattern) { return text.find(pattern) != std::string::npos; }
 
-nlohmann::json emptyStrNullable(const std::string &str) {
-    return str.empty() ? nlohmann::json(nullptr) : nlohmann::json(str);
-}
+nlohmann::json emptyStrNullable(const std::string &str) { return str.empty() ? nlohmann::json(nullptr) : nlohmann::json(str); }

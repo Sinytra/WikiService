@@ -14,16 +14,13 @@ namespace service {
     class ProjectDatabaseAccess;
 
     enum class FileType { UNKNOWN, DIR, FILE };
-    std::string enumToStr(FileType type);
-    FileType parseFileType(const std::string &type);
-    void to_json(nlohmann::json &j, const FileType &obj);
-    void from_json(const nlohmann::json &j, FileType &obj);
+    DECLARE_ENUM(FileType);
 
     enum class ProjectVisibility { PUBLIC, UNLISTED, PRIVATE, UNKNOWN };
-    std::string enumToStr(ProjectVisibility type);
-    ProjectVisibility parseProjectVisibility(const std::string &type);
-    void to_json(nlohmann::json &j, const ProjectVisibility &obj);
-    void from_json(const nlohmann::json &j, ProjectVisibility &obj);
+    DECLARE_ENUM(ProjectVisibility);
+
+    enum class ProjectFlag { UNPUBLISHED, UNKNOWN };
+    DECLARE_ENUM(ProjectFlag);
 
     struct FileTreeEntry {
         std::string id;
@@ -112,6 +109,10 @@ namespace service {
         std::string name;
         std::string path;
     };
+
+    drogon::Task<> setFlag(Project project, ProjectFlag flag);
+    drogon::Task<TaskResult<>> removeFlag(Project project, ProjectFlag flag);
+    bool hasFlag(const Project& project, ProjectFlag flag);
 
     class ProjectBase {
     public:

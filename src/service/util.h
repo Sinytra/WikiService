@@ -65,7 +65,8 @@ struct TaskResult {
 
     TaskResult operator||(TaskResult const &rhs) const { return has_value() ? *this : rhs; }
 
-    operator TaskResult<>() const {return TaskResult(error_);}
+    // ReSharper disable once CppTemplateArgumentsCanBeDeduced
+    operator TaskResult<>() const { return TaskResult<>(error_); }
 
     friend struct nlohmann::adl_serializer<TaskResult>;
 
@@ -97,14 +98,13 @@ static std::unordered_map<V, K> reverse_map(const std::unordered_map<K, V> &m) {
     return r;
 }
 
-#define ENUM_TO_STR(name, ...)                                                                                                             \
-    std::string enumToStr(const name value) {                                                                                              \
-        const static std::unordered_map<name, std::string> map{__VA_ARGS__};                                                               \
-        const auto val = map.find(value);                                                                                                  \
-        return val == map.end() ? "unknown" : val->second;                                                                                 \
-    }
+#define DECLARE_ENUM(name)                                                                                                                 \
+    std::string enumToStr(name value);                                                                                                     \
+    name parse##name(const std::string &value);                                                                                            \
+    void to_json(nlohmann::json &j, const name &obj);                                                                                      \
+    void from_json(const nlohmann::json &j, name &obj);
 
-#define ENUM_FROM_TO_STR(name, ...)                                                                                                        \
+#define DEFINE_ENUM(name, ...)                                                                                                             \
     const static std::unordered_map<name, std::string> _##name##_map{__VA_ARGS__};                                                         \
     const static std::unordered_map _##name##_map_rev{reverse_map(_##name##_map)};                                                         \
     std::string enumToStr(const name value) {                                                                                              \
@@ -114,7 +114,9 @@ static std::unordered_map<V, K> reverse_map(const std::unordered_map<K, V> &m) {
     name parse##name(const std::string &str) {                                                                                             \
         const auto value = _##name##_map_rev.find(str);                                                                                    \
         return value == _##name##_map_rev.end() ? name::UNKNOWN : value->second;                                                           \
-    }
+    }                                                                                                                                      \
+    void to_json(nlohmann::json &j, const name &obj) { j = enumToStr(obj); }                                                               \
+    void from_json(const nlohmann::json &j, name &obj) { obj = parse##name(j); }
 
 template<typename T>
 concept JsonSerializable = requires(nlohmann::json &j, const T &obj) {

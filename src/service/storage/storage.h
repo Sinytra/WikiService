@@ -11,7 +11,7 @@ using namespace drogon_model::postgres;
 
 namespace service {
     enum class ProjectStatus { UNKNOWN, LOADING, HEALTHY, AT_RISK, ERROR };
-    std::string enumToStr(ProjectStatus status);
+    DECLARE_ENUM(ProjectStatus);
 
     std::string createProjectSetupKey(const Project &project);
 

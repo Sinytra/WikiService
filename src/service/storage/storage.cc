@@ -18,7 +18,7 @@ namespace service {
     inline std::string createProjectSetupKey(const Project &project) { return "setup:" + project.getValueOfId(); }
 
     // clang-format off
-    ENUM_TO_STR(ProjectStatus,
+    DEFINE_ENUM(ProjectStatus,
         {ProjectStatus::LOADING, "loading"},
         {ProjectStatus::HEALTHY, "healthy"},
         {ProjectStatus::AT_RISK, "at_risk"},

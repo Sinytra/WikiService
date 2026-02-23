@@ -86,10 +86,7 @@ std::string formatEditUrl(const Project &project, const std::string &filePath) {
 }
 
 namespace service {
-    ENUM_FROM_TO_STR(FileType, {FileType::FILE, "file"}, {FileType::DIR, "dir"})
-
-    void to_json(nlohmann::json &j, const FileType &obj) { j = enumToStr(obj); }
-    void from_json(const nlohmann::json &j, FileType &obj) { obj = parseFileType(j); }
+    DEFINE_ENUM(FileType, {FileType::FILE, "file"}, {FileType::DIR, "dir"})
 
     FolderMetadata ResolvedProject::getFolderMetadata(const fs::path &path) const {
         FolderMetadata metadata;

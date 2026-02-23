@@ -1,2 +1,4 @@
 ALTER TABLE project
-    ADD COLUMN visibility varchar(255) not null default 'public';
+    ALTER COLUMN platforms TYPE text,
+    ADD COLUMN visibility varchar(255) not null default 'public',
+    ADD COLUMN flags text;

@@ -60,6 +60,7 @@ class Project
         static const std::string _modid;
         static const std::string _is_virtual;
         static const std::string _visibility;
+        static const std::string _flags;
     };
 
     static const int primaryKeyNumber;
@@ -235,8 +236,18 @@ class Project
     void setVisibility(const std::string &pVisibility) noexcept;
     void setVisibility(std::string &&pVisibility) noexcept;
 
+    /**  For column flags  */
+    ///Get the value of the column flags, returns the default value if the column is null
+    const std::string &getValueOfFlags() const noexcept;
+    ///Return a shared_ptr object pointing to the column const value, or an empty shared_ptr object if the column is null
+    const std::shared_ptr<std::string> &getFlags() const noexcept;
+    ///Set the value of the column flags
+    void setFlags(const std::string &pFlags) noexcept;
+    void setFlags(std::string &&pFlags) noexcept;
+    void setFlagsToNull() noexcept;
 
-    static size_t getColumnNumber() noexcept {  return 14;  }
+
+    static size_t getColumnNumber() noexcept {  return 15;  }
     static const std::string &getColumnName(size_t index) noexcept(false);
 
     Json::Value toJson() const;
@@ -275,6 +286,7 @@ class Project
     std::shared_ptr<std::string> modid_;
     std::shared_ptr<bool> isVirtual_;
     std::shared_ptr<std::string> visibility_;
+    std::shared_ptr<std::string> flags_;
     struct MetaData
     {
         const std::string colName_;
@@ -286,7 +298,7 @@ class Project
         const bool notNull_;
     };
     static const std::vector<MetaData> metaData_;
-    bool dirtyFlag_[14]={ false };
+    bool dirtyFlag_[15]={ false };
   public:
     static const std::string &sqlForFindingByPrimaryKey()
     {
@@ -378,6 +390,11 @@ class Project
         if(!dirtyFlag_[13])
         {
             needSelection=true;
+        }
+        if(dirtyFlag_[14])
+        {
+            sql += "flags,";
+            ++parametersCount;
         }
         if(parametersCount > 0)
         {
@@ -479,6 +496,11 @@ class Project
         else
         {
             sql +="default,";
+        }
+        if(dirtyFlag_[14])
+        {
+            n = snprintf(placeholderStr,sizeof(placeholderStr),"$%d,",placeholder++);
+            sql.append(placeholderStr, n);
         }
         if(parametersCount > 0)
         {

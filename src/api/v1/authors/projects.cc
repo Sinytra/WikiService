@@ -23,6 +23,7 @@ using namespace logging;
 
 using namespace drogon::orm;
 
+// TODO Move to service
 namespace api::v1 {
     ProjectsController::ProjectsController(const bool localEnv) : localEnv_(localEnv) {}
 
@@ -106,11 +107,15 @@ namespace api::v1 {
 
         auto validated = co_await validateProjectData(json, session.user, false, localEnv_);
         auto [project, platforms] = validated;
-        project.setIsCommunity(false);
 
         if (co_await global::database->existsForData(project.getValueOfId(), platforms)) {
             throw ApiException(Error::ErrBadRequest, "exists");
         }
+
+        project.setIsCommunity(false);
+        project.setVisibility(enumToStr(ProjectVisibility::UNLISTED));
+        const nlohmann::json flags{ProjectFlag::UNPUBLISHED};
+        project.setFlags(flags.dump());
 
         const auto result = co_await global::database->createProject(project);
         if (!result) {
@@ -265,6 +270,26 @@ namespace api::v1 {
 
         if (const auto result = co_await removeProjectMember(*project, session, *subjectMember); !result) {
             throw ApiException{result.error(), "Error removing member"};
+        }
+
+        callback(statusResponse(k200OK));
+    }
+
+    Task<> ProjectsController::removeFlag(const HttpRequestPtr req, const std::function<void(const HttpResponsePtr &)> callback,
+                                          const std::string id, const std::string flag) const {
+        assertNonEmptyParam(flag);
+        const auto session(co_await global::auth->getSession(req));
+
+        auto project(co_await BaseProjectController::getUserProject(session, id));
+        assertFound(project);
+
+        const auto parsedFlag = parseProjectFlag(flag);
+        if (parsedFlag == ProjectFlag::UNKNOWN) {
+            throw ApiException{Error::ErrBadRequest, "Unknown flag"};
+        }
+
+        if (const auto result = co_await service::removeFlag(*project, parsedFlag); !result) {
+            throw ApiException{result.error(), "Error removing project flag"};
         }
 
         callback(statusResponse(k200OK));

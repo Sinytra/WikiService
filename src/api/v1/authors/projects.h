@@ -30,6 +30,7 @@ namespace api::v1 {
         ADD_METHOD_TO(ProjectsController::listMembers,      "/api/v1/dev/projects/{1:id}/members",              drogon::Get,    "AuthFilter");
         ADD_METHOD_TO(ProjectsController::addMember,        "/api/v1/dev/projects/{1:id}/members",              drogon::Post,   "AuthFilter");
         ADD_METHOD_TO(ProjectsController::removeMember,     "/api/v1/dev/projects/{1:id}/members",              drogon::Delete, "AuthFilter");
+        ADD_METHOD_TO(ProjectsController::removeFlag,       "/api/v1/dev/projects/{1:id}/flags/{2:flag}",       drogon::Delete, "AuthFilter");
         // Content
         ADD_METHOD_TO(ProjectsController::getContentPages,  "/api/v1/dev/projects/{1:id}/content/pages",        drogon::Get,    "AuthFilter");
         ADD_METHOD_TO(ProjectsController::getContentTags,   "/api/v1/dev/projects/{1:id}/content/tags",         drogon::Get,    "AuthFilter");
@@ -69,6 +70,9 @@ namespace api::v1 {
                                  std::string id) const;
         drogon::Task<> removeMember(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
                                     std::string id) const;
+
+        drogon::Task<> removeFlag(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
+                                  std::string id, std::string flag) const;
 
         drogon::Task<> getContentPages(drogon::HttpRequestPtr req, std::function<void(const drogon::HttpResponsePtr &)> callback,
                                        std::string id) const;

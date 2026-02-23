@@ -7,9 +7,7 @@ using namespace drogon;
 using namespace drogon_model::postgres;
 
 namespace service {
-    ENUM_FROM_TO_STR(ProjectMemberRole, {ProjectMemberRole::OWNER, "owner"}, {ProjectMemberRole::MEMBER, "member"})
-    void to_json(nlohmann::json &j, const ProjectMemberRole &obj) { j = enumToStr(obj); }
-    void from_json(const nlohmann::json &j, ProjectMemberRole &obj) { obj = parseProjectMemberRole(j); }
+    DEFINE_ENUM(ProjectMemberRole, {ProjectMemberRole::OWNER, "owner"}, {ProjectMemberRole::MEMBER, "member"})
 
     Task<TaskResult<>> assignUserProject(const std::string username, const std::string id, const ProjectMemberRole role) {
         UserProject userProject;

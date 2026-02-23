@@ -10,5 +10,5 @@ namespace service {
         SUCCESS,
         ERROR
     };
-    std::string enumToStr(DeploymentStatus status);
+    DECLARE_ENUM(DeploymentStatus);
 }
